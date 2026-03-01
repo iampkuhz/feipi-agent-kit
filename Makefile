@@ -3,14 +3,17 @@
 # - `make validate`：校验单个 skill 目录
 # - `make list`：列出已有 skills
 # - `make install-links`：将本仓库 skills 软链接到用户目录
+# - `make install-project`：将本仓库 skills 拷贝到指定项目目录
 # - `make test`：按统一入口执行 skill 测试
 SHELL := /bin/bash
 SKILL ?=
 RESOURCES ?=
 TARGET ?=
 DIR ?=
+PROJECT ?=
+AGENT ?=
 
-.PHONY: new validate list install-links test
+.PHONY: new validate list install-links install-project test
 
 # 创建新 skill（默认优先 `skills/`，可切换到 `.agents/skills`）。
 # 示例：make new SKILL=gen-api-tests RESOURCES=scripts,references
@@ -41,6 +44,15 @@ list:
 # - AGENT=openclaw make install-links
 install-links:
 	./feipi-scripts/repo/install_skills_links.sh
+
+# 将仓库 `skills/` 下各 skill 复制安装到指定项目目录（覆盖式）。
+# 示例：
+# - make install-project PROJECT=/path/to/project
+# - AGENT=qwen make install-project PROJECT=/path/to/project
+# - make install-project PROJECT=/path/to/project AGENT=codex
+install-project:
+	@if [[ -z "$(PROJECT)" ]]; then echo "用法: make install-project PROJECT=<path> [AGENT=codex|qwen|qoder|coder|claudecode|openclaw]"; exit 1; fi
+	./feipi-scripts/repo/install_skills_project.sh "$(PROJECT)" $(if $(AGENT),--agent "$(AGENT)")
 
 # 统一执行 skill 测试入口。
 # 示例：

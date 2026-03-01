@@ -34,6 +34,33 @@ claudecode -> `~/.claude/skills`
 openclaw -> `$OPENCLAW_HOME/skills`（未设置时为 `~/.openclaw/skills`）
 未设置 AGENT -> `~/.agents/skills`
 
+## 安装 Skill（拷贝到项目目录）
+
+在仓库根目录执行：
+
+```bash
+make install-project PROJECT=/path/to/project
+```
+
+这会把 `skills/` 下的技能以“实际拷贝”的方式安装到项目目录（默认 `<project>/.agents/skills`），并覆盖同名 skill。
+如果 skill 脚本里通过 `$REPO_ROOT/...` 引用了仓库共享路径（例如 `feipi-scripts/video/*`），安装时也会复制到项目根目录下对应位置。
+
+可选示例：
+
+```bash
+AGENT=qwen make install-project PROJECT=/path/to/project
+```
+
+默认目录映射：
+
+codex -> `<project>/.codex/skills`
+qwen -> `<project>/.qwen/skills`
+qoder -> `<project>/.qoder/skills`
+coder -> `<project>/.coder/skills`
+claudecode -> `<project>/.claude/skills`
+openclaw -> `<project>/.openclaw/skills`
+未设置 AGENT -> `<project>/.agents/skills`
+
 ## 统一环境变量
 
 本仓库所有技能的环境变量模板统一维护在仓库根目录：
