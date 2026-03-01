@@ -20,6 +20,7 @@ make install-links
 可选示例：
 
 ```bash
+AGENT=qwen make install-links
 AGENT=qoder make install-links
 AGENT=openclaw make install-links
 ```
@@ -27,6 +28,7 @@ AGENT=openclaw make install-links
 默认目录映射：
 
 codex -> `$CODEX_HOME/skills`（未设置时为 `~/.codex/skills`）
+qwen -> `~/.qwen/skills`
 qoder -> `~/.qoder/skills`
 claudecode -> `~/.claude/skills`
 openclaw -> `$OPENCLAW_HOME/skills`（未设置时为 `~/.openclaw/skills`）

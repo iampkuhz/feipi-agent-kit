@@ -36,6 +36,7 @@ list:
 # 将仓库 `skills/` 下各 skill 软链接到目标目录（默认 ~/.agents/skills）。
 # 示例：
 # - make install-links
+# - AGENT=qwen make install-links
 # - AGENT=qoder make install-links
 # - AGENT=openclaw make install-links
 install-links:
