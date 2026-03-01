@@ -213,6 +213,13 @@ while IFS= read -r raw || [[ -n "$raw" ]]; do
     continue
   fi
 
+  if [[ "$text_path" == *" "* ]]; then
+    echo "[FAIL] $case_id 文本文件路径包含空格（text_path=$text_path）" >&2
+    echo "日志: $log_file" >&2
+    FAILED=$((FAILED + 1))
+    continue
+  fi
+
   if [[ -z "$run_dir" || ! -d "$run_dir" ]]; then
     echo "[FAIL] $case_id 未产出 URL 子目录 run_dir" >&2
     echo "日志: $log_file" >&2
@@ -387,8 +394,8 @@ EOF
     continue
   fi
 
-  if ! rg -q '背景知识补充（约2/3）|关键影响（约1/3）|122 条款是什么|此前条款 -> 当前条款|之前已经收上来的税如何处置|触发点 -> 作用机制 -> 受影响对象 -> 可观察结果' "$background_request_path"; then
-    echo "[FAIL] $case_id 第二次请求包缺少“背景优先 + 122/条款切换/税款处置 + 关键影响”约束" >&2
+  if ! rg -q '背景知识补充（约2/3）|关键影响（约1/3）|关键术语/人物/机构/事件|时间 \\+ 主体/机构 \\+ 关键动作 \\+ 直接结果 \\+ 含义|触发点 -> 作用机制 -> 受影响对象 -> 可观察结果' "$background_request_path"; then
+    echo "[FAIL] $case_id 第二次请求包缺少“背景优先 + 视频关键词 + 关键影响”约束" >&2
     echo "日志: $log_file" >&2
     FAILED=$((FAILED + 1))
     continue

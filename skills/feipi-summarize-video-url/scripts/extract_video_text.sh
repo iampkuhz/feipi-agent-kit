@@ -198,6 +198,54 @@ sanitize_key() {
   echo "$normalized"
 }
 
+sanitize_filename() {
+  local raw="$1"
+  local normalized
+
+  normalized="${raw// /_}"
+  normalized="$(printf "%s" "$normalized" | tr -s '_')"
+  if [[ -z "$normalized" ]]; then
+    echo "$raw"
+    return 0
+  fi
+
+  echo "$normalized"
+}
+
+rename_recent_files() {
+  local marker="$1"
+  local file dir base normalized newpath stem ext suffix
+
+  while IFS= read -r -d '' file; do
+    dir="$(dirname "$file")"
+    base="$(basename "$file")"
+    normalized="$(sanitize_filename "$base")"
+    if [[ "$normalized" == "$base" ]]; then
+      continue
+    fi
+
+    newpath="$dir/$normalized"
+    if [[ -e "$newpath" ]]; then
+      stem="${normalized%.*}"
+      ext="${normalized##*.}"
+      if [[ "$stem" == "$normalized" ]]; then
+        ext=""
+      fi
+      suffix=1
+      while [[ -e "$newpath" ]]; do
+        if [[ -n "$ext" ]]; then
+          newpath="$dir/${stem}_$suffix.$ext"
+        else
+          newpath="$dir/${stem}_$suffix"
+        fi
+        suffix=$((suffix + 1))
+      done
+    fi
+
+    mv "$file" "$newpath"
+  done < <(find "$RUN_DIR" -maxdepth 1 -type f -newer "$marker" -print0)
+}
+
 fallback_url_hash() {
   local url="$1"
 
@@ -336,7 +384,8 @@ run_mode() {
   local code=$?
   set -e
 
-  newest_txt="$(find "$RUN_DIR" -type f -name '*.txt' -newer "$marker" | sort | tail -n1 || true)"
+  rename_recent_files "$marker"
+  newest_txt="$(find "$RUN_DIR" -maxdepth 1 -type f -name '*.txt' -newer "$marker" | sort | tail -n1 || true)"
   rm -f "$marker"
 
   if [[ $code -eq 0 && -n "$newest_txt" ]]; then

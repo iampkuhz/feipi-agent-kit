@@ -1,5 +1,5 @@
 version: 1
 interface:
-  display_name: "视频 URL 两阶段总结（中文）"
+  display_name: "网页视频两阶段总结"
   short_description: "按来源提取时间戳文本，先交付结构化摘要，再补背景与影响分析。"
-  default_prompt: "请使用 feipi-summarize-video-url：先读取用户指令自动选择提取档位（明确高质量诉求走 accurate，否则 fast），提取带时间戳文本并生成 summary_request.md。第一轮先输出“摘要概述”（总述 + 结构化列表，合并时间线且仅用 00:00/HH:MM:SS 时间锚点）与“附件（原始视频链接 + 转写文本路径）”；随后继续生成 background_request.md，第二轮输出“相关影响和背景分析”（背景知识约 2/3，重点覆盖 122 条款/历史使用/此前条款/税款处置；影响约 1/3 且仅保留最关键 1-2 条）。"
+  default_prompt: "请使用 feipi-summarize-video-url：先读取用户指令自动选择提取档位（明确高质量诉求走 accurate，否则 fast），提取带时间戳文本并生成 summary_request.md。第一轮先输出“摘要概述”（总述 + 结构化列表，合并时间线且仅用 [MM:SS]/[HH:MM:SS] 时间锚点）与“附件（原始视频链接 + 转写文本路径）”；随后在同一轮回复继续生成 background_request.md，第二轮输出“相关影响和背景分析”（背景知识约 2/3，基于本次视频关键术语/人物/机构/事件逐条补充；影响约 1/3 且仅保留最关键 1-2 条），不得等待用户确认。"
