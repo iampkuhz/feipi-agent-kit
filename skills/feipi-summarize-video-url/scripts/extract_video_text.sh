@@ -24,6 +24,7 @@ URL=""
 OUT_ROOT_DIR="./tmp/video-text"
 RUN_DIR=""
 MODE="auto"
+AUTH_PRESENT="0"
 
 usage() {
   echo "用法: bash scripts/extract_video_text.sh <url> [output_root_dir] [auto|subtitle|whisper] [--instruction \"文本\"] [--quality auto|fast|accurate] [--check-deps]" >&2
@@ -168,6 +169,10 @@ WHISPER_PROFILE="$(resolve_whisper_profile "$QUALITY_HINT" "$INSTRUCTION_TEXT" |
 if [[ "$WHISPER_PROFILE" != "fast" && "$WHISPER_PROFILE" != "accurate" ]]; then
   echo "无法解析 whisper 档位，请检查 quality/instruction 输入。" >&2
   exit 1
+fi
+
+if [[ -n "${AGENT_CHROME_PROFILE:-}" || -n "${AGENT_YOUTUBE_COOKIE_FILE:-}" ]]; then
+  AUTH_PRESENT="1"
 fi
 
 detect_source() {
@@ -371,15 +376,24 @@ mkdir -p "$LOG_DIR"
 
 run_mode() {
   local mode="$1"
+  local auth_mode="${2:-auth}"
   local marker log_file newest_txt
+  local -a cmd_prefix=()
+
+  if [[ "$auth_mode" == "no_auth" ]]; then
+    cmd_prefix=(env AGENT_CHROME_PROFILE= AGENT_YOUTUBE_COOKIE_FILE=)
+    log_file="$LOG_DIR/${SOURCE}-${mode}-noauth.log"
+  else
+    log_file="$LOG_DIR/${SOURCE}-${mode}.log"
+  fi
+
   marker="$(mktemp "$RUN_DIR/.txt-marker.XXXXXX")"
-  log_file="$LOG_DIR/${SOURCE}-${mode}.log"
 
   set +e
   if [[ "$mode" == "whisper" ]]; then
-    bash "$DEP_SCRIPT" "$URL" "$RUN_DIR" "$mode" "$WHISPER_PROFILE" >"$log_file" 2>&1
+    "${cmd_prefix[@]}" bash "$DEP_SCRIPT" "$URL" "$RUN_DIR" "$mode" "$WHISPER_PROFILE" >"$log_file" 2>&1
   else
-    bash "$DEP_SCRIPT" "$URL" "$RUN_DIR" "$mode" >"$log_file" 2>&1
+    "${cmd_prefix[@]}" bash "$DEP_SCRIPT" "$URL" "$RUN_DIR" "$mode" >"$log_file" 2>&1
   fi
   local code=$?
   set -e
@@ -396,6 +410,23 @@ run_mode() {
   return 1
 }
 
+run_mode_with_fallback() {
+  local mode="$1"
+
+  if TEXT_FILE="$(run_mode "$mode" "auth")"; then
+    return 0
+  fi
+
+  if [[ "$SOURCE" == "youtube" && "$AUTH_PRESENT" -eq 1 ]]; then
+    echo "检测到 Cookie/浏览器认证可能导致失败，尝试无 Cookie 重试: mode=$mode" >&2
+    if TEXT_FILE="$(run_mode "$mode" "no_auth")"; then
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
 TEXT_FILE=""
 USED_MODE=""
 STRATEGY=""
@@ -403,27 +434,27 @@ STRATEGY=""
 if [[ "$MODE" == "auto" ]]; then
   if [[ "$WHISPER_PROFILE" == "accurate" ]]; then
     STRATEGY="whisper_first"
-    if TEXT_FILE="$(run_mode whisper)"; then
+    if run_mode_with_fallback whisper; then
       USED_MODE="whisper"
-    elif TEXT_FILE="$(run_mode subtitle)"; then
+    elif run_mode_with_fallback subtitle; then
       USED_MODE="subtitle"
     fi
   else
     STRATEGY="subtitle_first"
-    if TEXT_FILE="$(run_mode subtitle)"; then
+    if run_mode_with_fallback subtitle; then
       USED_MODE="subtitle"
-    elif TEXT_FILE="$(run_mode whisper)"; then
+    elif run_mode_with_fallback whisper; then
       USED_MODE="whisper"
     fi
   fi
 elif [[ "$MODE" == "subtitle" ]]; then
   STRATEGY="subtitle_only"
-  if TEXT_FILE="$(run_mode subtitle)"; then
+  if run_mode_with_fallback subtitle; then
     USED_MODE="subtitle"
   fi
 else
   STRATEGY="whisper_only"
-  if TEXT_FILE="$(run_mode whisper)"; then
+  if run_mode_with_fallback whisper; then
     USED_MODE="whisper"
   fi
 fi

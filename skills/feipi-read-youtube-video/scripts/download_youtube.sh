@@ -19,8 +19,9 @@ set -euo pipefail
 # - 默认不提示；仅在触发 bot 检测时给出配置建议
 #
 # 网络回退配置：
-# - 先尝试直连 YouTube
-# - 直连失败后默认尝试代理 http://127.0.0.1:7890
+# - 若检测到本地代理端口可用，优先使用代理 http://127.0.0.1:<port>
+# - 代理失败再回退直连
+# - 未检测到代理时，先尝试直连，再回退代理
 # - 可通过 AGENT_VIDEO_PROXY_PORT 覆盖默认端口
 
 URL="${1:-}"
@@ -130,6 +131,22 @@ build_proxy_url() {
   echo "$YT_PROXY_SCHEME_DEFAULT://$YT_PROXY_HOST_DEFAULT:$port"
 }
 
+is_proxy_port_listening() {
+  local port="$1"
+
+  if command -v nc >/dev/null 2>&1; then
+    nc -z -w 1 "$YT_PROXY_HOST_DEFAULT" "$port" >/dev/null 2>&1
+    return $?
+  fi
+
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1
+    return $?
+  fi
+
+  return 1
+}
+
 enable_proxy_for_yt_dlp() {
   local proxy_url="$1"
 
@@ -201,14 +218,26 @@ print_proxy_port_guidance() {
 }
 
 ensure_youtube_network_ready() {
-  local fallback_proxy
+  local fallback_proxy proxy_port
+
+  proxy_port="${AGENT_VIDEO_PROXY_PORT:-$YT_PROXY_PORT_DEFAULT}"
+  fallback_proxy="$(build_proxy_url)"
+
+  if is_proxy_port_listening "$proxy_port"; then
+    echo "检测到本地代理端口可用，优先尝试代理: $fallback_proxy" >&2
+    if probe_youtube_connectivity "$fallback_proxy"; then
+      enable_proxy_for_yt_dlp "$fallback_proxy"
+      echo "已启用代理下载: $fallback_proxy" >&2
+      return 0
+    fi
+    echo "代理可用但访问 YouTube 失败，回退直连探测。" >&2
+  fi
 
   if probe_youtube_connectivity; then
     YT_NETWORK_ROUTE="direct"
     return 0
   fi
 
-  fallback_proxy="$(build_proxy_url)"
   echo "检测到 YouTube 直连不可用，开始尝试代理: $fallback_proxy" >&2
   if probe_youtube_connectivity "$fallback_proxy"; then
     enable_proxy_for_yt_dlp "$fallback_proxy"

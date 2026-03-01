@@ -401,6 +401,20 @@ EOF
     continue
   fi
 
+  if ! rg -q '视频外公开资料' "$background_request_path" || ! rg -q '来源清单' "$background_request_path"; then
+    echo "[FAIL] $case_id 第二次请求包缺少“外部背景 + 来源清单”约束" >&2
+    echo "日志: $log_file" >&2
+    FAILED=$((FAILED + 1))
+    continue
+  fi
+
+  if ! rg -q '新闻原文|原始文件' "$background_request_path"; then
+    echo "[FAIL] $case_id 第二次请求包缺少“新闻原文/原始文件”约束" >&2
+    echo "日志: $log_file" >&2
+    FAILED=$((FAILED + 1))
+    continue
+  fi
+
   if ! rg -q '关键不确定性|后续观察点是否有诉讼' "$background_request_path"; then
     echo "[FAIL] $case_id 第二次请求包缺少“禁止空洞小节”约束" >&2
     echo "日志: $log_file" >&2
