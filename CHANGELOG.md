@@ -11,3 +11,7 @@
 - 优化 `feipi-read-youtube-video`：检测到本地代理端口时优先使用代理下载，失败回退直连。
 - 优化 `feipi-summarize-video-url`：新增转写执行严格性约束，禁止自动下载或切换 whisper 模型。
 - 优化 `feipi-summarize-video-url`：禁止手写 whisper-cli 参数并提示 `-ot` 误用会触发 `stoi` 错误。
+- 优化 `feipi-read-bilibili-video`：默认直连，直连失败且代理端口可用时才使用代理。
+- 优化 `feipi-summarize-video-url`：强制经 `extract_video_text.sh` 取转写并校验四个产物非空，避免直接调用依赖脚本。
+- 修复 `feipi-summarize-video-url`：无 Cookie 重试时避免 `cmd_prefix` 未定义导致脚本失败。
+- `feipi-gen-skills`：变更记录规则极简化。

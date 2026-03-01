@@ -8,6 +8,7 @@ description: 用于下载 Bilibili 视频或音频并保存到本地目录，支
 ## 核心目标
 
 稳定下载 Bilibili 视频/音频，输出可验证结果，并在失败时给出可执行修复路径。
+默认不使用代理：先直连，直连失败后才尝试本地代理端口（若可用）。
 
 ## 触发条件
 
@@ -62,6 +63,7 @@ curl -L --fail \
 2. 关键变量：
 - `AGENT_CHROME_PROFILE`：从浏览器 profile 读取登录态
 - `AGENT_BILIBILI_COOKIE_FILE`：使用 cookies.txt 文件登录态（Netscape Cookie File 格式）
+- `AGENT_VIDEO_PROXY_PORT`：可选代理端口（Bilibili 默认不走代理；仅直连失败时才尝试）
 
 说明：脚本默认不提示配置；仅在遇到权限/风控拦截时才提醒配置认证参数。  
 `AGENT_CHROME_PROFILE` 与 `AGENT_BILIBILI_COOKIE_FILE` 同时存在时，默认优先使用 cookie 文件。  
@@ -130,6 +132,12 @@ bash scripts/download_bilibili.sh "<bilibili_url>" "./downloads" whisper
 
 3. 下载成功但无音频/无视频
 - 优先改用默认 `video` 模式重试。
+
+3.1 直连失败时使用代理（Bilibili 默认不走代理）：
+```bash
+AGENT_VIDEO_PROXY_PORT=7891 bash scripts/download_bilibili.sh "<bilibili_url>" "./downloads" dryrun
+```
+说明：仅当直连失败且代理端口可用时才会走代理；否则保持直连。
 
 4. `subtitle` 模式提示无字幕
 - 先手工执行 `yt-dlp --skip-download --list-subs "<bilibili_url>"` 查看真实语言标签。

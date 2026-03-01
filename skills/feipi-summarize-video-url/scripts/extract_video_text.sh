@@ -378,10 +378,10 @@ run_mode() {
   local mode="$1"
   local auth_mode="${2:-auth}"
   local marker log_file newest_txt
-  local -a cmd_prefix=()
+  local use_no_auth="0"
 
   if [[ "$auth_mode" == "no_auth" ]]; then
-    cmd_prefix=(env AGENT_CHROME_PROFILE= AGENT_YOUTUBE_COOKIE_FILE=)
+    use_no_auth="1"
     log_file="$LOG_DIR/${SOURCE}-${mode}-noauth.log"
   else
     log_file="$LOG_DIR/${SOURCE}-${mode}.log"
@@ -391,9 +391,17 @@ run_mode() {
 
   set +e
   if [[ "$mode" == "whisper" ]]; then
-    "${cmd_prefix[@]}" bash "$DEP_SCRIPT" "$URL" "$RUN_DIR" "$mode" "$WHISPER_PROFILE" >"$log_file" 2>&1
+    if [[ "$use_no_auth" == "1" ]]; then
+      env AGENT_CHROME_PROFILE= AGENT_YOUTUBE_COOKIE_FILE= bash "$DEP_SCRIPT" "$URL" "$RUN_DIR" "$mode" "$WHISPER_PROFILE" >"$log_file" 2>&1
+    else
+      bash "$DEP_SCRIPT" "$URL" "$RUN_DIR" "$mode" "$WHISPER_PROFILE" >"$log_file" 2>&1
+    fi
   else
-    "${cmd_prefix[@]}" bash "$DEP_SCRIPT" "$URL" "$RUN_DIR" "$mode" >"$log_file" 2>&1
+    if [[ "$use_no_auth" == "1" ]]; then
+      env AGENT_CHROME_PROFILE= AGENT_YOUTUBE_COOKIE_FILE= bash "$DEP_SCRIPT" "$URL" "$RUN_DIR" "$mode" >"$log_file" 2>&1
+    else
+      bash "$DEP_SCRIPT" "$URL" "$RUN_DIR" "$mode" >"$log_file" 2>&1
+    fi
   fi
   local code=$?
   set -e

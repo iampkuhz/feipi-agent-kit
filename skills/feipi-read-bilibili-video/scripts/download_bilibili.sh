@@ -17,6 +17,11 @@ set -euo pipefail
 # - 支持 AGENT_CHROME_PROFILE（浏览器 profile）
 # - 支持 AGENT_BILIBILI_COOKIE_FILE（cookies.txt 文件，Netscape 格式）
 # - 默认不提示；仅在触发权限/风控问题时给出配置建议
+#
+# 网络回退配置（与 YouTube 相反）：
+# - 默认不使用代理，优先直连
+# - 直连失败后，若检测到本地代理端口可用，则尝试代理
+# - 可通过 AGENT_VIDEO_PROXY_PORT 覆盖默认端口
 
 URL="${1:-}"
 OUT_DIR_RAW="${2:-./downloads}"
@@ -46,8 +51,17 @@ YT_COMMON_LIB="$REPO_ROOT/feipi-scripts/video/yt_dlp_common.sh"
 AGENT_CHROME_PROFILE="${AGENT_CHROME_PROFILE:-}"
 AGENT_BILIBILI_COOKIE_FILE_RAW="${AGENT_BILIBILI_COOKIE_FILE:-}"
 AGENT_BILIBILI_COOKIE_FILE="$(normalize_out_dir "$AGENT_BILIBILI_COOKIE_FILE_RAW")"
+AGENT_VIDEO_PROXY_PORT="${AGENT_VIDEO_PROXY_PORT:-}"
 BILI_AUTH_HIT=0
 WHISPER_AUTO_ACCURATE_MAX_SEC=480
+YT_CONNECT_TEST_URL="https://www.bilibili.com"
+YT_CONNECT_TIMEOUT_SEC=8
+YT_PROXY_SCHEME_DEFAULT="http"
+YT_PROXY_HOST_DEFAULT="127.0.0.1"
+YT_PROXY_PORT_DEFAULT="7890"
+YT_DLP_NETWORK_ARGS=()
+ACTIVE_PROXY_URL=""
+YT_NETWORK_ROUTE="direct"
 
 if [[ -z "$URL" ]]; then
   echo "用法: bash scripts/download_bilibili.sh <url> [output_dir] [video|audio|dryrun|subtitle|whisper] [auto|fast|accurate]" >&2
@@ -56,6 +70,22 @@ fi
 
 if [[ "$WHISPER_PROFILE" != "auto" && "$WHISPER_PROFILE" != "fast" && "$WHISPER_PROFILE" != "accurate" ]]; then
   echo "whisper_profile 仅支持 auto|fast|accurate，当前: $WHISPER_PROFILE" >&2
+  exit 1
+fi
+
+is_valid_port() {
+  local value="${1:-}"
+  if [[ ! "$value" =~ ^[0-9]+$ ]]; then
+    return 1
+  fi
+  if (( value < 1 || value > 65535 )); then
+    return 1
+  fi
+  return 0
+}
+
+if [[ -n "$AGENT_VIDEO_PROXY_PORT" ]] && ! is_valid_port "$AGENT_VIDEO_PROXY_PORT"; then
+  echo "AGENT_VIDEO_PROXY_PORT 必须是 1~65535 的整数，当前: $AGENT_VIDEO_PROXY_PORT" >&2
   exit 1
 fi
 
@@ -80,6 +110,124 @@ if [[ -n "$AGENT_BILIBILI_COOKIE_FILE" ]]; then
   fi
   # 若同时配置 profile 与 cookie 文件，优先 cookie 文件，便于跨主机复用。
   YT_COMMON_AUTH_ARGS=(--cookies "$AGENT_BILIBILI_COOKIE_FILE")
+fi
+
+build_proxy_url() {
+  local port
+  port="${AGENT_VIDEO_PROXY_PORT:-$YT_PROXY_PORT_DEFAULT}"
+  echo "$YT_PROXY_SCHEME_DEFAULT://$YT_PROXY_HOST_DEFAULT:$port"
+}
+
+is_proxy_port_listening() {
+  local port="$1"
+
+  if command -v nc >/dev/null 2>&1; then
+    nc -z -w 1 "$YT_PROXY_HOST_DEFAULT" "$port" >/dev/null 2>&1
+    return $?
+  fi
+
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1
+    return $?
+  fi
+
+  return 1
+}
+
+enable_proxy_for_yt_dlp() {
+  local proxy_url="$1"
+
+  if [[ -z "$proxy_url" ]]; then
+    return 1
+  fi
+
+  if [[ "$ACTIVE_PROXY_URL" == "$proxy_url" ]]; then
+    return 0
+  fi
+
+  YT_COMMON_ARGS+=(--proxy "$proxy_url")
+  YT_DLP_NETWORK_ARGS=(--proxy "$proxy_url")
+  ACTIVE_PROXY_URL="$proxy_url"
+  YT_NETWORK_ROUTE="proxy"
+}
+
+probe_bilibili_connectivity() {
+  local proxy_url="${1:-}"
+  local -a curl_cmd
+
+  if ! command -v curl >/dev/null 2>&1; then
+    local -a ytdlp_cmd
+    ytdlp_cmd=(
+      yt-dlp
+      --skip-download
+      --no-playlist
+      --socket-timeout "$YT_CONNECT_TIMEOUT_SEC"
+    )
+    if [[ -n "$proxy_url" ]]; then
+      ytdlp_cmd+=(--proxy "$proxy_url")
+    fi
+    ytdlp_cmd+=(--print id "https://www.bilibili.com/video/BV1Q5411x7LJ")
+    "${ytdlp_cmd[@]}" >/dev/null 2>&1
+    return $?
+  fi
+
+  curl_cmd=(
+    curl
+    --silent
+    --show-error
+    --head
+    --location
+    --max-time "$YT_CONNECT_TIMEOUT_SEC"
+    --connect-timeout "$YT_CONNECT_TIMEOUT_SEC"
+  )
+  if [[ -n "$proxy_url" ]]; then
+    curl_cmd+=(--proxy "$proxy_url")
+  fi
+  curl_cmd+=("$YT_CONNECT_TEST_URL")
+
+  "${curl_cmd[@]}" >/dev/null 2>&1
+}
+
+print_proxy_port_guidance() {
+  local tested_proxy="$1"
+  local retry_cmd
+
+  if [[ "$MODE" == "whisper" ]]; then
+    retry_cmd="AGENT_VIDEO_PROXY_PORT=7891 bash scripts/download_bilibili.sh \"$URL\" \"$OUT_DIR_RAW\" \"$MODE\" \"$WHISPER_PROFILE\""
+  else
+    retry_cmd="AGENT_VIDEO_PROXY_PORT=7891 bash scripts/download_bilibili.sh \"$URL\" \"$OUT_DIR_RAW\" \"$MODE\""
+  fi
+
+  echo "直连 Bilibili 失败，且本地代理不可用: $tested_proxy" >&2
+  echo "如需走代理，请提供可用端口后重试，例如:" >&2
+  echo "  $retry_cmd" >&2
+}
+
+ensure_bilibili_network_ready() {
+  local fallback_proxy proxy_port
+
+  if probe_bilibili_connectivity; then
+    YT_NETWORK_ROUTE="direct"
+    return 0
+  fi
+
+  proxy_port="${AGENT_VIDEO_PROXY_PORT:-$YT_PROXY_PORT_DEFAULT}"
+  fallback_proxy="$(build_proxy_url)"
+  if is_proxy_port_listening "$proxy_port"; then
+    echo "直连失败，检测到代理端口可用，尝试代理: $fallback_proxy" >&2
+    if probe_bilibili_connectivity "$fallback_proxy"; then
+      enable_proxy_for_yt_dlp "$fallback_proxy"
+      echo "已启用代理下载: $fallback_proxy" >&2
+      return 0
+    fi
+  fi
+
+  print_proxy_port_guidance "$fallback_proxy"
+  return 1
+}
+
+if ! ensure_bilibili_network_ready; then
+  exit 1
 fi
 
 print_auth_guidance() {
@@ -274,4 +422,8 @@ case "$MODE" in
     ;;
 esac
 
+echo "network_route=$YT_NETWORK_ROUTE"
+if [[ -n "$ACTIVE_PROXY_URL" ]]; then
+  echo "proxy_url=$ACTIVE_PROXY_URL"
+fi
 echo "完成: mode=$MODE, output_dir=$OUT_DIR"
