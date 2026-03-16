@@ -1,5 +1,5 @@
-version: 1
+version: 2
 interface:
   display_name: "Skill 生成与重构（中文）"
-  short_description: "按仓库规范创建或更新 skill，并产出可验证交付。"
-  default_prompt: "请使用 feipi-gen-skills：先探索任务目标与边界并确定新 skill 目录（本仓库内 -> .agents/skills；默认优先 skills/），再规划改动文件；实现时同步更新 SKILL.md 与 agents/openai.yaml；最后执行 make validate 并汇报验证结果与剩余风险。"
+  short_description: "按仓库规范创建或更新 skill，同步维护版本号与可追溯变更记录。"
+  default_prompt: "请使用 feipi-gen-skills：先探索任务目标与边界并确定新 skill 目录（本仓库内 -> .agents/skills；默认优先 skills/），再规划改动文件；实现时同步更新 SKILL.md、agents/openai.yaml 以及必要的 references/scripts。若目标 skill 被修改，必须递增该 skill 的 agents/openai.yaml 顶层 version，并在 CHANGELOG.md 对应日期下用“skill 名 + version + 合并摘要”写清本次更新；同一天同一个 skill 只能升级一个版本，多次修改要合并到同一条记录；changelog 冒号后的摘要保持单行短语，建议不超过 18 个汉字、最多不超过 24 个汉字；最后执行 make validate 并汇报验证结果与剩余风险。"

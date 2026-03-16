@@ -70,3 +70,10 @@ openclaw -> `<project>/.openclaw/skills`
 ```
 
 后续新增或修改环境变量时，统一更新此文件，不再按 skill 分散维护。
+
+## 版本维护
+
+每个 skill 的版本号独立维护在各自的 `agents/openai.yaml` 顶层 `version` 字段。
+后续只要更新某个 skill 本身，就需要同步递增该版本号，并在仓库根目录 `CHANGELOG.md` 的对应日期下按“skill + version”写清合并后的更新内容。
+同一天内同一个 skill 只升级一个版本；若当天多次修改，需要汇总到同一条记录中。
+changelog 的摘要保持单行短语，建议不超过 18 个汉字、最多不超过 24 个汉字。

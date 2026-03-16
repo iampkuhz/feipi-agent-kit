@@ -1,4 +1,4 @@
-version: 1
+version: 2
 interface:
   display_name: "创新提案交底书生成（中文）"
   short_description: "把零散创新点整理成固定模板交底书，覆盖必填信息确认、图示协同与格式校验。"

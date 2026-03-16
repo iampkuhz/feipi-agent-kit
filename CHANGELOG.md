@@ -1,8 +1,8 @@
 # 变更记录
 
 ## 2026-03-16
-- `feipi-gen-skills`：补强创建与迭代流程。
-- `feipi-gen-innovation-disclosure`：重构交底书流程。
+- `feipi-gen-skills` v2：补强版本规则与摘要约束。
+- `feipi-gen-innovation-disclosure` v2：重构交底书流程与验收规则。
 
 ## 2026-03-01
 - 安装脚本支持 `AGENT=qwen`。
