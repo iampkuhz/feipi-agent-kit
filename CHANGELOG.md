@@ -1,8 +1,9 @@
 # 变更记录
 
 ## 2026-03-16
-- `feipi-gen-skills` v2：统一版本与同日合并规则。
+- `feipi-gen-skills` v2：统一同日版本规则并补齐自测。
 - `feipi-gen-innovation-disclosure` v2：重构交底书流程与验收规则。
+- `feipi-automate-dingtalk-webhook` v2：补齐文本脚本与离线自测。
 
 ## 2026-03-01
 - 安装脚本支持 `AGENT=qwen`。
