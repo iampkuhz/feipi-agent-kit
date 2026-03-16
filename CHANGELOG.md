@@ -1,7 +1,7 @@
 # 变更记录
 
 ## 2026-03-16
-- `feipi-gen-skills` v2：补强版本规则与摘要约束。
+- `feipi-gen-skills` v2：统一版本与同日合并规则。
 - `feipi-gen-innovation-disclosure` v2：重构交底书流程与验收规则。
 
 ## 2026-03-01

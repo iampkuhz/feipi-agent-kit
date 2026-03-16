@@ -18,7 +18,9 @@
 ## agents/openai.yaml 版本约束
 - 每个 skill 的 `agents/openai.yaml` 必须包含顶层整数 `version` 字段。
 - 版本号按 skill 自己维护，不使用仓库统一版本号。
-- 只要该 skill 自身发生更新（如 `SKILL.md`、`agents/openai.yaml`、`scripts/`、`references/`、`assets/` 变更且会影响使用、维护或触发），都必须同步递增该 `version`。
+- 只要该 skill 自身发生更新（如 `SKILL.md`、`agents/openai.yaml`、`scripts/`、`references/`、`assets/` 变更且会影响使用、维护或触发），都必须检查该 skill 当天是否已升版。
+- 若该 skill 当天尚未升版，则当天首次修改时递增该 `version`。
+- 若该 skill 当天已经升版且继续修改，则继续沿用当天版本，不重复升版。
 - 仅修改仓库级公共文件、且未改动某个 skill 自身时，不得顺带提升无关 skill 的版本号。
 
 ## 测试结构约束（开发流程）
@@ -29,7 +31,7 @@
 
 ## 校验约束
 - 新建或修改 skill 后，必须执行：`make validate DIR=<skill-root>/<name>`。
-- 修改 skill 后，除执行校验外，还必须确认该 skill 的 `agents/openai.yaml` 版本已递增，且 `CHANGELOG.md` 已在对应日期下追加或合并该版本记录。
+- 修改 skill 后，除执行校验外，还必须确认该 skill 的 `agents/openai.yaml` 版本已按“当日首次修改升版、同日后续修改不重复升版”的规则处理，且 `CHANGELOG.md` 已在对应日期下追加或合并该版本记录。
 
 ## 新建 skill 目录判定
 - 若用户明确要求“在本仓库内创建新 skill”，目标根目录固定为 `.agents/skills/`。

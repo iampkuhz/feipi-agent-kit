@@ -1,6 +1,6 @@
 ---
 name: feipi-gen-skills
-description: 用于在本仓库创建、更新与重构中文 skills，覆盖结构设计、文案完善、脚本补齐与验证闭环。在新建 skill、统一规范或批量提升已有 skill 质量时使用。
+description: 用于在本仓库创建、更新与重构中文 skills，覆盖结构设计、文案完善、版本维护、脚本补齐与验证闭环。在新建 skill、统一规范或批量提升已有 skill 质量时使用。
 ---
 
 # Skill Creator（中文）
@@ -52,7 +52,9 @@ description: 用于在本仓库创建、更新与重构中文 skills，覆盖结
    - 至少准备正常、边界、异常三类场景。
    - 若是优化现有 skill，优先保留一份旧版本对照，避免“改了很多但不知道是否更好”。
 4. 明确版本与变更记录：
-   - 目标 skill 每次更新都要同步修改 `agents/openai.yaml` 中的 `version`。
+   - 目标 skill 更新时先判断“当天是否已升版”。
+   - 若该 skill 当天尚未升版，则同步递增 `agents/openai.yaml` 中的 `version`。
+   - 若该 skill 当天已经升版且继续迭代，则保持当天版本，只合并当天 changelog 摘要。
    - `CHANGELOG.md` 继续按日期写，但每条要带上该 skill 的版本与汇总后的改动内容。
    - 同一天同一个 skill 只能升级一个版本；若一天内改动多次，最后合并成同一条版本摘要。
    - changelog 摘要必须精简，优先压成一行短语，不写解释性长句。
@@ -60,7 +62,7 @@ description: 用于在本仓库创建、更新与重构中文 skills，覆盖结
 ## 执行流程（开发态摘要）
 1. Explore：明确目标、输入输出、触发条件、边界与风险；优先从对话和现有文件抽取信息。
 2. Plan：列出改动文件、理由、对照基线与验证方式；批量或高风险任务先生成中间计划。
-3. Implement：先落脚本/参考/资产，再更新 `SKILL.md`；把重复操作收敛成脚本或模板；若目标 skill 被修改，同步递增其 `agents/openai.yaml` 的 `version`。
+3. Implement：先落脚本/参考/资产，再更新 `SKILL.md`；把重复操作收敛成脚本或模板；若目标 skill 被修改，先判断该 skill 当天是否已升版：未升则递增 `version`，已升则保持当天版本并只更新同日 changelog 摘要。
 4. Verify：运行 `make validate DIR=<skill-root>/<name>`，并完成至少一种任务级验证；能做对照测试时优先做。
 5. Iterate：根据失败样例、误触发/漏触发、执行成本与用户反馈修订 skill，而不是凭感觉改文案。
 6. 收尾：按 `references/changelog-policy.md` 用“日期分组 + skill 版本摘要”格式更新 `CHANGELOG.md`，并检查 `README.md`。
@@ -91,8 +93,10 @@ description: 用于在本仓库创建、更新与重构中文 skills，覆盖结
 - 只有在必须依赖外部输入或凭据时才引入环境变量，并同步根目录 `.env.example`。
 
 ### 5. 版本号与变更记录一起维护
-- 更新任意 skill 时，必须同步更新该 skill 的 `agents/openai.yaml` 中的 `version`。
+- 更新任意 skill 时，先检查该 skill 当天是否已经升版。
 - 默认按整数递增 `1`；不要跨 skill 共用一个全仓库版本号。
+- 若该 skill 当天尚未升版，则在当天首次修改时递增 `version`。
+- 若该 skill 当天已经升版且继续修改，则保持当天版本，不重复升版。
 - `CHANGELOG.md` 继续只按日期做二级标题；日期下的每条记录写成“skill 名 + version + 合并后的更新摘要”。
 - 同一天同一个 skill 只能递增一次版本；若当天多次修改，必须把改动合并到同一条 changelog 记录中。
 - changelog 摘要必须极简：
