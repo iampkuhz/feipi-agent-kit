@@ -56,8 +56,10 @@ AGENT_YOUTUBE_COOKIE_FILE="$(normalize_out_dir "$AGENT_YOUTUBE_COOKIE_FILE_RAW")
 
 # YouTube 反爬重试策略固定值（不通过环境变量暴露）。
 YT_REMOTE_COMPONENTS_DEFAULT="ejs:github"
-YT_EXTRACTOR_ARGS_DEFAULT="youtube:player_client=android,web_safari"
+YT_EXTRACTOR_ARGS_DEFAULT="youtube:player_client=web,web_safari"
 YT_BOT_HIT=0
+YT_AUTH_RETRY_NOAUTH=0
+YT_AUTH_RETRY_WITH_AUTH=0
 WHISPER_AUTO_ACCURATE_MAX_SEC=480
 YT_CONNECT_TEST_URL="https://www.youtube.com/generate_204"
 YT_CONNECT_TIMEOUT_SEC=8
@@ -116,14 +118,52 @@ source "$YT_COMMON_LIB"
 yt_common_require_tools "$MODE"
 yt_common_init "$OUT_DIR" "$AGENT_CHROME_PROFILE"
 AUTH_SOURCE="none"
-if [[ -n "$AGENT_CHROME_PROFILE" ]]; then
-  AUTH_SOURCE="browser_profile"
-fi
-if [[ -n "$AGENT_YOUTUBE_COOKIE_FILE" ]]; then
-  # 若同时配置 profile 与 cookie 文件，优先 cookie 文件，便于跨主机复用。
-  YT_COMMON_AUTH_ARGS=(--cookies "$AGENT_YOUTUBE_COOKIE_FILE")
-  AUTH_SOURCE="cookie_file"
-fi
+
+apply_youtube_auth_mode() {
+  local mode="${1:-none}"
+
+  YT_COMMON_AUTH_ARGS=()
+  case "$mode" in
+    none)
+      AUTH_SOURCE="none"
+      ;;
+    cookie_file)
+      YT_COMMON_AUTH_ARGS=(--cookies "$AGENT_YOUTUBE_COOKIE_FILE")
+      AUTH_SOURCE="cookie_file"
+      ;;
+    browser_profile)
+      YT_COMMON_AUTH_ARGS=(--cookies-from-browser "$AGENT_CHROME_PROFILE")
+      AUTH_SOURCE="browser_profile"
+      ;;
+    *)
+      echo "未知认证模式: $mode" >&2
+      return 1
+      ;;
+  esac
+}
+
+preferred_youtube_auth_mode() {
+  if [[ -n "$AGENT_YOUTUBE_COOKIE_FILE" ]]; then
+    echo "cookie_file"
+  elif [[ -n "$AGENT_CHROME_PROFILE" ]]; then
+    echo "browser_profile"
+  else
+    echo "none"
+  fi
+}
+
+retry_with_current_auth_tuned() {
+  local err_file="$1"
+  shift
+
+  yt_common_run_cmd "$err_file" \
+    --remote-components "$YT_REMOTE_COMPONENTS_DEFAULT" \
+    --extractor-args "$YT_EXTRACTOR_ARGS_DEFAULT" \
+    "$@"
+}
+
+# 公开视频优先无认证尝试；遇到需要登录的场景再按需切换到 cookie/profile。
+apply_youtube_auth_mode none
 
 build_proxy_url() {
   local port
@@ -274,12 +314,39 @@ yt_common_on_error() {
   local err_file="$1"
   shift
 
+  if [[ "$AUTH_SOURCE" != "none" ]] && [[ "$YT_AUTH_RETRY_NOAUTH" -eq 0 ]]; then
+    if rg -qi "Requested format is not available|Only images are available|n challenge solving failed|Sign in to confirm|confirm you're not a bot|HTTP Error 429|403 Forbidden" "$err_file"; then
+      YT_AUTH_RETRY_NOAUTH=1
+      echo "检测到带认证请求失败，回退无认证重试..." >&2
+      apply_youtube_auth_mode none
+      if yt_common_run_cmd "$err_file" "$@"; then
+        return 0
+      fi
+      if is_challenge_error "$err_file" && retry_with_current_auth_tuned "$err_file" "$@"; then
+        return 0
+      fi
+    fi
+  fi
+
+  if [[ "$AUTH_SOURCE" == "none" ]] && [[ "$YT_AUTH_RETRY_WITH_AUTH" -eq 0 ]]; then
+    if [[ -n "$AGENT_YOUTUBE_COOKIE_FILE" || -n "$AGENT_CHROME_PROFILE" ]]; then
+      if rg -qi "Sign in to confirm|confirm you're not a bot|HTTP Error 429|403 Forbidden|Subtitles are only available when logged in" "$err_file"; then
+        YT_AUTH_RETRY_WITH_AUTH=1
+        echo "检测到可能需要登录态，尝试带认证重试..." >&2
+        apply_youtube_auth_mode "$(preferred_youtube_auth_mode)"
+        if yt_common_run_cmd "$err_file" "$@"; then
+          return 0
+        fi
+        if is_challenge_error "$err_file" && retry_with_current_auth_tuned "$err_file" "$@"; then
+          return 0
+        fi
+      fi
+    fi
+  fi
+
   # YouTube JS challenge 失败时，使用远程组件与提取器参数重试一次。
   if is_challenge_error "$err_file"; then
-    if yt_common_run_cmd "$err_file" \
-      --remote-components "$YT_REMOTE_COMPONENTS_DEFAULT" \
-      --extractor-args "$YT_EXTRACTOR_ARGS_DEFAULT" \
-      "$@"; then
+    if retry_with_current_auth_tuned "$err_file" "$@"; then
       return 0
     fi
   fi

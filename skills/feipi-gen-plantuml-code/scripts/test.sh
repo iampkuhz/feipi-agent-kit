@@ -78,6 +78,9 @@ if [[ -n "$OUTPUT" ]]; then
 else
   stamp="$(date +%Y%m%d-%H%M%S)"
   ROOT_DIR="$HOME/Downloads/feipi-gen-plantuml-code-test-$stamp"
+  if ! mkdir -p "$ROOT_DIR" 2>/dev/null; then
+    ROOT_DIR="/tmp/feipi-gen-plantuml-code-test-$stamp"
+  fi
 fi
 mkdir -p "$ROOT_DIR"
 LOG_DIR="$ROOT_DIR/logs"

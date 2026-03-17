@@ -1,6 +1,6 @@
 ---
 name: feipi-read-bilibili-video
-description: 用于下载 Bilibili 视频或音频并保存到本地目录，支持 dryrun、字幕提取与 whisper.cpp 转写。在需要验证链接可下载、提取音频或批量沉淀视频素材时使用。
+description: 用于下载 Bilibili 视频或音频并保存到本地目录，覆盖 dryrun、字幕提取、whisper.cpp 转写和认证回退策略。在需要验证链接可下载、提取音频或沉淀 Bilibili 视频素材时使用。
 ---
 
 # Bilibili 下载技能（中文）
@@ -17,6 +17,21 @@ description: 用于下载 Bilibili 视频或音频并保存到本地目录，支
 - 提取 Bilibili 音频（如 mp3）
 - 先验证链接可下载再执行
 - 批量处理收藏夹/合集（需用户明确允许）
+
+## 先确认什么
+
+1. 必填
+- 视频 URL
+
+2. 按需确认
+- 输出目录
+- 目标模式：`dryrun`、`video`、`audio`、`subtitle`、`whisper`
+- 是否允许批量处理
+
+默认策略：
+1. 需求不明确时，默认先做 `dryrun`。
+2. 未指定输出目录时，默认用 `./downloads`。
+3. 未明确允许时，不自动展开收藏夹、合集或批量任务。
 
 ## 边界与合规
 
@@ -73,7 +88,7 @@ curl -L --fail \
 
 1. Explore
 - 确认 URL、输出目录、目标格式（视频/音频）。
-- 若需求不明确，默认：下载单视频到 `./downloads`。
+- 若需求不明确，默认：先对单视频执行 `dryrun`，输出目录为 `./downloads`。
 
 2. Plan
 - 选择模式：`video`、`audio`、`dryrun`、`subtitle`、`whisper`。
@@ -87,6 +102,15 @@ curl -L --fail \
 - 检查命令退出码为 0。
 - 检查输出目录存在新增文件。
 - 记录验证结果（文件名、大小、路径）。
+
+## 模式选择建议
+
+1. 只想确认链接与权限：`dryrun`
+2. 要完整视频：`video`
+3. 只要音频素材：`audio`
+4. 视频已有标准字幕：`subtitle`
+5. 视频无可用字幕或需要语音转写：`whisper`
+6. 只做链路烟测时，`whisper` 优先显式传 `fast`，不要依赖 `auto` 在短视频上触发 `accurate`
 
 ## 标准命令
 
@@ -119,6 +143,7 @@ bash scripts/download_bilibili.sh "<bilibili_url>" "./downloads" whisper
 说明：
 - 可选第 4 参数：`auto|fast|accurate`（示例：`whisper fast`、`whisper accurate`）。
 - `auto` 策略：先读取视频时长；短视频（<= 480 秒）选 `accurate`，长视频选 `fast`，若时长不可得默认 `fast`。
+- 测试/烟测优先显式使用 `whisper fast`，避免把短样本误跑成最重档。
 - 转写先尝试 Metal（GPU），失败自动回退 CPU，再把 `srt` 转为带时间戳 `.txt`。
 
 ## 失败处理
@@ -147,6 +172,17 @@ AGENT_VIDEO_PROXY_PORT=7891 bash scripts/download_bilibili.sh "<bilibili_url>" "
 5. `whisper` 模式失败
 - 检查 `whisper-cli` 是否存在（建议 `brew install whisper-cpp`）。
 - 检查模型文件是否存在于 `$HOME/Library/Caches/whisper.cpp/models/ggml-large-v3-q5_0.bin`。
+
+## 常见失败与修复
+
+1. 用户一上来就要批量下载
+- 处理：先确认是否真的允许批量，再执行。
+
+2. 视频能访问但字幕提取为空
+- 处理：先确认是否只有弹幕或需登录态，再决定切到 `whisper`。
+
+3. 直连失败
+- 处理：按现有策略让脚本尝试可用代理，不手工拼复杂命令。
 
 ## 验收标准
 

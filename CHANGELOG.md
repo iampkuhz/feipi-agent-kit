@@ -1,9 +1,20 @@
 # 变更记录
 
+## 2026-03-17
+- `feipi-read-youtube-video` v3：缩短样本并补快档烟测。
+- `feipi-read-bilibili-video` v3：缩短样本并补快档烟测。
+- `feipi-summarize-video-url` v3：缩短样本并统一时长标注。
+- 仓库级脚本：补字幕择优与 Metal 回退。
+
 ## 2026-03-16
 - `feipi-gen-skills` v2：统一同日版本规则并补齐自测。
 - `feipi-gen-innovation-disclosure` v2：重构交底书流程与验收规则。
 - `feipi-automate-dingtalk-webhook` v2：补齐文本脚本与离线自测。
+- `feipi-gen-plantuml-code` v2：补强触发流程与失败修复。
+- `feipi-ops-openclaw-config` v2：补强确认流程与失败修复。
+- `feipi-read-bilibili-video` v2：补强默认策略与失败处理。
+- `feipi-read-youtube-video` v2：补强回退链路与默认策略。
+- `feipi-summarize-video-url` v2：补强选档与交付边界。
 
 ## 2026-03-01
 - 安装脚本支持 `AGENT=qwen`。

@@ -48,6 +48,9 @@ if [[ -n "$OUTPUT" ]]; then
 else
   stamp="$(date +%Y%m%d-%H%M%S)"
   ROOT_DIR="$HOME/Downloads/feipi-ops-openclaw-config-test-$stamp"
+  if ! mkdir -p "$ROOT_DIR" 2>/dev/null; then
+    ROOT_DIR="/tmp/feipi-ops-openclaw-config-test-$stamp"
+  fi
 fi
 
 mkdir -p "$ROOT_DIR/cases" "$ROOT_DIR/logs"

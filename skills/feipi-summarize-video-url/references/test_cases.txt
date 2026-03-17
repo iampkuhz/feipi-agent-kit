@@ -3,14 +3,14 @@
 # - selection: 仅校验“自动选档”逻辑，不执行真实提取
 # - extract: 执行真实提取 + 请求包生成全链路
 
-# 正常场景：默认速度优先，应选 fast
-https://www.youtube.com/watch?v=CY5nvPIezAM|请快速提取并总结重点|fast|selection
+# 正常场景：默认速度优先，应选 fast（2:03）
+https://www.youtube.com/watch?v=wyVsPzzC_vo|请快速提取并总结重点|fast|selection # 2:03
 
-# 高质量场景：明确要求高质量，应选 accurate
-https://www.youtube.com/watch?v=CY5nvPIezAM|请高质量逐字转写，准确优先|accurate|selection
+# 高质量场景：明确要求高质量，应选 accurate（2:03）
+https://www.youtube.com/watch?v=wyVsPzzC_vo|请高质量逐字转写，准确优先|accurate|selection # 2:03
 
-# 真实回放：YouTube 全链路
-https://www.youtube.com/watch?v=fHGE9KePsMI||fast|extract
+# 真实回放：YouTube 全链路（2:20）
+https://www.youtube.com/watch?v=6OiE0jIY93c||fast|extract # 2:20
 
-# 真实回放：Bilibili 全链路
-https://www.bilibili.com/video/BV1FbdaYzEP1||fast|extract
+# 真实回放：Bilibili 全链路（2:41）
+https://www.bilibili.com/video/BV1LRcLzREG9||fast|extract # 2:41

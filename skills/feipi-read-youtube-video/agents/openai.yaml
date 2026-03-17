@@ -1,5 +1,5 @@
-version: 1
+version: 3
 interface:
   display_name: "YouTube 下载与转写（中文）"
-  short_description: "下载 YouTube 视频/音频，支持 dryrun、字幕提取和 whisper.cpp 转写。"
-  default_prompt: "请使用 feipi-read-youtube-video：先确认 URL、输出目录和目标模式，优先执行 dryrun，再按 video/audio/subtitle/whisper 模式运行脚本。whisper 模式使用 whisper.cpp（large-v3-q5_0，质量优先），并汇报生成文件与验证结果。"
+  short_description: "下载 YouTube 视频或音频，支持 dryrun、字幕提取、whisper 转写和代理回退。"
+  default_prompt: "请使用 feipi-read-youtube-video：先确认 URL、输出目录和目标模式。若需求不明确，默认先执行 `dryrun`；未指定输出目录时默认 `./downloads`；未明确允许时不自动展开播放列表。再按 `video`、`audio`、`subtitle`、`whisper` 模式运行脚本。若出现直连失败、bot 检测或字幕缺失，优先使用现有代理/认证/whisper 回退链路。最后汇报执行命令、结果状态和产物路径。"

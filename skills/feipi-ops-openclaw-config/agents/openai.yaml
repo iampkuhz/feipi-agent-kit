@@ -1,5 +1,5 @@
-version: 1
+version: 2
 interface:
   display_name: "OpenClaw 配置修改优化助手"
-  short_description: "安全修改 openclaw.json，输出最小 diff 与可复现验证结果。"
-  default_prompt: "请使用 feipi-ops-openclaw-config：先明确目标键与风险，再做最小配置改动；执行 scripts/audit_openclaw_config.sh 与必要的 openclaw 检查，并汇报改动摘要、验证结果和回滚建议。"
+  short_description: "安全修改 openclaw.json，覆盖最小 diff、敏感信息审计和可复现验证。"
+  default_prompt: "请使用 feipi-ops-openclaw-config：先确认要改的目标键、预期效果以及是否允许重启或新增字段，再给出“目标键 -> 改法 -> 风险 -> 验证命令”的短计划。实现时优先围绕 `openclaw.json` 做最小改动，敏感字段必须改为 `${ENV_NAME}` 引用；完成后至少执行 `bash scripts/audit_openclaw_config.sh --config /path/to/openclaw.json` 与 `jq . /path/to/openclaw.json >/dev/null` 之一，并汇报改动摘要、验证结果和回滚建议。"

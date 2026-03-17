@@ -31,6 +31,8 @@ WHISPER_BEAM_SIZE_ACCURATE=8
 WHISPER_BEST_OF_ACCURATE=8
 WHISPER_BEAM_SIZE_FAST=2
 WHISPER_BEST_OF_FAST=2
+WHISPER_METAL_CACHE_TTL_SEC=3600
+WHISPER_METAL_CACHE_FILE="${TMPDIR:-/tmp}/whispercpp-metal-unavailable.cache"
 
 usage() {
   echo "用法: bash feipi-scripts/video/whispercpp_transcribe.sh <audio_file> <output_prefix> [language] [accurate|fast|auto]" >&2
@@ -84,6 +86,42 @@ resolve_metal_resources_dir() {
   fi
 
   return 1
+}
+
+cache_mtime_epoch() {
+  local path="$1"
+
+  stat -f "%m" "$path" 2>/dev/null || echo 0
+}
+
+metal_cache_is_fresh() {
+  local now_epoch cached_epoch
+
+  if [[ ! -f "$WHISPER_METAL_CACHE_FILE" ]]; then
+    return 1
+  fi
+
+  now_epoch="$(date +%s)"
+  cached_epoch="$(cache_mtime_epoch "$WHISPER_METAL_CACHE_FILE")"
+  if ! [[ "$cached_epoch" =~ ^[0-9]+$ ]]; then
+    return 1
+  fi
+
+  if (( now_epoch - cached_epoch < WHISPER_METAL_CACHE_TTL_SEC )); then
+    return 0
+  fi
+
+  return 1
+}
+
+record_metal_unavailable() {
+  local reason="$1"
+
+  printf "reason=%s\nts=%s\n" "$reason" "$(date +%s)" > "$WHISPER_METAL_CACHE_FILE"
+}
+
+clear_metal_unavailable_cache() {
+  rm -f "$WHISPER_METAL_CACHE_FILE"
 }
 
 print_setup_guidance() {
@@ -209,10 +247,36 @@ WHISPER_ARGS=(
 )
 
 USED_DEVICE="metal"
-set +e
-GGML_METAL_PATH_RESOURCES="$METAL_RESOURCES" "$WHISPER_CLI" "${WHISPER_ARGS[@]}"
-RUN_CODE=$?
-set -e
+METAL_REASON=""
+RUN_CODE=1
+
+if metal_cache_is_fresh; then
+  METAL_REASON="cached_unavailable"
+  echo "检测到近期 Metal 初始化失败，跳过 GPU 直试，直接回退 CPU。" >&2
+else
+  METAL_LOG="$(mktemp "${TMPDIR:-/tmp}/whisper-metal-log.XXXXXX")"
+  set +e
+  GGML_METAL_PATH_RESOURCES="$METAL_RESOURCES" "$WHISPER_CLI" "${WHISPER_ARGS[@]}" >"$METAL_LOG" 2>&1
+  RUN_CODE=$?
+  set -e
+  cat "$METAL_LOG"
+
+  if [[ $RUN_CODE -eq 0 && -f "$SRT_FILE" ]]; then
+    clear_metal_unavailable_cache
+  else
+    if [[ $RUN_CODE -ge 128 ]]; then
+      METAL_REASON="metal_process_crashed"
+      record_metal_unavailable "$METAL_REASON"
+    elif grep -Eiq "ggml_metal_buffer_init: error: failed to allocate buffer" "$METAL_LOG"; then
+      METAL_REASON="metal_buffer_alloc_failed"
+      record_metal_unavailable "$METAL_REASON"
+    elif grep -Eiq "Segmentation fault|Abort trap|metal.*fail" "$METAL_LOG"; then
+      METAL_REASON="metal_runtime_failed"
+      record_metal_unavailable "$METAL_REASON"
+    fi
+  fi
+  rm -f "$METAL_LOG"
+fi
 
 if [[ $RUN_CODE -ne 0 || ! -f "$SRT_FILE" ]]; then
   echo "Metal 转写失败，回退 CPU 转写。" >&2
@@ -232,5 +296,8 @@ if [[ -n "$FALLBACK_REASON" ]]; then
   echo "profile_fallback=$FALLBACK_REASON"
 fi
 echo "device=$USED_DEVICE"
+if [[ -n "$METAL_REASON" ]]; then
+  echo "metal_reason=$METAL_REASON"
+fi
 echo "model=$(basename "$WHISPER_MODEL_FILE")"
 echo "srt_path=$SRT_FILE"

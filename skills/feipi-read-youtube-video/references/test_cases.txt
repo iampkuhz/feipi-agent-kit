@@ -1,5 +1,5 @@
-https://www.youtube.com/watch?v=fHGE9KePsMI|subtitle # 有中文字幕
-https://www.youtube.com/watch?v=fHGE9KePsMI|audio # 有中文字幕
-https://www.youtube.com/watch?v=6OiE0jIY93c|subtitle # 无中文但是有英文字幕
-https://www.youtube.com/watch?v=6OiE0jIY93c|video # 无中文但是有英文字幕
-https://www.youtube.com/watch?v=CY5nvPIezAM|whisper #无字幕，需回退转写
+https://www.youtube.com/watch?v=fHGE9KePsMI|subtitle # 中文字幕样例,6:30
+https://www.youtube.com/watch?v=PH2brWd6AuM|audio # 中文字幕音频提取,2:34
+https://www.youtube.com/watch?v=6OiE0jIY93c|subtitle # 英文字幕样例,2:20
+https://www.youtube.com/watch?v=wyVsPzzC_vo|video # 视频下载样例,2:03
+https://www.youtube.com/watch?v=wyVsPzzC_vo|whisper|fast # 无字幕转写烟测,2:03

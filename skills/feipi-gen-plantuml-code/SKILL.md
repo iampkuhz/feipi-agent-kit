@@ -1,6 +1,6 @@
 ---
 name: feipi-gen-plantuml-code
-description: 用于根据输入指令生成 PlantUML 代码并自动调用渲染器校验语法，在需要快速产出可渲染且宽度可控的图代码时使用。
+description: 用于根据输入需求生成并校验 PlantUML 代码，覆盖图类型判断、布局约束、渲染验证与可读性复核。在用户要画流程图、模块图、时序图或类图并要求结果可直接渲染时使用。
 ---
 
 # PlantUML 代码生成与校验（中文）
@@ -14,6 +14,28 @@ description: 用于根据输入指令生成 PlantUML 代码并自动调用渲染
 1. 需要把系统流程、组件关系、时序关系转换为 PlantUML。
 2. 需要在交付前自动验证语法，避免“写完不可渲染”。
 3. 需要控制图宽度，避免横向过宽导致阅读困难。
+
+## 非适用场景
+
+1. 只要 Mermaid、Draw.io 或非 PlantUML 图，不需要 PlantUML 代码。
+2. 只要一句口头结构建议，不需要真实可渲染图代码。
+3. 用户要求当前 skill 未支持的图类型，且不接受改写为 component/sequence/class。
+
+## 先确认什么
+
+1. 必填
+- 图类型：`component`、`sequence` 或 `class`
+- 图需求描述：核心元素、关系、流程或约束
+
+2. 按需确认
+- 是否要控制宽度、配色或分层
+- 是否有标题、关键编号或必须保留的术语
+
+默认策略：
+1. 组件与模块关系优先用 `component`。
+2. 有时间顺序、交互往返优先用 `sequence`。
+3. 有实体、属性、关联优先用 `class`。
+4. 图类型不明确时，先根据用户意图选一个默认类型，不在一开始给过多并列方案。
 
 ## 强约束
 
@@ -69,7 +91,7 @@ bash scripts/lint_layout.sh <input.puml>
 - `*.svg`：渲染结果（由校验脚本自动输出）
 - 校验日志：`server_url`、`server_mode`、`syntax_result`
 
-## 工作流（Explore -> Plan -> Implement -> Verify）
+## 工作流（使用态）
 
 1. Explore
 - 明确图类型、核心元素、关系方向、约束条件。
@@ -95,6 +117,20 @@ bash scripts/check_plantuml.sh ./tmp/diagram.puml --svg-output ./tmp/diagram.svg
 ```
 - 若报语法错误，修复后重跑，直到 `syntax_result=ok`。
 - 语法通过后必须做图像复核：检查是否存在文字重叠/遮挡；若有则继续迭代优化再重跑校验。
+
+## 常见失败与修复
+
+1. 图能渲染，但横向过宽
+- 处理：优先改成纵向布局、缩短长标签、增加换行点。
+
+2. sequence 图报 `top to bottom direction` 相关错误
+- 处理：移除该语法，减少参与者数量或拆分子图。
+
+3. component 图流程编号混乱
+- 处理：统一改成 `S1...Sn`，并确保正文或图例解释同步。
+
+4. 语法通过但图难读
+- 处理：先简化 edge 文案，再调整布局、隐藏线或拆图，不把“能渲染”当成交付完成。
 
 ## 标准命令
 

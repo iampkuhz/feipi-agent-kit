@@ -1,6 +1,6 @@
-# 格式：<url>|<mode>
+# 格式：<url>|<mode>|[whisper_profile]
 # 说明：默认给 dryrun 用例，确保在多数环境可快速验证。
-https://www.bilibili.com/video/BV1GJ411x7h7|dryrun # 正常：公开视频
-https://www.bilibili.com/video/BV1GJ411x7h7|whisper # 没有字幕，需要自己提取，旁白为英文
-https://www.bilibili.com/video/BV1LRcLzREG9|audio # 没有字幕，需要自己提取，旁白为中文
-https://www.bilibili.com/video/BV1pHrSB2E9L|subtitle # 有 B站 提供的 AI 字幕
+https://www.bilibili.com/video/BV1GJ411x7h7|dryrun # 正常：公开视频,3:32
+https://www.bilibili.com/video/BV1LRcLzREG9|whisper|fast # 中文旁白转写烟测,2:41
+https://www.bilibili.com/video/BV1LRcLzREG9|audio # 中文旁白音频提取,2:41
+https://www.bilibili.com/video/BV1pHrSB2E9L|subtitle # 字幕提取样例,3:26

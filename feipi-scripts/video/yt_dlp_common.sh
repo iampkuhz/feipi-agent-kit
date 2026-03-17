@@ -146,11 +146,42 @@ yt_common_find_new_audio_file() {
   find "$out_dir" -type f -name '*.mp3' -newer "$marker" | sort | head -n1 || true
 }
 
+yt_common_rank_subtitle_file() {
+  local file="$1"
+  local base stem lang_tag
+
+  base="$(basename "$file")"
+  stem="${base%.*}"
+  lang_tag="${stem##*.}"
+
+  case "$lang_tag" in
+    zh|zh-*|cmn|cmn-*)
+      echo "01"
+      ;;
+    en|en-*|en-orig)
+      echo "02"
+      ;;
+    *-en)
+      echo "03"
+      ;;
+    *)
+      echo "09"
+      ;;
+  esac
+}
+
 yt_common_find_new_subtitle_file() {
   local out_dir="$1"
   local marker="$2"
+  local file rank
 
-  find "$out_dir" -type f \( -name '*.vtt' -o -name '*.srt' \) -newer "$marker" | sort | head -n1 || true
+  while IFS= read -r file; do
+    rank="$(yt_common_rank_subtitle_file "$file")"
+    printf "%s\t%s\n" "$rank" "$file"
+  done < <(find "$out_dir" -type f \( -name '*.vtt' -o -name '*.srt' \) -newer "$marker" | sort) \
+    | sort -t $'\t' -k1,1 -k2,2 \
+    | head -n1 \
+    | cut -f2- || true
 }
 
 yt_common_find_new_danmaku_file() {

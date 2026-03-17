@@ -3,6 +3,7 @@ set -euo pipefail
 
 # 统一测试入口（供 make test 调用）
 # 严格模式：references/test_cases.txt 每一行（非空、非注释）都必须执行成功。
+# 每行格式：<url>|<mode>|[whisper_profile]
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -44,10 +45,11 @@ fi
 if [[ -n "$OUTPUT" ]]; then
   TMP_ROOT="$OUTPUT"
 else
-  # 默认将测试文件放在 ~/Downloads，便于人工查看与分享。
-  # 未来若要切换回 /tmp，只需改这一段默认路径逻辑。
   stamp="$(date +%Y%m%d-%H%M%S)"
   TMP_ROOT="$HOME/Downloads/feipi-youtube-test-$stamp"
+  if ! mkdir -p "$TMP_ROOT" 2>/dev/null; then
+    TMP_ROOT="/tmp/feipi-youtube-test-$stamp"
+  fi
 fi
 mkdir -p "$TMP_ROOT"
 OUT_DIR="$TMP_ROOT/out"
@@ -72,14 +74,14 @@ if ! command -v yt-dlp >/dev/null 2>&1; then
   exit 1
 fi
 
-if grep -Ev '^[[:space:]]*($|#)' "$CONFIG" | rg -q '\|(video|audio|whisper)[[:space:]]*($|#)'; then
+if grep -Ev '^[[:space:]]*($|#)' "$CONFIG" | rg -q '\|(video|audio|whisper)(\||[[:space:]]*($|#))'; then
   if ! command -v ffmpeg >/dev/null 2>&1; then
     echo "缺少依赖: ffmpeg（video/audio/whisper 用例需要）" >&2
     exit 1
   fi
 fi
 
-if grep -Ev '^[[:space:]]*($|#)' "$CONFIG" | rg -q '\|whisper[[:space:]]*($|#)'; then
+if grep -Ev '^[[:space:]]*($|#)' "$CONFIG" | rg -q '\|whisper(\||[[:space:]]*($|#))'; then
   if [[ ! -x "$WHISPER_HELPER" ]]; then
     echo "缺少共享转写脚本: $WHISPER_HELPER（whisper 用例需要）" >&2
     exit 1
@@ -108,11 +110,15 @@ while IFS= read -r raw || [[ -n "$raw" ]]; do
 
   TOTAL=$((TOTAL + 1))
 
-  IFS='|' read -r URL MODE <<< "$line"
+  IFS='|' read -r URL MODE WHISPER_PROFILE <<< "$line"
   URL="$(echo "${URL:-}" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
   MODE="$(echo "${MODE:-dryrun}" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+  WHISPER_PROFILE="$(echo "${WHISPER_PROFILE:-auto}" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
   if [[ -z "$MODE" ]]; then
     MODE="dryrun"
+  fi
+  if [[ -z "$WHISPER_PROFILE" ]]; then
+    WHISPER_PROFILE="auto"
   fi
 
   case "$MODE" in
@@ -124,6 +130,17 @@ while IFS= read -r raw || [[ -n "$raw" ]]; do
       ;;
   esac
 
+  if [[ "$MODE" == "whisper" ]]; then
+    case "$WHISPER_PROFILE" in
+      auto|fast|accurate) ;;
+      *)
+        echo "[FAIL] 第 $TOTAL 行 whisper_profile 非法: $WHISPER_PROFILE" >&2
+        FAILED=$((FAILED + 1))
+        continue
+        ;;
+    esac
+  fi
+
   log_file="$LOG_DIR/case-$TOTAL.log"
   case_out_dir="$OUT_DIR/case-$TOTAL"
   mkdir -p "$case_out_dir"
@@ -134,7 +151,12 @@ while IFS= read -r raw || [[ -n "$raw" ]]; do
   echo "模式: $MODE"
   echo "URL: $URL"
   echo "产物目录: $case_out_dir"
-  if bash "$TARGET_SCRIPT" "$URL" "$case_out_dir" "$MODE" >"$log_file" 2>&1; then
+  cmd=(bash "$TARGET_SCRIPT" "$URL" "$case_out_dir" "$MODE")
+  if [[ "$MODE" == "whisper" ]]; then
+    echo "whisper_profile: $WHISPER_PROFILE"
+    cmd+=("$WHISPER_PROFILE")
+  fi
+  if "${cmd[@]}" >"$log_file" 2>&1; then
     # 严格要求：各模式必须产出预期结果。
     if [[ "$MODE" == "video" ]]; then
       if find "$case_out_dir" -type f -name '*.mp4' -newer "$marker" | grep -q .; then
