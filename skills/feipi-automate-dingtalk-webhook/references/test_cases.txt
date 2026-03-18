@@ -3,3 +3,4 @@ validate-self
 text-missing-env
 markdown-missing-env
 markdown-missing-secret
+markdown-unsupported-strip

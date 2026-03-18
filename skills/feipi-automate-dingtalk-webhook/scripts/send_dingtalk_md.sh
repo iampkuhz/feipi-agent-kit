@@ -5,6 +5,7 @@
 set -euo pipefail
 
 TIMEOUT_SECONDS=10
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 usage() {
   cat <<'EOF'
@@ -74,7 +75,12 @@ if [[ -n "$SECRET_VAR_NAME" ]]; then
 fi
 
 TITLE_ESCAPED="$(escape_json "$TITLE")"
-CONTENT_ESCAPED="$(printf '%s' "$CONTENT" | sed 's/\\n/\n/g' | python3 -c 'import json, sys; print(json.dumps(sys.stdin.read())[1:-1])')"
+RAW_CONTENT="$(printf '%s' "$CONTENT" | sed 's/\\n/\n/g')"
+SANITIZED_CONTENT="$(printf '%s' "$RAW_CONTENT" | python3 "$SCRIPT_DIR/normalize_dingtalk_markdown.py")"
+if [[ "$SANITIZED_CONTENT" != "$RAW_CONTENT" ]]; then
+  echo "提示：已删除钉钉不支持的 Markdown 语法。" >&2
+fi
+CONTENT_ESCAPED="$(printf '%s' "$SANITIZED_CONTENT" | python3 -c 'import json, sys; print(json.dumps(sys.stdin.read())[1:-1])')"
 JSON_PAYLOAD=$(cat <<EOF
 {
   "msgtype": "markdown",

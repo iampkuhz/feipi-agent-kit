@@ -1,6 +1,7 @@
 # 变更记录
 
 ## 2026-03-17
+- `feipi-automate-dingtalk-webhook` v3：收紧语法并补真机烟测。
 - `feipi-read-youtube-video` v3：缩短样本并补快档烟测。
 - `feipi-read-bilibili-video` v3：缩短样本并补快档烟测。
 - `feipi-summarize-video-url` v3：缩短样本并统一时长标注。

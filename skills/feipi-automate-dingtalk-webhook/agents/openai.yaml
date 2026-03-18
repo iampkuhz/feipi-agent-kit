@@ -1,5 +1,5 @@
-version: 2
+version: 3
 interface:
   display_name: "钉钉 Webhook 消息发送"
-  short_description: "发送钉钉文本或 Markdown webhook 消息，支持加签和结果校验。"
-  default_prompt: "请使用 feipi-automate-dingtalk-webhook：先确认 webhook URL 的环境变量名，以及消息是文本还是 Markdown；需要标题、多行结构或列表时优先使用 Markdown。若用户启用了加签模式，再确认密钥环境变量名。文本消息使用 `bash scripts/send_dingtalk.sh <URL环境变量名> \"<消息内容>\" [密钥环境变量名]`；Markdown 消息使用 `bash scripts/send_dingtalk_md.sh <URL环境变量名> \"<标题>\" \"<正文>\" [密钥环境变量名]`。发送后检查退出码、HTTP 状态码和钉钉返回的 errcode。"
+  short_description: "发送钉钉文本或 Markdown webhook 消息，支持加签、语法收敛和结果校验。"
+  default_prompt: "请使用 feipi-automate-dingtalk-webhook：先确认 webhook URL 的环境变量名，以及消息是文本还是 Markdown；需要标题、多行结构或列表时优先使用 Markdown。正文只保留钉钉支持的 Markdown 类型：标题、引用、文字效果、链接、图片、无序列表和有序列表；其他不支持语法在发送前直接删除。若用户启用了加签模式，再确认密钥环境变量名。文本消息使用 `bash scripts/send_dingtalk.sh <URL环境变量名> \"<消息内容>\" [密钥环境变量名]`；Markdown 消息使用 `bash scripts/send_dingtalk_md.sh <URL环境变量名> \"<标题>\" \"<正文>\" [密钥环境变量名]`。发送后检查退出码、HTTP 状态码和钉钉返回的 errcode。"

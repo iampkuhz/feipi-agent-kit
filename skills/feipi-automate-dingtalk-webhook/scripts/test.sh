@@ -49,6 +49,15 @@ run_case() {
       [[ "$code" -ne 0 ]]
       grep -Fq "加签密钥环境变量 DINGTALK_TEST_SECRET 未设置或为空" <<<"$output"
       ;;
+    markdown-unsupported-strip)
+      output="$(printf '%s\n' '| 服务 | 状态 |' '| --- | --- |' '| api | 成功 |' '| worker | 失败 |' | python3 "$SKILL_DIR/scripts/normalize_dingtalk_markdown.py")"
+      [[ -z "$output" ]]
+      output="$(printf '%s\n' '```bash' 'echo hello' '```' '<font color=\"red\">告警</font>' '---' | python3 "$SKILL_DIR/scripts/normalize_dingtalk_markdown.py")"
+      grep -Fq "echo hello" <<<"$output"
+      grep -Fq "告警" <<<"$output"
+      ! grep -Fq '```' <<<"$output"
+      ! grep -Fq '<font' <<<"$output"
+      ;;
     *)
       echo "未知测试项: $case_name" >&2
       return 1
