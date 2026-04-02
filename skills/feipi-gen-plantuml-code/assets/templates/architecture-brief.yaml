@@ -1,0 +1,45 @@
+# 架构组件图需求模板
+
+diagram_id: <diagram-id>
+diagram_type: architecture
+title: "<图标题>"
+
+# 分层定义（至少 3 层）
+layers:
+  - id: protocol
+    name: 协议层
+    description: 协议核心组件
+    color: "#E3F2FD"
+  - id: data
+    name: 数据层
+    description: 数据对象
+    color: "#FFF9C4"
+  - id: external
+    name: 外部参与方
+    description: 用户、验证者等
+    color: "#E0E0E0"
+
+# 组件清单（至少 3 个）
+components:
+  - id: <组件 id>
+    name: <组件名称>
+    layer: <引用 layers[].id>
+    description: <组件描述>
+    type: component  # component | actor | database | note | interface | queue
+
+# 跨层流程（至少 1 个）
+flows:
+  - id: S1
+    from: <引用 components[].id>
+    to: <引用 components[].id>
+    description: <流程描述>
+
+# 边界条件（可选）
+boundaries:
+  - 不包含：<内容>
+
+# 特殊要求（可选）
+requirements:
+  - 使用纵向布局 (top to bottom direction)
+  - 箭头必须标注 S 序号
+  - 必须包含图例
