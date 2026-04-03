@@ -1,9 +1,0 @@
-# feipi-gen-plantuml-code 生成回放测试用例
-# 格式：case_id|expect|diagram_type|requirement_text|assert_contains
-# expect: ok | generate_error
-# assert_contains: 多个关键字用分号分隔
-
-component-layered-s-flow|ok|component|根据需求生成组件图：模块必须分层，不同模块颜色不同，模块间通过 edge 串联流程，流程从 S1 开始编号。|top to bottom direction;skinparam linetype ortho;L1 应用层（;L2 钱包层（;L3 基础设施层（;#F4F7FF;#F7FFF4;#FFF8F0;: S1;: S2;S11 emit\naccounts
-sequence-connect-sign|ok|sequence|根据需求生成时序图，描述用户连接钱包并进行签名确认。|participant "DApp";participant "Provider";request(eth_requestAccounts);request(personal_sign);autonumber
-class-wallet-domain|ok|class|根据需求生成类图，表达 Wallet Account Network Transaction SignatureRequest 的关系。|class Wallet;class Account;class Network;class Transaction;class SignatureRequest;o--
-invalid-diagram-type|generate_error|timeline|根据需求生成时间线图（当前技能暂不支持）。|不支持的图类型

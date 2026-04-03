@@ -1,5 +1,0 @@
-version: 3
-interface:
-  display_name: "PlantUML 代码生成与语法校验（中文）"
-  short_description: "生成并校验 PlantUML 图代码，覆盖图类型判断、渲染校验与可读性复核。"
-  default_prompt: "请使用 feipi-gen-plantuml-code：先判断图类型是 component、sequence 还是 class，再按对应 reference 生成 PlantUML。生成后必须执行 `bash scripts/check_plantuml.sh <input.puml>` 做真实渲染校验；校验时优先使用本地 PlantUML server，本地默认 8199 端口，可由 `AGENT_PLANTUML_SERVER_PORT` 覆盖；若语法通过，还要继续检查图像可读性，确认没有明显重叠、遮挡或过宽问题。component 图必须分层分色，并用 S1 开始给 edge 编号；sequence 图不要使用 `top to bottom direction`。"

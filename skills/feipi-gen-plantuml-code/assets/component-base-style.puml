@@ -1,8 +1,0 @@
-@startuml
-' Component 图基础样式片段（可直接复用）
-skinparam componentStyle uml2
-skinparam shadowing false
-top to bottom direction
-skinparam nodesep 6
-skinparam ranksep 75
-@enduml
