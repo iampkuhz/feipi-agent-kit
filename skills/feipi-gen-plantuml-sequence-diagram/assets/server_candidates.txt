@@ -1,0 +1,5 @@
+# 本地优先，公网兜底。
+http://127.0.0.1:${AGENT_PLANTUML_SERVER_PORT}/plantuml
+http://localhost:${AGENT_PLANTUML_SERVER_PORT}/plantuml
+https://www.plantuml.com/plantuml
+https://www.planttext.com/api/plantuml

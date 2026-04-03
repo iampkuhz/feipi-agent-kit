@@ -1,0 +1,5 @@
+version: 1
+interface:
+  display_name: "PlantUML 时序图生成与校验（中文）"
+  short_description: "根据 sequence-brief 生成 PlantUML 时序图，并校验覆盖、布局与渲染。"
+  default_prompt: "请使用 feipi-gen-plantuml-sequence-diagram：优先让用户提供或补齐 `assets/templates/sequence-brief.yaml` 对应格式的 YAML brief，再开始画图。若输入只有自然语言，先整理成 brief 草稿并补问缺失字段，不得直接脑补参与者或消息。生成 PlantUML 时，参与者 alias 必须严格复用 brief 中的 `participants[].id`，消息标签必须落 `Mx/Rx + 描述`。输出前依次执行 `python3 scripts/validate_brief.py <brief.yaml>`、`python3 scripts/check_coverage.py --brief <brief.yaml> --diagram <diagram.puml>`、`bash scripts/lint_layout.sh <diagram.puml>` 与 `bash scripts/check_render.sh <diagram.puml> --svg-output <diagram.svg>`；若渲染环境不可用，只能明确标注未完成真实渲染校验。"

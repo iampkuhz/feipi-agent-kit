@@ -1,0 +1,58 @@
+# 时序图需求模板
+#
+# 使用方式：
+# 1. 复制本文件，替换所有尖括号占位符。
+# 2. 执行：python3 scripts/validate_brief.py ./your-brief.yaml
+# 3. 校验通过后，再根据 brief 生成 PlantUML。
+
+diagram_id: <diagram-id>
+diagram_type: sequence
+title: "<图标题>"
+summary: "<这张图要表达的核心交互流程>"
+
+participants:
+  - id: user
+    name: <用户或发起方>
+    type: actor
+    description: <参与者职责>
+  - id: service_a
+    name: <服务 A>
+    type: participant
+    description: <参与者职责>
+  - id: db_a
+    name: <数据库 A>
+    type: database
+    description: <参与者职责>
+
+messages:
+  - id: M1
+    from: user
+    to: service_a
+    description: <消息描述>
+    type: sync
+  - id: M2
+    from: service_a
+    to: service_b
+    description: <消息描述>
+    type: sync
+  - id: R1
+    from: service_b
+    to: service_a
+    description: <返回描述>
+    type: return
+
+layout:
+  direction: left_to_right
+  include_legend: false
+
+groups:
+  - id: frontend
+    name: <前端层>
+    participants: [user, web_portal]
+  - id: backend
+    name: <后端层>
+    participants: [order_service, inventory_service]
+    separator: true
+
+out_of_scope:
+  - <明确不进入图中的内容>

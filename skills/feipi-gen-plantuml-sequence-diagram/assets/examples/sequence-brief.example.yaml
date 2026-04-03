@@ -1,0 +1,96 @@
+diagram_id: ecommerce-order-sequence
+diagram_type: sequence
+title: "电商下单链路时序图"
+summary: "展示用户下单请求从发起、服务处理到数据持久化的消息交互时序。"
+
+participants:
+  - id: user
+    name: 用户
+    type: actor
+    description: 发起下单操作的终端用户
+  - id: web_portal
+    name: 商城前台
+    type: participant
+    description: 接收用户下单请求的前端入口
+  - id: order_service
+    name: 订单服务
+    type: participant
+    description: 负责创建订单和编排交易流程
+  - id: inventory_service
+    name: 库存服务
+    type: participant
+    description: 负责预占和扣减库存
+  - id: payment_gateway
+    name: 支付网关
+    type: participant
+    description: 对接外部支付渠道完成支付
+  - id: order_db
+    name: 订单库
+    type: database
+    description: 存储订单主记录
+  - id: inventory_db
+    name: 库存库
+    type: database
+    description: 存储库存和预占状态
+
+messages:
+  - id: M1
+    from: user
+    to: web_portal
+    description: 提交下单请求
+    type: sync
+  - id: M2
+    from: web_portal
+    to: order_service
+    description: 转发创建订单请求
+    type: sync
+  - id: M3
+    from: order_service
+    to: inventory_service
+    description: 预占库存
+    type: sync
+  - id: R1
+    from: inventory_service
+    to: order_service
+    description: 返回预占结果
+    type: return
+  - id: M4
+    from: order_service
+    to: payment_gateway
+    description: 发起支付
+    type: sync
+  - id: R2
+    from: payment_gateway
+    to: order_service
+    description: 返回支付结果
+    type: return
+  - id: M5
+    from: order_service
+    to: order_db
+    description: 写入订单记录
+    type: sync
+  - id: M6
+    from: inventory_service
+    to: inventory_db
+    description: 更新库存状态
+    type: sync
+
+layout:
+  direction: left_to_right
+  include_legend: false
+
+groups:
+  - id: frontend
+    name: 前端层
+    participants: [user, web_portal]
+  - id: backend
+    name: 后端层
+    participants: [order_service, inventory_service, payment_gateway]
+    separator: true
+  - id: data
+    name: 数据层
+    participants: [order_db, inventory_db]
+
+out_of_scope:
+  - 营销优惠计算
+  - 监控告警指标

@@ -1,0 +1,7 @@
+@startuml
+title 测试时序图
+actor "用户" as user
+participant "服务 A" as service_a
+
+user -> service_a : M1 请求
+@enduml

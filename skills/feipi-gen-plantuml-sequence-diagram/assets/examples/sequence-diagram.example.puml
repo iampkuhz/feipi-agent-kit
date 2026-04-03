@@ -1,0 +1,47 @@
+@startuml
+title 电商下单链路时序图
+autonumber
+skinparam shadowing false
+skinparam sequenceStyle rectangle
+skinparam nodesep 30
+skinparam ranksep 50
+skinparam lifelineStrategy solid
+
+box "前端层" #DDDDDD
+  actor "用户" as user
+  participant "商城前台" as web_portal
+endbox
+
+box "后端层" #EEEEEE
+  participant "订单服务" as order_service
+  participant "库存服务" as inventory_service
+  participant "支付网关" as payment_gateway
+endbox
+
+separator
+
+box "数据层" #FFFFFF
+  database "订单库" as order_db
+  database "库存库" as inventory_db
+endbox
+
+user -> web_portal : M1 提交下单请求
+activate web_portal
+web_portal -> order_service : M2 转发创建订单请求
+activate order_service
+order_service -> inventory_service : M3 预占库存
+activate inventory_service
+inventory_service -> inventory_db : M6 更新库存状态
+inventory_service --> order_service : R1 返回预占结果
+deactivate inventory_service
+order_service -> payment_gateway : M4 发起支付
+activate payment_gateway
+payment_gateway --> order_service : R2 返回支付结果
+deactivate payment_gateway
+order_service -> order_db : M5 写入订单记录
+order_service --> web_portal : 返回下单结果
+deactivate order_service
+web_portal --> user : 返回下单结果
+deactivate web_portal
+
+@enduml
