@@ -169,41 +169,24 @@ link_item() {
   if [[ -L "$dest" ]]; then
     local current_target
     current_target="$(readlink "$dest")"
-    if [[ "$current_target" == "$src" ]]; then
+
+    # 检查软链接是否有效（目标是否存在）
+    local is_broken=false
+    if [[ ! -e "$current_target" ]]; then
+      is_broken=true
+    fi
+
+    if [[ "$current_target" == "$src" ]] && [[ "$is_broken" == false ]]; then
       echo "  已存在，跳过：$label"
       return 0
     fi
 
-    # 检查是否需要移除旧的软链接：
-    # 1. 软链接指向的源文件夹属于仓库文件
-    # 2. 原始 skill 文件夹已不存在
-    if [[ -d "$current_target" ]]; then
-      local current_target_dir
-      current_target_dir="$(cd "$current_target" && pwd)"
-      local repo_root
-      repo_root="$(cd "$REPO_ROOT" && pwd)"
-
-      # 判断软链接指向的目录是否在仓库根目录下（子孙目录都算）
-      if [[ "$current_target_dir" == "$repo_root"/* ]]; then
-        # 检查原始 skill 是否已不存在
-        local skill_name
-        skill_name="$(basename "$current_target")"
-        local src_dir
-        src_dir="$(cd "$SRC_ROOT" && pwd)"
-        local original_skill="$src_dir/$skill_name"
-
-        if [[ ! -e "$original_skill" ]]; then
-          rm -f "$dest"
-          echo "  移除失效的软链接：$label (原指向：$current_target)"
-        fi
-      else
-        # 软链接指向非仓库文件，保留或提示
-        echo "  警告：现有软链接指向非仓库文件，跳过：$dest -> $current_target" >&2
-        return 1
-      fi
-    else
-      # 软链接目标不存在，直接移除
-      rm -f "$dest"
+    # 需要移除旧软链接的情况：
+    # 1. 软链接已失效（目标不存在）
+    # 2. 软链接指向其他路径
+    rm -f "$dest"
+    if [[ "$is_broken" == true ]]; then
+      echo "  已移除失效软链接：$label"
     fi
   elif [[ -e "$dest" ]]; then
     echo "  警告：目标已存在且非软链接，跳过：$dest" >&2
@@ -228,6 +211,69 @@ copy_dir() {
   echo "  已安装：$label"
 }
 
+# 递归收集所有技能目录（平铺到一维）
+# 技能目录的识别规则：
+# 1. 包含 SKILL.md 文件
+# 2. 包含 .smile 文件
+# 3. 包含 agents/ 子目录（Claude Code skills 结构）
+# 只选择最深层的技能目录，中间分类目录不会被选中
+collect_all_skills() {
+  local src_root="$1"
+  local all_skill_dirs=()
+  local final_skills=()
+
+  # 第一遍：收集所有技能目录
+  while IFS= read -r -d '' skill_dir; do
+    # 跳过根目录本身
+    [[ "$skill_dir" == "$src_root" ]] && continue
+
+    # 跳过隐藏目录
+    local basename
+    basename="$(basename "$skill_dir")"
+    [[ "$basename" == .* ]] && continue
+
+    # 检查是否是有效的技能目录（满足任一条件）：
+    # 1. 包含 SKILL.md 文件
+    # 2. 包含 .smile 文件
+    # 3. 包含 agents/ 子目录
+    local is_skill=false
+
+    if [[ -f "$skill_dir/SKILL.md" ]]; then
+      is_skill=true
+    elif [[ -f "$skill_dir/.smile" ]]; then
+      is_skill=true
+    elif [[ -d "$skill_dir/agents" ]]; then
+      is_skill=true
+    fi
+
+    if [[ "$is_skill" == true ]]; then
+      all_skill_dirs+=("$skill_dir")
+    fi
+  done < <(find "$src_root" -type d -print0 2>/dev/null)
+
+  # 第二遍：排除那些有子技能的父目录
+  # 如果一个技能目录的子目录中还有其他技能目录，则排除这个父目录
+  for skill_dir in "${all_skill_dirs[@]}"; do
+    local has_child_skill=false
+
+    for other_dir in "${all_skill_dirs[@]}"; do
+      # 检查 other_dir 是否是 skill_dir 的子目录
+      if [[ "$other_dir" != "$skill_dir" ]] && [[ "$other_dir" == "$skill_dir"/* ]]; then
+        has_child_skill=true
+        break
+      fi
+    done
+
+    # 只有当没有子技能时，才将这个目录加入最终列表
+    if [[ "$has_child_skill" == false ]]; then
+      final_skills+=("$skill_dir")
+    fi
+  done
+
+  # 输出去重后的技能路径
+  printf '%s\n' "${final_skills[@]}" | sort -u
+}
+
 install_skills() {
   local mode="$1"
   local dest_root="$2"
@@ -240,14 +286,36 @@ install_skills() {
 
   mkdir -p "$dest_root"
 
+  # 清理目标目录中所有失效的软链接（指向不存在的目标）
+  echo "清理失效的软链接..."
+  local cleaned=0
+  for item in "$dest_root"/*; do
+    if [[ -L "$item" ]]; then
+      local target
+      target="$(readlink "$item")"
+      if [[ ! -e "$target" ]]; then
+        rm -f "$item"
+        echo "  已移除：$item (原指向：$target)"
+        cleaned=$((cleaned + 1))
+      fi
+    fi
+  done
+  if [[ $cleaned -gt 0 ]]; then
+    echo "共移除 $cleaned 个失效软链接"
+  fi
+
+  # 收集所有技能（递归扫描，平铺输出）
+  local skill_paths=()
+  while IFS= read -r skill_path; do
+    [[ -n "$skill_path" ]] && skill_paths+=("$skill_path")
+  done < <(collect_all_skills "$SRC_ROOT")
+
+  echo "发现 ${#skill_paths[@]} 个技能"
+
   local installed=0
   local skipped=0
 
-  for src in "$SRC_ROOT"/*; do
-    if [[ ! -d "$src" ]]; then
-      continue
-    fi
-
+  for src in "${skill_paths[@]}"; do
     local name
     name="$(basename "$src")"
     local dest="$dest_root/$name"
