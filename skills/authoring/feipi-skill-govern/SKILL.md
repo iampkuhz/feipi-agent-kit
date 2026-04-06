@@ -33,7 +33,7 @@ description: 用于治理 repo 内 skill 的命名、触发、执行、模板、
 - `success_criteria`：本次要消除的失真点，例如旧命名、误触发、模板漂移、验证不闭环。
 
 2. 按需确认
-- `allowed_shared_files`：允许同步修改的共享文件；默认仅限直接关联的 `templates/`、`scripts/`、`references/`，必要时补 `README.md` / `CHANGELOG.md`。
+- `allowed_shared_files`：允许同步修改的共享文件；默认仅限确实共享的仓库根文件，如 `.env.example`、`README.md`、`CHANGELOG.md`。目标 skill 自己的 `templates/`、`scripts/`、`references/`、`assets/` 属于本地资源，不应继续挂在仓库公共目录。
 - `current_name` / `current_layer`：已有 skill 的当前名称与目录位置。
 - `validation_env`：是否能运行本地脚本、临时目录初始化、dry-run 校验。
 
@@ -65,6 +65,7 @@ description: 用于治理 repo 内 skill 的命名、触发、执行、模板、
 - 命名真源统一是 `feipi-<domain>-<action>-<object...>`，`feipi-skill-govern` 是保留特例。
 - layer 只负责目录分层，不进入 skill 主语法，不为单个 skill 临时发明新 layer。
 - 仓库级脚本或 `make` 只能作为包装器；主流程必须可通过当前 skill 本地脚本闭环执行。
+- 仓库根目录不再保留给多个 skill 兜底的公共 `templates/`；模板要么放在 `feipi-skill-govern/templates/`，要么放在目标 skill 自己的 `templates/` 或 `assets/`。
 - 若发现历史 rename 建议是按旧规则得出的，只记录到待重审清单，不在本次顺手重命名其他 skills。
 
 ## 执行流程（治理态）
@@ -82,6 +83,7 @@ description: 用于治理 repo 内 skill 的命名、触发、执行、模板、
 3. Step 2：定点修复
 - 只修改目标 skill 与直接共享文件。
 - 同步修触发配置、`SKILL.md`、`references/`、`scripts/`、`assets/`、`templates/` 的一致性。
+- 若发现仓库根目录残留的公共模板或运行时脚本，优先迁回目标 skill 内部；无法证明仍被现役 skill 使用时，直接删除。
 - 检查项见 `assets/governance/step-2-execution-checklist.template.md`。
 
 4. Step 3：验证与收口

@@ -8,6 +8,7 @@
   - `agents/openai.yaml`
   - `scripts/test.sh`
 - `references/`、`assets/`、`templates/` 按需存在；没有复用价值时不要硬加目录。
+- 禁止在仓库根目录保留给多个 skill 兜底的公共 `templates/`；模板必须下沉到 `feipi-skill-govern/templates/` 或目标 skill 自己的 `templates/` / `assets/`。
 
 ## 命名与目录
 
@@ -32,6 +33,7 @@
 
 - 当前 skill 的核心流程必须可通过本地 `scripts/` 闭环执行。
 - 仓库级 `make` 或共享脚本只能作为包装器，不能成为唯一真入口。
+- 现役 skill 的运行时链路不得依赖仓库根 `feipi-scripts/` 之类的共享路径；仓库根脚本只允许承担安装、包装或兼容性迁移职责。
 - 调整目录、初始化、模板或校验规则时，必须同步检查：
   - 当前 skill 的 `scripts/`
   - 当前 skill 的 `templates/`

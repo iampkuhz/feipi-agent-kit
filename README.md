@@ -17,7 +17,7 @@ make install-links
 ```
 
 这会把 `skills/` 下的技能以软链接方式安装到目标目录（默认 `~/.agents/skills`）。
-如果某个 skill 仍通过 `$REPO_ROOT/...` 引用了仓库共享路径，安装时也会自动在目标根目录补齐对应软链接。
+当前现役 skill 已不依赖仓库根共享运行时路径；安装脚本里保留的共享路径补齐逻辑仅用于兼容历史迁移场景。
 
 可选示例：
 
@@ -45,7 +45,7 @@ make install-project PROJECT=/path/to/project
 ```
 
 这会把 `skills/` 下的技能以“实际拷贝”的方式安装到项目目录（默认 `<project>/.agents/skills`），并覆盖同名 skill。
-如果某个 skill 仍通过 `$REPO_ROOT/...` 引用了仓库共享路径，安装时也会复制到项目根目录下对应位置。
+当前现役 skill 已不依赖仓库根共享运行时路径；安装脚本里保留的共享路径复制逻辑仅用于兼容历史迁移场景。
 
 可选示例：
 

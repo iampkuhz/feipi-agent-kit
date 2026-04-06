@@ -1,7 +1,7 @@
 # 变更记录
 
 ## 2026-04-06
-- `feipi-skill-govern` v2：升级命名真源并补治理模板。
+- `feipi-skill-govern` v2：升级命名真源、补治理模板并移除根模板残留。
 - `feipi-video-read-url` v1：合并视频链路并内聚脚本。
 - `feipi-patent-generate-innovation-disclosure` v3：切换 v2 命名并补本地校验。
 - `feipi-plantuml-generate-architecture-diagram` v4：切换 v2 命名并补本地校验。
