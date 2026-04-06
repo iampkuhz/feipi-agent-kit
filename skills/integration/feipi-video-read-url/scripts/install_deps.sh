@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# 视频读取类 skill 的统一依赖安装/检查脚本
+# 视频 URL 读取 skill 的统一依赖安装/检查脚本
 # 依赖：yt-dlp, ffmpeg, whisper.cpp(whisper-cli), large-v3-q5_0 模型
 #
 # 用法：
-#   bash feipi-scripts/video/install_video_deps.sh            # 自动安装缺失依赖（支持 macOS + Homebrew）
-#   bash feipi-scripts/video/install_video_deps.sh --check    # 仅检查，不安装
+#   bash scripts/install_deps.sh            # 自动安装缺失依赖（支持 macOS + Homebrew）
+#   bash scripts/install_deps.sh --check    # 仅检查，不安装
 
 WHISPER_CPP_BIN_DEFAULT="/opt/homebrew/opt/whisper-cpp/bin/whisper-cli"
 WHISPER_MODEL_DIR_DEFAULT="$HOME/Library/Caches/whisper.cpp/models"
@@ -16,7 +16,7 @@ WHISPER_MODEL_URL="https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggm
 usage() {
   cat <<'USAGE'
 用法:
-  bash feipi-scripts/video/install_video_deps.sh [--check]
+  bash scripts/install_deps.sh [--check]
 
 参数:
   --check   仅检查依赖，不执行安装

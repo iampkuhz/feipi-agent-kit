@@ -1,0 +1,5 @@
+version: 1
+interface:
+  display_name: "视频 URL 读取与总结（中文）"
+  short_description: "按用户意图统一处理视频网站 URL，覆盖下载、转写、摘要和背景扩展。"
+  default_prompt: "请使用 feipi-video-read-url：只有在任务目标是处理视频 URL 时才触发；如果没有 URL、只处理本地文件，或要治理 skill 本身，不要误用当前 skill。先识别用户当前意图属于 `dryrun`、`video`、`audio`、`subtitle`、`whisper`、`summary`、`expand` 还是 `background-only`。如果用户只给 URL、意图不清，默认先做 `dryrun`，不直接真实下载。若用户要下载、提取或转写，统一通过 `scripts/download_video.sh` 执行；若用户要摘要或背景分析，统一通过 `scripts/extract_video_text.sh` 获取带时间戳文本，再用 `scripts/render_summary_prompt.sh` 或 `scripts/render_background_prompt.sh` 生成请求包。高质量、准确或逐字诉求默认走 `accurate`，其他情况默认 `fast`。未明确要求背景时，只做 `summary`，不得主动补充背景、影响或相关新闻；只有显式要求扩展分析时，才进入 `expand`；若用户单独问来龙去脉或上下文背景，才进入 `background-only`。当前统一入口支持 YouTube 与 Bilibili，后续新增站点也应继续在同一个 skill 内扩展，不再拆成新的站点 skill。"

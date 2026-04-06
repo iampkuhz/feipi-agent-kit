@@ -16,14 +16,14 @@
 - 问题：旧目录仍停留在 action-first 命名，且未完成 layer 归位与本地自校验闭环。
 - 处理：已在 2026-04-06 重审并落地到 `skills/authoring/feipi-patent-generate-innovation-disclosure/`。
 
+3. `feipi-read-youtube-video + feipi-read-bilibili-video + feipi-summarize-video-url -> skills/integration/feipi-video-read-url/`
+- 依据：三个 skill 实际形成同一条视频 URL 读取与总结链路，且都依赖同一组共享脚本。
+- 问题：旧结构按来源和摘要阶段拆散，命名仍来自 action-first 语法，公共脚本外置在仓库级目录。
+- 处理：已在 2026-04-06 合并为 `skills/integration/feipi-video-read-url/`，并完成本地脚本内聚。
+
 ## 已迁移或已存在但需重审的 skill
 
-- `skills/feipi-read-youtube-video`
-- `skills/feipi-read-bilibili-video`
-- `skills/feipi-summarize-video-url`
-
-共同原因：
-- 名称仍主要来自旧的 action-first 语法，或目录尚未完成 layer 归位。
+当前无新增待重审项。
 
 ## 应直接作废的未实施方案
 

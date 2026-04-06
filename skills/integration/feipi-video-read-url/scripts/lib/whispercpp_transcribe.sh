@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# whisper.cpp 转写共享脚本（仓库级）
+# whisper.cpp 转写共享脚本（当前 skill 内置）
 #
 # 用法：
-#   bash feipi-scripts/video/whispercpp_transcribe.sh <audio_file> <output_prefix> [language] [accurate|fast|auto]
+#   bash scripts/lib/whispercpp_transcribe.sh <audio_file> <output_prefix> [language] [accurate|fast|auto]
 #
 # 说明：
 # - 支持质量档位：
@@ -35,7 +35,7 @@ WHISPER_METAL_CACHE_TTL_SEC=3600
 WHISPER_METAL_CACHE_FILE="${TMPDIR:-/tmp}/whispercpp-metal-unavailable.cache"
 
 usage() {
-  echo "用法: bash feipi-scripts/video/whispercpp_transcribe.sh <audio_file> <output_prefix> [language] [accurate|fast|auto]" >&2
+  echo "用法: bash scripts/lib/whispercpp_transcribe.sh <audio_file> <output_prefix> [language] [accurate|fast|auto]" >&2
 }
 
 if [[ -z "$AUDIO_FILE" || -z "$OUTPUT_PREFIX" ]]; then

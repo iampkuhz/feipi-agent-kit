@@ -1,19 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# 依据 URL 来源调用依赖技能，提取文本。
+# 依据 URL 来源统一提取带时间戳文本。
 # 用法：
 #   bash scripts/extract_video_text.sh <url> [output_root_dir] [auto|subtitle|whisper] \
 #     [--instruction "用户原始指令"] [--quality auto|fast|accurate] [--check-deps]
-#
-# 档位策略（仅在需要 whisper 时生效）：
-# - --quality=auto：若指令明确要求高质量，则选 accurate；否则默认 fast。
-# - mode=auto + accurate：whisper 优先，失败后回退 subtitle。
-# - mode=auto + fast：subtitle 优先，失败后回退 whisper。
-#
-# 目录策略：
-# - 传入目录视为“根目录”，脚本会自动创建 source-url_key 子目录，避免多 URL 平铺。
-# - 例如：./tmp/video-text/youtube-5Foo8VUZlFM、./tmp/video-text/bilibili-BV1Q5fgBfExq。
 
 CHECK_ONLY="0"
 INSTRUCTION_TEXT=""
@@ -167,7 +158,7 @@ fi
 
 WHISPER_PROFILE="$(resolve_whisper_profile "$QUALITY_HINT" "$INSTRUCTION_TEXT" || true)"
 if [[ "$WHISPER_PROFILE" != "fast" && "$WHISPER_PROFILE" != "accurate" ]]; then
-  echo "无法解析 whisper 档位，请检查 quality/instruction 输入。" >&2
+  echo "无法解析 whisper 档位，请检查 quality 或 instruction 输入。" >&2
   exit 1
 fi
 
@@ -185,7 +176,7 @@ detect_source() {
     echo "bilibili"
     return 0
   fi
-  echo "不支持的视频来源: $url（仅支持 YouTube / Bilibili）" >&2
+  echo "不支持的视频来源: $url（当前仅支持 YouTube / Bilibili）" >&2
   return 1
 }
 
@@ -329,42 +320,40 @@ resolve_url_key() {
 }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-SKILLS_ROOT_DEFAULT="$(cd "$SKILL_DIR/.." && pwd)"
-SKILLS_ROOT="${AGENT_SKILLS_ROOT:-$SKILLS_ROOT_DEFAULT}"
-
+INSTALL_SCRIPT="$SCRIPT_DIR/install_deps.sh"
 SOURCE="$(detect_source "$URL")"
 URL_KEY="$(resolve_url_key "$SOURCE" "$URL")"
 RUN_DIR="$OUT_ROOT_DIR/${SOURCE}-${URL_KEY}"
 
-if [[ "$SOURCE" == "youtube" ]]; then
-  DEP_SKILL_DIR="$SKILLS_ROOT/feipi-read-youtube-video"
-  DEP_SCRIPT="$DEP_SKILL_DIR/scripts/download_youtube.sh"
-elif [[ "$SOURCE" == "bilibili" ]]; then
-  DEP_SKILL_DIR="$SKILLS_ROOT/feipi-read-bilibili-video"
-  DEP_SCRIPT="$DEP_SKILL_DIR/scripts/download_bilibili.sh"
-else
-  echo "未知来源: $SOURCE" >&2
+case "$SOURCE" in
+  youtube)
+    SOURCE_SCRIPT="$SCRIPT_DIR/download_youtube.sh"
+    ;;
+  bilibili)
+    SOURCE_SCRIPT="$SCRIPT_DIR/download_bilibili.sh"
+    ;;
+  *)
+    echo "未知来源: $SOURCE" >&2
+    exit 1
+    ;;
+esac
+
+if [[ ! -x "$INSTALL_SCRIPT" ]]; then
+  echo "缺少依赖安装脚本或不可执行: $INSTALL_SCRIPT" >&2
   exit 1
 fi
 
-if [[ ! -d "$DEP_SKILL_DIR" ]]; then
-  echo "缺少依赖 skill 目录: $DEP_SKILL_DIR" >&2
-  echo "请先配置依赖技能后再运行。" >&2
-  exit 1
-fi
-
-if [[ ! -x "$DEP_SCRIPT" ]]; then
-  echo "缺少依赖脚本或不可执行: $DEP_SCRIPT" >&2
-  echo "请先配置依赖技能后再运行。" >&2
+if [[ ! -x "$SOURCE_SCRIPT" ]]; then
+  echo "缺少来源脚本或不可执行: $SOURCE_SCRIPT" >&2
   exit 1
 fi
 
 if [[ "$CHECK_ONLY" == "1" ]]; then
+  bash "$INSTALL_SCRIPT" --check >/dev/null
   echo "dependency_ok=1"
   echo "source=$SOURCE"
   echo "run_dir=$RUN_DIR"
-  echo "script=$DEP_SCRIPT"
+  echo "script=$SOURCE_SCRIPT"
   echo "whisper_profile=$WHISPER_PROFILE"
   echo "selection_reason=$PROFILE_REASON"
   exit 0
@@ -378,10 +367,8 @@ run_mode() {
   local mode="$1"
   local auth_mode="${2:-auth}"
   local marker log_file newest_txt
-  local use_no_auth="0"
 
   if [[ "$auth_mode" == "no_auth" ]]; then
-    use_no_auth="1"
     log_file="$LOG_DIR/${SOURCE}-${mode}-noauth.log"
   else
     log_file="$LOG_DIR/${SOURCE}-${mode}.log"
@@ -391,16 +378,16 @@ run_mode() {
 
   set +e
   if [[ "$mode" == "whisper" ]]; then
-    if [[ "$use_no_auth" == "1" ]]; then
-      env AGENT_CHROME_PROFILE= AGENT_YOUTUBE_COOKIE_FILE= bash "$DEP_SCRIPT" "$URL" "$RUN_DIR" "$mode" "$WHISPER_PROFILE" >"$log_file" 2>&1
+    if [[ "$auth_mode" == "no_auth" && "$SOURCE" == "youtube" ]]; then
+      env AGENT_CHROME_PROFILE= AGENT_YOUTUBE_COOKIE_FILE= bash "$SOURCE_SCRIPT" "$URL" "$RUN_DIR" "$mode" "$WHISPER_PROFILE" >"$log_file" 2>&1
     else
-      bash "$DEP_SCRIPT" "$URL" "$RUN_DIR" "$mode" "$WHISPER_PROFILE" >"$log_file" 2>&1
+      bash "$SOURCE_SCRIPT" "$URL" "$RUN_DIR" "$mode" "$WHISPER_PROFILE" >"$log_file" 2>&1
     fi
   else
-    if [[ "$use_no_auth" == "1" ]]; then
-      env AGENT_CHROME_PROFILE= AGENT_YOUTUBE_COOKIE_FILE= bash "$DEP_SCRIPT" "$URL" "$RUN_DIR" "$mode" >"$log_file" 2>&1
+    if [[ "$auth_mode" == "no_auth" && "$SOURCE" == "youtube" ]]; then
+      env AGENT_CHROME_PROFILE= AGENT_YOUTUBE_COOKIE_FILE= bash "$SOURCE_SCRIPT" "$URL" "$RUN_DIR" "$mode" >"$log_file" 2>&1
     else
-      bash "$DEP_SCRIPT" "$URL" "$RUN_DIR" "$mode" >"$log_file" 2>&1
+      bash "$SOURCE_SCRIPT" "$URL" "$RUN_DIR" "$mode" >"$log_file" 2>&1
     fi
   fi
   local code=$?
@@ -426,7 +413,7 @@ run_mode_with_fallback() {
   fi
 
   if [[ "$SOURCE" == "youtube" && "$AUTH_PRESENT" -eq 1 ]]; then
-    echo "检测到 Cookie/浏览器认证可能导致失败，尝试无 Cookie 重试: mode=$mode" >&2
+    echo "检测到 Cookie 或浏览器认证可能导致失败，尝试无 Cookie 重试: mode=$mode" >&2
     if TEXT_FILE="$(run_mode "$mode" "no_auth")"; then
       return 0
     fi

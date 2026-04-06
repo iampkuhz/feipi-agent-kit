@@ -1,5 +1,0 @@
-version: 4
-interface:
-  display_name: "网页视频分段总结"
-  short_description: "按用户意图分段交付视频摘要、扩展背景或单独的上下文说明。"
-  default_prompt: "请使用 feipi-summarize-video-url：先识别用户意图是 `summary`、`expand` 还是 `background-only`。根据用户原始指令自动判断提取档位，明确高质量诉求走 `accurate`，其他情况默认 `fast`；必须通过来源技能和 `scripts/extract_video_text.sh` 获取带时间戳文本，不手写下载或转写流程。默认只做 `summary`：输出“摘要概述”和“附件（原始视频链接 + 转写文本路径）”，合并时间线，只用 [MM:SS]/[HH:MM:SS] 锚点，不主动补背景、影响或相关新闻。只有当用户明确要求扩展分析时，才继续调用 `scripts/render_background_prompt.sh --mode expand` 输出“相关影响和背景分析”；如果用户单独问视频的上下文背景，则调用 `scripts/render_background_prompt.sh --mode background-only`，只输出“上下文背景”。背景阶段若用户未明确要求相关新闻/最新进展，默认保持 `--news off`，优先稳定背景资料，不主动搜索相关新闻。"

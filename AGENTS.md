@@ -58,5 +58,5 @@ make install-links
 # 示例：AGENT=qoder make install-links
 
 # 统一入口执行 skill 测试
-make test SKILL=feipi-read-youtube-video
+make test SKILL=feipi-video-read-url
 ```

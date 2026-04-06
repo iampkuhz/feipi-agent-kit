@@ -91,6 +91,7 @@ feipi-<domain>-<action>-<object...>
 
 - `feipi-video-read-youtube`
 - `feipi-video-read-bilibili`
+- `feipi-video-read-url`
 - `feipi-video-summarize-url`
 - `feipi-plantuml-generate-architecture-diagram`
 - `feipi-plantuml-generate-sequence-diagram`

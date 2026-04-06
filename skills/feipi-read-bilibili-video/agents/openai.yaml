@@ -1,5 +1,0 @@
-version: 3
-interface:
-  display_name: "Bilibili 下载与转写（中文）"
-  short_description: "下载 Bilibili 视频或音频，支持 dryrun、字幕提取、whisper 转写和认证回退。"
-  default_prompt: "请使用 feipi-read-bilibili-video：先确认 URL、输出目录和目标模式。若用户需求不明确，默认先执行 `dryrun`；未指定输出目录时默认 `./downloads`；未明确允许时不自动做批量任务。再按 `video`、`audio`、`subtitle`、`whisper` 模式运行脚本。若字幕不可用或需登录态，再提示认证参数或切到 `whisper`。最后汇报执行命令、结果状态和产物路径。"

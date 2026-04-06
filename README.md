@@ -4,9 +4,9 @@
 |---|---|---------------------------------------|
 | `feipi-skill-govern` | 创建、重构、自检和治理其他 skill | 统一 v2 命名、layer、模板、脚本与验证边界，作为治理总入口 |
 | `feipi-patent-generate-innovation-disclosure` | 把零散创新点整理成专利创新交底书 | 先补齐专利名与使用场景，再协同架构图/时序图 skill 产出可校验交底书 |
+| `feipi-video-read-url` | 按用户意图统一处理视频 URL | 当前覆盖 YouTube/Bilibili 的下载、转写、摘要和背景扩展，后续站点继续在同一个 skill 内适配 |
 | `feipi-plantuml-generate-architecture-diagram` | 根据 architecture-brief 生成 PlantUML 架构图 | 先校验 brief，再检查命名覆盖、布局和渲染；把需求定义和画图执行分开 |
 | `feipi-plantuml-generate-sequence-diagram` | 根据 sequence-brief 生成 PlantUML 时序图 | 先校验 brief，再检查参与者覆盖、布局和渲染；把需求定义和画图执行分开 |
-| `feipi-read-youtube-video` | 下载 YouTube 视频或提取音频 | 支持下视频或只拿音频                            |
 
 ## 安装 Skill（最简单）
 
@@ -17,7 +17,7 @@ make install-links
 ```
 
 这会把 `skills/` 下的技能以软链接方式安装到目标目录（默认 `~/.agents/skills`）。
-如果 skill 脚本里通过 `$REPO_ROOT/...` 引用了仓库共享路径（例如 `feipi-scripts/video/*`），安装时也会自动在目标根目录补齐对应软链接（例如 `~/.codex/feipi-scripts`）。
+如果某个 skill 仍通过 `$REPO_ROOT/...` 引用了仓库共享路径，安装时也会自动在目标根目录补齐对应软链接。
 
 可选示例：
 
@@ -45,7 +45,7 @@ make install-project PROJECT=/path/to/project
 ```
 
 这会把 `skills/` 下的技能以“实际拷贝”的方式安装到项目目录（默认 `<project>/.agents/skills`），并覆盖同名 skill。
-如果 skill 脚本里通过 `$REPO_ROOT/...` 引用了仓库共享路径（例如 `feipi-scripts/video/*`），安装时也会复制到项目根目录下对应位置。
+如果某个 skill 仍通过 `$REPO_ROOT/...` 引用了仓库共享路径，安装时也会复制到项目根目录下对应位置。
 
 可选示例：
 

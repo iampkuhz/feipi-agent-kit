@@ -1,0 +1,25 @@
+# 每行格式：<kind>|<url>|<arg3>|<arg4>|<arg5>
+#
+# kind=download:
+#   download|<url>|<mode>|[whisper_profile]|
+#
+# kind=summary:
+#   summary|<url>|<instruction>|<expected_profile>|<selection|extract>
+
+# 统一下载入口：YouTube dryrun
+download|https://www.youtube.com/watch?v=wyVsPzzC_vo|dryrun||
+
+# 统一下载入口：Bilibili dryrun
+download|https://www.bilibili.com/video/BV1GJ411x7h7|dryrun||
+
+# 自动选档：默认速度优先，应选 fast
+summary|https://www.youtube.com/watch?v=wyVsPzzC_vo|请快速提取并总结重点|fast|selection
+
+# 自动选档：明确要求高质量，应选 accurate
+summary|https://www.youtube.com/watch?v=wyVsPzzC_vo|请高质量逐字转写，准确优先|accurate|selection
+
+# 统一提取 + 摘要请求包：YouTube
+summary|https://www.youtube.com/watch?v=6OiE0jIY93c||fast|extract
+
+# 统一提取 + 摘要请求包：Bilibili
+summary|https://www.bilibili.com/video/BV1LRcLzREG9||fast|extract
