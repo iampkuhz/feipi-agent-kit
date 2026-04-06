@@ -26,9 +26,11 @@
 
 ## 共享脚本和本地 wrapper 分叉
 
-**症状**：`feipi-scripts/`、`templates/` 和 `skills/feipi-gen-skills/scripts/` 分别实现同一件事，但规则逐渐漂移。
+**症状**：`feipi-scripts/`、`templates/` 和 `skills/feipi-skill-govern/scripts/` 分别实现同一件事，但规则逐渐漂移。
 
 **修复**：明确主入口和 wrapper 关系，公共逻辑放共享脚本，skill 内脚本只做补充校验或转发。
+
+**新政策**：每个 skill 应独立运行，脚本和模板应回归 skill 本地，不再依赖仓库级共享实现。
 
 ---
 

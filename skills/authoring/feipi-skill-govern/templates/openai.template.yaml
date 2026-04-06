@@ -1,0 +1,5 @@
+version: 1
+interface:
+  display_name: "{{DISPLAY_NAME}}"
+  short_description: "{{SHORT_DESCRIPTION}}"
+  default_prompt: "{{DEFAULT_PROMPT}}"

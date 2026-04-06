@@ -50,6 +50,8 @@ feipi-<action>-<target...>
 - `translate`：翻译本地化
 - `design`：方案设计
 - `planning`：计划拆解
+- `govern`：技能治理与规范化
+- `skill`：skill 工程与治理（仅用于 `feipi-skill-govern`）
 
 ## target 规范（第三段及以后）
 

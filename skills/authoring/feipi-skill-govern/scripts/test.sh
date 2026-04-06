@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# feipi-gen-skills 自测入口。
+# feipi-skill-govern 自测入口。
 # 目标：除了校验自身结构，还验证初始化、校验与模板产物是否真的可用。
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -9,7 +9,7 @@ SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 INIT_SCRIPT="$SCRIPT_DIR/init_skill.sh"
 VALIDATE_SCRIPT="$SCRIPT_DIR/validate.sh"
 
-TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/feipi-gen-skills-test.XXXXXX")"
+TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/feipi-skill-govern-test.XXXXXX")"
 cleanup() {
   rm -rf "$TMP_ROOT"
 }
@@ -66,7 +66,7 @@ run_case() {
       grep -Fq "repo 维护命令" <<<"$output"
       ;;
     *)
-      echo "未知测试项: $case_name" >&2
+      echo "未知测试项：$case_name" >&2
       return 1
       ;;
   esac
@@ -88,9 +88,9 @@ do
   fi
 done
 
-echo "测试汇总: total=$TOTAL pass=$PASSED fail=$FAILED"
+echo "测试汇总：total=$TOTAL pass=$PASSED fail=$FAILED"
 if [[ "$FAILED" -ne 0 ]]; then
   exit 1
 fi
 
-echo "测试通过: feipi-gen-skills"
+echo "测试通过：feipi-skill-govern"

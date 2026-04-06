@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Skill 目录结构校验脚本
-# 用法：bash scripts/validate.sh <skill-dir>
+# feipi-skill-govern 的本地校验封装（标准入口）。
+# 目标：使用 skill 本地脚本校验目标 skill 目录，不依赖仓库级共享实现。
 
 usage() {
   cat <<'USAGE'
 用法:
   bash scripts/validate.sh <skill-dir>
+
+示例:
+  bash scripts/validate.sh skills/feipi-coding-react
+  bash scripts/validate.sh ../skills/feipi-coding-react
 USAGE
 }
 
@@ -21,33 +25,35 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   exit 0
 fi
 
-SKILL_INPUT="${1:-.}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SKILL_TOOL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-REPO_ROOT="$(cd "$SKILL_TOOL_DIR/../.." && pwd)"
-SHARED_VALIDATE="$REPO_ROOT/feipi-scripts/repo/quick_validate.sh"
+SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+VALIDATE_INTERNAL="$SCRIPT_DIR/quick_validate_internal.sh"
 
-if [[ ! -x "$SHARED_VALIDATE" ]]; then
-  echo "缺少共享校验脚本: $SHARED_VALIDATE" >&2
+if [[ ! -x "$VALIDATE_INTERNAL" ]]; then
+  echo "缺少内部校验脚本：$VALIDATE_INTERNAL" >&2
   exit 1
 fi
 
-if [[ -d "$SKILL_INPUT" ]]; then
-  TARGET_DIR="$(cd "$SKILL_INPUT" && pwd)"
-elif [[ -d "$REPO_ROOT/$SKILL_INPUT" ]]; then
-  TARGET_DIR="$(cd "$REPO_ROOT/$SKILL_INPUT" && pwd)"
-else
+SKILL_INPUT="${1:-.}"
+DIR="$SKILL_INPUT"
+
+if [[ ! -d "$DIR" && -d "$SKILL_DIR/../$SKILL_INPUT" ]]; then
+  DIR="$SKILL_DIR/../$SKILL_INPUT"
+fi
+
+if [[ ! -d "$DIR" ]]; then
   echo "错误：目录不存在：$SKILL_INPUT" >&2
   exit 1
 fi
 
+TARGET_DIR="$(cd "$DIR" && pwd)"
 SKILL_FILE="$TARGET_DIR/SKILL.md"
 OPENAI_FILE="$TARGET_DIR/agents/openai.yaml"
 TEST_SCRIPT="$TARGET_DIR/scripts/test.sh"
 
 echo "=== 校验 skill 目录：$TARGET_DIR ==="
 
-bash "$SHARED_VALIDATE" "$TARGET_DIR" >/dev/null
+bash "$VALIDATE_INTERNAL" "$TARGET_DIR" >/dev/null
 echo "[PASS] 共享结构校验通过"
 
 if [[ ! -f "$OPENAI_FILE" ]]; then
@@ -64,14 +70,14 @@ echo "[PASS] version 字段为顶层整数"
 
 for field in display_name short_description default_prompt; do
   if ! rg -q "^[[:space:]]+$field:[[:space:]]*.+$" "$OPENAI_FILE"; then
-    echo "[FAIL] agents/openai.yaml 缺少非空字段: $field" >&2
+    echo "[FAIL] agents/openai.yaml 缺少非空字段：$field" >&2
     exit 1
   fi
 done
 echo "[PASS] interface 关键字段齐全"
 
 if [[ ! -x "$TEST_SCRIPT" ]]; then
-  echo "[FAIL] 缺少可执行测试脚本: $TEST_SCRIPT" >&2
+  echo "[FAIL] 缺少可执行测试脚本：$TEST_SCRIPT" >&2
   exit 1
 fi
 echo "[PASS] scripts/test.sh 可执行"
@@ -89,11 +95,14 @@ do
 done
 
 for placeholder in "${placeholders[@]}"; do
-  if rg -F "$placeholder" "$TARGET_DIR" >/dev/null 2>&1; then
-    echo "[FAIL] 检测到未替换模板占位符: $placeholder" >&2
-    rg -Fn "$placeholder" "$TARGET_DIR" >&2 || true
-    exit 1
-  fi
+  # 只检查 SKILL.md、agents/openai.yaml 和 scripts/test.sh，不检查 templates/ 和脚本中的模板字符串
+  for file in "$TARGET_DIR/SKILL.md" "$TARGET_DIR/agents/openai.yaml" "$TARGET_DIR/scripts/test.sh"; do
+    if [[ -f "$file" ]] && rg -Fq "$placeholder" "$file"; then
+      echo "[FAIL] 检测到未替换模板占位符：$placeholder (文件：$file)" >&2
+      rg -Fn "$placeholder" "$file" >&2 || true
+      exit 1
+    fi
+  done
 done
 echo "[PASS] 无未替换模板占位符"
 
@@ -106,26 +115,10 @@ echo "[PASS] scripts/*.sh 语法检查通过"
 while IFS= read -r ref_path; do
   [[ -z "$ref_path" ]] && continue
   if [[ ! -e "$TARGET_DIR/$ref_path" ]]; then
-    echo "[FAIL] SKILL.md 引用了不存在的路径: $ref_path" >&2
+    echo "[FAIL] SKILL.md 引用了不存在的路径：$ref_path" >&2
     exit 1
   fi
 done < <(rg -o 'references/[A-Za-z0-9._/-]+\.md|scripts/[A-Za-z0-9._/-]+\.sh' "$SKILL_FILE" | sort -u)
 echo "[PASS] SKILL.md 中的资源路径可解析"
 
-if [[ "$(basename "$TARGET_DIR")" == "feipi-gen-skills" ]]; then
-  for shared_path in \
-    "$REPO_ROOT/templates/SKILL.template.md" \
-    "$REPO_ROOT/templates/openai.template.yaml" \
-    "$REPO_ROOT/templates/test.template.sh" \
-    "$REPO_ROOT/feipi-scripts/repo/init_skill.sh" \
-    "$REPO_ROOT/feipi-scripts/repo/quick_validate.sh"
-  do
-    if [[ ! -e "$shared_path" ]]; then
-      echo "[FAIL] 缺少直接关联的共享文件: $shared_path" >&2
-      exit 1
-    fi
-  done
-  echo "[PASS] 直接关联的共享脚手架文件齐全"
-fi
-
-echo "校验通过: $TARGET_DIR"
+echo "校验通过：$TARGET_DIR"

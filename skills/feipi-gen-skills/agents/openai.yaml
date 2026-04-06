@@ -1,5 +1,0 @@
-version: 4
-interface:
-  display_name: "Skill 生成与重构（中文）"
-  short_description: "按仓库规范创建或重构 skill，并同步脚手架、校验与版本记录。"
-  default_prompt: "请使用 feipi-gen-skills：先判断这次是新建、重构还是修复已有 skill，并锁定目标 skill 与允许改动的直接共享文件。若用户明确要优化 feipi-gen-skills，则允许修改它自身及直接关联的模板、共享脚本与文档。优化时优先让 skill 更容易被正确触发、更容易稳定产出、更容易验证，不只做目录整理；按“触发层 -> 执行层 -> 脚手架层 -> 验证层 -> 版本记录”定位问题。实现时同步更新目标 skill 的 SKILL.md、agents/openai.yaml 以及必要的 references/scripts/assets；若改动影响初始化或校验入口，还要同步 templates、feipi-scripts 与相关说明。验证默认执行 make validate DIR=<skill-dir>，若存在统一测试入口，再执行 make test SKILL=<name> 或等价脚本；若改了模板或初始化逻辑，至少生成一个临时 skill 验证产物。若目标 skill 被修改，按 version-policy 和 changelog-policy 处理当天版本与合并摘要，并汇报结构改进、效果改进、验证结果与剩余风险。"

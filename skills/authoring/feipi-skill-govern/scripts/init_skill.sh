@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# feipi-gen-skills 的本地初始化封装。
-# 目标：转发到仓库共享初始化脚本，并对生成结果做一次本地校验。
+# feipi-skill-govern 的本地初始化封装（标准入口）。
+# 目标：使用 skill 本地模板和脚本初始化新 skill，不依赖仓库级共享实现。
 
 usage() {
   cat <<'USAGE'
@@ -28,17 +28,16 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-REPO_ROOT="$(cd "$SKILL_DIR/../.." && pwd)"
-SHARED_INIT="$REPO_ROOT/feipi-scripts/repo/init_skill.sh"
+INIT_INTERNAL="$SCRIPT_DIR/init_skill_internal.sh"
 VALIDATE_SCRIPT="$SCRIPT_DIR/validate.sh"
 
-if [[ ! -x "$SHARED_INIT" ]]; then
-  echo "缺少共享初始化脚本: $SHARED_INIT" >&2
+if [[ ! -x "$INIT_INTERNAL" ]]; then
+  echo "缺少内部初始化脚本：$INIT_INTERNAL" >&2
   exit 1
 fi
 
 if [[ ! -x "$VALIDATE_SCRIPT" ]]; then
-  echo "缺少本地校验脚本: $VALIDATE_SCRIPT" >&2
+  echo "缺少本地校验脚本：$VALIDATE_SCRIPT" >&2
   exit 1
 fi
 
@@ -93,23 +92,23 @@ resolve_target_root() {
   local target="$1"
   case "$target" in
     auto)
-      if [[ -d "$REPO_ROOT/skills" ]]; then
-        echo "$REPO_ROOT/skills"
+      if [[ -d "$SKILL_DIR/../skills" ]]; then
+        echo "$SKILL_DIR/../skills"
       else
-        echo "$REPO_ROOT/.agents/skills"
+        echo "$SKILL_DIR/../../.agents/skills"
       fi
       ;;
     skills)
-      echo "$REPO_ROOT/skills"
+      echo "$SKILL_DIR/../skills"
       ;;
     repo)
-      echo "$REPO_ROOT/.agents/skills"
+      echo "$SKILL_DIR/../../.agents/skills"
       ;;
     /*)
       echo "$target"
       ;;
     *)
-      echo "$REPO_ROOT/$target"
+      echo "$SKILL_DIR/../$target"
       ;;
   esac
 }
@@ -120,10 +119,10 @@ TARGET_ROOT="$(resolve_target_root "$TARGET_INPUT")"
 TARGET_SKILL_DIR="$TARGET_ROOT/$SKILL_NAME"
 
 echo "=== 初始化 skill: $SKILL_NAME ==="
-echo "资源: $RESOURCES"
-echo "目标根目录: $TARGET_ROOT"
+echo "资源：$RESOURCES"
+echo "目标根目录：$TARGET_ROOT"
 
-bash "$SHARED_INIT" "$SKILL_INPUT" --resources "$RESOURCES" --target "$TARGET_INPUT"
+bash "$INIT_INTERNAL" "$SKILL_INPUT" --resources "$RESOURCES" --target "$TARGET_INPUT"
 bash "$VALIDATE_SCRIPT" "$TARGET_SKILL_DIR" >/dev/null
 
-echo "初始化并校验完成: $TARGET_SKILL_DIR"
+echo "初始化并校验完成：$TARGET_SKILL_DIR"

@@ -13,7 +13,7 @@
 ## 升版时机
 
 - 只要该 skill 自身发生更新（如 `SKILL.md`、`agents/openai.yaml`、`scripts/`、`references/`、`assets/` 变更且会影响使用、维护或触发），都必须检查该 skill 当天是否已升版。
-- 若目标 skill 明确是 `feipi-gen-skills`，则与其直接绑定的共享模板、初始化脚本、校验脚本更新，也按该 skill 的一次变更处理。
+- 若目标 skill 明确是 `feipi-skill-govern`，则与其直接绑定的共享模板、初始化脚本、校验脚本更新，也按该 skill 的一次变更处理。
 - 若该 skill 当天尚未升版，则当天首次修改时递增该 `version`。
 - 若该 skill 当天已经升版且继续修改，则继续沿用当天版本，不重复升版。
 - 仅修改仓库级公共文件、且未改动某个 skill 自身时，不得顺带提升无关 skill 的版本号。

@@ -20,13 +20,13 @@
 
 3. Implement
 - 修误触发或漏触发：优先改 `description`、`short_description`、`default_prompt`。
-- 修“会触发但做不好”：优先改 `SKILL.md` 的输入、输出、默认策略、失败处理与验证路径。
-- 修模板或共享脚手架失真：同步改 `templates/`、`feipi-scripts/` 与本 skill 的 wrapper 脚本。
+- 修”会触发但做不好”：优先改 `SKILL.md` 的输入、输出、默认策略、失败处理与验证路径。
+- 修模板或共享脚手架失真：同步改 `templates/` 与本 skill 的 wrapper 脚本。
 - 修目录或导航问题：减少重复规则，保留一份主规则，其余位置改为引用或摘要。
 
 4. Verify
-- 默认执行 `make validate DIR=<skill-root>/<name>`。
-- 若目标 skill 有统一测试入口，再执行 `make test SKILL=<name>` 或等价脚本。
+- 默认执行 `bash scripts/validate.sh <skill-dir>`。
+- 若目标 skill 有统一测试入口，再执行 `bash scripts/test.sh` 或等价脚本。
 - 若改了初始化模板或初始化脚本，必须生成一个临时 skill，并确认：
   - 目录结构符合约定。
   - 模板占位符已被替换。
@@ -43,7 +43,7 @@
 - 主要是执行问题：
   改 `SKILL.md` 正文，必要时补 `references/` 或 `scripts/`。
 - 主要是脚手架问题：
-  改 `templates/`、`feipi-scripts/repo/*.sh`、`skills/feipi-gen-skills/scripts/*.sh`。
+  改 `templates/`、当前 skill 本地的 `scripts/*.sh`。
 - 主要是验证问题：
   改 `scripts/test.sh`、`scripts/validate.sh`，并补更贴近真实场景的回归检查。
 - 主要是规则漂移：

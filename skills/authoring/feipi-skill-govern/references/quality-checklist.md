@@ -13,7 +13,7 @@
 - [ ] 变更记录与 README 同步符合 `references/changelog-policy.md`
 - [ ] 已确认目标 skill 的 `agents/openai.yaml` `version` 符合当日规则（首次修改升版，同日后续修改不重复升版）
 - [ ] `CHANGELOG.md` 已在对应日期下按该 skill 的新版本写清合并后的更新内容
-- [ ] 已运行 `make validate DIR=<skill-dir>`
+- [ ] 已运行 `bash scripts/validate.sh <skill-dir>`
 - [ ] 已完成至少一种任务级验证；若改了模板或初始化脚本，已生成临时 skill 验证
 - [ ] 已记录验证结果与剩余风险
 ```
