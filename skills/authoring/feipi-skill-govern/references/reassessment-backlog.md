@@ -11,9 +11,13 @@
 - 问题：该结论仍建立在旧 action-first 逻辑上，且 `web` 不是推荐 action。
 - 处理：已在 2026-04-06 重审并落地为 `skills/integration/feipi-dingtalk-send-webhook/`，本条不再属于待执行迁移。
 
+2. `feipi-gen-innovation-disclosure -> skills/authoring/feipi-patent-generate-innovation-disclosure/`
+- 依据：`feipi-skill-govern` 的 v2 命名示例已明确推荐 `feipi-patent-generate-innovation-disclosure`。
+- 问题：旧目录仍停留在 action-first 命名，且未完成 layer 归位与本地自校验闭环。
+- 处理：已在 2026-04-06 重审并落地到 `skills/authoring/feipi-patent-generate-innovation-disclosure/`。
+
 ## 已迁移或已存在但需重审的 skill
 
-- `skills/feipi-gen-innovation-disclosure`
 - `skills/feipi-read-youtube-video`
 - `skills/feipi-read-bilibili-video`
 - `skills/feipi-summarize-video-url`

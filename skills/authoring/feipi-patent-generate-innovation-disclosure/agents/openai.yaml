@@ -1,0 +1,5 @@
+version: 3
+interface:
+  display_name: "专利创新交底书生成（中文）"
+  short_description: "把零散创新点整理成固定模板交底书，并协同 PlantUML 图示与格式校验。"
+  default_prompt: "请使用 feipi-patent-generate-innovation-disclosure：只有在任务目标是产出完整专利创新交底书时才触发；若用户只要单张图、只做创意润色，或要治理 skill 本身，不要误用当前 skill。先从当前对话提取已知事实，再确认专利名、使用场景两项必填输入；缺失时先提问，不得自行脑补。若只有抽象口号，没有模块、步骤、阈值、失败环节或场景事实，先要求用户补充 3 至 5 条可核对事实。应用产品/项目（含时间）为可选输入，未提供时不追问，在对应章节写“暂无明确产品/项目（计划在该场景验证，时间待定）”或“无”。写作时必须使用 `assets/proposal_template.md`，不改主标题结构，先搭完整骨架再逐章填充；正文保持工程复盘口吻，先写事实再写判断，详细描述围绕最常见场景的一条完整流程展开，并统一使用 `S1...Sn` 编号。图示协同必须基于当前仓库中已存在的 PlantUML skill：模块图/分层图用 feipi-plantuml-generate-architecture-diagram，主流程图优先用 feipi-plantuml-generate-sequence-diagram；若图示未完成校验，不得直接贴入文档。完成后执行格式自检，若失败优先修复缺章、字数超限、图文序号不一致等硬错误。"

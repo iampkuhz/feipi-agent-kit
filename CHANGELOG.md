@@ -2,6 +2,7 @@
 
 ## 2026-04-06
 - `feipi-skill-govern` v2：升级命名真源并补治理模板。
+- `feipi-patent-generate-innovation-disclosure` v3：切换 v2 命名并补本地校验。
 - `feipi-plantuml-generate-architecture-diagram` v4：切换 v2 命名并补本地校验。
 - `feipi-plantuml-generate-sequence-diagram` v5：切换 v2 命名并补本地校验。
 - `feipi-dingtalk-send-webhook` v4：切换 v2 命名并补本地闭环。
