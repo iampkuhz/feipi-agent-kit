@@ -2,6 +2,8 @@
 
 ## 2026-04-06
 - `feipi-skill-govern` v2：升级命名真源并补治理模板。
+- `feipi-plantuml-generate-architecture-diagram` v4：切换 v2 命名并补本地校验。
+- `feipi-plantuml-generate-sequence-diagram` v5：切换 v2 命名并补本地校验。
 - Step 2B 迁移：`feipi-automate-dingtalk-webhook` → `skills/integration/feipi-web-dingtalk-webhook/`，action 从 `automate` 改为 `web`。
 
 ## 2026-04-03

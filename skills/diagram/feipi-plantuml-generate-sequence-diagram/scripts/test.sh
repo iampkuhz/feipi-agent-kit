@@ -3,8 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-REPO_ROOT="$(cd "$SKILL_DIR/../.." && pwd)"
-VALIDATE_REPO_SCRIPT="$REPO_ROOT/feipi-scripts/repo/quick_validate.sh"
+VALIDATE_SCRIPT="$SCRIPT_DIR/validate.sh"
 VALIDATE_BRIEF_SCRIPT="$SCRIPT_DIR/validate_brief.py"
 COVERAGE_SCRIPT="$SCRIPT_DIR/check_coverage.py"
 LAYOUT_SCRIPT="$SCRIPT_DIR/lint_layout.sh"
@@ -18,9 +17,7 @@ EXTRA_MESSAGE_DIAGRAM="$SCRIPT_DIR/tests/extra-message-diagram.puml"
 MISSING_SEPARATOR_DIAGRAM="$SCRIPT_DIR/tests/missing-separator-diagram.puml"
 MOCK_RENDER_SERVER="$SCRIPT_DIR/tests/mock_plantuml_server.py"
 
-if [[ -x "$VALIDATE_REPO_SCRIPT" ]]; then
-  "$VALIDATE_REPO_SCRIPT" "$SKILL_DIR" >/dev/null
-fi
+bash "$VALIDATE_SCRIPT" "$SKILL_DIR" >/dev/null
 
 python3 "$VALIDATE_BRIEF_SCRIPT" "$VALID_BRIEF" >/dev/null
 
@@ -92,4 +89,4 @@ if [[ ! -f "$SVG_OUTPUT" ]]; then
   exit 1
 fi
 
-echo "测试通过：feipi-gen-plantuml-sequence-diagram"
+echo "测试通过：feipi-plantuml-generate-sequence-diagram"

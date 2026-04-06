@@ -3,7 +3,8 @@
 | Skill | 用途 | 特点                                    |
 |---|---|---------------------------------------|
 | `feipi-skill-govern` | 创建、重构、自检和治理其他 skill | 统一 v2 命名、layer、模板、脚本与验证边界，作为治理总入口 |
-| `feipi-gen-plantuml-arch-diagram` | 根据 architecture-brief 生成 PlantUML 架构图 | 先校验 brief，再检查命名覆盖、布局和渲染；把需求定义和画图执行分开 |
+| `feipi-plantuml-generate-architecture-diagram` | 根据 architecture-brief 生成 PlantUML 架构图 | 先校验 brief，再检查命名覆盖、布局和渲染；把需求定义和画图执行分开 |
+| `feipi-plantuml-generate-sequence-diagram` | 根据 sequence-brief 生成 PlantUML 时序图 | 先校验 brief，再检查参与者覆盖、布局和渲染；把需求定义和画图执行分开 |
 | `feipi-read-youtube-video` | 下载 YouTube 视频或提取音频 | 支持下视频或只拿音频                            |
 
 ## 安装 Skill（最简单）

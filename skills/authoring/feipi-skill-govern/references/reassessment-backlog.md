@@ -14,8 +14,6 @@
 ## 已迁移或已存在但需重审的 skill
 
 - `skills/integration/feipi-web-dingtalk-webhook`
-- `skills/diagram/feipi-gen-plantuml-architecture-diagram`
-- `skills/diagram/feipi-gen-plantuml-sequence-diagram`
 - `skills/feipi-gen-innovation-disclosure`
 - `skills/feipi-read-youtube-video`
 - `skills/feipi-read-bilibili-video`
@@ -42,4 +40,3 @@
 - 第一批建议优先重审：
   - 已落地 rename 的 `feipi-web-dingtalk-webhook`
   - 仍平铺在 `skills/` 根下的 skills
-  - 已分层但仍是旧 action-first 命名的 diagram skills

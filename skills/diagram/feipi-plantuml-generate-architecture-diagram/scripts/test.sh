@@ -3,8 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-REPO_ROOT="$(cd "$SKILL_DIR/../.." && pwd)"
-VALIDATE_REPO_SCRIPT="$REPO_ROOT/feipi-scripts/repo/quick_validate.sh"
+VALIDATE_SCRIPT="$SCRIPT_DIR/validate.sh"
 VALIDATE_BRIEF_SCRIPT="$SCRIPT_DIR/validate_brief.py"
 COVERAGE_SCRIPT="$SCRIPT_DIR/check_coverage.py"
 LAYOUT_SCRIPT="$SCRIPT_DIR/lint_layout.sh"
@@ -14,10 +13,9 @@ VALID_BRIEF="$SKILL_DIR/assets/examples/architecture-brief.example.yaml"
 VALID_DIAGRAM="$SKILL_DIR/assets/examples/architecture-diagram.example.puml"
 INVALID_BRIEF="$SCRIPT_DIR/tests/invalid-brief.yaml"
 INVALID_DIAGRAM="$SCRIPT_DIR/tests/invalid-diagram.puml"
+MOCK_RENDER_SERVER="$SCRIPT_DIR/tests/mock_plantuml_server.py"
 
-if [[ -x "$VALIDATE_REPO_SCRIPT" ]]; then
-  "$VALIDATE_REPO_SCRIPT" "$SKILL_DIR" >/dev/null
-fi
+bash "$VALIDATE_SCRIPT" "$SKILL_DIR" >/dev/null
 
 python3 "$VALIDATE_BRIEF_SCRIPT" "$VALID_BRIEF" >/dev/null
 
@@ -36,22 +34,47 @@ fi
 bash "$LAYOUT_SCRIPT" "$VALID_DIAGRAM" >/dev/null
 
 TMP_DIR="$(mktemp -d)"
-trap 'rm -rf "$TMP_DIR"' EXIT
+MOCK_PORT="$(python3 - <<'PY'
+import socket
+
+with socket.socket() as s:
+    s.bind(("127.0.0.1", 0))
+    print(s.getsockname()[1])
+PY
+)"
+
+cleanup() {
+  if [[ -n "${MOCK_PID:-}" ]]; then
+    kill "$MOCK_PID" >/dev/null 2>&1 || true
+    wait "$MOCK_PID" >/dev/null 2>&1 || true
+  fi
+  rm -rf "$TMP_DIR"
+}
+
+python3 "$MOCK_RENDER_SERVER" --port "$MOCK_PORT" >"$TMP_DIR/mock-render.log" 2>&1 &
+MOCK_PID=$!
+trap cleanup EXIT
+
+for _ in $(seq 1 30); do
+  if curl -sS "http://127.0.0.1:$MOCK_PORT/healthz" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 0.1
+done
+
 SVG_OUTPUT="$TMP_DIR/render.svg"
 
-set +e
-bash "$RENDER_SCRIPT" "$VALID_DIAGRAM" --svg-output "$SVG_OUTPUT" >/dev/null
-RENDER_CODE=$?
-set -e
-
-if [[ "$RENDER_CODE" -ne 0 && "$RENDER_CODE" -ne 4 ]]; then
-  echo "渲染检查失败，返回码: $RENDER_CODE" >&2
+if ! bash "$RENDER_SCRIPT" \
+  "$VALID_DIAGRAM" \
+  --server-url "http://127.0.0.1:$MOCK_PORT/plantuml" \
+  --svg-output "$SVG_OUTPUT" >/dev/null; then
+  echo "渲染检查未通过 mock 服务验证" >&2
   exit 1
 fi
 
-if [[ "$RENDER_CODE" -eq 0 && ! -f "$SVG_OUTPUT" ]]; then
+if [[ ! -f "$SVG_OUTPUT" ]]; then
   echo "渲染成功但未产出 svg 文件" >&2
   exit 1
 fi
 
-echo "测试通过: feipi-gen-plantuml-arch-diagram"
+echo "测试通过：feipi-plantuml-generate-architecture-diagram"
