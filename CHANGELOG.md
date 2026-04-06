@@ -1,6 +1,7 @@
 # 变更记录
 
 ## 2026-04-06
+- `feipi-skill-govern` v2：升级命名真源并补治理模板。
 - Step 2B 迁移：`feipi-automate-dingtalk-webhook` → `skills/integration/feipi-web-dingtalk-webhook/`，action 从 `automate` 改为 `web`。
 
 ## 2026-04-03

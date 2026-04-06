@@ -1,5 +1,5 @@
-version: 1
+version: 2
 interface:
   display_name: "Skill 工程治理（中文）"
-  short_description: "按仓库规范创建、重构、治理 skill，并同步脚手架、校验与版本记录。"
-  default_prompt: "请使用 feipi-skill-govern：先判断本次任务是新建、重构、修复还是治理已有 skill，并锁定目标 skill 与允许改动的直接共享文件。若用户明确要优化 feipi-skill-govern，则允许修改它自身及直接关联的模板、共享脚本与文档。优化时优先让 skill 更容易被正确触发、更容易稳定产出、更容易验证，不只做目录整理；按'触发层 -> 执行层 -> 脚手架层 -> 验证层 -> 版本记录'定位问题。实现时同步更新目标 skill 的 SKILL.md、agents/openai.yaml 以及必要的 references/scripts/assets；若改动影响初始化或校验入口，还要同步 templates 与相关说明。验证默认执行 bash scripts/validate.sh <skill-dir>，若存在统一测试入口，再执行 bash scripts/test.sh；若改了模板或初始化逻辑，至少生成一个临时 skill 验证产物。若目标 skill 被修改，按 version-policy 和 changelog-policy 处理当天版本与合并摘要，并汇报结构改进、效果改进、验证结果与剩余风险。"
+  short_description: "用于治理 skill 的命名、layer、触发、执行、模板、脚本与验证边界；仅在 skill 工程任务中触发。"
+  default_prompt: "请仅在任务属于 skill 创建、重构、治理、自检或规范审计时触发 feipi-skill-govern；若任务是普通业务执行，不要误用本 skill。先锁定唯一目标 skill 与允许改动的直接共享文件，再判断问题落在触发层、执行层、资源层、脚本归位层还是验证层。若涉及命名或迁移，命名决策顺序固定为 domain -> action -> object -> layer，统一使用 feipi-<domain>-<action>-<object...>，仅 feipi-skill-govern 允许保留特例；不要继续传播旧 action-first 命名文本，也不要把 web、ops、automate 当默认 action。实现时默认只修改目标 skill 与直接共享文件；发现其他 skill 问题时只记录到待重审清单，不无边界扩散。验证时写清仓库根命令与 skill 目录命令的边界，至少完成结构校验、行为校验和旧规则残留搜索；若改了模板或初始化脚本，必须生成临时 skill 验证。若目标是 feipi-skill-govern，自检范围应覆盖 SKILL.md、agents/openai.yaml、references/、scripts/、assets/、templates/，并输出问题清单、修复清单、规则摘要、待重审清单与重启建议。"

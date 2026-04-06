@@ -8,7 +8,7 @@ description: {{SKILL_DESCRIPTION}}
 ## 核心目标
 
 - 用一句话写清这个 skill 要稳定完成什么事。
-- 输出应可验证，而不是只给一段看起来合理的文字。
+- 输出必须可验证，而不是只给一段“看起来合理”的文字。
 
 ## 适用场景
 
@@ -30,9 +30,9 @@ description: {{SKILL_DESCRIPTION}}
 
 ## 工作流（Explore -> Plan -> Implement -> Verify）
 
-1. Explore：仅读取必要文件，避免无边界探索。
-2. Plan：先定义改动范围与验收标准，再实现。
-3. Implement：优先复用 `scripts/`、`references/`、`assets/`。
+1. Explore：只读取必要上下文，避免无边界探索。
+2. Plan：先定义范围、成功标准和验证方式，再实现。
+3. Implement：优先复用本 skill 本地 `scripts/`、`references/`、`assets/`。
 4. Verify：执行当前任务产物校验并记录结果。
 
 ## 输入与输出
@@ -42,6 +42,11 @@ description: {{SKILL_DESCRIPTION}}
 
 2. 输出
 - 写清最终要交付什么，以及如何让结果可核对。
+
+## 默认策略与失败处理
+
+- 默认策略：写清不需要用户反复确认时，skill 应如何推进。
+- 失败处理：写清输入缺失、外部依赖失败、校验失败时怎么收敛。
 
 ## 标准命令
 

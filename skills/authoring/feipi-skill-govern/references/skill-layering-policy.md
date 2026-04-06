@@ -1,133 +1,74 @@
 # Skills 分层规则
 
-## 目标
+## 核心原则
 
-解决 skills 目录平铺导致的问题：
-- 技能数量增长后难以导航
-- 职责边界模糊，难以判断新技能应放在哪里
-- 治理时无法按层批量处理
+- layer 只负责目录分层与治理导航，不进入 skill 主名称语法。
+- 命名决策顺序固定为 `domain -> action -> object -> layer`。
+- 不为单个 skill 临时发明 layer；新增 layer 必须能覆盖一组稳定的 skill 类型，而不是一次性安置问题。
+- layer 不能替代 domain；名称表达职责，layer 表达目录归位。
 
-## 分层结构
+## 当前允许的 layer
 
-```
-skills/
-├── authoring/          # 技能创作与治理
-│   └── feipi-skill-govern/
-├── diagram/            # 图表生成
-│   ├── feipi-gen-plantuml-arch-diagram/
-│   └── feipi-gen-plantuml-sequence-diagram/
-├── integration/        # 外部服务集成
-│   ├── feipi-read-youtube-video/
-│   ├── feipi-read-bilibili-video/
-│   ├── feipi-summarize-video-url/
-│   └── feipi-automate-dingtalk-webhook/
-└── platform/           # 平台/工具链集成
-    └── feipi-ops-openclaw-config/
-```
+### `authoring/`
 
-## 层定义
+- 职责：skill 创作、治理、重构、自检。
+- 适用：输入与输出都围绕 skill 本身展开。
 
-### authoring/
+### `diagram/`
 
-**职责**：用于创建、更新、重构、治理其他 skills 的技能。
+- 职责：图表、图形描述、渲染输入物的生成。
+- 适用：核心产物是图表代码、结构图、时序图等可视化结果。
 
-**典型特征**：
-- 输入是"某个 skill 的名称或目录"
-- 输出是"重构后的 skill 结构或文档"
-- 被治理的对象是 skills 本身
+### `integration/`
 
-**现有技能**：
-- `feipi-skill-govern`：Skill 工程治理总入口
+- 职责：外部平台、服务、内容源或消息通道的接入。
+- 适用：核心动作需要访问第三方平台、下载内容、发送 webhook、调用远程接口。
 
-**何时归入此层**：
-- 当技能的主要职责是治理其他 skills 时
+### `platform/`
 
-### diagram/
+- 职责：开发平台、运行平台、工具链或配置系统的管理。
+- 适用：核心动作是配置、管理、生成平台相关设置或运行参数。
 
-**职责**：生成可视化图表（PlantUML、流程图、时序图等）。
+## 判定方法
 
-**典型特征**：
-- 输入是"结构化描述或需求 brief"
-- 输出是"可渲染的图表代码或图片"
-- 核心能力是图表语法和布局
+1. 先按命名规范确定 `target_domain`、`target_action`、`target_object`。
+2. 再根据 skill 的主要职责选择 `target_layer`。
+3. 最终目录使用 `skills/<layer>/<skill-name>/`。
 
-**现有技能**：
-- `feipi-gen-plantuml-arch-diagram`：PlantUML 架构图生成
-- `feipi-gen-plantuml-sequence-diagram`：PlantUML 时序图生成
+## 常见误区
 
-**何时归入此层**：
-- 当技能的主要输出是图表代码或可视化设计时
+### 把 layer 写进 skill 名
 
-### integration/
+反例：
+- `feipi-integration-read-youtube`
+- `feipi-platform-configure-openclaw`
 
-**职责**：与外部服务/平台集成（视频平台、通讯工具、第三方 API）。
+问题：
+- layer 与名称重复表达，导致名称变长但语义没有更清楚。
 
-**典型特征**：
-- 输入是"外部服务的 URL 或配置"
-- 输出是"从外部服务提取的内容或操作结果"
-- 需要处理认证、API 调用、数据下载
+### 用 layer 兜底命名不清
 
-**现有技能**：
-- `feipi-read-youtube-video`：YouTube 视频/音频下载与转写
-- `feipi-read-bilibili-video`：Bilibili 视频/音频下载与转写
-- `feipi-summarize-video-url`：视频 URL 摘要
-- `feipi-automate-dingtalk-webhook`：钉钉机器人 webhook 发送
+反例：
+- “先放到 integration，再随便起名为 `feipi-web-dingtalk-webhook`”
 
-**何时归入此层**：
-- 当技能需要调用外部服务 API 或处理外部平台数据时
+问题：
+- `integration/` 只能说明目录归属，不能替代 action 的语义质量。
 
-### platform/
+### 为单个 skill 临时发明 layer
 
-**职责**：与开发平台/工具链集成（代码托管、CI/CD、配置管理）。
+反例：
+- 仅因为一个 skill 特殊，就新增 `skills/video/`、`skills/ops/`。
 
-**典型特征**：
-- 输入是"平台配置或仓库设置"
-- 输出是"平台配置文件或操作结果"
-- 需要理解特定平台的配置格式和工作流
+问题：
+- 目录层级会变成历史包袱，治理成本高于收益。
 
-**现有技能**：
-- `feipi-ops-openclaw-config`：OpenClaw 配置管理
+## 新增或调整 layer 的门槛
 
-**何时归入此层**：
-- 当技能的主要职责是管理开发平台或工具链配置时
+- 需要至少 3 个以上 skill 会稳定使用该 layer。
+- 需要能清楚区分与现有 layer 的边界。
+- 需要先更新 `feipi-skill-govern` 的规则、模板、脚本与导航，再允许落地。
 
-## 命名约束
+## 可保留的内容
 
-每个 skill 的名称仍必须满足：
-- `feipi-<action>-<target...>` 格式
-- action 在标准字典中
-- 总长度 <= 64 字符
-
-**layer 不进入 skill 名称**，layer 只用于目录归类。
-
-示例：
-- `feipi-gen-plantuml-arch-diagram` 放在 `skills/diagram/` 下
-- 名称不变，仍表达"生成 PlantUML 架构图"的职责
-- layer 帮助导航，不负责命名
-
-## 新建 skill 流程
-
-1. **判定 layer**：根据上述层定义，确定技能应归属的层
-2. **确定 skill 名**：按命名规范确定 `feipi-<action>-<target...>`
-3. **选择目标路径**：`skills/<layer>/<skill-name>/`
-4. **执行初始化**：使用 `feipi-skill-govern` 生成骨架
-
-## 迁移已有 skill
-
-若已有 skill 目录平铺在 `skills/` 下：
-1. 使用 `feipi-skill-govern` 分析其职责
-2. 判定应归属的 layer
-3. 移动到 `skills/<layer>/<skill-name>/`
-4. 更新引用和测试配置
-
-## 为什么不按技术栈分层
-
-- 技术栈（Python/JavaScript/Go）变化快，职责域相对稳定
-- 用户找技能时，先想"要做什么"，而不是"用什么写"
-- 治理时可以按层批量处理，如统一优化所有 `integration/` 下的认证逻辑
-
-## 层的扩展与合并
-
-- 新增层：当出现 3 个及以上技能共享同一职责域时，可新增层
-- 合并层：当层下技能少于 2 个且职责接近其他层时，考虑合并
-- 层名变更：需同步更新 `feipi-skill-govern` 和导航文档
+- `authoring/`、`diagram/`、`integration/`、`platform/` 的分层思想可继续保留。
+- 历史 skill 若名称仍是旧规则，可先记录到待重审清单；layer 本身不必因此废弃。

@@ -1,111 +1,121 @@
-# Skill 命名规范（强制版）
+# Skill 命名规范 v2
 
-## 目标
+## 唯一真源
 
-统一个人技能库命名，避免与外部技能重名，并且一眼看出技能用途。
-
-## 强制格式
-
-所有 skill 名称必须满足：
+除保留特例 `feipi-skill-govern` 外，仓库内 skill 名统一使用：
 
 ```txt
-feipi-<action>-<target...>
+feipi-<domain>-<action>-<object...>
 ```
 
-约束：
-- 前缀固定：`feipi-`
-- 至少 3 段（`feipi` + `action` + `target`）
-- 仅允许：小写字母、数字、连字符
-- 总长度 <= 64
-- 与目录名一致
-- 禁止保留词：`anthropic`、`claude`
+这是当前唯一有效的主语法；历史上的 action-first 命名文本与旧四段变体均不再作为现行规则文本使用。
 
-正则参考：
-- 基础：`^[a-z0-9-]{1,64}$`
-- 结构：`^feipi-[a-z0-9]+-[a-z0-9-]+$`
+## 四段含义
 
-## action 标准字典（第二段固定）
+1. `feipi`
+- 固定前缀，用于仓库内唯一识别。
 
-仅允许以下 action：
-- `coding`：生成/修改代码
-- `gen`：通用内容生成（文档、模板、配置）
-- `read`：读取/提取信息（含视频、音频、文档）
-- `write`：写入/改写
-- `analyze`：分析与归纳
-- `review`：审查与评估
-- `test`：测试相关
-- `debug`：故障排查
-- `refactor`：重构
-- `docs`：文档工程
-- `data`：数据处理
-- `git`：版本控制工作流
-- `web`：前端与页面
-- `ops`：运维与发布
-- `build`：构建相关
-- `deploy`：部署相关
-- `migrate`：迁移相关
-- `automate`：自动化流程
-- `monitor`：监控巡检
-- `summarize`：摘要汇总
-- `translate`：翻译本地化
-- `design`：方案设计
-- `planning`：计划拆解
-- `govern`：技能治理与规范化
-- `skill`：skill 工程与治理（仅用于 `feipi-skill-govern`）
+2. `domain`
+- 能力域、工具域、集成域或场景域。
+- 目标是先说明“在哪个能力上下文里做事”，例如 `video`、`plantuml`、`dingtalk`、`openclaw`。
 
-## target 规范（第三段及以后）
+3. `action`
+- 动词原形，说明 skill 的核心动作。
+- 应优先选择可执行、可验证的动作词，例如 `read`、`generate`、`summarize`、`configure`、`send`、`review`。
 
-- 使用对象/载体/场景词，尽量具体。
-- 推荐 1~3 段，避免过长。
+4. `object`
+- 对象、载体或产物。
+- 用来说明 action 作用在什么上，例如 `youtube`、`webhook`、`architecture-diagram`、`innovation-disclosure`。
 
-示例 target：
-- `react-components`
-- `api-tests`
-- `video-transcript`
-- `pdf-forms`
-- `pr-comments`
+## 命名决策顺序
 
-## 你关心的常见命名示例
+命名时严格按以下顺序判断，不要倒推：
 
-1. 生成代码：
-- `feipi-coding-react-components`
-- `feipi-coding-api-clients`
-- `feipi-gen-code-snippets`（偏模板化生成）
+1. 先定 `domain`
+2. 再定 `action`
+3. 再定 `object`
+4. 最后定 `layer`
 
-2. 读取视频：
-- `feipi-read-video-transcript`
-- `feipi-read-video-keyframes`
-- `feipi-read-video-summary`
+说明：
+- layer 是目录归位决策，不参与主名称拼装。
+- 若 `domain` 还没想清楚，不要先用一个宽泛 action 抢占名称。
 
-3. 测试与调试：
-- `feipi-test-api-contracts`
-- `feipi-debug-build-failures`
+## 强制约束
 
-4. 文档与评审：
-- `feipi-docs-architecture-notes`
-- `feipi-review-pull-requests`
+- 全小写。
+- kebab-case。
+- 仅允许字母、数字、连字符。
+- 总长度建议不超过 64。
+- 名称要兼顾可读性、可区分性、可治理性。
+- 尽量避免无意义缩写；若必须缩写，需是团队已有稳定术语。
 
-## 禁止命名
+## action 选择规则
 
-- `helper`、`utils`、`tools`、`misc`
-- `my-skill`、`temp`、`tmp-fix`
-- 带时间版本：`report-2026-q1`、`skill-v2`
+- action 必须是动词原形。
+- action 应表达稳定主动作，而不是技术栈、渠道或泛化标签。
+- 不把 `web`、`ops`、`automate`、`misc`、`helper`、`utils` 当默认 action 推荐。
+- 若第二段本身已经像 `read`、`generate`、`summarize` 这类动词，通常说明你把旧 action-first 命名直接搬过来了，应先回到 domain 重新命名。
+- 若动作不清晰，先回到任务本身，明确“它到底在做什么”。
 
-## 冲突处理
+反例：
+- `feipi-dingtalk-web-webhook`
+- `feipi-openclaw-ops-config`
+- `feipi-video-automate-summary`
 
-1. 如果与现有 skill 语义重叠，优先扩展原 skill，不新建重复项。
-2. 若确需拆分，使用更具体 target 区分：
-- `feipi-coding-react-components`
-- `feipi-coding-react-hooks`
+更合理的命名方向：
+- `feipi-dingtalk-send-webhook`
+- `feipi-openclaw-configure-runtime`
+- `feipi-video-summarize-url`
 
-## 新建前检查清单
+## domain 选择规则
+
+- domain 应优先表达能力域、工具域、平台域或集成对象，而不是目录层名。
+- 不要为了迁就 layer 直接把 `integration`、`platform`、`authoring` 写进 skill 名。
+- 若 layer 与 domain 重复，优先保留更具体的 domain。
+
+反例：
+- `feipi-integration-read-youtube`
+- `feipi-platform-configure-openclaw`
+
+更合理的命名方向：
+- `feipi-video-read-youtube`
+- `feipi-openclaw-configure-runtime`
+
+## object 选择规则
+
+- object 必须落到对象、载体或产物，而不是空泛尾巴。
+- 优先用 1 到 3 段描述对象，避免过长尾串。
+- object 若天然是复合词，使用 kebab-case 拆开。
+
+## 推荐示例
+
+- `feipi-video-read-youtube`
+- `feipi-video-read-bilibili`
+- `feipi-video-summarize-url`
+- `feipi-plantuml-generate-architecture-diagram`
+- `feipi-plantuml-generate-sequence-diagram`
+- `feipi-dingtalk-send-webhook`
+- `feipi-openclaw-configure-runtime`
+- `feipi-patent-generate-innovation-disclosure`
+
+## 禁止示例
+
+- `feipi-read-youtube-video`
+- `feipi-gen-plantuml-architecture-diagram`
+- `feipi-ops-openclaw-config`
+- `feipi-web-dingtalk-webhook`
+- `helper`、`utils`、`misc`、`tmp-fix`
+
+## 新建或重命名前检查清单
 
 ```txt
 命名检查
-- [ ] 以 feipi- 开头
-- [ ] 格式为 feipi-<action>-<target...>
-- [ ] action 在标准字典中
-- [ ] 名称总长 <= 64
-- [ ] 不含 anthropic/claude
-- [ ] 与现有技能不重复
+- [ ] 已先确定 target_domain
+- [ ] 已先确定 target_action
+- [ ] 已先确定 target_object
+- [ ] 已确认 target_layer 只用于目录，不进入 skill 主语法
+- [ ] 目标名符合 feipi-<domain>-<action>-<object...>
+- [ ] action 是动词原形，不是 web/ops/automate 等低语义词
+- [ ] 未与现有 skill 语义重复
+- [ ] 已在 Step 1.5 记录 rename_reason、rule_violation、migration_risk
 ```

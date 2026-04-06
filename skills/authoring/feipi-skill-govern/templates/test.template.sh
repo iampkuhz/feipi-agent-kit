@@ -3,14 +3,13 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-REPO_ROOT="$(cd "$SKILL_DIR/../.." && pwd)"
-VALIDATE_SCRIPT="$REPO_ROOT/feipi-scripts/repo/quick_validate.sh"
 
-if [[ -x "$VALIDATE_SCRIPT" ]]; then
-  "$VALIDATE_SCRIPT" "$SKILL_DIR" >/dev/null
-else
-  [[ -f "$SKILL_DIR/SKILL.md" ]]
-  [[ -f "$SKILL_DIR/agents/openai.yaml" ]]
-fi
+[[ -f "$SKILL_DIR/SKILL.md" ]]
+[[ -f "$SKILL_DIR/agents/openai.yaml" ]]
+[[ -x "$SKILL_DIR/scripts/test.sh" ]]
 
+! rg -Fq '{{' "$SKILL_DIR/SKILL.md" "$SKILL_DIR/agents/openai.yaml" "$SKILL_DIR/scripts/test.sh"
+! rg -n 'make[[:space:]]+(new|test|validate)|^##[[:space:]]*维护与回归' "$SKILL_DIR/SKILL.md"
+
+bash -n "$SKILL_DIR/scripts/test.sh"
 echo "测试通过: {{SKILL_NAME}}"

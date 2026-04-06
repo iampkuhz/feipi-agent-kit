@@ -1,68 +1,91 @@
-# 工作流与迭代
+# 工作流与执行边界
 
-## 目标导向原则
-- 目标边界优先：先锁定本次要交付的目标 skill；被读取的工作流说明书不自动进入改动范围。
-- 效果优先：优先修会影响触发准确性、执行稳定性和验证可信度的问题，再处理纯结构美化。
-- 一处改动，多处对齐：初始化、校验、模板、文档和共享脚本只要描述同一件事，就不能各说各话。
-- 验证优先：无可执行验证证据，视为未完成。
-- 渐进式披露：`SKILL.md` 负责导航和默认路径，长规则、样例和清单下沉到 `references/`。
+## 总原则
 
-## 五步工作流
-1. Explore
-- 识别当前任务属于新建、重构、修复还是统一规范。
-- 判断问题落在触发层、执行层、脚手架层还是验证层。
-- 只读必要文件，先看入口文件，再定向打开相关脚本和 reference。
+- 先规则后实现：先锁定真规则和边界，再修改文件。
+- 目标收敛：默认只治理一个目标 skill。
+- 治理优先：先修命名、触发、执行、脚本归位、验证闭环，再做纯文案整理。
+- 验证优先：没有结构校验、行为校验和旧规则残留搜索，就不算完成。
 
-2. Plan
-- 写清目标 skill、直接关联的共享文件、验证方式和回归风险。
-- 先决定“最小有效改动集”，避免把发现的所有问题都捆成一次大重构。
-- 若用户只点名一个目标 skill，默认不扩散到其他 skill。
+## 执行顺序
 
-3. Implement
-- 修误触发或漏触发：优先改 `description`、`short_description`、`default_prompt`。
-- 修”会触发但做不好”：优先改 `SKILL.md` 的输入、输出、默认策略、失败处理与验证路径。
-- 修模板或共享脚手架失真：同步改 `templates/` 与本 skill 的 wrapper 脚本。
-- 修目录或导航问题：减少重复规则，保留一份主规则，其余位置改为引用或摘要。
+1. Scope
+- 判断任务是否真的是 skill 治理任务。
+- 锁定 `target_skill`、`task_type`、`allowed_shared_files`。
+- 若用户没有点名多 skill，不扩散到其他 skills。
 
-4. Verify
-- 默认执行 `bash scripts/validate.sh <skill-dir>`。
-- 若目标 skill 有统一测试入口，再执行 `bash scripts/test.sh` 或等价脚本。
-- 若改了初始化模板或初始化脚本，必须生成一个临时 skill，并确认：
-  - 目录结构符合约定。
-  - 模板占位符已被替换。
-  - 生成的 `SKILL.md` 不含仓库维护命令。
-  - 生成结果可通过校验与最小测试。
+2. Step 1 基线审计
+- 读取 `SKILL.md`、`agents/openai.yaml`、直接使用到的 `references/`、`scripts/`、`assets/`、`templates/`。
+- 输出问题清单，标记命名、layer、触发、执行、资源、脚本归位、验证状态。
 
-5. Iterate
-- 先看失败样例、误触发/漏触发案例和维护成本，再决定继续改哪里。
-- 只有“更好看”但没有更稳、更清楚或更易验证，不算完成。
+3. Step 1.5 命名与归位评审
+- 仅在命名、路径、layer 有争议时进入此步。
+- 严格按 `domain -> action -> object -> layer` 决策。
+- 若旧 rename 结论来自 action-first 规则，只能记录为待重审，不能直接沿用。
 
-## 问题到文件的映射
-- 主要是触发问题：
-  改 `SKILL.md` frontmatter、`agents/openai.yaml` 的 `short_description` / `default_prompt`。
-- 主要是执行问题：
-  改 `SKILL.md` 正文，必要时补 `references/` 或 `scripts/`。
-- 主要是脚手架问题：
-  改 `templates/`、当前 skill 本地的 `scripts/*.sh`。
-- 主要是验证问题：
-  改 `scripts/test.sh`、`scripts/validate.sh`，并补更贴近真实场景的回归检查。
-- 主要是规则漂移：
-  保留一份主规则，其他位置改为跳转或简短摘要，不维护多份长说明。
+4. Step 2 定点修复
+- 先改最影响结果稳定性的文件。
+- 触发问题：优先改 frontmatter、`agents/openai.yaml`。
+- 执行问题：优先改 `SKILL.md`、直接关联的 `references/`。
+- 资源和脚本问题：优先改本地 `scripts/`、`assets/`、`templates/`，不要继续把仓库级包装器当核心依赖。
+
+5. Step 3 验证与收口
+- 结构校验：`bash scripts/validate.sh <skill-dir>`。
+- 行为校验：`bash scripts/test.sh` 或更贴近目标 skill 的本地 test。
+- 旧规则残留搜索：搜索旧命名文本、过时模板占位符、旧入口依赖。
+- 版本与记录：按 `references/version-policy.md` 与 `references/changelog-policy.md` 收口。
+
+## 文件与问题映射
+
+- 命名 / layer 问题：
+  改 `references/naming-conventions.md`、`references/skill-layering-policy.md`、相关脚本校验逻辑。
+- 误触发 / 漏触发：
+  改 frontmatter 与 `agents/openai.yaml`。
+- 执行边界不清：
+  改 `SKILL.md` 与 `references/governance-process.md`。
+- 模板漂移：
+  改 `templates/` 与 `assets/governance/`。
+- 本地闭环不足：
+  改 `scripts/init_skill*.sh`、`scripts/validate.sh`、`scripts/test.sh`。
+
+## 共享文件边界
+
+- 默认只允许修改目标 skill 自身文件。
+- 仅当模板、脚本或共享规则与目标 skill 直接绑定时，才允许连带修改对应共享文件。
+- README、CHANGELOG 只有在入口、命令、版本或治理说明直接变化时才同步。
+- 发现其他 skill 的问题时，记录到待重审清单，不顺手改名或迁移。
+
+## 失败处理
+
+- 目标不清：默认收敛到用户明确点名的 skill。
+- 与无关改动冲突：先停下来缩小影响面，不回滚别人的改动。
+- 无法验证：写清阻塞点、未覆盖环节和风险。
+- 历史流程已失真：暂停后续 Step 2x，回到 Step 1 重新建基线。
+
+## 命令边界
+
+### 仓库根目录执行
+
+```bash
+bash skills/authoring/feipi-skill-govern/scripts/validate.sh skills/authoring/feipi-skill-govern
+bash skills/authoring/feipi-skill-govern/scripts/init_skill.sh feipi-video-read-youtube --layer integration
+```
+
+### 当前 skill 目录执行
+
+```bash
+bash scripts/validate.sh .
+bash scripts/test.sh
+```
+
+说明：
+- `scripts/validate.sh` 是主结构校验入口。
+- `scripts/test.sh` 是主行为校验入口。
+- 仓库级 `make` 只能包装本地脚本，不可替代本地入口。
 
 ## 最低验证矩阵
-- 结构校验：文件存在、命名合法、frontmatter 合法、元数据齐全。
-- 内容校验：触发说明、输入输出、默认策略、验证要求是否成套出现。
-- 行为校验：至少覆盖一种真实动作，如初始化一个临时 skill、运行一次统一测试入口、验证一条失败路径。
-- 同步校验：若改动影响模板或共享脚本，要确认本 skill 文档与共享实现没有分叉。
 
-## 高风险任务处理
-- 触发条件：批量改动、共享规则变更、初始化入口变化、破坏性迁移。
-- 优先做法：先缩小影响面，再补自动化验证，不要只靠人工比对文本。
-
-## 用户协作方式
-- 先复用用户已提供的信息，再补问真正缺失项。
-- 优先给推荐方案，只有路径选择或风险明显分叉时再停下来确认。
-- 说明改动时，把“为什么它会让 skill 更稳”讲清楚，不只报文件名。
-
-## 反模式
-详见 `references/anti-patterns.md`。
+- 结构校验：目录位置、命名结构、frontmatter、`agents/openai.yaml`、脚本存在性。
+- 行为校验：至少覆盖一条真实动作链，例如初始化临时 skill 或运行目标 skill 的本地测试。
+- dry-run / 非破坏性验证：优先使用临时目录、只读搜索、占位符扫描。
+- 旧引用残留搜索：检查旧命名文本、旧 action-first 规则、旧 make 依赖是否残留在规范文件和模板中。

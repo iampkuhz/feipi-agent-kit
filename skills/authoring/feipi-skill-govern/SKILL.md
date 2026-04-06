@@ -1,143 +1,134 @@
 ---
 name: feipi-skill-govern
-description: 按仓库规范创建、重构、治理 skill，并同步脚手架、校验与版本记录。
+description: 用于治理 repo 内 skill 的命名、触发、执行、模板、脚本与验证边界；在创建、重构、自检或审计 skill 时使用。
 ---
 
 # Skill 工程治理（中文）
 
 ## 核心目标
 
-- 让目标 skill 更容易被正确触发、更容易稳定产出、更容易验证，而不只是在目录上"看起来规范"。
-- 以最小改动修复触发边界、执行流程、模板脚手架、验证入口和版本记录之间的不一致。
-- 交付可追溯：说明改了什么、为什么改、怎么验证、还有什么风险。
+- 让 `feipi-skill-govern` 成为后续 skill 治理的唯一正确入口，先修规则真源，再修脚本、模板与验证闭环。
+- 输出必须可追溯：问题清单、修复清单、验证结果、剩余风险、待重审项缺一不可。
+- 默认只治理目标 skill 与直接共享文件，不把发现的所有问题捆成一次无边界大迁移。
 
 ## 适用场景
 
-- 新建 repo 内 skill，并补齐脚手架、元数据与统一测试入口。
-- 重构已有 skill 的 `description`、`SKILL.md`、`references/`、`scripts/`、`assets/`。
-- 修复"会触发但做不对""不会触发/乱触发""模板和规范互相打架""验证失真"等问题。
-- 调整 skill 维护约定，并同步到直接关联的共享脚本、模板与文档。
-- **治理其他 skills**：使用本 skill 作为总入口，批量治理仓库内的其他 skills。
+- 新建 repo 内 skill，并确定 `domain -> action -> object -> layer`。
+- 重构已有 skill 的命名、layer、触发文案、执行流程、模板、脚本或验证方式。
+- 审计某个 skill 或 `feipi-skill-govern` 自身，清理旧规则、旧模板、旧校验残留。
+- 产出 Step 1、Step 1.5、Step 2 报告、rename plan、governance report 与待重审清单。
 
 ## 不适用场景
 
-- 普通业务代码开发、缺陷修复或仓库脚本维护，但任务本身与 skill 工作流无关。
-- 仅使用某个 skill 完成一次用户任务，而不是创建或优化 skill 本身。
-- 只想讨论创意方向、暂不落地文件改动的纯脑暴场景。
+- 普通业务任务、代码开发、数据处理或内容生成，本次目标不是治理 skill。
+- 仅使用某个 skill 完成一次用户需求，而不是创建、重构或审计 skill 本身。
+- 未经用户明确授权就批量迁移多个 skills。
+- 发现其他 skill 也有问题时顺手大范围改名；此时只记录到待重审清单。
 
-## 先判断问题落在哪一层
+## 先确认什么
 
-1. **触发层**：`description`、`short_description`、`default_prompt` 是否准确描述"做什么、什么时候用、什么时候别用"。
-2. **执行层**：`SKILL.md` 是否明确输入、输出、默认策略、失败处理和验证方式。
-3. **资源层**：`references/` 是否按需拆分，`scripts/` / `assets/` 是否真正复用，而不是复制粘贴。
-4. **脚手架层**：初始化模板、目录标准、共享脚本是否与规约一致，能否生成可通过校验的骨架。
-5. **验证层**：校验与测试是否同时覆盖结构正确性和行为正确性，而不是只搜关键词。
+1. 必填
+- `target_skill`：本次要治理的唯一目标 skill，或新建 skill 的目标能力。
+- `task_type`：`create` / `refactor` / `govern` / `self-audit`。
+- `success_criteria`：本次要消除的失真点，例如旧命名、误触发、模板漂移、验证不闭环。
 
-## 默认交付要求
+2. 按需确认
+- `allowed_shared_files`：允许同步修改的共享文件；默认仅限直接关联的 `templates/`、`scripts/`、`references/`，必要时补 `README.md` / `CHANGELOG.md`。
+- `current_name` / `current_layer`：已有 skill 的当前名称与目录位置。
+- `validation_env`：是否能运行本地脚本、临时目录初始化、dry-run 校验。
 
-- 优先给出一个最小但完整的可执行方案，不把维护者留在"规则很多但不知道先改哪里"。
-- 若用户只点名一个目标 skill，默认只改该 skill 与直接关联的共享文件；不顺手扩散到其他 skill。
-- 若目标就是 `feipi-skill-govern`，允许同时改它自己的 `references/`、`scripts/`，以及直接关联的共享模板/脚本。
-- 只要改动影响初始化、校验、版本或文档入口，就要同步检查 `templates/`、共享脚本、`CHANGELOG.md`，必要时补查 `README.md`。
+## 输入与输出
+
+1. 输入
+- 用户目标、目标 skill 路径或名称、已知问题、历史 rename 结论或迁移上下文。
+- 现有 `SKILL.md`、`agents/openai.yaml`、`references/`、`scripts/`、`assets/`、`templates/`。
+
+2. 输出
+- 问题清单：哪些文件残留旧规则、违反了什么。
+- 修复结果：改了什么、为什么这样改、边界控制在哪里。
+- 验证结果：主验证入口、执行命令、通过/失败、剩余风险。
+- 治理产物：Step 1 / Step 1.5 / Step 2 模板、rename plan、governance report、待重审清单。
 
 ## 决策顺序
 
-1. 先修会直接影响效果的问题：误触发、漏触发、默认策略错误、模板产出不合规、验证失真。
-2. 再修会放大维护成本的问题：重复规则、入口不一致、目录拆分过细但缺少导航。
-3. 最后再做纯文案整理，避免"改了很多字，但行为没有更稳"。
+1. 先判断本次是不是治理型任务；若不是，不触发本 skill。
+2. 锁定唯一目标 skill 与允许改动的直接共享文件。
+3. 若涉及命名或归位，严格按 `domain -> action -> object -> layer` 决策。
+4. 判断问题落在哪层：触发层、执行层、资源层、脚本归位层、验证层。
+5. 只改最小有效改动集；发现其他 skill 问题只登记，不扩散执行。
+6. 完成本地验证、旧规则残留搜索、版本与变更记录同步，再关闭。
 
-## 仓库落地结构
+## 默认策略
 
-### 便携最小结构
+- 默认只改一个目标 skill；只有目标就是 `feipi-skill-govern` 时，才允许同时改它自己的 `references/`、`scripts/`、`assets/`、`templates/` 与直接关联入口文件。
+- `feipi-skill-govern` 是治理型 skill，不是普通业务 skill；触发说明必须写清“什么时候该用、什么时候不该用”。
+- 命名真源统一是 `feipi-<domain>-<action>-<object...>`，`feipi-skill-govern` 是保留特例。
+- layer 只负责目录分层，不进入 skill 主语法，不为单个 skill 临时发明新 layer。
+- 仓库级脚本或 `make` 只能作为包装器；主流程必须可通过当前 skill 本地脚本闭环执行。
+- 若发现历史 rename 建议是按旧规则得出的，只记录到待重审清单，不在本次顺手重命名其他 skills。
 
-- `SKILL.md`：skill 的入口说明与执行规则。
+## 执行流程（治理态）
 
-### 本仓库交付结构
+1. Step 1：基线审计
+- 读取目标 skill 的入口文件和直接资源。
+- 产出问题清单，标记命名、layer、触发、执行、资源、脚本归位、验证七类状态。
+- 模板见 `assets/governance/step-1-audit.template.md`。
 
-- `SKILL.md`
-- `agents/openai.yaml`
-- `scripts/test.sh`
-- `references/`：按需存在，放长规则、样例和清单。
-- `scripts/`：放确定性脚本；若修改初始化或校验逻辑，优先脚本化。
-- `assets/`：放模板或静态资源；只有真的被初始化或输出流程复用时才新增。
-- `templates/`：放初始化模板（若 skill 有初始化其他 skill 的职责）。
+2. Step 1.5：命名与归位评审
+- 只有涉及命名、layer 或迁移路径时进入此步。
+- 先定 `target_domain`，再定 `target_action`，再定 `target_object`，最后定 `target_layer`。
+- 模板见 `assets/governance/step-1-5-rename-review.template.md` 与 `assets/governance/rename-plan.template.md`。
 
-## 执行流程（开发态摘要）
+3. Step 2：定点修复
+- 只修改目标 skill 与直接共享文件。
+- 同步修触发配置、`SKILL.md`、`references/`、`scripts/`、`assets/`、`templates/` 的一致性。
+- 检查项见 `assets/governance/step-2-execution-checklist.template.md`。
 
-1. **Explore**：锁定目标 skill、用户想达成的效果、当前失真点和直接关联的共享文件。
-2. **Plan**：列出要改的文件，并写清每个文件是在修触发、修流程、修模板、修验证还是修版本同步。
-3. **Implement**：先改最能影响结果稳定性的层，再补文档与导航；若引入新入口，必须同步旧入口或明确废弃。
-4. **Verify**：默认执行 `bash scripts/validate.sh <skill-dir>`；若目标 skill 有统一测试入口，再执行 `bash scripts/test.sh` 或等价脚本；涉及初始化模板时，至少生成一个临时 skill 并验证生成结果。
-5. **Iterate**：根据失败样例、误触发/漏触发案例和维护成本继续收敛，而不是凭感觉扩写规则。
-6. **Close**：更新目标 skill 版本与 `CHANGELOG.md`；入口命令或维护说明变化时，补查 `README.md`。
+4. Step 3：验证与收口
+- 先做结构校验，再做行为校验，再做旧规则残留搜索。
+- 输出 governance report、validation status 与待重审清单。
+- 模板见 `assets/governance/governance-report.template.md`。
 
-详细执行细节见 `references/workflow.md`。
+## 失败处理
 
-## 何时改哪个文件
+- 缺少 `target_skill` 或边界不清时，默认收敛到用户明确点名的唯一目标 skill。
+- 若共享文件变更会影响无关 skills，先停下来缩小范围或把影响写入风险，不直接扩散执行。
+- 若本地脚本无法验证，必须明确阻塞点、受影响环节与未验证风险。
+- 若发现旧命名结论已污染后续迁移，暂停后续步骤，从 Step 1 重新建立基线。
 
-- `description` / `agents/openai.yaml`：
-  当问题主要是不会触发、乱触发、默认提示偏离目标时优先改这里。
-- `SKILL.md`：
-  当问题主要是输入输出不清、步骤顺序混乱、默认策略缺失、失败处理不完整时优先改这里。
-- `references/`：
-  当正文太长、规则需要复用、反模式或清单需要独立维护时再下沉。
-- `scripts/` / `assets/`：
-  当动作稳定、重复、可判定，或需要让初始化、校验、测试变成可复用流程时优先落这里。
-- `templates/`：
-  当共享脚手架和 skill 规约不一致，或本 skill 依赖共享实现时同步修这里。
+## 资源导航
 
-## 规则索引
-
-- `references/repo-constraints.md`：仓库落地硬约束与结构边界。
-- `references/naming-conventions.md`：命名规范与 action 字典。
-- `references/frontmatter-policy.md`：frontmatter 约束。
-- `references/chinese-policy.md`：中文维护要求。
-- `references/version-policy.md`：版本与兼容策略。
-- `references/skill-directory-policy.md`：新建 skill 目录判定。
-- `references/workflow.md`：工作流、改动优先级与验证策略。
-- `references/anti-patterns.md`：常见失真与修复方式。
-- `references/changelog-policy.md`：版本记录与 README 同步规则。
+- `references/naming-conventions.md`：命名规范 v2 与命名决策顺序。
+- `references/skill-layering-policy.md`：layer 的职责、边界与禁忌。
+- `references/workflow.md`：执行顺序、边界、失败处理、验证矩阵。
+- `references/governance-process.md`：Step 1 / Step 1.5 / Step 2 / Step 3 的治理流程。
+- `references/governance-artifacts.md`：治理模板与字段说明。
 - `references/quality-checklist.md`：交付前核查清单。
-- `references/sources.md`：来源说明。
-- `references/skill-layering-policy.md`：skills 分层规则。
-- `references/governance-process.md`：第二阶段治理其他 skills 的流程。
+- `references/reassessment-backlog.md`：既有治理结论待重审清单。
+- 其他规则见 `references/repo-constraints.md`、`references/changelog-policy.md`、`references/version-policy.md`、`references/anti-patterns.md`。
 
-## 常用命令
+## 主入口与包装器
 
+1. 当前 skill 目录执行
 ```bash
-# 新建 skill（本地脚本是标准入口）
-bash scripts/init_skill.sh <name> [resources] [target]
-
-# 校验单个 skill
-bash scripts/validate.sh <skill-dir>
-
-# 执行统一测试入口
+bash scripts/validate.sh .
 bash scripts/test.sh
 ```
 
-**说明**：
-- 本地脚本是唯一真源，仓库级 `make` 只是可选包装器。
-- 本 skill 不依赖仓库级 Makefile 也能独立运行。
-- 生成目标 skill 默认放在 `skills/<layer>/` 下，layer 判定见 `references/skill-layering-policy.md`。
+2. 仓库根目录执行
+```bash
+bash skills/authoring/feipi-skill-govern/scripts/validate.sh skills/authoring/feipi-skill-govern
+bash skills/authoring/feipi-skill-govern/scripts/init_skill.sh feipi-video-read-youtube --layer integration
+```
 
-## 第二阶段：治理其他 skills
+说明：
+- `scripts/validate.sh` 是结构校验主入口。
+- `scripts/test.sh` 是行为校验与旧规则残留搜索入口。
+- `scripts/init_skill.sh` 是新建 skill 的本地脚手架入口；仓库级 `make` 只可作为包装器，不是唯一真源。
 
-若使用本 skill 去治理其他 skills，见 `references/governance-process.md`。
+## 验收标准
 
-核心流程：
-1. 分析目标 skill 的问题（使用 `validate.sh`）
-2. 迁移共享脚本到 skill 本地
-3. 更新目标 skill 的文档和配置
-4. 执行验证确保独立运行
-5. 更新版本和 changelog
-
-## 分层规则
-
-skills 目录必须分层，不能平铺。当前采用以下层：
-
-- `authoring/`：技能创作与治理（本 skill 所在层）
-- `diagram/`：图表生成
-- `integration/`：外部服务集成
-- `platform/`：平台/工具链集成
-
-详细分层规则见 `references/skill-layering-policy.md`。
+1. 命名、layer、触发、执行、资源、脚本归位、验证七类规则与模板一致。
+2. 仅修改目标 skill 与直接共享文件，无无边界扩散。
+3. 本地验证、dry-run 或临时产物验证至少完成一条真实动作链。
+4. 已输出问题清单、修复清单、规则摘要、待重审清单与重启建议。
