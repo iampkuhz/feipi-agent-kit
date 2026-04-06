@@ -1,6 +1,6 @@
 ---
-name: feipi-web-dingtalk-webhook
-description: 用于向钉钉群机器人 webhook 发送文本或 Markdown 消息，覆盖环境变量读取、可选加签、Markdown 语法收敛和结果校验。在用户要发送部署通知、告警推送、任务结果播报或测试钉钉机器人连通性时使用。
+name: feipi-dingtalk-send-webhook
+description: 用于向钉钉群机器人 webhook 发送文本或 Markdown 消息；在用户要发送通知、播报结果或验证 webhook 连通性时使用。
 ---
 
 # 钉钉 Webhook 消息发送（中文）
@@ -21,6 +21,7 @@ description: 用于向钉钉群机器人 webhook 发送文本或 Markdown 消息
 1. 发送 `link`、`actionCard`、`feedCard` 等复杂消息类型。
 2. 需要 `@` 指定人员、手机号列表或群内精细化提醒。
 3. 用户未提供 webhook 环境变量名，且当前对话无法推断目标变量名。
+4. 需要治理、重构或迁移 skill 本身；这类任务应使用 `feipi-skill-govern`。
 
 ## 先确认什么
 
@@ -120,12 +121,13 @@ bash scripts/send_dingtalk_md.sh DINGTALK_WEBHOOK_URL "巡检结果" "| 服务 |
 1. 环境变量缺失时，脚本能明确报错。
 2. 提供加签密钥环境变量名但变量缺失时，脚本能明确报错。
 3. 文本与 Markdown 两类脚本都能通过基础参数校验。
-4. 测试脚本 `scripts/test.sh` 可运行。
+4. 本地校验脚本 `scripts/validate.sh` 与测试脚本 `scripts/test.sh` 可运行。
 
 ## 资源说明
 
 - `scripts/send_dingtalk.sh`：文本消息发送脚本
 - `scripts/send_dingtalk_md.sh`：Markdown 消息发送脚本
 - `scripts/normalize_dingtalk_markdown.py`：删除不支持 Markdown 语法的收敛脚本
+- `scripts/validate.sh`：本地结构校验入口
 - `scripts/test.sh`：统一测试入口
 - `references/test_cases.txt`：测试项列表

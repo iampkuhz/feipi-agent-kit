@@ -1,0 +1,9 @@
+# feipi-dingtalk-send-webhook 离线自测项
+validate-self
+text-missing-env
+markdown-missing-env
+markdown-missing-secret
+markdown-unsupported-strip
+text-send-success
+markdown-send-success
+markdown-send-with-sign

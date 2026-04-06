@@ -9,11 +9,10 @@
 1. `feipi-automate-dingtalk-webhook -> skills/integration/feipi-web-dingtalk-webhook/`
 - 依据：`CHANGELOG.md` 于 2026-04-06 明确记录 action 从 `automate` 改为 `web`。
 - 问题：该结论仍建立在旧 action-first 逻辑上，且 `web` 不是推荐 action。
-- 处理：保留现状，后续重新做 Step 1 与 Step 1.5，再决定目标名。
+- 处理：已在 2026-04-06 重审并落地为 `skills/integration/feipi-dingtalk-send-webhook/`，本条不再属于待执行迁移。
 
 ## 已迁移或已存在但需重审的 skill
 
-- `skills/integration/feipi-web-dingtalk-webhook`
 - `skills/feipi-gen-innovation-disclosure`
 - `skills/feipi-read-youtube-video`
 - `skills/feipi-read-bilibili-video`
@@ -38,5 +37,4 @@
 
 - 后续治理应从新的 Step 1 重新开始，而不是继续旧的 Step 2C / Step 2D。
 - 第一批建议优先重审：
-  - 已落地 rename 的 `feipi-web-dingtalk-webhook`
   - 仍平铺在 `skills/` 根下的 skills
