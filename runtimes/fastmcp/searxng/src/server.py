@@ -11,13 +11,11 @@ from .searxng_client import SearXNGClient
 from .schemas import SearchWebOutput
 
 mcp = create_mcp("searxng")
-_client: SearXNGClient | None = None
 
 
 def get_client() -> SearXNGClient:
-    if _client is None:
-        _client = SearXNGClient(os.getenv("SEARXNG_URL", "http://localhost:8873"))
-    return _client
+    """获取 SearXNG 客户端"""
+    return SearXNGClient(os.getenv("SEARXNG_URL", "http://localhost:8873"))
 
 
 @mcp.tool()

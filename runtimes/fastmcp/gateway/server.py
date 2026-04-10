@@ -21,29 +21,19 @@ logger = logging.getLogger(__name__)
 mcp = FastMCP("agent-skills-mcp")
 
 
-def register_service(name: str, service_module: str) -> None:
+def register_service(name: str, service_mcp: FastMCP) -> None:
     """注册 MCP 服务
 
     Args:
         name: 服务名称
-        service_module: 服务模块路径（如 "runtimes.fastmcp.searxng.src.server"）
+        service_mcp: 服务的 FastMCP 实例
     """
     try:
-        module = __import__(service_module, fromlist=[""])
-        service_mcp = getattr(module, "mcp", None)
-        if not service_mcp:
-            logger.warning(f"Service {name} has no 'mcp' instance, skipping...")
-            return
+        # 使用 mount 方法将服务挂载到主 MCP 服务器
+        # namespace 参数会给所有工具名称添加前缀
+        mcp.mount(service_mcp, namespace=name)
+        logger.info(f"Mounted service: {name}")
 
-        # 获取服务中的所有 tool
-        tools = getattr(service_mcp, "_tools", {})
-        for tool_name, tool_fn in tools.items():
-            prefixed_name = f"{name}_{tool_name}"
-            mcp.tool()(tool_fn)
-            logger.info(f"Registered tool: {prefixed_name}")
-
-    except ImportError as e:
-        logger.warning(f"Failed to import service {name}: {e}")
     except Exception as e:
         logger.error(f"Failed to register service {name}: {e}")
 
@@ -90,7 +80,12 @@ def main():
 
     # 注册所有服务
     for service_name, module_path in services:
-        register_service(service_name, module_path)
+        module = __import__(module_path, fromlist=[""])
+        service_mcp = getattr(module, "mcp", None)
+        if service_mcp:
+            register_service(service_name, service_mcp)
+        else:
+            logger.warning(f"Service {service_name} has no 'mcp' instance, skipping...")
 
     # 启动服务器
     port = int(os.getenv("MCP_PORT", "18080"))
