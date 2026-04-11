@@ -8,7 +8,7 @@ set -euo pipefail
 #   bash scripts/validate_package.sh --brief <brief.yaml> --diagram <diagram.puml> --out-dir <dir>
 #
 # 产出物 (在 <out-dir> 中):
-#   - brief.normalized.yaml  (规范化后的 brief)
+#   - brief.optimized.yaml   (优化后的 brief)
 #   - diagram.puml           (输入的 diagram 原样复制)
 #   - diagram.svg            (仅 render 成功时存在)
 #   - validation.json        (验证结果合同)
@@ -89,6 +89,10 @@ RENDER_SERVER=""
 BLOCKED_REASON=""
 FINAL_STATUS="pending"
 
+# 输出文件路径
+SVG_OUT="$OUT_DIR/diagram.svg"
+VALIDATION_OUT="$OUT_DIR/validation.json"
+
 # 清理函数
 cleanup() {
   local exit_code=$?
@@ -161,13 +165,27 @@ trap cleanup EXIT
 
 # 复制输入文件到输出目录
 DIAGRAM_OUT="$OUT_DIR/diagram.puml"
-BRIEF_OUT="$OUT_DIR/brief.normalized.yaml"
+BRIEF_OUT="$OUT_DIR/brief.optimized.yaml"  # 优化后的 brief
 
-cp "$DIAGRAM_FILE" "$DIAGRAM_OUT"
-cp "$BRIEF_FILE" "$BRIEF_OUT"
+if [[ "$DIAGRAM_FILE" != "$DIAGRAM_OUT" ]]; then
+  cp -f "$DIAGRAM_FILE" "$DIAGRAM_OUT"
+fi
 
-SVG_OUT="$OUT_DIR/diagram.svg"
-VALIDATION_OUT="$OUT_DIR/validation.json"
+# =============================================================================
+# Step 0: Optimize Brief (布局优化)
+# =============================================================================
+echo "Step 0/5: Optimizing brief for layout..."
+
+OPTIMIZE_SCRIPT="$SCRIPT_DIR/optimize_brief.py"
+if [[ -f "$OPTIMIZE_SCRIPT" ]]; then
+  python3 "$OPTIMIZE_SCRIPT" "$BRIEF_FILE" "$BRIEF_OUT"
+  echo "  Brief optimized: $BRIEF_OUT"
+else
+  echo "  Warning: optimize_brief.py not found, using original brief" >&2
+  if [[ "$BRIEF_FILE" != "$BRIEF_OUT" ]]; then
+    cp -f "$BRIEF_FILE" "$BRIEF_OUT"
+  fi
+fi
 
 # 临时 JSON 文件用于累积状态
 TMP_JSON="$(mktemp)"
@@ -225,7 +243,7 @@ echo "[OK] coverage check passed"
 # =============================================================================
 echo "Step 3/4: Linting layout..."
 
-LAYOUT_OUTPUT="$(bash "$SCRIPT_DIR/lint_layout.sh" "$DIAGRAM_FILE" 2>&1)" || {
+LAYOUT_OUTPUT="$(bash "$SCRIPT_DIR/lint_layout.sh" "$DIAGRAM_FILE" "$BRIEF_FILE" 2>&1)" || {
   LAYOUT_CHECK="failed"
   BLOCKED_REASON="layout_validation_failed"
   echo "[FAIL] layout check failed" >&2

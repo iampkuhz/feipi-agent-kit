@@ -89,6 +89,10 @@ RENDER_SERVER=""
 BLOCKED_REASON=""
 FINAL_STATUS="pending"
 
+# 输出文件路径
+SVG_OUT="$OUT_DIR/diagram.svg"
+VALIDATION_OUT="$OUT_DIR/validation.json"
+
 # 清理函数
 cleanup() {
   local exit_code=$?
@@ -163,11 +167,12 @@ trap cleanup EXIT
 DIAGRAM_OUT="$OUT_DIR/diagram.puml"
 BRIEF_OUT="$OUT_DIR/brief.normalized.yaml"
 
-cp "$DIAGRAM_FILE" "$DIAGRAM_OUT"
-cp "$BRIEF_FILE" "$BRIEF_OUT"
-
-SVG_OUT="$OUT_DIR/diagram.svg"
-VALIDATION_OUT="$OUT_DIR/validation.json"
+if [[ "$DIAGRAM_FILE" != "$DIAGRAM_OUT" ]]; then
+  cp -f "$DIAGRAM_FILE" "$DIAGRAM_OUT"
+fi
+if [[ "$BRIEF_FILE" != "$BRIEF_OUT" ]]; then
+  cp -f "$BRIEF_FILE" "$BRIEF_OUT"
+fi
 
 # 临时 JSON 文件用于累积状态
 TMP_JSON="$(mktemp)"
