@@ -6,14 +6,14 @@ model_list:
   - model_name: os.environ/LITELLM_OPENAI_QWEN_MODEL
     litellm_params:
       # 百炼 OpenAI 兼容端点
-      model: openai/qwen3.5-plus
+      model: openai/qwen3.6-plus
       api_base: os.environ/BAILIAN_CODING_PLAN_OPENAI_BASE_URL
       api_key: os.environ/BAILIAN_CODING_PLAN_API_KEY
 
   - model_name: os.environ/LITELLM_ANTHROPIC_QWEN_MODEL
     litellm_params:
       # 百炼 Anthropic 兼容端点
-      model: anthropic/qwen3.5-plus
+      model: anthropic/qwen3.6-plus
       api_base: os.environ/BAILIAN_CODING_PLAN_ANTHROPIC_BASE_URL
       api_key: os.environ/BAILIAN_CODING_PLAN_API_KEY
 
