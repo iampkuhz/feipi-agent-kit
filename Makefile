@@ -25,6 +25,7 @@ LITELLM_DIR := tools/gateway/litellm
 .PHONY: litellm-up litellm-down litellm-restart litellm-logs
 .PHONY: searxng-mcp-run searxng-mcp-test
 .PHONY: doctor setup
+.PHONY: model-download
 
 # ===== 主帮助 =====
 
@@ -50,6 +51,10 @@ help:
 	@echo "  make searxng-mcp-run     # 运行 SearXNG MCP 服务（Stdio 模式）"
 	@echo "  make searxng-mcp-http    # 运行 SearXNG MCP 服务（HTTP 模式）"
 	@echo "  make searxng-mcp-test    # 测试 SearXNG MCP 服务"
+	@echo ""
+	@echo "===== 模型管理 ====="
+	@echo "  make model-download MODEL=<id> [PROXY=<url>] [OUTPUT=<dir>]"
+	@echo "                         # 从 Hugging Face 下载模型"
 	@echo ""
 	@echo "===== 仓库维护 ====="
 	@echo "  make setup               # 初始化设置"
@@ -155,3 +160,15 @@ doctor:
 	@echo ""
 	@echo "SearXNG MCP:"
 	@echo "  需要手动测试（在 Claude Code 中调用）"
+
+# ===== 模型管理 =====
+
+model-download:
+	@if [[ -z "$(MODEL)" ]]; then \
+		echo "❌ 缺少 MODEL 参数，用法: make model-download MODEL=<id> [PROXY=<url>] [OUTPUT=<dir>]" >&2; \
+		exit 1; \
+	fi
+	@bash scripts/model/download_hf_model.sh \
+		$(if $(PROXY),-p "$(PROXY)") \
+		$(if $(OUTPUT),-o "$(OUTPUT)") \
+		"$(MODEL)"

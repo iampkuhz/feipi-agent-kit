@@ -42,7 +42,7 @@ curl -s "http://localhost:8873/search?q=test&format=json" | jq '.results | lengt
 ```bash
 # 配置环境变量
 cp tools/gateway/litellm/env/.env.example tools/gateway/litellm/env/.env
-# 编辑 .env 填入真实值（至少 BAILIAN_CODING_PLAN_API_KEY）
+# 编辑 .env 填入真实值（至少 BAILIAN_API_KEY）
 
 # 启动服务
 make litellm-up

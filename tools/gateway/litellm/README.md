@@ -61,7 +61,7 @@ curl -s http://localhost:4000/v1/chat/completions \
   -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "bailian-openai-qwen-model",
+    "model": "'"$LITELLM_CODE_MODEL_OPENAI"'",
     "messages": [{"role": "user", "content": "Hello"}],
     "stream": false
   }' | jq .
@@ -76,11 +76,18 @@ curl -s http://localhost:4000/v1/chat/completions \
 | 变量名 | 用途 | 是否必需 |
 |--------|------|----------|
 | `LITELLM_MASTER_KEY` | LiteLLM 访问密钥 | 必需 |
-| `BAILIAN_CODING_PLAN_API_KEY` | 百炼 API 密钥 | 必需 |
-| `BAILIAN_CODING_PLAN_OPENAI_BASE_URL` | 百炼 OpenAI 兼容端点 | 必需 |
-| `BAILIAN_CODING_PLAN_ANTHROPIC_BASE_URL` | 百炼 Anthropic 兼容端点 | 必需 |
-| `LITELLM_OPENAI_QWEN_MODEL` | OpenAI 协议模型名 | 必需 |
-| `LITELLM_ANTHROPIC_QWEN_MODEL` | Anthropic 协议模型名 | 必需 |
+| `LITELLM_CODE_MODEL_OPENAI` | OpenAI 协议逻辑模型名 | 必需 |
+| `LITELLM_UPSTREAM_CODE_MODEL_OPENAI_NAME` | 上游 OpenAI 模型 ID | 必需 |
+| `LITELLM_UPSTREAM_CODE_MODEL_OPENAI_BASE` | 上游 OpenAI 端点 | 必需 |
+| `LITELLM_UPSTREAM_CODE_MODEL_OPENAI_KEY` | 上游 OpenAI 密钥 | 必需 |
+| `LITELLM_CODE_MODEL_ANTHROPIC` | Anthropic 协议逻辑模型名 | 必需 |
+| `LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_NAME` | 上游 Anthropic 模型 ID | 必需 |
+| `LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_BASE` | 上游 Anthropic 端点 | 必需 |
+| `LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_KEY` | 上游 Anthropic 密钥 | 必需 |
+| `LITELLM_AUTOCOMPLETE_MODEL_OPENAI` | 补全逻辑模型名 | 可选 |
+| `LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_NAME` | 上游补全模型 ID | 可选 |
+| `LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_BASE` | 上游补全端点 | 可选 |
+| `LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_KEY` | 上游补全密钥 | 可选 |
 
 ### config.yaml 结构
 
@@ -139,7 +146,7 @@ client = OpenAI(
 )
 
 response = client.chat.completions.create(
-    model="bailian-openai-qwen-model",
+    model="qwen-openai",  # 对应 LITELLM_CODE_MODEL_OPENAI
     messages=[{"role": "user", "content": "Hello"}]
 )
 ```
