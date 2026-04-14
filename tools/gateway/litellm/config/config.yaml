@@ -3,19 +3,26 @@
 # 观测：不强制依赖任何本地观测组件，未来可通过 OTel 接入云端平台
 
 model_list:
-  - model_name: os.environ/LITELLM_OPENAI_QWEN_MODEL
+  - model_name: os.environ/LITELLM_CODE_MODEL_OPENAI
     litellm_params:
       # 百炼 OpenAI 兼容端点
-      model: openai/qwen3.6-plus
-      api_base: os.environ/BAILIAN_CODING_PLAN_OPENAI_BASE_URL
-      api_key: os.environ/BAILIAN_CODING_PLAN_API_KEY
+      model: os.environ/LITELLM_UPSTREAM_CODE_MODEL_OPENAI_NAME
+      api_base: os.environ/LITELLM_UPSTREAM_CODE_MODEL_OPENAI_BASE
+      api_key: os.environ/LITELLM_UPSTREAM_CODE_MODEL_OPENAI_KEY
 
-  - model_name: os.environ/LITELLM_ANTHROPIC_QWEN_MODEL
+  - model_name: os.environ/LITELLM_CODE_MODEL_ANTHROPIC
     litellm_params:
       # 百炼 Anthropic 兼容端点
-      model: anthropic/qwen3.6-plus
-      api_base: os.environ/BAILIAN_CODING_PLAN_ANTHROPIC_BASE_URL
-      api_key: os.environ/BAILIAN_CODING_PLAN_API_KEY
+      model: os.environ/LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_NAME
+      api_base: os.environ/LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_BASE
+      api_key: os.environ/LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_KEY
+
+  - model_name: os.environ/LITELLM_AUTOCOMPLETE_MODEL_OPENAI
+    litellm_params:
+      # 本地 OMLX 端点
+      model: os.environ/LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_NAME
+      api_base: os.environ/LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_BASE
+      api_key: os.environ/LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_KEY
 
 # ===== LiteLLM 运行时设置 =====
 # 这里不能只保留注释而没有实际键值；YAML 会把 `litellm_settings` 解析成 null，
