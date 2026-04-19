@@ -1,0 +1,20 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+exporters:
+  file:
+    path: /data/claude-code-otel.raw
+    format: json
+    append: true
+    create_directory: true
+
+service:
+  pipelines:
+    logs:
+      receivers: [otlp]
+      exporters: [file]

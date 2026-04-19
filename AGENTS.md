@@ -15,7 +15,12 @@
 
 ## 强约束（必须遵守）
 
-1. **中文优先**：所有说明、注释、文档使用中文（保留英文原文需附中文摘要）
+1. **中文优先**：所有面向用户的可见输出默认使用简体中文
+   - 包括计划、分析、拆解、审阅、总结、步骤说明、修改说明
+   - 若产生可见 reasoning / planning summary 等过程文本，也必须用简体中文表达
+   - 代码、shell 命令、文件路径、JSON/YAML key、API/class/function/library/protocol 名称保持英文原样
+   - 外部系统返回的英文中间结果应先给出中文解释或归纳，仅在必要时保留原文片段作为引用
+   - 详见 `rules/global/language.md`
 2. **规则先行**：处理 skill/tool 相关任务时，先遵循 `rules/` 和 `feipi-skill-govern`
 3. **职责分离**：
    - `skills/` - Agent 能力扩展

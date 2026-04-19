@@ -1,0 +1,23 @@
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: otel-collector
+    volumes:
+      - ../config:/etc/otelcol:ro
+      - /Users/zhehan/Documents/service-data/otel:/data:rw
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    command: ["--config", "/etc/otelcol/otel-collector.yaml"]
+    restart: unless-stopped
+
+  otel-cleaner:
+    image: python:3.13-slim
+    container_name: otel-cleaner
+    volumes:
+      - /Users/zhehan/Documents/service-data/otel:/data:rw
+      - ../scripts/clean-otel.py:/clean-otel.py:ro
+    command: ["python3", "/clean-otel.py"]
+    restart: unless-stopped
+    depends_on:
+      - otel-collector
