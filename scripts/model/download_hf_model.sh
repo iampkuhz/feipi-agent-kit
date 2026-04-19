@@ -36,7 +36,9 @@ usage() {
   -t, --token TOKEN     Hugging Face token（或设置 HF_TOKEN 环境变量）
   --include GGUF_PAT    仅下载匹配 GGUF 模式文件，如 '*Q4_K_M*'
   --exclude PATTERN     排除匹配的文件模式（可多次使用）
-  -f, --force           覆盖已存在的目录
+  -f, --force           覆盖已存在的目录（删除后重新下载）
+  --resume              断点续传模式：保留已有文件，利用 HF 缓存继续下载（默认行为）
+  --no-resume           禁用断点续传：删除目标目录后重新下载（旧版行为）
   --dry-run             仅打印下载计划，不实际执行
   -h, --help            显示帮助
 
@@ -54,6 +56,10 @@ usage() {
   # 使用 token 下载 gated 模型
   $(basename "$0") -t hf_xxxxx -o /path/to/models \\
       meta-llama/Llama-3.2-3B-Instruct
+
+  # 断点续传（网络中断后重新执行）
+  $(basename "$0") -p http://127.0.0.1:7890 --resume \\
+      bartowski/Llama-3.2-3B-Instruct-GGUF
 EOF
     exit 0
 }
@@ -65,6 +71,7 @@ REVISION="main"
 TOKEN=""
 INCLUDE_PATTERN=""
 EXCLUDE_PATTERNS=()
+RESUME=true  # 默认启用断点续传
 FORCE=false
 DRY_RUN=false
 MODEL_ID=""
@@ -84,7 +91,11 @@ while [[ $# -gt 0 ]]; do
         --exclude)
             EXCLUDE_PATTERNS+=("$2"); shift 2 ;;
         -f|--force)
-            FORCE=true; shift ;;
+            FORCE=true; RESUME=false; shift ;;
+        --resume)
+            RESUME=true; shift ;;
+        --no-resume)
+            RESUME=false; shift ;;
         --dry-run)
             DRY_RUN=true; shift ;;
         -h|--help)
@@ -164,6 +175,7 @@ main() {
     info "模型 ID:    ${MODEL_ID}"
     info "输出目录:   ${TARGET_DIR}"
     info "版本:       ${REVISION}"
+    info "断点续传:   ${RESUME}"
 
     if [[ -n "$PROXY" ]]; then
         info "代理:       ${PROXY}"
@@ -173,11 +185,25 @@ main() {
         info "包含模式:   ${INCLUDE_PATTERN}"
     fi
 
-    # 检查目标目录是否已存在
-    if [[ -d "$TARGET_DIR" ]] && [[ "$FORCE" != true ]]; then
-        error "目标目录已存在: ${TARGET_DIR}"
-        echo "  使用 --force 覆盖，或选择其他输出目录"
-        exit 1
+    # 处理目标目录已存在的情况
+    if [[ -d "$TARGET_DIR" ]]; then
+        if [[ "$RESUME" == true ]]; then
+            warn "目标目录已存在: ${TARGET_DIR}"
+            info "启用断点续传模式，跳过已有文件，利用 HF 缓存继续下载..."
+            # 统计已有文件数
+            local existing_count
+            existing_count=$(find "$TARGET_DIR" -type f 2>/dev/null | wc -l | tr -d ' ')
+            if [[ "$existing_count" -gt 0 ]]; then
+                info "已有 ${existing_count} 个文件，将跳过这些文件"
+            fi
+        elif [[ "$FORCE" == true ]]; then
+            warn "强制覆盖: 删除已存在的目录 ${TARGET_DIR}"
+            rm -rf "$TARGET_DIR"
+        else
+            error "目标目录已存在: ${TARGET_DIR}"
+            echo "  使用 --force 完全重新下载，或使用 --resume 断点续传"
+            exit 1
+        fi
     fi
 
     # Dry run
@@ -191,16 +217,16 @@ main() {
     # 确保父目录存在
     mkdir -p "$(dirname "$TARGET_DIR")"
 
-    # 如果启用 --force 且目录已存在，先删除
-    if [[ -d "$TARGET_DIR" ]] && [[ "$FORCE" == true ]]; then
-        warn "强制覆盖: 删除已存在的目录 ${TARGET_DIR}"
-        rm -rf "$TARGET_DIR"
-    fi
-
     # 执行下载
+    # HF CLI 默认行为: --no-force-download (跳过已缓存的文件 = 断点续传)
+    # 断点续传依赖: HF 全局缓存 ~/.cache/huggingface/hub
     info "开始下载..."
     local download_cmd
     download_cmd=$(build_download_cmd)
+    # 断点续传时使用 --no-force-download（默认值），让 HF CLI 利用缓存跳过已下载文件
+    if [[ "$RESUME" != true ]]; then
+        download_cmd+=" --force-download"
+    fi
 
     # 如果设置了代理，通过环境变量传递
     if [[ -n "$PROXY" ]]; then
