@@ -1,0 +1,113 @@
+# Crawl4AI 0.8.6 服务端默认配置
+#
+# 设计目标：
+# 1. 对所有 MCP 端点都真正生效的部分，优先放在 BrowserConfig。
+# 2. 默认画像更接近真实桌面浏览器，降低静态指纹过于单薄带来的拦截概率。
+# 3. 保持服务端默认值“稳而不过猛”，站点级对抗仍建议调用侧显式传 crawler_config。
+
+app:
+  title: "Crawl4AI API"
+  version: "1.0.0"
+  host: "0.0.0.0"
+  port: 11235
+  reload: false
+  workers: 1
+  timeout_keep_alive: 300
+
+# 这里不在仓库里显式固定 llm provider。
+# 普通 crawl / md / html / screenshot / pdf 都不依赖它。
+# 只有使用 /llm/* 或 md?f=llm 时，才需要再通过环境变量补 LLM_PROVIDER / LLM_API_KEY。
+llm: {}
+
+redis:
+  host: "localhost"
+  port: 6379
+  db: 0
+  password: ""
+  task_ttl_seconds: 3600
+  ssl: false
+
+rate_limiting:
+  enabled: true
+  default_limit: "1000/minute"
+  trusted_proxies: []
+  storage_uri: "memory://"
+
+security:
+  enabled: false
+  jwt_enabled: false
+  api_token: ""
+  https_redirect: false
+  trusted_hosts: ["*"]
+  headers:
+    x_content_type_options: "nosniff"
+    x_frame_options: "DENY"
+    content_security_policy: "default-src 'self'"
+    strict_transport_security: "max-age=63072000; includeSubDomains"
+
+crawler:
+  # 注意：0.8.6 的 /crawl base_config 只会覆盖 None / ""，无法可靠兜底布尔型 anti-bot 开关。
+  # 因此这里不把 simulate_user / magic / override_navigator 伪装成“服务端默认值”。
+  base_config: {}
+  memory_threshold_percent: 97.0
+  rate_limiter:
+    enabled: true
+    base_delay: [2.0, 5.0]
+  timeouts:
+    stream_init: 30.0
+    batch_process: 300.0
+  pool:
+    max_pages: 12
+    idle_ttl_sec: 180
+  browser:
+    kwargs:
+      headless: true
+      text_mode: false
+      light_mode: false
+      verbose: false
+      enable_stealth: true
+      viewport_width: 1440
+      viewport_height: 900
+      ignore_https_errors: true
+      java_script_enabled: true
+      user_agent_mode: "random"
+      user_agent_generator_config:
+        browsers: ["Chrome"]
+        os: ["Linux"]
+        platforms: ["desktop"]
+        min_version: 120.0
+      headers:
+        Accept-Language: "en-US,en;q=0.9"
+      max_pages_before_recycle: 200
+      memory_saving_mode: true
+    extra_args:
+      - "--no-sandbox"
+      - "--disable-dev-shm-usage"
+      - "--disable-gpu"
+      - "--disable-software-rasterizer"
+      - "--disable-blink-features=AutomationControlled"
+      - "--window-size=1440,900"
+      - "--lang=en-US,en"
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+observability:
+  prometheus:
+    enabled: true
+    endpoint: "/metrics"
+  health_check:
+    endpoint: "/health"
+
+webhooks:
+  enabled: true
+  default_url: null
+  data_in_payload: false
+  retry:
+    max_attempts: 5
+    initial_delay_ms: 1000
+    max_delay_ms: 32000
+    timeout_ms: 30000
+  headers:
+    User-Agent: "Crawl4AI-Webhook/1.0"

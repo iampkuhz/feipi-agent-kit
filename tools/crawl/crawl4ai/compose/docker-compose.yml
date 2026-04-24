@@ -17,6 +17,7 @@ services:
       no_proxy: 127.0.0.1,localhost,0.0.0.0,::1,host.containers.internal
     volumes:
       - /dev/shm:/dev/shm
+      - ../config/config.yml:/app/config.yml:ro
     deploy:
       resources:
         limits:

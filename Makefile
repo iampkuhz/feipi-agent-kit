@@ -23,7 +23,7 @@ LITELLM_DIR := tools/gateway/litellm
 .PHONY: help install install-links install-project
 .PHONY: searxng-up searxng-down searxng-restart searxng-logs
 .PHONY: litellm-up litellm-down litellm-restart litellm-logs
-.PHONY: searxng-mcp-run searxng-mcp-test
+.PHONY: searxng-mcp-run searxng-mcp-http searxng-mcp-test
 .PHONY: doctor setup
 .PHONY: model-download
 
