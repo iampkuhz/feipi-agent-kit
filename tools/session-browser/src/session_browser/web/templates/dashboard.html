@@ -20,6 +20,24 @@
         <div class="metric-label">Projects</div>
         <div class="metric-value">{{ stats.project_count }}</div>
     </div>
+    <div class="metric-card metric-card--compact" data-tooltip="Total input-side tokens (fresh + cache read + cache write)">
+        <div class="metric-label">Input-side</div>
+        <div class="metric-value">{{ (aggregate.input_side_total or 0) | format_number }}</div>
+        <div class="metric-sub">fresh + cache R/W</div>
+    </div>
+</div>
+
+<div class="metric-section-label">Efficiency</div>
+<div class="metrics-grid">
+    <div class="metric-card metric-card--compact" data-tooltip="Cache reuse ratio: cache_read / input_side_total">
+        <div class="metric-label">Cache R</div>
+        <div class="metric-value">
+            {% if aggregate.cache_reuse_ratio is not none %}
+            {{ (aggregate.cache_reuse_ratio * 100) | round(1) }}%
+            {% else %}—{% endif %}
+        </div>
+        <div class="metric-sub">reuse ratio</div>
+    </div>
     <div class="metric-card metric-card--compact" data-tooltip="Total tool invocations across all sessions">
         <div class="metric-label">Tools</div>
         <div class="metric-value">{{ stats.total_tool_calls | format_number }}</div>
@@ -27,43 +45,77 @@
         <div class="metric-sub"><span class="badge badge-error">{{ stats.total_failed_tools }} failed</span></div>
         {% endif %}
     </div>
-</div>
-
-<div class="metric-section-label">Input-side Tokens</div>
-<div class="metrics-grid">
-    <div class="metric-card metric-card--compact" data-tooltip="New input tokens not served from cache (provider-reported)">
-        <div class="metric-label">Input</div>
-        <div class="metric-value">{{ stats.total_input_tokens | format_number }}</div>
-        <div class="metric-sub">actual new input</div>
-    </div>
-    <div class="metric-card metric-card--compact" data-tooltip="Input tokens served from cache — cheaper than fresh (provider-reported)">
-        <div class="metric-label">Cache R</div>
-        <div class="metric-value">{{ stats.total_cached_input_tokens | format_number }}</div>
-        <div class="metric-sub">input-side cache hit</div>
-    </div>
-    <div class="metric-card metric-card--compact" data-tooltip="Input tokens written to cache for future reads (provider-reported for Anthropic, unknown for OpenAI)">
-        <div class="metric-label">Cache W</div>
-        <div class="metric-value">{{ stats.total_cached_output_tokens | format_number }}</div>
-        <div class="metric-sub">input-side cache write</div>
+    <div class="metric-card metric-card--compact" data-tooltip="Tools per round: total_tools / total_rounds">
+        <div class="metric-label">Tools/R</div>
+        <div class="metric-value">
+            {% if aggregate.tools_per_round is not none %}
+            {{ aggregate.tools_per_round }}
+            {% else %}—{% endif %}
+        </div>
+        <div class="metric-sub">per round</div>
     </div>
 </div>
 
-<div class="metric-section-label">Output-side Tokens</div>
-<div class="metrics-grid">
-    <div class="metric-card metric-card--compact" data-tooltip="Visible output tokens in chat responses (provider-reported)">
-        <div class="metric-label">Output</div>
-        <div class="metric-value">{{ stats.total_output_tokens | format_number }}</div>
-        <div class="metric-sub">visible tokens</div>
+<!-- Needs Attention -->
+{% if needs_attention %}
+<div class="card card--attention">
+    <div class="card-title flex justify-between items-center">
+        <span>
+            <span class="attention-icon">!</span> Needs Attention
+            <span class="text-muted" style="font-weight:400; text-transform:none; letter-spacing:0">({{ needs_attention | length }} sessions)</span>
+        </span>
+        <div class="flex gap-1">
+            <button class="filter-chip filter-chip--active" data-filter="all" onclick="filterNeedsAttention('all', this)">All</button>
+            <button class="filter-chip" data-filter="critical" onclick="filterNeedsAttention('critical', this)">Critical</button>
+            <button class="filter-chip" data-filter="long_duration" onclick="filterNeedsAttention('long_duration', this)">Long</button>
+            <button class="filter-chip" data-filter="high_tools" onclick="filterNeedsAttention('high_tools', this)">High Tools</button>
+            <button class="filter-chip" data-filter="low_cache" onclick="filterNeedsAttention('low_cache', this)">Low Cache</button>
+            <button class="filter-chip" data-filter="failed" onclick="filterNeedsAttention('failed', this)">Failed</button>
+        </div>
+    </div>
+    <div id="needs-attention-list">
+        {% for item in needs_attention %}
+        <div class="attention-item" data-severity="{{ item.max_severity }}"
+             data-types="{{ item.anomaly_types | join(',') }}">
+            <div class="attention-item__severity">
+                <span class="severity-dot {{ 'severity--' + item.max_severity }}"></span>
+            </div>
+            <div class="attention-item__content">
+                <a href="/sessions/{{ item.agent }}/{{ item.session_id | urlencode }}" class="attention-item__title">
+                    {{ item.title[:80] or 'Untitled' }}
+                </a>
+                <div class="attention-item__meta">
+                    <span class="badge {{ 'badge-claude' if item.agent == 'claude_code' else 'badge-codex' }}">
+                        {{ 'CC' if item.agent == 'claude_code' else 'CX' }}
+                    </span>
+                    <span class="attention-item__project" data-tooltip="{{ item.project_key }}">{{ item.project_name }}</span>
+                    <span class="mono text-micro" data-tooltip="{{ item.model }}">{{ (item.model or '?')[:30] }}</span>
+                    <span class="text-muted text-xs">{{ item.ended_at | relative_time }}</span>
+                </div>
+                <div class="attention-item__badges">
+                    {% for i in range(item.anomaly_labels | length) %}
+                    <span class="anomaly-badge {{ item.anomaly_badge_classes[i] }}" data-tooltip="{{ item.anomaly_types[i] }}">
+                        {{ item.anomaly_labels[i] }}
+                    </span>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="attention-item__reason text-muted text-xs" data-tooltip="{{ item.main_reason }}">
+                {{ item.main_reason[:60] }}…
+            </div>
+        </div>
+        {% endfor %}
     </div>
 </div>
+{% endif %}
 
 <!-- Trend chart -->
 <div class="card">
     <div class="card-title flex justify-between items-center">
-        <span>Session Trend (sessions per day)</span>
+        <span>Trend</span>
         <div class="flex gap-1">
-            <button class="tab tab--chart" data-days="7" onclick="updateChart(7)">7d</button>
             <button class="tab tab--chart active" data-days="30" onclick="updateChart(30)">30d</button>
+            <button class="tab tab--chart" data-days="7" onclick="updateChart(7)">7d</button>
         </div>
     </div>
     {% if trend %}
@@ -122,23 +174,28 @@
                     <th class="numeric">Claude</th>
                     <th class="numeric">Codex</th>
                     <th class="numeric" data-tooltip="Total input-side tokens">Input</th>
-                    <th class="numeric" data-tooltip="Input-side cache read">Cache R</th>
+                    <th class="numeric" data-tooltip="Cache reuse ratio: cache_read / input_side_total">Cache R</th>
                     <th class="numeric" data-tooltip="Input-side cache write">Cache W</th>
                     <th class="numeric">Tools</th>
+                    <th class="numeric" data-tooltip="Tools per round">Tools/R</th>
                     <th>Last Active</th>
                 </tr>
             </thead>
             <tbody>
                 {% for p in projects %}
+                {% set p_input_side = p.total_input_tokens + p.total_cached_tokens + p.total_cache_write_tokens %}
+                {% set p_cache_reuse = (p.total_cached_tokens / p_input_side * 100) | round(1) if p_input_side > 0 else 0 %}
+                {% set p_tools_per_round = (p.total_tool_calls / p.total_assistant_messages) | round(1) if p.total_assistant_messages > 0 else 0 %}
                 <tr data-project="{{ p.project_name | lower }} {{ p.project_key | lower }}">
                     <td><a href="/projects/{{ p.project_key | urlencode }}" class="link" data-tooltip="{{ p.project_key }}">{{ p.project_name }}</a></td>
                     <td class="numeric"><strong>{{ p.total_sessions }}</strong></td>
                     <td class="numeric"><span class="badge badge-claude">{{ p.claude_sessions }}</span></td>
                     <td class="numeric"><span class="badge badge-codex">{{ p.codex_sessions }}</span></td>
                     <td class="numeric mono text-xs">{{ p.total_input_tokens | format_number }}</td>
-                    <td class="numeric mono text-xs">{{ p.total_cached_tokens | format_number }}</td>
+                    <td class="numeric mono text-xs">{{ p_cache_reuse }}%</td>
                     <td class="numeric mono text-xs">{{ p.total_cache_write_tokens | format_number }}</td>
                     <td class="numeric mono text-xs {{ 'highlight-warn' if p.total_tool_calls > 1000 else '' }}">{{ p.total_tool_calls | format_number }}</td>
+                    <td class="numeric mono text-xs">{{ p_tools_per_round }}</td>
                     <td class="text-xs text-muted">{{ p.last_seen | relative_time }}</td>
                 </tr>
                 {% endfor %}
@@ -175,22 +232,25 @@
                     <th class="numeric">Output</th>
                     <th class="numeric">Tools</th>
                     <th>Duration</th>
+                    <th>Anomaly</th>
                     <th>Time</th>
                 </tr>
             </thead>
             <tbody>
                 {% for s in recent %}
-                <tr data-title="{{ s.title | lower }}" data-session-id="{{ s.session_id | lower }}">
+                {% set has_anomalies = s.get('anomalies') and s['anomalies'] | length > 0 %}
+                <tr data-title="{{ s.title | lower }}" data-session-id="{{ s.session_id | lower }}"
+                    {% if has_anomalies %}class="row--anomaly"{% endif %}>
                     <td><span class="agent-dot {{ 'claude' if s.agent == 'claude_code' else 'codex' }}"></span></td>
                     <td>
-                        <a href="/sessions/{{ s.agent }}/{{ s.session_id }}" class="link truncate" style="max-width:280px; display:block" data-tooltip="{{ s.title }}&#10;ID: {{ s.session_id }}">
+                        <a href="/sessions/{{ s.agent }}/{{ s.session_id }}" class="link truncate" style="max-width:240px; display:block" data-tooltip="{{ s.title }}&#10;ID: {{ s.session_id }}">
                             {{ s.title[:80] or 'Untitled' }}
                         </a>
                     </td>
                     <td class="text-xs">
                         <a href="/projects/{{ s.project_key | urlencode }}" class="link-muted" data-tooltip="{{ s.project_key }}">{{ s.project_name }}</a>
                     </td>
-                    <td class="text-xs text-muted mono" data-tooltip="{{ s.model }}">{{ (s.model or '—')[:40] }}</td>
+                    <td class="text-xs text-muted mono truncate" style="max-width:120px" data-tooltip="{{ s.model }}">{{ (s.model or '—')[:40] }}</td>
                     <td class="numeric mono text-xs">{{ s.input_tokens | format_number }}</td>
                     <td class="numeric mono text-xs">{{ s.cached_input_tokens | format_number }}</td>
                     <td class="numeric mono text-xs">{{ s.output_tokens | format_number }}</td>
@@ -200,7 +260,17 @@
                         <span class="badge badge-error">{{ s.failed_tool_count }}</span>
                         {% endif %}
                     </td>
-                    <td class="text-xs text-muted">{{ s.duration_seconds | format_duration }}</td>
+                    <td class="text-xs text-muted {{ 'highlight-warn' if s.duration_seconds > 3600 else '' }}" data-tooltip="{{ s.duration_seconds | int }}s">{{ s.duration_seconds | format_duration }}</td>
+                    <td>
+                        {% if has_anomalies %}
+                        {% for a in s.anomalies[:2] %}
+                        <span class="anomaly-badge {{ a.badge_class }}">{{ a.label }}</span>
+                        {% endfor %}
+                        {% if s.anomalies | length > 2 %}
+                        <span class="anomaly-badge anomaly-badge--more">+{{ s.anomalies | length - 2 }}</span>
+                        {% endif %}
+                        {% endif %}
+                    </td>
                     <td class="text-xs text-muted">{{ s.ended_at | relative_time }}</td>
                 </tr>
                 {% endfor %}
@@ -214,6 +284,27 @@
 
 <script>
 (function() {
+    /* ─── Needs Attention filter ──────────────────────────────────────── */
+    window.filterNeedsAttention = function(filterType, btn) {
+        document.querySelectorAll('.filter-chip').forEach(function(c) {
+            c.classList.remove('filter-chip--active');
+        });
+        if (btn) btn.classList.add('filter-chip--active');
+
+        var items = document.querySelectorAll('.attention-item');
+        items.forEach(function(item) {
+            var types = item.dataset.types || '';
+            var severity = item.dataset.severity || '';
+            var show = true;
+            if (filterType === 'critical' && severity !== 'critical') show = false;
+            if (filterType === 'long_duration' && types.indexOf('long_duration') === -1) show = false;
+            if (filterType === 'high_tools' && types.indexOf('tool_spike') === -1) show = false;
+            if (filterType === 'low_cache' && types.indexOf('low_cache_reuse') === -1) show = false;
+            if (filterType === 'failed' && types.indexOf('failed_run') === -1) show = false;
+            item.style.display = show ? '' : 'none';
+        });
+    };
+
     /* ─── Trend chart ──────────────────────────────────────────────── */
     var container = document.getElementById('trend-chart');
     if (!container) return;

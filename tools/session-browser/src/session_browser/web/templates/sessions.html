@@ -9,9 +9,6 @@
     <span class="sep">/</span>
     <span class="current">Sessions</span>
 </div>
-<div class="topbar-actions">
-    <span class="text-xs text-muted">{{ sessions | length }} of {{ total_count }} sessions</span>
-</div>
 {% endblock %}
 
 {% block content %}
@@ -44,6 +41,17 @@
         <label style="display:flex;align-items:center;gap:4px;font-size:var(--text-xs);white-space:nowrap;cursor:pointer">
             <input id="filter-failed-only" type="checkbox" /> Failed only
         </label>
+
+        <!-- Diagnostic filter -->
+        <select id="filter-anomaly" class="filter-bar__select" style="border-color:var(--status-warning)">
+            <option value="">All Sessions</option>
+            <option value="has_anomalies">Has Anomalies</option>
+            <option value="high_tools">High Tools Only</option>
+            <option value="long_duration">Long Duration Only</option>
+            <option value="low_output">Low Output Only</option>
+            <option value="low_cache">Low Cache Reuse</option>
+        </select>
+
         <select id="sort-by" class="filter-bar__select">
             <option value="ended_at">Sort: Last Active</option>
             <option value="input_tokens">Sort: Input Tokens</option>
@@ -71,17 +79,21 @@
                     <th>Model</th>
                     <th class="numeric">Input</th>
                     <th class="numeric">Cache R</th>
-                    <th class="numeric">Cache W</th>
                     <th class="numeric">Output</th>
+                    <th class="numeric">Output%</th>
                     <th class="numeric">Tools</th>
+                    <th class="numeric">Tools/R</th>
                     <th class="numeric">Failed</th>
                     <th>Duration</th>
+                    <th>Anomaly</th>
                     <th>Time</th>
                 </tr>
             </thead>
             <tbody>
                 {% for s in sessions %}
-                {% set total_tokens = s.input_tokens + s.output_tokens + s.cached_input_tokens + s.cached_output_tokens %}
+                {% set has_anomalies = s.get('anomalies') and s['anomalies'] | length > 0 %}
+                {% set output_ratio_val = (s.output_tokens / (s.input_tokens + s.cached_input_tokens + s.cached_output_tokens) * 100) | round(1) if (s.input_tokens + s.cached_input_tokens + s.cached_output_tokens) > 0 else 0 %}
+                {% set tools_per_round_val = (s.tool_call_count / s.assistant_message_count) | round(1) if s.assistant_message_count > 0 else 0 %}
                 <tr data-agent="{{ s.agent }}"
                     data-model="{{ s.model }}"
                     data-project="{{ s.project_key }}"
@@ -93,10 +105,12 @@
                     data-tool-count="{{ s.tool_call_count }}"
                     data-failed-count="{{ s.failed_tool_count }}"
                     data-duration="{{ s.duration_seconds }}"
-                    class="{{ 'row--failed' if s.failed_tool_count > 0 else '' }}">
+                    data-has-anomalies="{{ 'true' if has_anomalies else 'false' }}"
+                    data-anomaly-types="{% if has_anomalies %}{% for a in s.anomalies %}{{ a.type }}{% if not loop.last %},{% endif %}{% endfor %}{% endif %}"
+                    class="{{ 'row--failed' if s.failed_tool_count > 0 else '' }} {{ 'row--anomaly' if has_anomalies else '' }}">
                     <td><span class="agent-dot {{ 'claude' if s.agent == 'claude_code' else 'codex' }}"></span></td>
                     <td>
-                        <a href="/sessions/{{ s.agent }}/{{ s.session_id }}" class="link truncate" style="max-width:300px; display:block" data-tooltip="{{ s.title }}&#10;ID: {{ s.session_id }}">
+                        <a href="/sessions/{{ s.agent }}/{{ s.session_id }}" class="link truncate" style="max-width:240px; display:block" data-tooltip="{{ s.title }}&#10;ID: {{ s.session_id }}">
                             {{ s.title[:80] or 'Untitled' }}
                         </a>
                     </td>
@@ -104,12 +118,13 @@
                         <a href="/projects/{{ s.project_key | urlencode }}" class="link-muted" data-tooltip="{{ s.project_key }}">{{ s.project_name }}</a>
                     </td>
                     <td><span class="badge {{ 'badge-claude' if s.agent == 'claude_code' else 'badge-codex' }}">{{ 'CC' if s.agent == 'claude_code' else 'CX' }}</span></td>
-                    <td class="text-xs text-muted mono truncate" style="max-width:160px" data-tooltip="{{ s.model or 'unknown' }}">{{ s.model or '—' }}</td>
+                    <td class="text-xs text-muted mono truncate" style="max-width:120px" data-tooltip="{{ s.model or 'unknown' }}">{{ s.model or '—' }}</td>
                     <td class="numeric mono text-xs">{{ s.input_tokens | format_number }}</td>
                     <td class="numeric mono text-xs">{{ s.cached_input_tokens | format_number }}</td>
-                    <td class="numeric mono text-xs">{{ s.cached_output_tokens | format_number }}</td>
                     <td class="numeric mono text-xs">{{ s.output_tokens | format_number }}</td>
+                    <td class="numeric mono text-xs">{{ output_ratio_val }}%</td>
                     <td class="numeric mono text-xs {{ 'highlight-warn' if s.tool_call_count > 50 else '' }}">{{ s.tool_call_count }}</td>
+                    <td class="numeric mono text-xs">{{ tools_per_round_val }}</td>
                     <td class="numeric mono text-xs">
                         {% if s.failed_tool_count > 0 %}
                         <span class="badge badge-error">{{ s.failed_tool_count }}</span>
@@ -118,6 +133,16 @@
                         {% endif %}
                     </td>
                     <td class="text-xs text-muted {{ 'highlight-warn' if s.duration_seconds > 3600 else '' }}" data-tooltip="{{ s.duration_seconds | int }}s">{{ s.duration_seconds | format_duration }}</td>
+                    <td class="anomaly-cell">
+                        {% if has_anomalies %}
+                        {% for a in s.anomalies[:3] %}
+                        <span class="anomaly-badge {{ a.badge_class }}" data-tooltip="{{ a.reason }}">{{ a.label }}</span>
+                        {% endfor %}
+                        {% if s.anomalies | length > 3 %}
+                        <span class="anomaly-badge anomaly-badge--more" data-tooltip="{% for a in s.anomalies[3:] %}{{ a.label }}: {{ a.reason }}&#10;{% endfor %}">+{{ s.anomalies | length - 3 }}</span>
+                        {% endif %}
+                        {% endif %}
+                    </td>
                     <td class="text-xs text-muted">{{ s.ended_at | relative_time }}</td>
                 </tr>
                 {% endfor %}
@@ -144,6 +169,7 @@
         var dateEnd = document.getElementById('filter-date-end').value;
         var tokenMin = parseInt(document.getElementById('filter-token-min').value) || 0;
         var failedOnly = document.getElementById('filter-failed-only').checked;
+        var anomalyFilter = document.getElementById('filter-anomaly').value;
         var sortBy = document.getElementById('sort-by').value;
 
         var tbody = document.querySelector('#sessions-table tbody');
@@ -161,7 +187,6 @@
                 var title = (row.dataset.title || '');
                 var sid = (row.dataset.sessionId || '').toLowerCase();
                 if (title.indexOf(q) === -1 && sid.indexOf(q) === -1) show = false;
-                // Exact or prefix match on session ID → navigate directly
                 if ((sid === q || sid.startsWith(q) || q.startsWith(sid)) && q.length >= 8) {
                     var matches = 0;
                     rows.forEach(function(r2) {
@@ -181,6 +206,17 @@
                 if (total < tokenMin) show = false;
             }
             if (failedOnly && parseInt(row.dataset.failedCount) === 0) show = false;
+
+            /* Anomaly filter */
+            if (anomalyFilter) {
+                var hasAnomalies = row.dataset.hasAnomalies === 'true';
+                var types = row.dataset.anomalyTypes || '';
+                if (anomalyFilter === 'has_anomalies' && !hasAnomalies) show = false;
+                if (anomalyFilter === 'high_tools' && types.indexOf('tool_spike') === -1) show = false;
+                if (anomalyFilter === 'long_duration' && types.indexOf('long_duration') === -1) show = false;
+                if (anomalyFilter === 'low_output' && types.indexOf('low_output_ratio') === -1) show = false;
+                if (anomalyFilter === 'low_cache' && types.indexOf('low_cache_reuse') === -1) show = false;
+            }
 
             row.style.display = show ? '' : 'none';
             if (show) {
@@ -235,6 +271,7 @@
             dateEnd: document.getElementById('filter-date-end').value,
             tokenMin: document.getElementById('filter-token-min').value,
             failedOnly: document.getElementById('filter-failed-only').checked,
+            anomalyFilter: document.getElementById('filter-anomaly').value,
             sortBy: document.getElementById('sort-by').value
         };
         arpStorage.set(STORAGE_KEY, state);
@@ -251,7 +288,8 @@
             'filter-date-start': 'dateStart',
             'filter-date-end': 'dateEnd',
             'filter-token-min': 'tokenMin',
-            'sort-by': 'sortBy'
+            'sort-by': 'sortBy',
+            'filter-anomaly': 'anomalyFilter'
         };
         for (var id in map) {
             var el = document.getElementById(id);
@@ -278,6 +316,7 @@
         document.getElementById('filter-date-end').value = '';
         document.getElementById('filter-token-min').value = '';
         document.getElementById('filter-failed-only').checked = false;
+        document.getElementById('filter-anomaly').value = '';
         document.getElementById('sort-by').value = 'ended_at';
         arpStorage.remove(STORAGE_KEY);
         applyFilters();
@@ -286,7 +325,8 @@
     /* ─── Bind events ────────────────────────────────────────────── */
     var filterInputs = [
         'session-search', 'filter-agent', 'filter-model', 'filter-project',
-        'filter-date-start', 'filter-date-end', 'filter-token-min', 'filter-failed-only', 'sort-by'
+        'filter-date-start', 'filter-date-end', 'filter-token-min', 'filter-failed-only',
+        'filter-anomaly', 'sort-by'
     ];
     filterInputs.forEach(function(id) {
         var el = document.getElementById(id);

@@ -17,37 +17,60 @@
 <!-- Set session ID for localStorage persistence (used by base.html JS) -->
 <script>window._sessionId = "{{ session.session_id }}";</script>
 
-<!-- Compact session header -->
-<div class="session-header">
-    <div style="flex:1; min-width:0">
-        <h1 class="session-title" data-tooltip="{{ session.title }}">{{ session.title[:120] or 'Untitled Session' }}</h1>
-        <div class="session-meta">
-            <span class="session-meta__item">
-                <span class="badge {{ 'badge-claude' if session.agent == 'claude_code' else 'badge-codex' }}">
-                    {{ 'Claude Code' if session.agent == 'claude_code' else 'Codex' }}
-                </span>
-            </span>
-            {% if session.model %}
-            <span class="session-meta__item mono" data-tooltip="{{ session.model }}">{{ session.model[:60] }}</span>
-            {% endif %}
-            {% if session.git_branch and session.git_branch != 'main' %}
-            <span class="session-meta__item mono" data-tooltip="Branch: {{ session.git_branch }}">{{ session.git_branch[:30] }}</span>
-            {% endif %}
-            {% if session.cwd %}
-            <span class="session-meta__item mono" data-tooltip="{{ session.cwd }}">{{ session.cwd | truncate(50, True) }}</span>
-            {% endif %}
-            <span class="session-meta__item mono" data-tooltip="{{ session.project_key }}">{{ session.project_name }}</span>
-        </div>
+{% set input_total = session.input_tokens + session.cached_input_tokens + session.cached_output_tokens %}
+{% set cache_reuse = (session.cached_input_tokens / input_total * 100) | round(1) if input_total > 0 else 0 %}
+{% set output_ratio = (session.output_tokens / input_total * 100) | round(1) if input_total > 0 else 0 %}
+{% set tools_per_round = (session.tool_call_count / session.assistant_message_count) | round(1) if session.assistant_message_count > 0 else 0 %}
+{% set has_anomalies = session_anomalies and session_anomalies.anomalies | length > 0 %}
+
+<!-- Session header: title / metadata / path / time layers -->
+<div class="session-header-v2">
+    <!-- Title row -->
+    <h1 class="session-title-v2" data-tooltip="{{ session.title }}">{{ session.title[:120] or 'Untitled Session' }}</h1>
+
+    <!-- Metadata row: Agent · Model · Project -->
+    <div class="session-meta-row">
+        <span class="badge {{ 'badge-claude' if session.agent == 'claude_code' else 'badge-codex' }}">
+            {{ 'Claude Code' if session.agent == 'claude_code' else 'Codex' }}
+        </span>
+        {% if session.model %}
+        <span class="meta-label" data-tooltip="{{ session.model }}">{{ session.model[:60] }}</span>
+        {% endif %}
+        <a href="/projects/{{ session.project_key | urlencode }}" class="meta-link" data-tooltip="{{ session.project_key }}">{{ session.project_name }}</a>
     </div>
-    <div class="text-xs text-muted" style="flex-shrink:0;text-align:right;white-space:nowrap">
-        <div>{{ session.started_at[:19].replace('T', ' ') if session.started_at else '' }}</div>
-        <div>{{ session.ended_at[:19].replace('T', ' ') if session.ended_at else '' }}</div>
-        <div style="font-weight:500">{{ session.duration_seconds | format_duration }}</div>
+
+    <!-- Path row -->
+    <div class="session-path-row">
+        <code class="session-path" data-tooltip="Click to copy: {{ session.project_key }}" onclick="copyPath(this)">{{ session.project_key }}</code>
+        {% if session.git_branch and session.git_branch != 'main' %}
+        <span class="badge badge-muted">{{ session.git_branch }}</span>
+        {% endif %}
+    </div>
+
+    <!-- Time row -->
+    <div class="session-time-row">
+        <span class="text-xs text-muted">Started: {{ session.started_at[:19].replace('T', ' ') if session.started_at else '?' }}</span>
+        <span class="text-xs text-muted">Ended: {{ session.ended_at[:19].replace('T', ' ') if session.ended_at else '?' }}</span>
+        <span class="text-xs" style="font-weight:600">{{ session.duration_seconds | format_duration }}</span>
     </div>
 </div>
 
-<!-- Summary cards -->
-{% set input_total = session.input_tokens + session.cached_input_tokens + session.cached_output_tokens %}
+<!-- Anomaly banner -->
+{% if has_anomalies %}
+<div class="anomaly-banner anomaly-banner--{{ session_anomalies.max_severity }}">
+    <span class="anomaly-banner__icon">!</span>
+    <div class="anomaly-banner__content">
+        <strong>{{ session_anomalies.anomalies | length }} anomaly detected</strong>
+        <span class="anomaly-banner__reasons">
+            {% for a in session_anomalies.anomalies %}
+            <span class="anomaly-badge {{ a.badge_class }}">{{ a.label }}</span>
+            {% endfor %}
+        </span>
+    </div>
+</div>
+{% endif %}
+
+<!-- Summary cards with derived metrics -->
 <div class="metric-section-label">Overview</div>
 <div class="metrics-grid">
     <div class="metric-card metric-card--compact" data-tooltip="Total session duration">
@@ -66,249 +89,268 @@
         <div class="metric-sub"><span class="badge badge-error">{{ session.failed_tool_count }} failed</span></div>
         {% endif %}
     </div>
+    <div class="metric-card metric-card--compact" data-tooltip="Tools per round: total_tools / rounds">
+        <div class="metric-label">Tools/R</div>
+        <div class="metric-value">{{ tools_per_round }}</div>
+        <div class="metric-sub">per round</div>
+    </div>
+    {% if has_anomalies %}
+    <div class="metric-card metric-card--compact" data-tooltip="Detected anomalies for this session">
+        <div class="metric-label">Anomalies</div>
+        <div class="metric-value">{{ session_anomalies.anomalies | length }}</div>
+        <div class="metric-sub">
+            {% for a in session_anomalies.anomalies[:2] %}
+            <span class="anomaly-badge {{ a.badge_class }}">{{ a.label }}</span>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
 </div>
 
-<div class="metric-section-label">Input-side Tokens</div>
+<div class="metric-section-label">Token Breakdown</div>
 <div class="metrics-grid">
-    <div class="metric-card metric-card--compact" data-tooltip="New input tokens not served from cache">
-        <div class="metric-label">Input</div>
-        <div class="metric-value">{{ session.input_tokens | format_number }}</div>
+    <div class="metric-card metric-card--compact" data-tooltip="Input-side total: input_fresh + cache_read + cache_write">
+        <div class="metric-label">Input-side</div>
+        <div class="metric-value">{{ input_total | format_number }}</div>
+        <div class="metric-sub">fresh + cache R/W</div>
     </div>
-    <div class="metric-card metric-card--compact" data-tooltip="Input tokens served from cache">
+    <div class="metric-card metric-card--compact" data-tooltip="Cache reuse ratio: cache_read / input_side_total">
         <div class="metric-label">Cache R</div>
-        <div class="metric-value">{{ session.cached_input_tokens | format_number }}</div>
+        <div class="metric-value">{{ cache_reuse }}%</div>
+        <div class="metric-sub">reuse ratio</div>
     </div>
-    <div class="metric-card metric-card--compact" data-tooltip="Input tokens written to cache for future reads">
-        <div class="metric-label">Cache W</div>
-        <div class="metric-value">{{ session.cached_output_tokens | format_number }}</div>
-    </div>
-</div>
-
-<div class="metric-section-label">Output-side Tokens</div>
-<div class="metrics-grid">
-    <div class="metric-card metric-card--compact" data-tooltip="Visible output tokens">
+    <div class="metric-card metric-card--compact" data-tooltip="Output ratio: output / input_side_total">
         <div class="metric-label">Output</div>
         <div class="metric-value">{{ session.output_tokens | format_number }}</div>
+        <div class="metric-sub">{{ output_ratio }}% ratio</div>
+    </div>
+    <div class="metric-card metric-card--compact" data-tooltip="Cache write: input tokens written to cache">
+        <div class="metric-label">Cache W</div>
+        <div class="metric-value">{{ session.cached_output_tokens | format_number }}</div>
+        <div class="metric-sub">cache write</div>
     </div>
 </div>
-
-<!-- Token Breakdown (compact) -->
-{% if input_total > 0 or session.output_tokens > 0 %}
-<div class="card">
-    <div class="card-title">Token Breakdown</div>
-    <div class="token-breakdown-compact">
-        <!-- Input-side -->
-        <div style="font-size:var(--text-micro);font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em">Input-side ({{ input_total | format_number }})</div>
-        {% if input_total > 0 %}
-        <div class="token-bar-group">
-            <div class="token-breakdown-row">
-                <span class="label" style="color:var(--token-input-fresh)">Input fresh</span>
-                <span class="value">{{ session.input_tokens | format_number }}</span>
-                <div class="bar">
-                    <div class="bar-fill" style="width:{{ (session.input_tokens / input_total * 100) | round(1) }}%;background:var(--token-input-fresh)"></div>
-                </div>
-                <span class="text-muted" style="font-size:var(--text-micro)">{{ (session.input_tokens / input_total * 100) | round(1) }}%</span>
-            </div>
-            <div class="token-bar-tooltip">
-                Fresh: {{ session.input_tokens | format_number }} · Cache R: {{ session.cached_input_tokens | format_number }} · Cache W: {{ session.cached_output_tokens | format_number }}
-            </div>
-        </div>
-        <div class="token-bar-group">
-            <div class="token-breakdown-row">
-                <span class="label" style="color:var(--token-cache-read)">Cache read</span>
-                <span class="value">{{ session.cached_input_tokens | format_number }}</span>
-                <div class="bar">
-                    <div class="bar-fill" style="width:{{ (session.cached_input_tokens / input_total * 100) | round(1) }}%;background:var(--token-cache-read)"></div>
-                </div>
-                <span class="text-muted" style="font-size:var(--text-micro)">{{ (session.cached_input_tokens / input_total * 100) | round(1) }}%</span>
-            </div>
-        </div>
-        <div class="token-bar-group">
-            <div class="token-breakdown-row">
-                <span class="label" style="color:var(--token-cache-write)">Cache write</span>
-                <span class="value">{{ session.cached_output_tokens | format_number }}</span>
-                <div class="bar">
-                    <div class="bar-fill" style="width:{{ (session.cached_output_tokens / input_total * 100) | round(1) }}%;background:var(--token-cache-write)"></div>
-                </div>
-                <span class="text-muted" style="font-size:var(--text-micro)">{{ (session.cached_output_tokens / input_total * 100) | round(1) }}%</span>
-            </div>
-        </div>
-        <!-- Combined input bar -->
-        <div class="token-bar-group" style="margin-top:4px">
-            <div class="token-bar token-bar--lg">
-                {% if session.input_tokens > 0 %}
-                <div class="token-bar__input-fresh" style="width:{{ (session.input_tokens / input_total * 100) | round(1) }}%" title="Input fresh: {{ session.input_tokens | format_number }}"></div>
-                {% endif %}
-                {% if session.cached_input_tokens > 0 %}
-                <div class="token-bar__cache-read" style="width:{{ (session.cached_input_tokens / input_total * 100) | round(1) }}%" title="Cache read: {{ session.cached_input_tokens | format_number }}"></div>
-                {% endif %}
-                {% if session.cached_output_tokens > 0 %}
-                <div class="token-bar__cache-write" style="width:{{ (session.cached_output_tokens / input_total * 100) | round(1) }}%" title="Cache write: {{ session.cached_output_tokens | format_number }}"></div>
-                {% endif %}
-            </div>
-            <div class="token-bar-tooltip">
-                Input: {{ session.input_tokens | format_number }} · Cache R: {{ session.cached_input_tokens | format_number }} · Cache W: {{ session.cached_output_tokens | format_number }} · Total: {{ input_total | format_number }}
-            </div>
-        </div>
-        {% endif %}
-
-        <!-- Output-side -->
-        {% if session.output_tokens > 0 %}
-        <div style="font-size:var(--text-micro);font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;margin-top:8px">Output-side ({{ session.output_tokens | format_number }})</div>
-        <div class="token-bar-group">
-            <div class="token-breakdown-row">
-                <span class="label" style="color:var(--token-output-visible)">Output</span>
-                <span class="value">{{ session.output_tokens | format_number }}</span>
-                <div class="bar">
-                    <div class="bar-fill" style="width:100%;background:var(--token-output-visible)"></div>
-                </div>
-                <span class="text-muted" style="font-size:var(--text-micro)">100%</span>
-            </div>
-            <div class="token-bar-tooltip">
-                Output visible: {{ session.output_tokens | format_number }} tokens
-            </div>
-        </div>
-        {% endif %}
-    </div>
-</div>
-{% endif %}
 
 <!-- Tabs -->
 <div class="tabs">
-    <button class="tab active" data-tab="timeline" onclick="switchTab('timeline')">Timeline</button>
+    <button class="tab active" data-tab="run-profile" onclick="switchTab('run-profile')">Run Profile</button>
     <button class="tab" data-tab="messages" onclick="switchTab('messages')">Messages</button>
     <button class="tab" data-tab="tools" onclick="switchTab('tools')">Tools ({{ tool_calls | length }})</button>
     <button class="tab" data-tab="token-profile" onclick="switchTab('token-profile')">Token Profile</button>
     <button class="tab" data-tab="raw" onclick="switchTab('raw')">Raw</button>
 </div>
 
-<!-- Tab: Timeline (default) -->
-<div id="timeline" class="tab-content active">
-    <div class="card">
-        <div class="card-title">Timeline ({{ rounds | length }} rounds)</div>
-        {% if rounds %}
-        {% for round in rounds %}
-        {% set rb = round.token_breakdown() %}
-        {% set has_failed = false %}
-        {% if round.tool_calls %}
-            {% for tc in round.tool_calls %}
-                {% if tc.is_failed %}{% set has_failed = true %}{% endif %}
-            {% endfor %}
-        {% endif %}
-        <div class="round {{ 'has-failed' if has_failed else '' }}" data-round-idx="{{ loop.index }}">
-            <!-- Collapsible header -->
-            <div class="round-header">
-                <span class="round-chevron">›</span>
-                <span class="round-number">#{{ loop.index }}</span>
-                <span class="round-role round-role--{{ 'assistant' if round.assistant_msg.content or round.assistant_msg.tool_calls else 'user' }}">{{ round.assistant_msg.role or round.user_msg.role }}</span>
+<!-- Tab: Run Profile (default) -->
+<div id="run-profile" class="tab-content active">
+    <!-- Phase summary -->
+    <div class="card" style="margin-bottom:12px">
+        <div class="card-title">Run Profile</div>
+        {% set total_rounds = rounds | length %}
+        {% set total_tool_calls = session.tool_call_count %}
+        {% set failed_calls = session.failed_tool_count %}
+        {% set avg_tokens_per_round = ((input_total + session.output_tokens) / total_rounds) | round(0) if total_rounds > 0 else 0 %}
 
-                <!-- Compact token info -->
-                {% if round.total_tokens > 0 %}
-                <span class="round-token-count" data-tooltip="Total tokens: {{ round.total_tokens | format_number }}">
-                    {{ round.total_tokens | format_number }} tok
-                </span>
-                {% if rb.cache_read > 0 %}
-                <span class="token-badge token-badge--cache-read" data-tooltip="Cache read: {{ rb.cache_read | format_number }}">R{{ rb.cache_read | format_number }}</span>
-                {% endif %}
-                {% if rb.cache_write > 0 %}
-                <span class="token-badge token-badge--cache-write" data-tooltip="Cache write: {{ rb.cache_write | format_number }}">W{{ rb.cache_write | format_number }}</span>
-                {% endif %}
-                {% endif %}
-
-                <!-- Tool count -->
-                {% if round.tool_calls %}
-                <span class="text-xs mono {{ 'highlight-error' if has_failed else '' }}" data-tooltip="{{ round.tool_calls | length }} tool calls, {{ round.tool_calls | selectattr('is_failed') | list | length }} failed">
-                    {{ round.tool_calls | length }} tools{% if has_failed %} ({{ round.tool_calls | selectattr('is_failed') | list | length }}✗){% endif %}
-                </span>
-                {% endif %}
-
-                <!-- Mini token bar -->
-                {% if round.total_tokens > 0 %}
-                <div class="token-bar-group" style="width:80px; flex-shrink:0">
-                    <div class="token-bar token-bar--sm">
-                        {% if rb.input > 0 %}
-                        <div class="token-bar__input-fresh" style="width:{{ (rb.input / round.total_tokens * 100) | round(1) }}%"></div>
-                        {% endif %}
-                        {% if rb.cache_read > 0 %}
-                        <div class="token-bar__cache-read" style="width:{{ (rb.cache_read / round.total_tokens * 100) | round(1) }}%"></div>
-                        {% endif %}
-                        {% if rb.cache_write > 0 %}
-                        <div class="token-bar__cache-write" style="width:{{ (rb.cache_write / round.total_tokens * 100) | round(1) }}%"></div>
-                        {% endif %}
-                        {% if rb.output > 0 %}
-                        <div class="token-bar__output" style="width:{{ (rb.output / round.total_tokens * 100) | round(1) }}%"></div>
-                        {% endif %}
-                    </div>
-                    <div class="token-bar-tooltip">
-                        In: {{ rb.input | format_number }} · Cache R: {{ rb.cache_read | format_number }} · Cache W: {{ rb.cache_write | format_number }} · Out: {{ rb.output | format_number }}
-                    </div>
-                </div>
-                {% endif %}
-
-                <span class="text-xs text-muted">{{ round.user_msg.timestamp[:16].replace('T', ' ') if round.user_msg.timestamp else '' }}</span>
+        <div class="run-profile-summary">
+            <div class="run-profile-stat">
+                <div class="run-profile-stat__value">{{ total_rounds }}</div>
+                <div class="run-profile-stat__label">Rounds</div>
             </div>
-
-            <!-- Expandable content -->
-            <div class="round-content">
-                <!-- User message -->
-                {% if round.user_msg.content_html %}
-                <div class="msg msg--user">
-                    <div class="msg__meta">User</div>
-                    <div class="msg__body">
-                        {{ round.user_msg.content_html | safe }}
-                    </div>
-                </div>
-                {% endif %}
-
-                <!-- Assistant message -->
-                {% if round.assistant_msg.content_html %}
-                <div class="msg msg--assistant">
-                    <div class="msg__meta">
-                        Assistant{% if round.assistant_msg.model %} ({{ round.assistant_msg.model }}){% endif %}
-                    </div>
-                    <div class="msg__body">
-                        {{ round.assistant_msg.content_html | safe }}
-                    </div>
-                </div>
-                {% endif %}
-
-                <!-- Tool calls -->
-                {% if round.tool_calls %}
-                <div class="tool-tree">
-                    {% for tc in round.tool_calls %}
-                    <div class="tool-tree__item {{ 'tool-tree__item--error' if tc.is_failed else '' }}">
-                        <span class="tool-tree__icon">{{ '✗' if tc.is_failed else '├' }}</span>
-                        <span class="tool-tree__name">{{ tc.name }}</span>
-                        <span class="tool-tree__detail">
-                            {% if tc.parameters %}
-                            {% if tc.name == 'Bash' %}
-                                <code class="mono text-xs">{{ tc.parameters.get('command', '')[:80] }}</code>
-                            {% elif tc.parameters.get('file_path') %}
-                                <code class="mono text-xs">{{ tc.parameters.file_path }}</code>
-                            {% elif tc.parameters.get('path') %}
-                                <code class="mono text-xs">{{ tc.parameters.path }}</code>
-                            {% else %}
-                                {{ tc.parameters | tojson | truncate(60) }}
-                            {% endif %}
-                            {% endif %}
-                        </span>
-                        <span class="tool-tree__status">
-                            {% if tc.is_failed %}
-                            <span class="badge badge-error">exit={{ tc.exit_code }}</span>
-                            {% else %}
-                            <span class="badge badge-success">ok</span>
-                            {% endif %}
-                        </span>
-                    </div>
-                    {% endfor %}
-                </div>
-                {% endif %}
+            <div class="run-profile-stat">
+                <div class="run-profile-stat__value">{{ total_tool_calls }}</div>
+                <div class="run-profile-stat__label">Tool Calls</div>
+            </div>
+            <div class="run-profile-stat">
+                <div class="run-profile-stat__value {% if failed_calls > 0 %}highlight-error{% endif %}">{{ failed_calls }}</div>
+                <div class="run-profile-stat__label">Failed</div>
+            </div>
+            <div class="run-profile-stat">
+                <div class="run-profile-stat__value">{{ avg_tokens_per_round | format_number }}</div>
+                <div class="run-profile-stat__label">Tok/Round</div>
+            </div>
+            <div class="run-profile-stat">
+                <div class="run-profile-stat__value">{{ tools_per_round }}</div>
+                <div class="run-profile-stat__label">Tools/Round</div>
+            </div>
+            <div class="run-profile-stat">
+                <div class="run-profile-stat__value">{{ cache_reuse }}%</div>
+                <div class="run-profile-stat__label">Cache Reuse</div>
             </div>
         </div>
-        {% endfor %}
+    </div>
+
+    <!-- Round summary with signals -->
+    <div class="card">
+        <div class="card-title flex justify-between items-center">
+            Round Summary ({{ total_rounds }} rounds)
+        </div>
+        {% if rounds %}
+        <div class="table-wrap">
+            <table class="round-summary-table">
+                <thead>
+                    <tr>
+                        <th class="numeric">#</th>
+                        <th>Signal</th>
+                        <th class="numeric">Tokens</th>
+                        <th class="numeric">Cache R</th>
+                        <th class="numeric">Cache W</th>
+                        <th class="numeric">Tools</th>
+                        <th>Time</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for round in rounds %}
+                    {% set rb = round.token_breakdown() %}
+                    {% set round_input_total = rb.input + rb.cache_read + rb.cache_write %}
+                    {% set has_failed_tools = round.tool_calls | selectattr('is_failed') | list | length > 0 %}
+                    {% set round_tools = round.tool_calls | length %}
+
+                    <!-- Determine signals -->
+                    {% set signals = [] %}
+                    {% if loop.index <= 3 and rb.cache_read == 0 and round_input_total > 0 %}
+                        {% set _ = signals.append("warm-up") %}
+                    {% endif %}
+                    {% if rb.cache_read > round_input_total * 0.5 and round_input_total > 0 %}
+                        {% set _ = signals.append("cache-hit") %}
+                    {% endif %}
+                    {% if rb.cache_write > 10000 %}
+                        {% set _ = signals.append("high-write") %}
+                    {% endif %}
+                    {% if round_tools > 5 %}
+                        {% set _ = signals.append("tool-burst") %}
+                    {% endif %}
+                    {% if rb.output < 100 and round_input_total > 10000 %}
+                        {% set _ = signals.append("low-output") %}
+                    {% endif %}
+                    {% if has_failed_tools %}
+                        {% set _ = signals.append("failed-tool") %}
+                    {% endif %}
+
+                    <tr class="{{ 'row--failed' if has_failed_tools else '' }}"
+                        data-round-idx="{{ loop.index }}">
+                        <td class="numeric mono text-xs">#{{ loop.index }}</td>
+                        <td class="signals-cell">
+                            {% if signals %}
+                                {% for sig in signals %}
+                                <span class="signal-badge signal-{{ sig }}">{{ sig }}</span>
+                                {% endfor %}
+                            {% else %}
+                                <span class="signal-badge signal-normal">normal</span>
+                            {% endif %}
+                        </td>
+                        <td class="numeric mono text-xs">{{ round.total_tokens | format_number }}</td>
+                        <td class="numeric mono text-xs">{{ rb.cache_read | format_number }}</td>
+                        <td class="numeric mono text-xs">{{ rb.cache_write | format_number }}</td>
+                        <td class="numeric mono text-xs">
+                            {{ round_tools }}
+                            {% if has_failed_tools %}
+                            <span class="badge badge-error">{{ round.tool_calls | selectattr('is_failed') | list | length }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-xs text-muted">{{ round.user_msg.timestamp[:16].replace('T', ' ') if round.user_msg.timestamp else '' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
         {% else %}
         <div class="empty-state">No conversation data available.</div>
         {% endif %}
+    </div>
+
+    <!-- Tool hotspots -->
+    {% if tool_calls %}
+    <div class="card" style="margin-top:12px">
+        <div class="card-title">Tool Hotspots</div>
+        <div class="tool-hotspots">
+            {% set ns = namespace(tool_counts={}) %}
+            {% for tc in tool_calls %}
+                {% if tc.name in ns.tool_counts %}
+                    {% set _ = ns.tool_counts.update({tc.name: ns.tool_counts[tc.name] + 1}) %}
+                {% else %}
+                    {% set _ = ns.tool_counts.update({tc.name: 1}) %}
+                {% endif %}
+            {% endfor %}
+            {% for tool_name, count in ns.tool_counts | dictsort(by='value', reverse=true) %}
+            <div class="tool-hotspot__item">
+                <span class="tool-hotspot__name">{{ tool_name }}</span>
+                <div class="tool-hotspot__bar-wrap">
+                    <div class="tool-hotspot__bar" style="width:{{ (count / (tool_calls | length) * 100) | round(0) }}%"></div>
+                </div>
+                <span class="tool-hotspot__count">{{ count }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Raw timeline (collapsed by default) -->
+    <div class="card" style="margin-top:12px">
+        <div class="card-title flex justify-between items-center" style="cursor:pointer" onclick="toggleRawTimeline()">
+            Raw Timeline
+            <span id="raw-toggle-icon" class="text-muted">+</span>
+        </div>
+        <div id="raw-timeline" style="display:none">
+            {% for round in rounds %}
+            {% set rb = round.token_breakdown() %}
+            {% set has_failed = round.tool_calls | selectattr('is_failed') | list | length > 0 %}
+            <div class="round {{ 'has-failed' if has_failed else '' }}" data-round-idx="{{ loop.index }}">
+                <div class="round-header">
+                    <span class="round-chevron">›</span>
+                    <span class="round-number">#{{ loop.index }}</span>
+                    <span class="round-role round-role--{{ 'assistant' if round.assistant_msg.content or round.assistant_msg.tool_calls else 'user' }}">{{ round.assistant_msg.role or round.user_msg.role }}</span>
+                    {% if round.total_tokens > 0 %}
+                    <span class="round-token-count">{{ round.total_tokens | format_number }} tok</span>
+                    {% endif %}
+                    {% if round.tool_calls %}
+                    <span class="text-xs mono {{ 'highlight-error' if has_failed else '' }}">{{ round.tool_calls | length }} tools</span>
+                    {% endif %}
+                    <span class="text-xs text-muted">{{ round.user_msg.timestamp[:16].replace('T', ' ') if round.user_msg.timestamp else '' }}</span>
+                </div>
+                <div class="round-content">
+                    {% if round.user_msg.content_html %}
+                    <div class="msg msg--user">
+                        <div class="msg__meta">User</div>
+                        <div class="msg__body">{{ round.user_msg.content_html | safe }}</div>
+                    </div>
+                    {% endif %}
+                    {% if round.assistant_msg.content_html %}
+                    <div class="msg msg--assistant">
+                        <div class="msg__meta">Assistant{% if round.assistant_msg.model %} ({{ round.assistant_msg.model }}){% endif %}</div>
+                        <div class="msg__body">{{ round.assistant_msg.content_html | safe }}</div>
+                    </div>
+                    {% endif %}
+                    {% if round.tool_calls %}
+                    <div class="tool-tree">
+                        {% for tc in round.tool_calls %}
+                        <div class="tool-tree__item {{ 'tool-tree__item--error' if tc.is_failed else '' }}">
+                            <span class="tool-tree__icon">{{ '✗' if tc.is_failed else '├' }}</span>
+                            <span class="tool-tree__name">{{ tc.name }}</span>
+                            <span class="tool-tree__detail">
+                                {% if tc.parameters %}
+                                {% if tc.name == 'Bash' %}
+                                    <code class="mono text-xs">{{ tc.parameters.get('command', '')[:80] }}</code>
+                                {% elif tc.parameters.get('file_path') %}
+                                    <code class="mono text-xs">{{ tc.parameters.file_path }}</code>
+                                {% else %}
+                                    {{ tc.parameters | tojson | truncate(60) }}
+                                {% endif %}
+                                {% endif %}
+                            </span>
+                            <span class="tool-tree__status">
+                                {% if tc.is_failed %}
+                                <span class="badge badge-error">exit={{ tc.exit_code }}</span>
+                                {% else %}
+                                <span class="badge badge-success">ok</span>
+                                {% endif %}
+                            </span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
     </div>
 </div>
 
@@ -477,6 +519,28 @@
                 btn.textContent = 'Copied!';
                 setTimeout(function() { btn.textContent = 'Copy'; }, 1500);
             });
+        }
+    };
+
+    /* ─── Copy path ──────────────────────────────────────────────── */
+    window.copyPath = function(el) {
+        var text = el.dataset.tooltip.replace('Click to copy: ', '');
+        navigator.clipboard.writeText(text).then(function() {
+            el.textContent = 'Copied!';
+            setTimeout(function() { el.textContent = text; }, 1000);
+        });
+    };
+
+    /* ─── Toggle raw timeline ────────────────────────────────────── */
+    window.toggleRawTimeline = function() {
+        var el = document.getElementById('raw-timeline');
+        var icon = document.getElementById('raw-toggle-icon');
+        if (el.style.display === 'none') {
+            el.style.display = 'block';
+            icon.textContent = '−';
+        } else {
+            el.style.display = 'none';
+            icon.textContent = '+';
         }
     };
 })();

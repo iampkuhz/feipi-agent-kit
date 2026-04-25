@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "defaultMode": "bypassPermissions",
+    "allow": [
+      "Bash(chmod:*)",
+      "Bash(pip3 show:*)",
+      "Bash(pip3 install:*)",
+      "Bash(cd:*)",
+      "Bash(python3:*)",
+      "Bash(find /Users/zhehan/Documents/tools/llm/skills/feipi-agent-kit/skills/feipi-gen-plantuml-code -type f -name *.sh -o -name *.py -o -name *.yaml -o -name *.yml -o -name *.md -o -name *.json)",
+      "WebFetch(domain:plantuml.com)",
+      "WebSearch",
+      "Bash(bash scripts/test.sh)",
+      "Bash(/Users/zhehan/Documents/tools/llm/skills/feipi-agent-kit/skills/feipi-plantuml-arch-diagram/scripts/tests/test_cases.txt:*)"
+    ]
+  }
+}

@@ -52,12 +52,27 @@
                     <th class="numeric">Cache W</th>
                     <th class="numeric" data-sort-key="total_output_tokens">Output</th>
                     <th class="numeric" data-sort-key="total_tool_calls">Tools</th>
+                    <th class="numeric">Tools/R</th>
                     <th class="numeric" data-sort-key="total_failed_tools">Failed</th>
+                    <th>Health</th>
                     <th data-sort-key="last_seen">Last Active</th>
                 </tr>
             </thead>
             <tbody>
                 {% for p in projects %}
+                {% set p_input_side = p.total_input_tokens + p.total_cached_tokens + p.total_cache_write_tokens %}
+                {% set p_cache_reuse = (p.total_cached_tokens / p_input_side * 100) | round(1) if p_input_side > 0 else 0 %}
+                {% set p_tools_per_round = (p.total_tool_calls / p.total_assistant_messages) | round(1) if p.total_assistant_messages > 0 else 0 %}
+                {% set p_health = 'healthy' %}
+                {% set p_health_label = 'Healthy' %}
+                {% if p.total_failed_tools > 0 %}
+                    {% set p_health = 'warning' %}
+                    {% set p_health_label = p.total_failed_tools ~ ' failed' %}
+                {% endif %}
+                {% if p.total_failed_tools > 5 %}
+                    {% set p_health = 'error' %}
+                    {% set p_health_label = p.total_failed_tools ~ ' failed' %}
+                {% endif %}
                 <tr data-name="{{ p.project_name | lower }}"
                     data-path="{{ p.project_key | lower }}"
                     data-last-seen="{{ p.last_seen }}"
@@ -68,20 +83,33 @@
                     data-total-tools="{{ p.total_tool_calls }}"
                     data-total-failed="{{ p.total_failed_tools }}">
                     <td><a href="/projects/{{ p.project_key | urlencode }}" class="link">{{ p.project_name }}</a></td>
-                    <td class="text-xs mono truncate" style="max-width:200px" data-tooltip="{{ p.project_key }}">{{ p.project_key | truncate_path }}</td>
+                    <td class="path-cell">
+                        <span class="path-text truncate" style="max-width:200px; display:block" data-tooltip="{{ p.project_key }}">{{ p.project_key | truncate_path }}</span>
+                        <button class="path-copy-btn" onclick="copyProjectPath(this, '{{ p.project_key }}')" title="Copy full path">⧉</button>
+                    </td>
                     <td class="numeric"><strong>{{ p.total_sessions }}</strong></td>
                     <td class="numeric"><span class="badge badge-claude">{{ p.claude_sessions }}</span></td>
                     <td class="numeric"><span class="badge badge-codex">{{ p.codex_sessions }}</span></td>
                     <td class="numeric mono text-xs {{ 'muted-zero' if p.total_input_tokens == 0 else '' }}">{{ p.total_input_tokens | format_number }}</td>
-                    <td class="numeric mono text-xs {{ 'muted-zero' if p.total_cached_tokens == 0 else '' }}">{{ p.total_cached_tokens | format_number }}</td>
+                    <td class="numeric mono text-xs {{ 'muted-zero' if p.total_cached_tokens == 0 else '' }}">{{ p_cache_reuse }}%</td>
                     <td class="numeric mono text-xs {{ 'muted-zero' if p.total_cache_write_tokens == 0 else '' }}">{{ p.total_cache_write_tokens | format_number }}</td>
                     <td class="numeric mono text-xs {{ 'muted-zero' if p.total_output_tokens == 0 else '' }}">{{ p.total_output_tokens | format_number }}</td>
                     <td class="numeric mono text-xs {{ 'highlight-warn' if p.total_tool_calls > 500 else '' }}">{{ p.total_tool_calls | format_number }}</td>
+                    <td class="numeric mono text-xs">{{ p_tools_per_round }}</td>
                     <td class="numeric mono text-xs">
                         {% if p.total_failed_tools > 0 %}
                         <span class="badge badge-error">{{ p.total_failed_tools }}</span>
                         {% else %}
                         <span class="muted-zero">0</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if p_health == 'healthy' %}
+                        <span class="health-badge health--healthy">Healthy</span>
+                        {% elif p_health == 'warning' %}
+                        <span class="health-badge health--warning">{{ p_health_label }}</span>
+                        {% else %}
+                        <span class="health-badge health--error">{{ p_health_label }}</span>
                         {% endif %}
                     </td>
                     <td class="text-xs text-muted">{{ p.last_seen | relative_time }}</td>
@@ -98,8 +126,13 @@
 
 <script>
 (function() {
-    /* ─── Truncate path: keep first + last segment ────────────────── */
-    /* Done server-side via truncate_path filter; tooltip shows full path */
+    /* ─── Copy project path ────────────────────────────────────────── */
+    window.copyProjectPath = function(btn, path) {
+        navigator.clipboard.writeText(path).then(function() {
+            btn.textContent = '✓';
+            setTimeout(function() { btn.textContent = '⧉'; }, 1000);
+        });
+    };
 
     /* ─── Project search ─────────────────────────────────────────── */
     window.applyProjectFilters = function() {

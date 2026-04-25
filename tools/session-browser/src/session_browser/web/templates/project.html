@@ -15,9 +15,16 @@
 
 {% block content %}
 
+{% set p_input_side = project.total_input_tokens + project.total_cached_tokens + project.total_cache_write_tokens %}
+{% set p_cache_reuse = (project.total_cached_tokens / p_input_side * 100) | round(1) if p_input_side > 0 else 0 %}
+{% set p_tools_per_round = (project.total_tool_calls / project.total_assistant_messages) | round(1) if project.total_assistant_messages > 0 else 0 %}
+
 <!-- Compact header -->
 <h1 style="font-size:16px; font-weight:600; margin-bottom:2px" data-tooltip="{{ project.project_key }}">{{ project.project_name }}</h1>
-<p class="text-xs text-muted mono truncate mb-3" style="max-width:600px" data-tooltip="{{ project.project_key }}">{{ project.project_key | truncate_path }}</p>
+<p class="text-xs text-muted mono mb-3" style="max-width:600px">
+    <span class="path-text truncate" style="display:inline-block; max-width:500px; vertical-align:middle" data-tooltip="{{ project.project_key }}">{{ project.project_key | truncate_path }}</span>
+    <button class="path-copy-btn" style="opacity:1; vertical-align:middle" onclick="copyProjectPath(this, '{{ project.project_key }}')" title="Copy full path">⧉</button>
+</p>
 
 <!-- Project stats -->
 <div class="metrics-grid" style="grid-template-columns: repeat(auto-fill, minmax(180px, 1fr))">
@@ -30,14 +37,14 @@
         </div>
     </div>
     <div class="metric-card metric-card--compact" data-tooltip="Total input-side tokens">
-        <div class="metric-label">Input</div>
-        <div class="metric-value">{{ project.total_input_tokens | format_number }}</div>
-        <div class="metric-sub">Cache R: {{ project.total_cached_tokens | format_number }} · W: {{ project.total_cache_write_tokens | format_number }}</div>
+        <div class="metric-label">Input-side</div>
+        <div class="metric-value">{{ p_input_side | format_number }}</div>
+        <div class="metric-sub">Cache R: {{ p_cache_reuse }}%</div>
     </div>
     <div class="metric-card metric-card--compact" data-tooltip="Total output-side tokens">
         <div class="metric-label">Output</div>
         <div class="metric-value">{{ project.total_output_tokens | format_number }}</div>
-        <div class="metric-sub">{{ project.total_tool_calls | format_number }} tools</div>
+        <div class="metric-sub">{{ project.total_tool_calls | format_number }} tools · {{ p_tools_per_round }}/R</div>
     </div>
     <div class="metric-card metric-card--compact" data-tooltip="Active period of this project">
         <div class="metric-label">Active Period</div>
@@ -107,5 +114,14 @@
     <div class="empty-state">No sessions found for this project.</div>
     {% endif %}
 </div>
+
+<script>
+window.copyProjectPath = function(btn, path) {
+    navigator.clipboard.writeText(path).then(function() {
+        btn.textContent = '✓';
+        setTimeout(function() { btn.textContent = '⧉'; }, 1000);
+    });
+};
+</script>
 
 {% endblock %}

@@ -29,6 +29,15 @@ from session_browser.index.metrics import (
     get_token_breakdown,
     get_model_distribution,
     get_agent_distribution,
+    compute_derived_metrics,
+    compute_aggregate_metrics,
+    compute_agent_efficiency,
+)
+from session_browser.index.anomalies import (
+    detect_all_anomalies,
+    get_needs_attention,
+    enrich_sessions_with_anomalies,
+    AnomalyType,
 )
 from session_browser.domain.models import (
     ChatMessage,
@@ -327,17 +336,36 @@ class SessionBrowserHandler(BaseHTTPRequestHandler):
         model_dist = get_model_distribution(conn)
         agent_dist = get_agent_distribution(conn)
         token_breakdown = get_token_breakdown(conn)
+        aggregate_metrics = compute_aggregate_metrics(conn)
+
+        # Anomaly detection for all sessions
+        all_sessions_raw = list_sessions(conn, limit=2000, order_by="ended_at")
+        sessions_data = []
+        sessions_lookup = {}
+        for s in all_sessions_raw:
+            d = compute_derived_metrics(s.to_dict())
+            sessions_data.append(d)
+            sessions_lookup[d["session_key"]] = d
+
+        anomalies_map = detect_all_anomalies(sessions_data)
+        needs_attention = get_needs_attention(anomalies_map, sessions_lookup, limit=8)
+
+        # Enrich recent sessions with anomalies
+        recent_enriched = enrich_sessions_with_anomalies(recent, anomalies_map)
+
         conn.close()
 
         html = self._render_template(
             "dashboard.html",
             stats=stats,
             projects=projects,
-            recent=recent,
+            recent=recent_enriched,
             trend=trend,
             model_dist=model_dist.distribution,
             agent_dist=agent_dist,
             tokens=token_breakdown,
+            aggregate=aggregate_metrics,
+            needs_attention=needs_attention,
             active_page="dashboard",
         )
         self._send_html(html)
@@ -400,12 +428,21 @@ class SessionBrowserHandler(BaseHTTPRequestHandler):
             agent,
         )
 
+        # Compute derived metrics
+        session_data = compute_derived_metrics(session.to_dict())
+
+        # Detect anomalies for this session
+        from session_browser.index.anomalies import detect_session_anomalies
+        sa = detect_session_anomalies(session_data)
+
         html = self._render_template(
             "session.html",
             session=session,
+            session_data=session_data,
             rounds=rounds,
             tool_calls=tool_calls,
             current_agent=agent,
+            session_anomalies=sa,
         )
         self._send_html(html)
 
@@ -434,11 +471,13 @@ class SessionBrowserHandler(BaseHTTPRequestHandler):
     def _serve_agents(self) -> None:
         conn = _get_connection()
         agents = list_agents(conn)
+        efficiency = compute_agent_efficiency(conn)
         conn.close()
 
         html = self._render_template(
             "agents.html",
             agents=agents,
+            efficiency=efficiency,
             current_agent="__all__",
             active_page="agents",
         )
@@ -470,6 +509,19 @@ class SessionBrowserHandler(BaseHTTPRequestHandler):
         projects = conn.execute(
             "SELECT DISTINCT project_key, project_name FROM sessions ORDER BY project_name"
         ).fetchall()
+
+        # Anomaly detection for all sessions
+        all_sessions_raw = list_sessions(conn, limit=2000, order_by="ended_at")
+        sessions_data = []
+        sessions_lookup = {}
+        for s in all_sessions_raw:
+            d = compute_derived_metrics(s.to_dict())
+            sessions_data.append(d)
+            sessions_lookup[d["session_key"]] = d
+
+        anomalies_map = detect_all_anomalies(sessions_data)
+        sessions_enriched = enrich_sessions_with_anomalies(sessions, anomalies_map)
+
         conn.close()
 
         model_list = [r["model"] for r in models]
@@ -477,7 +529,7 @@ class SessionBrowserHandler(BaseHTTPRequestHandler):
 
         html = self._render_template(
             "sessions.html",
-            sessions=sessions,
+            sessions=sessions_enriched,
             total_count=total_count,
             model_list=model_list,
             project_list=[p[0] for p in project_list],

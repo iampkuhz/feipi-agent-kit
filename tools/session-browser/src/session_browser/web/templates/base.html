@@ -1124,6 +1124,440 @@
             color: var(--text-muted);
             margin-top: 2px;
         }
+
+        /* ─── Tabular numbers for data columns ──────────────────────── */
+        td.numeric, th.numeric {
+            font-variant-numeric: tabular-nums;
+        }
+        .mono {
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* ─── Anomaly badges ────────────────────────────────────────── */
+        .anomaly-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+            padding: 1px 6px;
+            border-radius: 3px;
+            font-size: var(--text-micro);
+            font-weight: 600;
+            white-space: nowrap;
+            line-height: 1.4;
+            border: 1px solid transparent;
+        }
+        .badge-anomaly-critical {
+            background: var(--status-error-bg);
+            color: var(--status-error);
+            border-color: rgba(239, 68, 68, 0.2);
+        }
+        .badge-anomaly-warning {
+            background: var(--status-warning-bg);
+            color: #b45309;
+            border-color: rgba(245, 158, 11, 0.2);
+        }
+        .badge-anomaly-info {
+            background: var(--accent-bg);
+            color: var(--accent);
+            border-color: rgba(99, 102, 241, 0.2);
+        }
+        .anomaly-badge--more {
+            background: var(--border-light);
+            color: var(--text-muted);
+            border: none;
+        }
+
+        /* ─── Anomaly row highlight ─────────────────────────────────── */
+        tr.row--anomaly {
+            border-left: 2px solid var(--status-warning);
+        }
+
+        /* ─── Anomaly cell ──────────────────────────────────────────── */
+        .anomaly-cell {
+            white-space: nowrap;
+            max-width: 180px;
+            overflow: hidden;
+        }
+
+        /* ─── Needs Attention card ──────────────────────────────────── */
+        .card--attention {
+            border-left: 3px solid var(--status-warning);
+        }
+        .attention-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 18px;
+            height: 18px;
+            background: var(--status-warning);
+            color: white;
+            border-radius: 50%;
+            font-size: 11px;
+            font-weight: 700;
+            margin-right: 6px;
+        }
+
+        /* ─── Filter chips ──────────────────────────────────────────── */
+        .filter-chip {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: var(--text-micro);
+            font-weight: 500;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 150ms ease;
+        }
+        .filter-chip:hover {
+            background: var(--surface-hover);
+            color: var(--text);
+        }
+        .filter-chip--active {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+
+        /* ─── Attention item ────────────────────────────────────────── */
+        .attention-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border-light);
+        }
+        .attention-item:last-child {
+            border-bottom: none;
+        }
+        .attention-item__severity {
+            flex-shrink: 0;
+            padding-top: 2px;
+        }
+        .severity-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        .severity--critical { background: var(--status-error); box-shadow: 0 0 4px rgba(239,68,68,0.4); }
+        .severity--warning { background: var(--status-warning); }
+        .severity--info { background: var(--accent); opacity: 0.6; }
+        .attention-item__content {
+            flex: 1;
+            min-width: 0;
+        }
+        .attention-item__title {
+            display: block;
+            color: var(--text);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: var(--text-sm);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .attention-item__title:hover { color: var(--accent); }
+        .attention-item__meta {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 3px;
+            font-size: var(--text-xs);
+            color: var(--text-muted);
+        }
+        .attention-item__project {
+            max-width: 120px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .attention-item__badges {
+            display: flex;
+            gap: 4px;
+            margin-top: 4px;
+            flex-wrap: wrap;
+        }
+        .attention-item__reason {
+            flex-shrink: 0;
+            max-width: 160px;
+            text-align: right;
+            padding-top: 4px;
+        }
+
+        /* ─── Session header v2 (layered) ──────────────────────────── */
+        .session-header-v2 {
+            margin-bottom: var(--space-md);
+        }
+        .session-title-v2 {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text);
+            line-height: 1.3;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            margin-bottom: 4px;
+        }
+        .session-meta-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: var(--text-xs);
+            color: var(--text-muted);
+            margin-bottom: 3px;
+        }
+        .meta-label {
+            font-family: var(--font-mono);
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .meta-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+        }
+        .meta-link:hover { color: var(--accent); }
+        .session-path-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 3px;
+        }
+        .session-path {
+            font-size: var(--text-micro);
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+            background: var(--panel);
+            padding: 2px 6px;
+            border-radius: 3px;
+            max-width: 500px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            cursor: pointer;
+        }
+        .session-path:hover { color: var(--text-secondary); }
+        .session-time-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: var(--text-xs);
+        }
+
+        /* ─── Anomaly banner ────────────────────────────────────────── */
+        .anomaly-banner {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            border-radius: var(--radius);
+            margin-bottom: var(--space-md);
+            font-size: var(--text-sm);
+        }
+        .anomaly-banner--critical {
+            background: var(--status-error-bg);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+        .anomaly-banner--warning {
+            background: var(--status-warning-bg);
+            border: 1px solid rgba(245, 158, 11, 0.2);
+        }
+        .anomaly-banner--info {
+            background: var(--accent-bg);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+        }
+        .anomaly-banner__icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 20px;
+            background: var(--status-warning);
+            color: white;
+            border-radius: 50%;
+            font-size: 12px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        .anomaly-banner--critical .anomaly-banner__icon {
+            background: var(--status-error);
+        }
+        .anomaly-banner__content {
+            flex: 1;
+        }
+        .anomaly-banner__reasons {
+            display: block;
+            margin-top: 4px;
+        }
+
+        /* ─── Run profile summary ───────────────────────────────────── */
+        .run-profile-summary {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        .run-profile-stat {
+            display: flex;
+            flex-direction: column;
+            min-width: 80px;
+        }
+        .run-profile-stat__value {
+            font-size: var(--text-metric-sm);
+            font-weight: 700;
+            color: var(--text);
+            line-height: 1.1;
+        }
+        .run-profile-stat__label {
+            font-size: var(--text-micro);
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-top: 2px;
+        }
+
+        /* ─── Signal badges for round summary ───────────────────────── */
+        .signals-cell {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+        .signal-badge {
+            display: inline-block;
+            padding: 1px 6px;
+            border-radius: 3px;
+            font-size: var(--text-micro);
+            font-weight: 500;
+            white-space: nowrap;
+        }
+        .signal-normal {
+            background: var(--status-success-bg);
+            color: var(--status-success);
+        }
+        .signal-warm-up {
+            background: var(--accent-bg);
+            color: var(--accent);
+        }
+        .signal-cache-hit {
+            background: var(--token-cache-read-bg);
+            color: var(--token-cache-read);
+        }
+        .signal-high-write {
+            background: var(--token-cache-write-bg);
+            color: var(--token-cache-write);
+        }
+        .signal-tool-burst {
+            background: var(--token-tool-bg);
+            color: var(--token-tool);
+        }
+        .signal-low-output {
+            background: var(--status-warning-bg);
+            color: var(--status-warning);
+        }
+        .signal-failed-tool {
+            background: var(--status-error-bg);
+            color: var(--status-error);
+        }
+
+        /* ─── Tool hotspots ─────────────────────────────────────────── */
+        .tool-hotspots {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .tool-hotspot__item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .tool-hotspot__name {
+            min-width: 100px;
+            font-size: var(--text-xs);
+            font-weight: 500;
+            font-family: var(--font-mono);
+            white-space: nowrap;
+        }
+        .tool-hotspot__bar-wrap {
+            flex: 1;
+            height: 6px;
+            background: var(--border-light);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .tool-hotspot__bar {
+            height: 100%;
+            background: var(--agent-claude);
+            border-radius: 3px;
+            transition: width 200ms ease;
+        }
+        .tool-hotspot__count {
+            min-width: 30px;
+            text-align: right;
+            font-size: var(--text-xs);
+            font-family: var(--font-mono);
+            color: var(--text-muted);
+        }
+
+        /* ─── Health badge ──────────────────────────────────────────── */
+        .health-badge {
+            display: inline-block;
+            padding: 1px 8px;
+            border-radius: 999px;
+            font-size: var(--text-micro);
+            font-weight: 600;
+        }
+        .health--healthy {
+            background: var(--status-success-bg);
+            color: var(--status-success);
+        }
+        .health--warning {
+            background: var(--status-warning-bg);
+            color: #b45309;
+        }
+        .health--error {
+            background: var(--status-error-bg);
+            color: var(--status-error);
+        }
+
+        /* ─── Path cell with copy button ────────────────────────────── */
+        .path-cell {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .path-text {
+            flex: 1;
+            min-width: 0;
+        }
+        .path-copy-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: var(--text-micro);
+            padding: 0 2px;
+            flex-shrink: 0;
+            opacity: 0;
+            transition: opacity 150ms ease;
+        }
+        .path-cell:hover .path-copy-btn {
+            opacity: 1;
+        }
+        .path-copy-btn:hover {
+            color: var(--text);
+        }
+
+        /* ─── Round summary table ───────────────────────────────────── */
+        .round-summary-table {
+            font-size: var(--text-xs);
+        }
+        .round-summary-table td {
+            padding: 4px 10px;
+        }
+
+        /* ─── Text micro utility ────────────────────────────────────── */
+        .text-micro { font-size: var(--text-micro); }
     </style>
 
     {% block head_extra %}{% endblock %}

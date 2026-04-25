@@ -194,3 +194,174 @@ def get_high_cache_read_sessions(conn: sqlite3.Connection, limit: int = 10) -> l
         (limit,),
     ).fetchall()
     return [dict(r) for r in rows]
+
+
+# ─── Derived metrics ─────────────────────────────────────────────────────
+
+
+def safe_div(a: int | float | None, b: int | float | None) -> float | None:
+    """Safe division: returns None when denominator is 0 or inputs are None."""
+    if a is None or b is None or b == 0:
+        return None
+    return a / b
+
+
+def compute_derived_metrics(session_row: dict) -> dict:
+    """Compute derived metrics for a single session row.
+
+    Adds: input_side_total, cache_reuse_ratio, cache_write_ratio,
+          output_ratio, tools_per_round, tokens_per_round, tokens_per_minute, output_per_minute.
+
+    Args:
+        session_row: Dict with session fields.
+
+    Returns:
+        Original dict enriched with derived metrics (mutated in place).
+    """
+    input_tokens = session_row.get("input_tokens", 0) or 0
+    output_tokens = session_row.get("output_tokens", 0) or 0
+    cache_read = session_row.get("cached_input_tokens", 0) or 0
+    cache_write = session_row.get("cached_output_tokens", 0) or 0
+    tools = session_row.get("tool_call_count", 0) or 0
+    duration = session_row.get("duration_seconds", 0) or 0
+    rounds = session_row.get("assistant_message_count", 0) or 0
+
+    input_side_total = input_tokens + cache_read + cache_write
+
+    cache_reuse_ratio = safe_div(cache_read, input_side_total)
+    cache_write_ratio = safe_div(cache_write, input_side_total)
+    output_ratio = safe_div(output_tokens, input_side_total)
+    tools_per_round = safe_div(tools, rounds)
+    tokens_per_round = safe_div(input_side_total + output_tokens, rounds)
+    tokens_per_minute = safe_div(input_side_total + output_tokens, duration / 60.0) if duration > 0 else None
+    output_per_minute = safe_div(output_tokens, duration / 60.0) if duration > 0 else None
+
+    session_row["input_side_total"] = input_side_total
+    session_row["cache_reuse_ratio"] = round(cache_reuse_ratio, 4) if cache_reuse_ratio is not None else None
+    session_row["cache_write_ratio"] = round(cache_write_ratio, 4) if cache_write_ratio is not None else None
+    session_row["output_ratio"] = round(output_ratio, 4) if output_ratio is not None else None
+    session_row["tools_per_round"] = round(tools_per_round, 2) if tools_per_round is not None else None
+    session_row["tokens_per_round"] = round(tokens_per_round, 1) if tokens_per_round is not None else None
+    session_row["tokens_per_minute"] = round(tokens_per_minute, 1) if tokens_per_minute is not None else None
+    session_row["output_per_minute"] = round(output_per_minute, 1) if output_per_minute is not None else None
+
+    return session_row
+
+
+def compute_aggregate_metrics(conn: sqlite3.Connection) -> dict:
+    """Compute dashboard-level aggregate derived metrics.
+
+    Returns dict with cache_reuse, output_ratio, tools_per_round, etc.
+    """
+    row = conn.execute(
+        """
+        SELECT
+            COALESCE(SUM(input_tokens), 0) as total_input,
+            COALESCE(SUM(output_tokens), 0) as total_output,
+            COALESCE(SUM(cached_input_tokens), 0) as total_cache_read,
+            COALESCE(SUM(cached_output_tokens), 0) as total_cache_write,
+            COALESCE(SUM(tool_call_count), 0) as total_tools,
+            COALESCE(SUM(assistant_message_count), 0) as total_rounds
+        FROM sessions
+        """
+    ).fetchone()
+
+    total_input = row["total_input"]
+    total_output = row["total_output"]
+    total_cache_read = row["total_cache_read"]
+    total_cache_write = row["total_cache_write"]
+    total_tools = row["total_tools"]
+    total_rounds = row["total_rounds"]
+
+    input_side_total = total_input + total_cache_read + total_cache_write
+
+    return {
+        "input_side_total": input_side_total,
+        "cache_reuse_ratio": round(safe_div(total_cache_read, input_side_total), 4) if safe_div(total_cache_read, input_side_total) else None,
+        "cache_write_ratio": round(safe_div(total_cache_write, input_side_total), 4) if safe_div(total_cache_write, input_side_total) else None,
+        "output_ratio": round(safe_div(total_output, input_side_total), 4) if safe_div(total_output, input_side_total) else None,
+        "tools_per_round": round(safe_div(total_tools, total_rounds), 2) if safe_div(total_tools, total_rounds) else None,
+        "tokens_per_round": round(safe_div(input_side_total + total_output, total_rounds), 1) if safe_div(input_side_total + total_output, total_rounds) else None,
+    }
+
+
+def compute_agent_efficiency(conn: sqlite3.Connection) -> list[dict]:
+    """Compute per-agent/model efficiency metrics.
+
+    Returns list of {agent, model, session_count, avg_duration, p95_duration,
+                     avg_input_side, avg_tools, tools_per_round, cache_reuse_ratio,
+                     failure_rate, anomaly_rate}.
+    """
+    rows = conn.execute(
+        """
+        SELECT
+            agent,
+            COALESCE(model, 'unknown') as model,
+            COUNT(*) as session_count,
+            AVG(duration_seconds) as avg_duration,
+            COALESCE(SUM(input_tokens + cached_input_tokens + cached_output_tokens), 0) as total_input_side,
+            COALESCE(SUM(tool_call_count), 0) as total_tools,
+            COALESCE(SUM(assistant_message_count), 0) as total_rounds,
+            COALESCE(SUM(cached_input_tokens), 0) as total_cache_read,
+            COALESCE(SUM(failed_tool_count), 0) as total_failed
+        FROM sessions
+        GROUP BY agent, model
+        ORDER BY session_count DESC
+        """
+    ).fetchall()
+
+    # Get duration values per agent/model for P95
+    duration_rows = conn.execute(
+        """
+        SELECT agent, COALESCE(model, 'unknown') as model, duration_seconds
+        FROM sessions
+        WHERE duration_seconds > 0
+        ORDER BY agent, model, duration_seconds
+        """
+    ).fetchall()
+
+    # Build duration lists per (agent, model)
+    from collections import defaultdict
+    durations: dict[str, list] = defaultdict(list)
+    for r in duration_rows:
+        key = f"{r['agent']}|||{r['model']}"
+        durations[key].append(r["duration_seconds"])
+
+    # Compute P95
+    def p95(values):
+        if not values:
+            return 0
+        s = sorted(values)
+        idx = int(0.95 * (len(s) - 1))
+        return s[idx]
+
+    result = []
+    for r in rows:
+        key = f"{r['agent']}|||{r['model']}"
+        session_count = r["session_count"]
+        avg_duration = r["avg_duration"] or 0
+        p95_duration = p95(durations.get(key, []))
+        total_input_side = r["total_input_side"]
+        total_tools = r["total_tools"]
+        total_rounds = r["total_rounds"]
+        total_cache_read = r["total_cache_read"]
+        total_failed = r["total_failed"]
+
+        cache_reuse = safe_div(total_cache_read, total_input_side)
+        tpr = safe_div(total_tools, total_rounds)
+        failure_rate = safe_div(total_failed, session_count)
+
+        result.append({
+            "agent": r["agent"],
+            "model": r["model"],
+            "session_count": session_count,
+            "avg_duration": round(avg_duration, 1),
+            "p95_duration": round(p95_duration, 1),
+            "avg_input_side": total_input_side,
+            "avg_tools": round(safe_div(total_tools, session_count), 1) if session_count > 0 else 0,
+            "tools_per_round": round(tpr, 2) if tpr else None,
+            "cache_reuse_ratio": round(cache_reuse, 4) if cache_reuse else None,
+            "failure_rate": round(failure_rate, 4) if failure_rate else None,
+        })
+
+    return result
