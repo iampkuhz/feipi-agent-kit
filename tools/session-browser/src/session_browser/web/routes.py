@@ -42,6 +42,7 @@ from session_browser.index.anomalies import (
 from session_browser.domain.models import (
     ChatMessage,
     ConversationRound,
+    LLMCall,
     ToolCall,
 )
 
@@ -132,11 +133,11 @@ def _build_rounds(
 ) -> list[ConversationRound]:
     """Group messages into conversation rounds and compute token ratios.
 
-    Consecutive same-role messages are merged into a single round
-    (joined by \\n\\n). Orphan assistant messages (no preceding user) also
-    become their own rounds with an empty user_msg.
+    Each assistant LLM response becomes its own round. Consecutive user
+    messages before an assistant response are merged; assistant responses that
+    happen during tool loops get an empty user_msg so repeated tool iterations
+    stay visible instead of collapsing into one giant round.
 
-    Each round = 1 user message (possibly merged) + 1 assistant message.
     Token ratio is derived from the assistant message's usage data (Claude)
     or distributed evenly (Codex).
     """
@@ -145,58 +146,40 @@ def _build_rounds(
 
     total_session_tokens = session_input_tokens + session_output_tokens + session_cached_tokens + session_cache_write_tokens
 
-    # Step 1: Merge consecutive same-role messages
-    grouped: list[list[ChatMessage]] = []
+    # Step 1: Render markdown and pair each assistant LLM response into its
+    # own round. Tool-result pseudo-user messages are filtered in sources, so
+    # consecutive assistant responses are expected during tool loops.
+    pending_users: list[ChatMessage] = []
+    rounds: list[ConversationRound] = []
     for msg in messages:
-        # Pre-render markdown for every message
         msg.content_html = _md_filter(msg.content)
 
-        if grouped and grouped[-1][0].role == msg.role:
-            grouped[-1].append(msg)
-        else:
-            grouped.append([msg])
+        if msg.role == "user":
+            pending_users.append(msg)
+            continue
 
-    # Step 2: Pair user-groups with assistant-groups into rounds
-    rounds: list[ConversationRound] = []
-    i = 0
-    while i < len(grouped):
-        group = grouped[i]
-        role = group[0].role
-
-        if role == "user":
-            # Merge all consecutive user messages into one
-            merged_user = _merge_messages(group)
-
-            # Look ahead for the next assistant group
-            j = i + 1
-            if j < len(grouped) and grouped[j][0].role == "assistant":
-                merged_assistant = _merge_messages(grouped[j])
-                j += 1
+        if msg.role == "assistant":
+            if pending_users:
+                merged_user = _merge_messages(pending_users)
+                pending_users = []
             else:
-                # Orphan user message — no assistant response
-                merged_assistant = ChatMessage(role="assistant", content="", timestamp="")
-                j = i + 1
-
+                merged_user = ChatMessage(role="user", content="", timestamp="")
             rounds.append(
-                _make_round(merged_user, merged_assistant, tool_calls,
+                _make_round(merged_user, msg, tool_calls,
                             total_session_tokens, agent, session_cache_write_tokens)
             )
-            i = j
 
-        elif role == "assistant":
-            # Orphan assistant message — no preceding user
-            merged_assistant = _merge_messages(group)
-            rounds.append(
-                _make_round(
-                    ChatMessage(role="user", content="", timestamp=""),
-                    merged_assistant,
-                    tool_calls,
-                    total_session_tokens,
-                    agent,
-                    session_cache_write_tokens,
-                )
+    if pending_users:
+        rounds.append(
+            _make_round(
+                _merge_messages(pending_users),
+                ChatMessage(role="assistant", content="", timestamp=""),
+                tool_calls,
+                total_session_tokens,
+                agent,
+                session_cache_write_tokens,
             )
-            i += 1
+        )
 
     return rounds
 
@@ -228,6 +211,8 @@ def _merge_messages(msgs: list[ChatMessage]) -> ChatMessage:
         tool_calls=all_tool_calls,
         usage=usage,
         content_html=content_html,
+        llm_call_id=msgs[-1].llm_call_id,
+        llm_status=msgs[-1].llm_status,
     )
 
 
@@ -243,11 +228,14 @@ def _make_round(
     # Match tool calls from assistant message
     round_tool_calls = []
     if assistant_msg.tool_calls:
+        matched_ids = {
+            mt.get("id")
+            for mt in assistant_msg.tool_calls
+            if mt.get("id")
+        }
         for tc in all_tool_calls:
-            for mt in assistant_msg.tool_calls:
-                if mt.get("name") == tc.name:
-                    round_tool_calls.append(tc)
-                    break
+            if tc.tool_use_id and tc.tool_use_id in matched_ids:
+                round_tool_calls.append(tc)
 
     # Token info (Claude only)
     round_input = 0
@@ -262,6 +250,9 @@ def _make_round(
 
     round_total = round_input + round_output + round_cached + round_cache_write
     token_ratio = round_total / total_session_tokens if total_session_tokens > 0 else 0
+    direct_llm_calls = 1 if assistant_msg.llm_call_id else 0
+    nested_llm_calls = sum(tc.llm_call_count for tc in round_tool_calls)
+    nested_llm_errors = sum(tc.llm_error_count for tc in round_tool_calls)
 
     return ConversationRound(
         user_msg=user_msg,
@@ -269,7 +260,247 @@ def _make_round(
         tool_calls=round_tool_calls,
         total_tokens=round_total,
         token_ratio=token_ratio,
+        llm_call_count=direct_llm_calls + nested_llm_calls,
+        llm_error_count=nested_llm_errors,
     )
+
+
+def _build_llm_calls(
+    messages: list[ChatMessage],
+    tool_calls: list[ToolCall],
+    rounds: list[ConversationRound],
+    subagent_runs: list[dict],
+) -> list[LLMCall]:
+    """Extract individual LLMCall objects (one per LLM turn).
+
+    Main agent: one call per assistant message.
+    Subagent: one call per internal turn (so the LLM Calls tab shows all).
+    """
+    llm_calls: list[LLMCall] = []
+
+    # Map assistant llm_call_id -> round_index
+    call_id_to_round: dict[str, int] = {}
+    for r_idx, r in enumerate(rounds):
+        if r.assistant_msg.llm_call_id:
+            call_id_to_round[r.assistant_msg.llm_call_id] = r_idx
+
+    # Main agent calls
+    for msg in messages:
+        if msg.role != "assistant" or not msg.llm_call_id:
+            continue
+        r_idx = call_id_to_round.get(msg.llm_call_id, 0)
+        usage = msg.usage or {}
+        round_tools = rounds[r_idx].tool_calls if r_idx < len(rounds) else []
+
+        llm_calls.append(LLMCall(
+            id=msg.llm_call_id,
+            model=msg.model,
+            scope="main",
+            subagent_id="",
+            round_index=r_idx,
+            parent_id="",
+            parent_tool_name="",
+            timestamp=msg.timestamp,
+            status=msg.llm_status,
+            input_tokens=usage.get("input_tokens", 0),
+            output_tokens=usage.get("output_tokens", 0),
+            cache_read_tokens=usage.get("cache_read_input_tokens", 0),
+            cache_write_tokens=usage.get("cache_creation_input_tokens", 0),
+            prompt_preview="",
+            response_preview=msg.content[:200],
+            response_full=msg.content,
+            tool_calls=[tc for tc in round_tools if tc.scope == "main"],
+            tool_call_count=len([tc for tc in round_tools if tc.scope == "main"]),
+            failed_tool_count=sum(1 for tc in round_tools if tc.scope == "main" and tc.is_failed),
+        ))
+
+    # Subagent individual calls — one per internal LLM turn
+    for run in subagent_runs:
+        summary = run["summary"]
+        agent_id = summary["agent_id"]
+
+        parent_tc = None
+        for tc in tool_calls:
+            if tc.name == "Agent" and tc.subagent_summary.get("agent_id") == agent_id:
+                parent_tc = tc
+                break
+
+        parent_round = 0
+        if parent_tc:
+            for r_idx, r in enumerate(rounds):
+                if any(tc.tool_use_id == parent_tc.tool_use_id for tc in r.tool_calls):
+                    parent_round = r_idx
+                    break
+
+        for msg in run["messages"]:
+            if msg.role != "assistant" or not msg.llm_call_id:
+                continue
+            usage = msg.usage or {}
+
+            llm_calls.append(LLMCall(
+                id=msg.llm_call_id,
+                model=msg.model,
+                scope="subagent",
+                subagent_id=agent_id,
+                round_index=parent_round,
+                parent_id=parent_tc.tool_use_id if parent_tc else "",
+                parent_tool_name=parent_tc.name if parent_tc else "Agent",
+                timestamp=msg.timestamp,
+                status="ok",
+                input_tokens=usage.get("input_tokens", 0),
+                output_tokens=usage.get("output_tokens", 0),
+                cache_read_tokens=usage.get("cache_read_input_tokens", 0),
+                cache_write_tokens=usage.get("cache_creation_input_tokens", 0),
+                prompt_preview="",
+                response_preview=msg.content[:200],
+                response_full=msg.content,
+                tool_calls=[],
+                tool_call_count=0,
+                failed_tool_count=0,
+            ))
+
+    return llm_calls
+
+
+def _build_subagent_interactions(
+    llm_calls: list[LLMCall],
+    subagent_runs: list[dict],
+    tool_calls: list[ToolCall],
+) -> list[LLMCall]:
+    """Build one aggregated interaction per subagent run (for rounds view).
+
+    Each subagent run becomes a single interaction that aggregates all its
+    internal LLM calls and tools, so the round expand shows it as one nested
+    block instead of repeating 260 times.
+    """
+    interactions: list[LLMCall] = []
+    for run in subagent_runs:
+        summary = run["summary"]
+        agent_id = summary["agent_id"]
+
+        parent_tc = None
+        for tc in tool_calls:
+            if tc.name == "Agent" and tc.subagent_summary.get("agent_id") == agent_id:
+                parent_tc = tc
+                break
+
+        # Find individual subagent calls for this run
+        sub_calls = [c for c in llm_calls if c.scope == "subagent" and c.subagent_id == agent_id]
+        if not sub_calls:
+            continue
+
+        parent_round = sub_calls[0].round_index
+        total_input = sum(c.input_tokens for c in sub_calls)
+        total_output = sum(c.output_tokens for c in sub_calls)
+        total_cr = sum(c.cache_read_tokens for c in sub_calls)
+        total_cw = sum(c.cache_write_tokens for c in sub_calls)
+
+        response = ""
+        for c in reversed(sub_calls):
+            if c.response_full:
+                response = c.response_full
+                break
+
+        sub_tools = [tc for tc in tool_calls if tc.subagent_id == agent_id]
+
+        interactions.append(LLMCall(
+            id=f"subagent-{agent_id}",
+            model=sub_calls[0].model if sub_calls else "",
+            scope="subagent",
+            subagent_id=agent_id,
+            round_index=parent_round,
+            parent_id=parent_tc.tool_use_id if parent_tc else "",
+            parent_tool_name=parent_tc.name if parent_tc else "Agent",
+            timestamp=sub_calls[0].timestamp,
+            status="ok",
+            input_tokens=total_input,
+            output_tokens=total_output,
+            cache_read_tokens=total_cr,
+            cache_write_tokens=total_cw,
+            prompt_preview="",
+            response_preview=response[:200],
+            response_full=response,
+            tool_calls=sub_tools,
+            tool_call_count=len(sub_tools),
+            failed_tool_count=sum(1 for t in sub_tools if t.is_failed),
+        ))
+
+    return interactions
+
+
+def _assign_interactions_to_rounds(
+    rounds: list[ConversationRound],
+    llm_calls: list[LLMCall],
+    tool_calls: list[ToolCall],
+    subagent_runs: list[dict],
+) -> None:
+    """Populate round.interactions.
+
+    Main agent: individual calls stay as individual interactions.
+    Subagent: replaced by one aggregated interaction per run (so round expand
+    shows it as a single nested block, not repeated for every internal turn).
+    """
+    # Group main-agent calls by round
+    main_by_round: dict[int, list[LLMCall]] = {}
+    for call in llm_calls:
+        if call.scope == "main":
+            main_by_round.setdefault(call.round_index, []).append(call)
+
+    # Build aggregated subagent interactions
+    subagent_interactions = _build_subagent_interactions(llm_calls, subagent_runs, tool_calls)
+    sub_by_round: dict[int, list[LLMCall]] = {}
+    for ix in subagent_interactions:
+        sub_by_round.setdefault(ix.round_index, []).append(ix)
+
+    for r_idx, r in enumerate(rounds):
+        main_calls = main_by_round.get(r_idx, [])
+        sub_calls = sub_by_round.get(r_idx, [])
+        # Main calls first, then subagent interactions
+        r.interactions = main_calls + sub_calls
+
+
+def _group_tools_by_agent(tool_calls: list[ToolCall]) -> list[dict]:
+    """Group tool calls by agent scope, preserving parent-child hierarchy."""
+    main_tools = [tc for tc in tool_calls if tc.scope == "main"]
+    subagent_tools = [tc for tc in tool_calls if tc.scope == "subagent"]
+
+    # Group subagent tools by subagent_id
+    subagent_groups: dict[str, list[ToolCall]] = {}
+    for tc in subagent_tools:
+        subagent_groups.setdefault(tc.subagent_id, []).append(tc)
+
+    # Find parent Agent tool for each subagent
+    agent_tool_by_subagent: dict[str, ToolCall] = {}
+    for tc in main_tools:
+        if tc.name == "Agent" and tc.subagent_summary:
+            aid = tc.subagent_summary.get("agent_id", "")
+            if aid:
+                agent_tool_by_subagent[aid] = tc
+
+    root = {
+        "agent_name": "Main Agent",
+        "agent_id": "",
+        "tools": [tc for tc in main_tools if tc.name != "Agent"],
+        "agent_tools": [tc for tc in main_tools if tc.name == "Agent"],
+        "children": [],
+    }
+
+    for aid, tools in subagent_groups.items():
+        parent_tc = agent_tool_by_subagent.get(aid)
+        summary = parent_tc.subagent_summary if parent_tc else {}
+        child = {
+            "agent_name": summary.get("description", "") or summary.get("agent_type", "") or aid,
+            "agent_id": aid,
+            "parent_tool": parent_tc,
+            "tools": tools,
+            "children": [],
+            "llm_calls": summary.get("llm_call_count", 0),
+            "total_tools": len(tools),
+            "failed_tools": sum(1 for t in tools if t.is_failed),
+        }
+        root["children"].append(child)
+
+    return [root]
 
 
 class SessionBrowserHandler(BaseHTTPRequestHandler):
@@ -410,12 +641,25 @@ class SessionBrowserHandler(BaseHTTPRequestHandler):
         # Get raw conversation data from source
         if agent == "claude_code":
             from session_browser.sources.claude import parse_session_detail
-            _, messages, tool_calls = parse_session_detail(
+            raw_summary, messages, tool_calls, subagent_runs = parse_session_detail(
                 session.project_key, session_id
             )
         else:
             from session_browser.sources.codex import parse_session_detail
-            _, messages, tool_calls = parse_session_detail(session_id)
+            raw_summary, messages, tool_calls, subagent_runs = parse_session_detail(session_id)
+
+        # Use freshly parsed detail counts on the session page so newly added
+        # diagnostics do not require a rescan before they become visible.
+        if raw_summary is not None:
+            session.user_message_count = raw_summary.user_message_count
+            session.assistant_message_count = raw_summary.assistant_message_count
+            session.tool_call_count = raw_summary.tool_call_count
+            session.failed_tool_count = raw_summary.failed_tool_count
+            session.input_tokens = raw_summary.input_tokens
+            session.output_tokens = raw_summary.output_tokens
+            session.cached_input_tokens = raw_summary.cached_input_tokens
+            session.cached_output_tokens = raw_summary.cached_output_tokens
+            session.duration_seconds = raw_summary.duration_seconds or session.duration_seconds
 
         # Build conversation rounds with token data and markdown rendering
         rounds = _build_rounds(
@@ -427,6 +671,13 @@ class SessionBrowserHandler(BaseHTTPRequestHandler):
             session.cached_output_tokens,
             agent,
         )
+
+        # Build LLM calls and assign interactions to rounds
+        llm_calls = _build_llm_calls(messages, tool_calls, rounds, subagent_runs)
+        _assign_interactions_to_rounds(rounds, llm_calls, tool_calls, subagent_runs)
+
+        # Build hierarchical tool grouping
+        tools_by_agent = _group_tools_by_agent(tool_calls)
 
         # Compute derived metrics
         session_data = compute_derived_metrics(session.to_dict())
@@ -441,6 +692,8 @@ class SessionBrowserHandler(BaseHTTPRequestHandler):
             session_data=session_data,
             rounds=rounds,
             tool_calls=tool_calls,
+            llm_calls=llm_calls,
+            tools_by_agent=tools_by_agent,
             current_agent=agent,
             session_anomalies=sa,
         )

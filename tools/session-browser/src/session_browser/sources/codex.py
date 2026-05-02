@@ -146,14 +146,14 @@ def _parse_session_events(path: Path) -> list[dict]:
 def parse_session_detail(
     session_id: str,
     threads_db: dict | None = None,
-) -> tuple[SessionSummary, list[ChatMessage], list[ToolCall]]:
+) -> tuple[SessionSummary, list[ChatMessage], list[ToolCall], list[dict]]:
     """Parse a single Codex session.
 
     Args:
         session_id: The Codex thread/session ID.
         threads_db: Pre-loaded threads DB data (from read_threads_db).
 
-    Returns: (SessionSummary, chat_messages, tool_calls).
+    Returns: (SessionSummary, chat_messages, tool_calls, []).
     """
     # Get metadata from threads DB
     thread_info = (threads_db or {}).get(session_id, {})
@@ -162,7 +162,7 @@ def parse_session_detail(
     rollout_path = thread_info.get("rollout_path", "")
     session_file = _find_session_file(session_id, rollout_path)
     if session_file is None:
-        return _empty_session(session_id, thread_info), [], []
+        return _empty_session(session_id, thread_info), [], [], []
 
     events = _parse_session_events(session_file)
 
@@ -179,7 +179,7 @@ def parse_session_detail(
     messages = _extract_messages(events)
     tool_calls = _extract_tool_calls(events)
 
-    return summary, messages, tool_calls
+    return summary, messages, tool_calls, []
 
 
 def _empty_session(session_id: str, thread_info: dict) -> SessionSummary:

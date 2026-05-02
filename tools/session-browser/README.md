@@ -77,6 +77,23 @@ docker compose -f compose/docker-compose.yml up -d
 
 注意：Cache Read ≠ 输出缓存。`cache_read_input_tokens` 和 `cache_creation_input_tokens` 都是输入侧字段。
 
+## Claude Code 子 Agent 诊断
+
+Claude Code 的父会话文件只记录主会话的 `Agent` 工具调用；子 Agent 内部的真实工具循环会写到同级目录：
+
+```text
+~/.claude/projects/<project>/<session-id>/subagents/*.jsonl
+```
+
+`session-browser` 会把这些 sidechain 文件合并到父 session 的诊断视图：
+
+- 会话级 `Tools` 包含主会话工具调用和子 Agent 内部工具调用。
+- `Tools` 页会用 `Scope` 标记 `main` 或 `subagent`。
+- `Rounds` 表新增 `LLM` 列，显示该 round 的主模型调用数和嵌套 Agent 内部模型调用数。
+- `Agent` 工具行会显示子 Agent 摘要，包括 `LLM` 调用数、内部工具调用数和工具分布。
+
+LLM 调用数基于 Claude Code JSONL 中唯一 `assistant.message.id` 推断。它能反映已经落盘的模型响应；如果要精确看到 LiteLLM 层的 HTTP 重试、失败状态和未落盘请求，需要后续接入 LiteLLM proxy 日志或数据库作为补充数据源。
+
 ## 目录结构
 
 ```

@@ -373,7 +373,6 @@ run_mode() {
   else
     log_file="$LOG_DIR/${SOURCE}-${mode}.log"
   fi
-
   marker="$(mktemp "$RUN_DIR/.txt-marker.XXXXXX")"
 
   set +e
@@ -405,17 +404,34 @@ run_mode() {
   return 1
 }
 
+log_indicates_auth_issue() {
+  local log_file="$1"
+
+  if [[ -z "$log_file" || ! -f "$log_file" ]]; then
+    return 1
+  fi
+
+  rg -qi \
+    "Sign in to confirm|confirm you're not a bot|HTTP Error 429|403 Forbidden|Subtitles are only available when logged in|检测到可能的 YouTube bot/风控拦截|检测到可能需要登录态|检测到带认证请求失败|cookies-from-browser|AGENT_YOUTUBE_COOKIE_FILE 指向的文件不存在|AGENT_YOUTUBE_COOKIE_FILE 不可读" \
+    "$log_file"
+}
+
 run_mode_with_fallback() {
   local mode="$1"
+  local auth_log_file="$LOG_DIR/${SOURCE}-${mode}.log"
 
   if TEXT_FILE="$(run_mode "$mode" "auth")"; then
     return 0
   fi
 
   if [[ "$SOURCE" == "youtube" && "$AUTH_PRESENT" -eq 1 ]]; then
-    echo "检测到 Cookie 或浏览器认证可能导致失败，尝试无 Cookie 重试: mode=$mode" >&2
-    if TEXT_FILE="$(run_mode "$mode" "no_auth")"; then
-      return 0
+    if log_indicates_auth_issue "$auth_log_file"; then
+      echo "检测到认证或风控相关失败，尝试无 Cookie 重试: mode=$mode" >&2
+      if TEXT_FILE="$(run_mode "$mode" "no_auth")"; then
+        return 0
+      fi
+    else
+      echo "未检测到认证或 Cookie 相关失败，跳过无 Cookie 重试: mode=$mode log=$auth_log_file" >&2
     fi
   fi
 

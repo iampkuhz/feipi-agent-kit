@@ -173,8 +173,9 @@ description: 用于按用户意图下载、提取或总结视频网站 URL，统
 - `scripts/install_deps.sh --check` 或 `scripts/extract_video_text.sh --check-deps` 校验依赖与自动选档结果。
 - 先判断用户意图属于直接读取还是总结模式。
 - 再判断背景阶段是否明确要求“相关新闻/最新进展”；未明确时默认 `--news off`。
-- 若检测到 YouTube 在 Cookie 或浏览器认证下失败，会自动以“无 Cookie”重试，并输出 `*-noauth.log` 便于排查。
+- 若检测到 YouTube 在 Cookie、浏览器认证或风控相关失败，会自动以“无 Cookie”重试，并输出 `*-noauth.log` 便于排查；若日志不含认证/风控信号，不把普通字幕缺失或转写失败误报为 Cookie 问题。
 - 若转写失败，只能回到当前 skill 的本地脚本排查网络、认证或模型缺失；禁止切换转写工具。
+- 如需配置 YouTube 登录态，优先引导用户运行 `scripts/setup_youtube_cookies.sh`，按向导导出 Netscape `cookies.txt` 并设置 `AGENT_YOUTUBE_COOKIE_FILE`；`AGENT_CHROME_PROFILE` 仅作为备用方式。
 
 2. Plan
 - 直接读取模式：确定 `dryrun / video / audio / subtitle / whisper`。

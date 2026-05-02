@@ -6,11 +6,17 @@ set -euo pipefail
 # 1. 软链接模式：安装到用户级 agent 目录（~/.claude/skills 等）
 # 2. 拷贝模式：安装到项目目录内（<project>/.agents/skills 等）
 #
+# 注意：OpenClaw 安全策略拒绝 realpath 超出根目录的软链接
+# （"resolved realpath stays inside the configured root"），
+# 因此对 openclaw 用户级安装也使用实拷，而非软链接。
+#
 # 用法：
 #   ./scripts/install_skills.sh
 #     软链接到所有已存在的用户级 agent 目录
 #   ./scripts/install_skills.sh --agent claudecode
 #     软链接到 ~/.claude/skills
+#   ./scripts/install_skills.sh --agent openclaw
+#     实拷到 ~/.openclaw/skills（非软链接）
 #   ./scripts/install_skills.sh --dir /path/to/project
 #     拷贝到 /path/to/project/.agents/skills
 #   ./scripts/install_skills.sh --agent qwen --dir /path/to/project
@@ -35,6 +41,7 @@ while [[ $# -gt 0 ]]; do
       echo "示例:"
       echo "  $0                              # 软链接到所有已存在的用户级目录"
       echo "  $0 --agent claudecode           # 软链接到 ~/.claude/skills"
+      echo "  $0 --agent openclaw             # 实拷到 ~/.openclaw/skills"
       echo "  $0 --dir /path/to/project       # 拷贝到 /path/to/project/.agents/skills"
       echo "  $0 --agent qwen --dir /path     # 拷贝到 /path/to/project/.qwen/skills"
       exit 0
@@ -422,7 +429,11 @@ else
     agent="${agent_entry%%:*}"
     dest_root="${agent_entry#*:}"
 
-    if [[ -n "$agent" ]]; then
+    # OpenClaw 安全策略拒绝 realpath 超出根目录的软链接，
+    # 因此对 openclaw 使用实拷而非软链接
+    if [[ "$agent" == "openclaw" ]]; then
+      result="$(install_skills "copy" "$dest_root" "copy_dir" "安装到 ${agent} -> ${dest_root} [实拷]")"
+    elif [[ -n "$agent" ]]; then
       result="$(install_skills "link" "$dest_root" "link_item" "安装到 $agent -> $dest_root")"
     else
       result="$(install_skills "link" "$dest_root" "link_item" "安装到 $dest_root")"

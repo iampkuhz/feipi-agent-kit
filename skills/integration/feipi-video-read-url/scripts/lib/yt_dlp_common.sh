@@ -245,7 +245,7 @@ yt_common_run_whisper_mode_from_url() {
   local language="${4:-zh}"
   local whisper_profile="${5:-auto}"
 
-  local marker audio_file base text_file srt_file output_prefix
+  local marker audio_file transcribe_audio_file base text_file srt_file output_prefix
   local audio_download_log
   local transcribe_log used_device used_model used_profile requested_profile
   local run_code
@@ -299,9 +299,17 @@ yt_common_run_whisper_mode_from_url() {
   text_file="$output_prefix.txt"
   rm -f "$srt_file" "$text_file"
 
+  transcribe_audio_file="$out_dir/$base.whisper.wav"
+  rm -f "$transcribe_audio_file"
+  echo "转换音频为 whisper.cpp 兼容 WAV: $transcribe_audio_file" >&2
+  if ! ffmpeg -y -hide_banner -loglevel error -i "$audio_file" -ar 16000 -ac 1 -f wav "$transcribe_audio_file" >&2; then
+    echo "whisper 模式失败：音频转 WAV 失败: $audio_file" >&2
+    return 1
+  fi
+
   transcribe_log="$(mktemp "$out_dir/.whispercpp-log.XXXXXX")"
   set +e
-  bash "$whisper_helper" "$audio_file" "$output_prefix" "$language" "$whisper_profile" >"$transcribe_log" 2>&1
+  bash "$whisper_helper" "$transcribe_audio_file" "$output_prefix" "$language" "$whisper_profile" >"$transcribe_log" 2>&1
   run_code=$?
   set -e
   cat "$transcribe_log"
@@ -338,5 +346,6 @@ yt_common_run_whisper_mode_from_url() {
   echo "model=$used_model"
   echo "device=$used_device"
   echo "audio_file=$audio_file"
+  echo "transcribe_audio_file=$transcribe_audio_file"
   echo "text_file=$text_file"
 }

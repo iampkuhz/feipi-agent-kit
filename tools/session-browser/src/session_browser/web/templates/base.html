@@ -659,6 +659,10 @@
         .tool-tree__item--error .tool-tree__name {
             color: var(--status-error);
         }
+        .subagent-inline {
+            color: var(--text);
+            font-weight: 500;
+        }
 
         /* ─── Tabs ────────────────────────────────────────────────────── */
         .tabs {
@@ -1451,9 +1455,17 @@
             background: var(--token-tool-bg);
             color: var(--token-tool);
         }
+        .signal-llm-burst {
+            background: var(--accent-bg);
+            color: var(--accent);
+        }
         .signal-low-output {
             background: var(--status-warning-bg);
             color: var(--status-warning);
+        }
+        .signal-llm-error {
+            background: var(--status-error-bg);
+            color: var(--status-error);
         }
         .signal-failed-tool {
             background: var(--status-error-bg);
@@ -1578,6 +1590,115 @@
 
         /* ─── Text micro utility ────────────────────────────────────── */
         .text-micro { font-size: var(--text-micro); }
+
+        /* ── Interaction timeline ──────────────────────────────────────── */
+        .interaction-timeline {
+            margin-bottom: 8px;
+        }
+        .interaction {
+            border-radius: var(--radius);
+            padding: 8px 10px;
+        }
+        .interaction--main {
+            background: var(--surface-hover);
+            border: 1px solid var(--border-light);
+        }
+        .interaction--subagent {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--token-tool);
+        }
+        .interaction__header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+            font-size: var(--text-micro);
+        }
+        .interaction__scope-badge {
+            padding: 1px 6px;
+            border-radius: 3px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+        .interaction__scope--main {
+            background: var(--accent-bg);
+            color: var(--accent);
+        }
+        .interaction__scope--subagent {
+            background: var(--token-tool-bg);
+            color: var(--token-tool);
+        }
+        .interaction__model {
+            font-family: var(--font-mono);
+            color: var(--text-muted);
+        }
+        .interaction__tokens {
+            margin-left: auto;
+            font-family: var(--font-mono);
+            color: var(--text-secondary);
+        }
+        .interaction__tools {
+            margin-top: 6px;
+        }
+        .interaction__body {
+            margin-top: 6px;
+        }
+        .interaction__parent {
+            color: var(--text-muted);
+            font-style: italic;
+        }
+        .interaction__tool-count {
+            font-family: var(--font-mono);
+            color: var(--text-secondary);
+        }
+
+        /* ─── Hierarchical tool groups ──────────────────────────────────── */
+        .agent-group {
+            margin-bottom: 8px;
+        }
+        .agent-group--subagent {
+            border-left: 2px solid var(--border);
+            padding-left: 12px;
+        }
+        .tool-row__chevron {
+            display: inline-block;
+            font-size: var(--text-micro);
+            color: var(--text-muted);
+            transition: transform 180ms ease;
+            width: 12px;
+            text-align: center;
+        }
+        .tool-row__chevron.rotated {
+            transform: rotate(90deg);
+        }
+        .tool-row__detail pre {
+            font-size: 11px;
+            line-height: 1.4;
+        }
+
+        /* ─── LLM call rows ─────────────────────────────────────────────── */
+        .llm-call-row {
+            transition: background 150ms ease;
+        }
+        .llm-call-row:hover {
+            background: var(--surface-hover);
+        }
+        .llm-call-detail td {
+            padding: 0;
+        }
+        .llm-call-detail pre {
+            font-size: 11px;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .model-color-sonnet { color: #8b5cf6; }
+        .model-color-haiku { color: #10b981; }
+        .model-color-opus { color: #3b82f6; }
+        .model-color-default { color: var(--text-muted); }
+
     </style>
 
     {% block head_extra %}{% endblock %}

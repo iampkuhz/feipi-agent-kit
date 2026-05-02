@@ -131,6 +131,8 @@ class ChatMessage:
     content_html: str = ""  # pre-rendered markdown HTML
     token_ratio: float = 0  # proportion of session tokens used in this message
     token_breakdown: Optional[TokenBreakdown] = None  # per-message token breakdown
+    llm_call_id: str = ""  # provider/Claude message id, one logical LLM call
+    llm_status: str = "ok"  # "ok" | "error"
 
 
 @dataclass
@@ -147,10 +149,45 @@ class ToolCall:
     error_message: str = ""
     files_touched: list[str] = field(default_factory=list)
     round_index: int = 0
+    tool_use_id: str = ""
+    scope: str = "main"  # "main" | "subagent"
+    parent_tool_use_id: str = ""
+    parent_tool_name: str = ""
+    subagent_id: str = ""
+    subagent_summary: dict = field(default_factory=dict)
+    llm_call_count: int = 0
+    llm_error_count: int = 0
+    subagent_tool_call_count: int = 0
+    subagent_failed_tool_count: int = 0
 
     @property
     def is_failed(self) -> bool:
         return self.status == "error" or (self.exit_code is not None and self.exit_code != 0)
+
+
+@dataclass
+class LLMCall:
+    """One logical LLM API call (main agent or subagent)."""
+
+    id: str                          # msg["id"] — the llm_call_id
+    model: str                       # e.g. "qwen3.6-plus", "claude-sonnet-4-6"
+    scope: str                       # "main" | "subagent"
+    subagent_id: str                 # "" for main; agent_id for subagent
+    round_index: int                 # 0-based round index
+    parent_id: str                   # "" for main; parent Agent tool_use_id for subagent
+    parent_tool_name: str            # "" for main; "Agent" for subagent
+    timestamp: str                   # ISO8601
+    status: str                      # "ok" | "error"
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cache_read_tokens: int = 0
+    cache_write_tokens: int = 0
+    prompt_preview: str = ""         # first ~200 chars of prompt context
+    response_preview: str = ""       # first ~200 chars of response
+    response_full: str = ""          # full response text (for expand)
+    tool_calls: list["ToolCall"] = field(default_factory=list)
+    tool_call_count: int = 0
+    failed_tool_count: int = 0
 
 
 @dataclass
@@ -163,6 +200,9 @@ class ConversationRound:
     total_tokens: int = 0
     token_ratio: float = 0  # proportion of total session tokens
     round_index: int = 0
+    llm_call_count: int = 0
+    llm_error_count: int = 0
+    interactions: list[LLMCall] = field(default_factory=list)
 
     @property
     def input_tokens(self) -> int:

@@ -22,6 +22,8 @@
 {% set output_ratio = (session.output_tokens / input_total * 100) | round(1) if input_total > 0 else 0 %}
 {% set tools_per_round = (session.tool_call_count / session.assistant_message_count) | round(1) if session.assistant_message_count > 0 else 0 %}
 {% set has_anomalies = session_anomalies and session_anomalies.anomalies | length > 0 %}
+{% set total_llm_calls = rounds | sum(attribute='llm_call_count') %}
+{% set total_llm_errors = rounds | sum(attribute='llm_error_count') %}
 
 <!-- Session header: title / metadata / path / time layers -->
 <div class="session-header-v2">
@@ -94,6 +96,13 @@
         <div class="metric-value">{{ tools_per_round }}</div>
         <div class="metric-sub">per round</div>
     </div>
+    <div class="metric-card metric-card--compact" data-tooltip="Logical LLM calls inferred from Claude message ids, including nested Agent sidechains">
+        <div class="metric-label">LLM Calls</div>
+        <div class="metric-value">{{ total_llm_calls | format_number }}</div>
+        {% if total_llm_errors > 0 %}
+        <div class="metric-sub"><span class="badge badge-error">{{ total_llm_errors }} error</span></div>
+        {% endif %}
+    </div>
     {% if has_anomalies %}
     <div class="metric-card metric-card--compact" data-tooltip="Detected anomalies for this session">
         <div class="metric-label">Anomalies</div>
@@ -136,6 +145,7 @@
     <button class="tab active" data-tab="run-profile" onclick="switchTab('run-profile')">Run Profile</button>
     <button class="tab" data-tab="messages" onclick="switchTab('messages')">Messages</button>
     <button class="tab" data-tab="tools" onclick="switchTab('tools')">Tools ({{ tool_calls | length }})</button>
+    <button class="tab" data-tab="llm-calls" onclick="switchTab('llm-calls')">LLM ({{ llm_calls | length }})</button>
     <button class="tab" data-tab="token-profile" onclick="switchTab('token-profile')">Token Profile</button>
     <button class="tab" data-tab="raw" onclick="switchTab('raw')">Raw</button>
 </div>
@@ -172,6 +182,10 @@
                 <div class="run-profile-stat__label">Tools/Round</div>
             </div>
             <div class="run-profile-stat">
+                <div class="run-profile-stat__value {{ 'highlight-error' if total_llm_errors > 0 else '' }}">{{ total_llm_calls | format_number }}</div>
+                <div class="run-profile-stat__label">LLM Calls</div>
+            </div>
+            <div class="run-profile-stat">
                 <div class="run-profile-stat__value">{{ cache_reuse }}%</div>
                 <div class="run-profile-stat__label">Cache Reuse</div>
             </div>
@@ -191,6 +205,7 @@
                         <th class="numeric">Tokens</th>
                         <th class="numeric">Cache R</th>
                         <th class="numeric">Cache W</th>
+                        <th class="numeric">LLM</th>
                         <th class="numeric">Tools</th>
                         <th>Time</th>
                     </tr>
@@ -216,8 +231,14 @@
                     {% if round_tools > 5 %}
                         {% set _ = signals.append("tool-burst") %}
                     {% endif %}
+                    {% if round.llm_call_count > 10 %}
+                        {% set _ = signals.append("llm-burst") %}
+                    {% endif %}
                     {% if rb.output < 100 and round_input_total > 10000 %}
                         {% set _ = signals.append("low-output") %}
+                    {% endif %}
+                    {% if round.llm_error_count > 0 %}
+                        {% set _ = signals.append("llm-error") %}
                     {% endif %}
                     {% if has_failed_tools %}
                         {% set _ = signals.append("failed-tool") %}
@@ -245,6 +266,12 @@
                         <td class="numeric mono text-xs">{{ rb.cache_read | format_number }}</td>
                         <td class="numeric mono text-xs">{{ rb.cache_write | format_number }}</td>
                         <td class="numeric mono text-xs">
+                            {{ round.llm_call_count | format_number }}
+                            {% if round.llm_error_count > 0 %}
+                            <span class="badge badge-error">{{ round.llm_error_count }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="numeric mono text-xs">
                             {{ round_tools }}
                             {% if has_failed_tools %}
                             <span class="badge badge-error">{{ round.tool_calls | selectattr('is_failed') | list | length }}</span>
@@ -253,15 +280,133 @@
                         <td class="text-xs text-muted">{{ round.user_msg.timestamp[:16].replace('T', ' ') if round.user_msg.timestamp else '' }}</td>
                     </tr>
                     <tr class="round-detail-row" data-round-idx="{{ loop.index }}" style="display:none">
-                        <td colspan="7" class="round-detail-cell">
+                        <td colspan="8" class="round-detail-cell">
                             <div class="round {{ 'has-failed' if has_failed_tools else '' }}">
                                 <div class="round-content">
                                     {% if round.user_msg.content_html %}
                                     <div class="msg msg--user">
-                                        <div class="msg__meta">User</div>
+                                        <div class="msg__meta">Round #{{ loop.index }} - User</div>
                                         <div class="msg__body">{{ round.user_msg.content_html | safe }}</div>
+                                        {% if round.user_msg.content_html | length > 800 %}
+                                        <button class="show-more" onclick="this.previousElementSibling.classList.toggle('expanded');this.textContent=this.previousElementSibling.classList.contains('expanded')?'Show less':'Show more'">Show more</button>
+                                        {% endif %}
                                     </div>
                                     {% endif %}
+
+                                    {# Interaction timeline #}
+                                    {% for interaction in round.interactions %}
+                                    <div class="interaction-timeline" data-scope="{{ interaction.scope }}">
+                                        {% if interaction.scope == "main" %}
+                                        <div class="interaction interaction--main">
+                                            <div class="interaction__header">
+                                                <span class="interaction__scope-badge interaction__scope--main">Main</span>
+                                                <span class="interaction__model">{{ interaction.model }}</span>
+                                                <span class="interaction__tokens">
+                                                    {{ interaction.input_tokens | format_number }} in / {{ interaction.output_tokens | format_number }} out
+                                                    {% if interaction.cache_read_tokens > 0 %}
+                                                    <span class="badge badge-muted" data-tooltip="Cache read: {{ interaction.cache_read_tokens }}">CR {{ interaction.cache_read_tokens | format_number }}</span>
+                                                    {% endif %}
+                                                    {% if interaction.cache_write_tokens > 0 %}
+                                                    <span class="badge badge-muted" data-tooltip="Cache write: {{ interaction.cache_write_tokens }}">CW {{ interaction.cache_write_tokens | format_number }}</span>
+                                                    {% endif %}
+                                                </span>
+                                            </div>
+                                            {% if interaction.response_preview %}
+                                            <div class="interaction__response">
+                                                <div class="msg msg--assistant" style="margin-bottom:0">
+                                                    <div class="msg__meta">Assistant Response</div>
+                                                    <div class="msg__body">{{ interaction.response_full | markdown | safe }}</div>
+                                                    {% if interaction.response_full | length > 800 %}
+                                                    <button class="show-more" onclick="this.previousElementSibling.classList.toggle('expanded');this.textContent=this.previousElementSibling.classList.contains('expanded')?'Show less':'Show more'">Show more</button>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                            {% endif %}
+                                            {% if interaction.tool_calls %}
+                                            <div class="interaction__tools">
+                                                <div class="tool-tree">
+                                                    {% for tc in interaction.tool_calls %}
+                                                    <div class="tool-tree__item {{ 'tool-tree__item--error' if tc.is_failed else '' }}">
+                                                        <span class="tool-tree__icon">{{ 'x' if tc.is_failed else '├' }}</span>
+                                                        <span class="tool-tree__name">{{ tc.name }}</span>
+                                                        <span class="tool-tree__detail">
+                                                            {% if tc.name == 'Bash' %}
+                                                                <code class="mono text-xs">{{ tc.parameters.get('command', '')[:80] }}</code>
+                                                            {% elif tc.name == 'Agent' and tc.subagent_summary %}
+                                                                <span class="subagent-inline">Agent: {{ tc.subagent_summary.description or tc.subagent_summary.agent_type }}</span>
+                                                            {% elif tc.parameters.get('file_path') %}
+                                                                <code class="mono text-xs">{{ tc.parameters.file_path }}</code>
+                                                            {% else %}
+                                                                {{ tc.parameters | tojson | truncate(60) }}
+                                                            {% endif %}
+                                                        </span>
+                                                        <span class="tool-tree__status">
+                                                            {% if tc.is_failed %}
+                                                            <span class="badge badge-error">exit={{ tc.exit_code }}</span>
+                                                            {% else %}
+                                                            <span class="badge badge-success">ok</span>
+                                                            {% endif %}
+                                                        </span>
+                                                    </div>
+                                                    {% endfor %}
+                                                </div>
+                                            </div>
+                                            {% endif %}
+                                        </div>
+
+                                        {% elif interaction.scope == "subagent" %}
+                                        <div class="interaction interaction--subagent" style="margin-left: 24px;">
+                                            <div class="interaction__header" style="cursor:pointer" onclick="toggleSubagentCard(this)">
+                                                <span class="interaction__scope-badge interaction__scope--subagent">Subagent</span>
+                                                <span class="interaction__model">{{ interaction.model }}</span>
+                                                <span class="interaction__parent">via {{ interaction.parent_tool_name }}</span>
+                                                <span class="interaction__tool-count">{{ interaction.tool_call_count }} tools</span>
+                                                <span class="round-chevron-inline">&#8250;</span>
+                                            </div>
+                                            <div class="interaction__body" style="display:none">
+                                                {% if interaction.response_preview %}
+                                                <div class="msg msg--assistant" style="margin-top:8px">
+                                                    <div class="msg__meta">Subagent Response</div>
+                                                    <div class="msg__body">{{ interaction.response_full | markdown | safe }}</div>
+                                                    {% if interaction.response_full | length > 800 %}
+                                                    <button class="show-more" onclick="this.previousElementSibling.classList.toggle('expanded');this.textContent=this.previousElementSibling.classList.contains('expanded')?'Show less':'Show more'">Show more</button>
+                                                    {% endif %}
+                                                </div>
+                                                {% endif %}
+                                                {% if interaction.tool_calls %}
+                                                <div class="tool-tree" style="margin-top:8px">
+                                                    {% for tc in interaction.tool_calls %}
+                                                    <div class="tool-tree__item {{ 'tool-tree__item--error' if tc.is_failed else '' }}">
+                                                        <span class="tool-tree__icon">{{ 'x' if tc.is_failed else '├' }}</span>
+                                                        <span class="tool-tree__name">{{ tc.name }}</span>
+                                                        <span class="tool-tree__detail">
+                                                            {% if tc.name == 'Bash' %}
+                                                                <code class="mono text-xs">{{ tc.parameters.get('command', '')[:80] }}</code>
+                                                            {% elif tc.parameters.get('file_path') %}
+                                                                <code class="mono text-xs">{{ tc.parameters.file_path }}</code>
+                                                            {% else %}
+                                                                {{ tc.parameters | tojson | truncate(60) }}
+                                                            {% endif %}
+                                                        </span>
+                                                        <span class="tool-tree__status">
+                                                            {% if tc.is_failed %}
+                                                            <span class="badge badge-error">exit={{ tc.exit_code }}</span>
+                                                            {% else %}
+                                                            <span class="badge badge-success">ok</span>
+                                                            {% endif %}
+                                                        </span>
+                                                    </div>
+                                                    {% endfor %}
+                                                </div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    {% endfor %}
+
+                                    {# Fallback: if no interactions, show original assistant msg + tool calls #}
+                                    {% if not round.interactions %}
                                     {% if round.assistant_msg.content_html %}
                                     <div class="msg msg--assistant">
                                         <div class="msg__meta">Assistant{% if round.assistant_msg.model %} ({{ round.assistant_msg.model }}){% endif %}</div>
@@ -272,7 +417,7 @@
                                     <div class="tool-tree">
                                         {% for tc in round.tool_calls %}
                                         <div class="tool-tree__item {{ 'tool-tree__item--error' if tc.is_failed else '' }}">
-                                            <span class="tool-tree__icon">{{ '✗' if tc.is_failed else '├' }}</span>
+                                            <span class="tool-tree__icon">{{ 'x' if tc.is_failed else '├' }}</span>
                                             <span class="tool-tree__name">{{ tc.name }}</span>
                                             <span class="tool-tree__detail">
                                                 {% if tc.parameters %}
@@ -283,6 +428,14 @@
                                                 {% else %}
                                                     {{ tc.parameters | tojson | truncate(60) }}
                                                 {% endif %}
+                                                {% endif %}
+                                                {% if tc.subagent_summary %}
+                                                <span class="subagent-inline">
+                                                    · {{ tc.llm_call_count | format_number }} LLM · {{ tc.subagent_tool_call_count | format_number }} tools
+                                                    {% if tc.subagent_summary.tool_counts %}
+                                                    · {{ tc.subagent_summary.tool_counts | tojson | truncate(80) }}
+                                                    {% endif %}
+                                                </span>
                                                 {% endif %}
                                             </span>
                                             <span class="tool-tree__status">
@@ -295,6 +448,7 @@
                                         </div>
                                         {% endfor %}
                                     </div>
+                                    {% endif %}
                                     {% endif %}
                                 </div>
                             </div>
@@ -365,43 +519,240 @@
 
 <!-- Tab: Tools -->
 <div id="tools" class="tab-content">
+    {# Filter bar #}
+    <div class="card" style="margin-bottom:12px">
+        <div class="filter-bar">
+            <input class="filter-bar__input" id="tool-filter" placeholder="Filter tools..." oninput="filterTools(this.value)" style="min-width:200px">
+            <select class="filter-bar__select" id="tool-scope-filter" onchange="filterToolsByScope(this.value)">
+                <option value="all">All Scopes</option>
+                <option value="main">Main Agent Only</option>
+                <option value="subagent">Subagents Only</option>
+            </select>
+            <span class="text-xs text-muted" id="tool-count">{{ tool_calls | length }} tool calls</span>
+        </div>
+    </div>
+
     <div class="card">
-        <div class="card-title">All Tool Calls ({{ tool_calls | length }})</div>
-        {% if tool_calls %}
+        <div class="card-title">Tool Calls by Agent</div>
+        {% for agent_group in tools_by_agent %}
+        {# Agent group header #}
+        <div class="agent-group" data-agent-id="{{ agent_group.agent_id }}">
+            <div class="agent-group__header" style="padding:8px 0; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px;">
+                <span class="badge {{ 'badge-claude' if agent_group.agent_id else 'badge-primary' }}">
+                    {{ agent_group.agent_name }}
+                </span>
+                <span class="text-xs text-muted">
+                    {{ agent_group.tools | length + agent_group.agent_tools | length }} tools
+                    {% for child in agent_group.children %}
+                    + {{ child.total_tools }} in {{ child.agent_name }}
+                    {% endfor %}
+                </span>
+            </div>
+
+            {# Main agent tools #}
+            {% for tc in agent_group.agent_tools + agent_group.tools %}
+            <div class="tool-row" data-tool-name="{{ tc.name }}" data-scope="main" data-tool-id="{{ tc.tool_use_id }}">
+                <div class="tool-row__header" style="display:flex; align-items:center; gap:6px; padding:4px 8px; border-bottom:1px solid var(--border-light); cursor:{{ 'pointer' if tc.parameters or tc.result else 'default' }};" onclick="toggleToolRow(this)">
+                    {% if tc.parameters or tc.result %}
+                    <span class="tool-row__chevron">&#8250;</span>
+                    {% endif %}
+                    <span class="badge badge-primary" style="min-width:70px">{{ tc.name }}</span>
+                    <span class="text-xs mono" style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                        {% if tc.name == 'Bash' %}{{ tc.parameters.get('command', '')[:100] }}
+                        {% elif tc.name == 'Agent' %}Agent: {{ tc.subagent_summary.description or tc.subagent_summary.agent_type or '' }}
+                        {% elif tc.parameters.get('file_path') %}{{ tc.parameters.file_path }}
+                        {% else %}{{ tc.parameters | tojson | truncate(100) }}{% endif %}
+                    </span>
+                    {% if tc.is_failed %}
+                    <span class="badge badge-error">exit={{ tc.exit_code }}</span>
+                    {% else %}
+                    <span class="badge badge-success">ok</span>
+                    {% endif %}
+                    <span class="text-xs text-muted mono">{{ tc.round_index + 1 if tc.round_index else '' }}</span>
+                </div>
+                <div class="tool-row__detail" style="display:none; padding:8px 8px 8px 28px; background:var(--bg);">
+                    <div style="margin-bottom:8px">
+                        <strong class="text-xs">Parameters:</strong>
+                        <pre class="mono text-xs" style="max-height:200px; overflow-y:auto; margin-top:4px; padding:8px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); white-space:pre-wrap;">{{ tc.parameters | tojson(indent=2) if tc.parameters else '—' }}</pre>
+                    </div>
+                    {% if tc.result %}
+                    <div>
+                        <strong class="text-xs">Result:</strong>
+                        <pre class="mono text-xs" style="max-height:300px; overflow-y:auto; margin-top:4px; padding:8px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); white-space:pre-wrap;">{{ tc.result[:2000] }}</pre>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+
+            {# Subagent children #}
+            {% for child in agent_group.children %}
+            <div class="agent-group agent-group--subagent" data-agent-id="{{ child.agent_id }}" style="margin-left:24px; margin-top:8px;">
+                <div class="agent-group__header" style="padding:6px 0; display:flex; align-items:center; gap:8px;">
+                    <span class="badge badge-muted">{{ child.agent_name }}</span>
+                    {% if child.parent_tool %}
+                    <span class="text-xs text-muted">parent: {{ child.parent_tool.name }}</span>
+                    {% endif %}
+                    <span class="text-xs text-muted">{{ child.total_tools }} tools · {{ child.llm_calls }} LLM calls{% if child.failed_tools > 0 %} · <span class="highlight-error">{{ child.failed_tools }} failed</span>{% endif %}</span>
+                </div>
+
+                {% for tc in child.tools %}
+                <div class="tool-row" data-tool-name="{{ tc.name }}" data-scope="subagent" data-subagent-id="{{ tc.subagent_id }}">
+                    <div class="tool-row__header" style="display:flex; align-items:center; gap:6px; padding:4px 8px; border-bottom:1px solid var(--border-light); cursor:pointer;" onclick="toggleToolRow(this)">
+                        {% if tc.parameters or tc.result %}
+                        <span class="tool-row__chevron">&#8250;</span>
+                        {% endif %}
+                        <span class="badge badge-muted" style="min-width:70px">{{ tc.name }}</span>
+                        <span class="text-xs mono" style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                            {% if tc.name == 'Bash' %}{{ tc.parameters.get('command', '')[:100] }}
+                            {% elif tc.parameters.get('file_path') %}{{ tc.parameters.file_path }}
+                            {% else %}{{ tc.parameters | tojson | truncate(100) }}{% endif %}
+                        </span>
+                        {% if tc.is_failed %}
+                        <span class="badge badge-error">exit={{ tc.exit_code }}</span>
+                        {% else %}
+                        <span class="badge badge-success">ok</span>
+                        {% endif %}
+                        <span class="text-xs text-muted mono">R{{ tc.round_index + 1 if tc.round_index else '' }}</span>
+                    </div>
+                    <div class="tool-row__detail" style="display:none; padding:8px 8px 8px 28px; background:var(--bg);">
+                        <div style="margin-bottom:8px">
+                            <strong class="text-xs">Parameters:</strong>
+                            <pre class="mono text-xs" style="max-height:200px; overflow-y:auto; margin-top:4px; padding:8px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); white-space:pre-wrap;">{{ tc.parameters | tojson(indent=2) if tc.parameters else '—' }}</pre>
+                        </div>
+                        {% if tc.result %}
+                        <div>
+                            <strong class="text-xs">Result:</strong>
+                            <pre class="mono text-xs" style="max-height:300px; overflow-y:auto; margin-top:4px; padding:8px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); white-space:pre-wrap;">{{ tc.result[:2000] }}</pre>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endfor %}
+        {% if not tool_calls %}
+        <div class="empty-state">No tool calls in this session.</div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Tab: LLM Calls -->
+<div id="llm-calls" class="tab-content">
+    {# Summary cards #}
+    {% set main_calls = llm_calls | selectattr('scope', 'equalto', 'main') | list %}
+    {% set sub_calls = llm_calls | selectattr('scope', 'equalto', 'subagent') | list %}
+    <div class="metrics-grid" style="margin-bottom:12px">
+        <div class="metric-card metric-card--compact">
+            <div class="metric-label">Total Calls</div>
+            <div class="metric-value">{{ llm_calls | length }}</div>
+            <div class="metric-sub">{{ main_calls | length }} main + {{ sub_calls | length }} subagent</div>
+        </div>
+        <div class="metric-card metric-card--compact">
+            <div class="metric-label">Total Input</div>
+            <div class="metric-value">{{ llm_calls | sum(attribute='input_tokens') | format_number }}</div>
+        </div>
+        <div class="metric-card metric-card--compact">
+            <div class="metric-label">Total Output</div>
+            <div class="metric-value">{{ llm_calls | sum(attribute='output_tokens') | format_number }}</div>
+        </div>
+        <div class="metric-card metric-card--compact">
+            <div class="metric-label">Cache Read</div>
+            <div class="metric-value">{{ llm_calls | sum(attribute='cache_read_tokens') | format_number }}</div>
+        </div>
+        <div class="metric-card metric-card--compact">
+            <div class="metric-label">Cache Write</div>
+            <div class="metric-value">{{ llm_calls | sum(attribute='cache_write_tokens') | format_number }}</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-title">LLM Calls ({{ llm_calls | length }})</div>
+        {% if llm_calls %}
         <div class="table-wrap">
             <table>
                 <thead>
                     <tr>
                         <th class="numeric">#</th>
-                        <th>Tool</th>
-                        <th>Parameters</th>
-                        <th>Result</th>
-                        <th>Status</th>
+                        <th>Round</th>
+                        <th>Scope</th>
+                        <th>Model</th>
+                        <th class="numeric">Input</th>
+                        <th class="numeric">Cache R</th>
+                        <th class="numeric">Cache W</th>
+                        <th class="numeric">Output</th>
+                        <th class="numeric">Tools</th>
+                        <th>Preview</th>
                         <th>Time</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for tc in tool_calls %}
-                    <tr class="{{ 'row--failed' if tc.is_failed else '' }}">
+                    {% for call in llm_calls|sort(attribute='round_index') %}
+                    <tr class="llm-call-row {{ 'row--failed' if call.status == 'error' else '' }}" style="cursor:pointer" onclick="toggleLLMCallDetail(this)">
                         <td class="numeric mono text-xs">{{ loop.index }}</td>
-                        <td><span class="badge badge-primary" data-tooltip="Tool: {{ tc.name }}">{{ tc.name }}</span></td>
-                        <td class="text-xs mono truncate" style="max-width:250px" data-tooltip="{{ tc.parameters | tojson if tc.parameters else '—' }}">{{ tc.parameters | tojson | truncate(80) if tc.parameters else '—' }}</td>
-                        <td class="text-xs mono truncate" style="max-width:250px" data-tooltip="{{ tc.result[:500] if tc.result else '—' }}">{{ tc.result[:80] if tc.result else '—' }}</td>
+                        <td class="numeric mono text-xs">R{{ call.round_index + 1 }}</td>
                         <td>
-                            {% if tc.is_failed %}
-                            <span class="badge badge-error" data-tooltip="Exit code: {{ tc.exit_code }}">exit={{ tc.exit_code }}</span>
+                            {% if call.scope == 'main' %}
+                            <span class="badge badge-primary">Main</span>
                             {% else %}
-                            <span class="badge badge-success">ok</span>
+                            <span class="badge badge-muted" data-tooltip="Subagent: {{ call.subagent_id }}">{{ call.parent_tool_name }}</span>
                             {% endif %}
                         </td>
-                        <td class="text-xs text-muted mono">{{ tc.timestamp[:19].replace('T', ' ') if tc.timestamp else '' }}</td>
+                        <td class="text-xs mono">
+                            {% set model_lower = call.model | lower %}
+                            <span class="{{ 'model-color-sonnet' if 'sonnet' in model_lower else 'model-color-haiku' if 'haiku' in model_lower else 'model-color-opus' if 'opus' in model_lower else 'model-color-default' }}">
+                                {{ call.model[:30] }}
+                            </span>
+                        </td>
+                        <td class="numeric mono text-xs">{{ call.input_tokens | format_number }}</td>
+                        <td class="numeric mono text-xs">{{ call.cache_read_tokens | format_number }}</td>
+                        <td class="numeric mono text-xs">{{ call.cache_write_tokens | format_number }}</td>
+                        <td class="numeric mono text-xs">{{ call.output_tokens | format_number }}</td>
+                        <td class="numeric mono text-xs">{{ call.tool_call_count }}</td>
+                        <td class="text-xs mono truncate" style="max-width:300px" data-tooltip="{{ call.response_full[:500] if call.response_full else '' }}">
+                            {{ call.response_preview[:80] if call.response_preview else '—' }}
+                        </td>
+                        <td class="text-xs text-muted mono">{{ call.timestamp[:19].replace('T', ' ') if call.timestamp else '' }}</td>
+                    </tr>
+                    {# Expandable detail row #}
+                    <tr class="llm-call-detail" style="display:none">
+                        <td colspan="11" style="padding:0; background:var(--bg);">
+                            <div style="padding:12px; display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                                <div>
+                                    <strong class="text-xs">Response:</strong>
+                                    <pre class="mono text-xs" style="max-height:300px; overflow-y:auto; margin-top:4px; padding:8px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); white-space:pre-wrap;">{{ call.response_full[:2000] if call.response_full else '—' }}</pre>
+                                </div>
+                                {% if call.tool_calls %}
+                                <div>
+                                    <strong class="text-xs">Tool Calls ({{ call.tool_call_count }}):</strong>
+                                    <div class="tool-tree" style="margin-top:4px">
+                                        {% for tc in call.tool_calls %}
+                                        <div class="tool-tree__item {{ 'tool-tree__item--error' if tc.is_failed else '' }}">
+                                            <span class="tool-tree__name">{{ tc.name }}</span>
+                                            <span class="tool-tree__detail">{{ tc.parameters | tojson | truncate(80) }}</span>
+                                            <span class="tool-tree__status">
+                                                {% if tc.is_failed %}
+                                                <span class="badge badge-error">exit={{ tc.exit_code }}</span>
+                                                {% else %}
+                                                <span class="badge badge-success">ok</span>
+                                                {% endif %}
+                                            </span>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
         {% else %}
-        <div class="empty-state">No tool calls in this session.</div>
+        <div class="empty-state">No LLM calls in this session.</div>
         {% endif %}
     </div>
 </div>
@@ -542,6 +893,75 @@
             el.textContent = 'Copied!';
             setTimeout(function() { el.textContent = text; }, 1000);
         });
+    };
+
+    /* ─── Tool row expand/collapse ─────────────────────────── */
+    window.toggleToolRow = function(headerEl) {
+        var row = headerEl.closest('.tool-row');
+        if (!row) return;
+        var detail = row.querySelector('.tool-row__detail');
+        if (!detail) return;
+        var chevron = headerEl.querySelector('.tool-row__chevron');
+        if (detail.style.display === 'none' || detail.style.display === '') {
+            detail.style.display = 'block';
+            if (chevron) chevron.classList.add('rotated');
+        } else {
+            detail.style.display = 'none';
+            if (chevron) chevron.classList.remove('rotated');
+        }
+    };
+
+    /* ─── LLM call row expand/collapse ─────────────────────── */
+    window.toggleLLMCallDetail = function(headerRow) {
+        var detailRow = headerRow.nextElementSibling;
+        if (!detailRow || !detailRow.classList.contains('llm-call-detail')) return;
+        if (detailRow.style.display === 'none' || detailRow.style.display === '') {
+            detailRow.style.display = 'table-row';
+        } else {
+            detailRow.style.display = 'none';
+        }
+    };
+
+    /* ─── Subagent card toggle ─────────────────────────────── */
+    window.toggleSubagentCard = function(headerEl) {
+        var body = headerEl.nextElementSibling;
+        if (!body) return;
+        var chevron = headerEl.querySelector('.round-chevron-inline');
+        if (body.style.display === 'none' || body.style.display === '') {
+            body.style.display = 'block';
+            if (chevron) chevron.style.transform = 'rotate(90deg)';
+        } else {
+            body.style.display = 'none';
+            if (chevron) chevron.style.transform = '';
+        }
+    };
+
+    /* ─── Tool filter ──────────────────────────────────────── */
+    window.filterTools = function(query) {
+        var rows = document.querySelectorAll('.tool-row');
+        var q = query.toLowerCase();
+        var visible = 0;
+        rows.forEach(function(row) {
+            var name = (row.dataset.toolName || '').toLowerCase();
+            var match = !q || name.indexOf(q) >= 0;
+            row.style.display = match ? '' : 'none';
+            if (match) visible++;
+        });
+        var countEl = document.getElementById('tool-count');
+        if (countEl) countEl.textContent = visible + ' tool calls';
+    };
+
+    window.filterToolsByScope = function(scope) {
+        var rows = document.querySelectorAll('.tool-row');
+        var visible = 0;
+        rows.forEach(function(row) {
+            var rowScope = row.dataset.scope || 'main';
+            var match = scope === 'all' || rowScope === scope;
+            row.style.display = match ? '' : 'none';
+            if (match) visible++;
+        });
+        var countEl = document.getElementById('tool-count');
+        if (countEl) countEl.textContent = visible + ' tool calls';
     };
 
 })();

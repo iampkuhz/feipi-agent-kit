@@ -154,6 +154,14 @@ cp .env.example .env
 # 编辑 .env 填入真实值
 ```
 
+视频类 skill 如需 YouTube 登录态，推荐先运行 Cookie 向导：
+
+```bash
+bash skills/integration/feipi-video-read-url/scripts/setup_youtube_cookies.sh
+```
+
+向导会提示导出 Netscape `cookies.txt` 并生成 `AGENT_YOUTUBE_COOKIE_FILE` / `AGENT_CHROME_PROFILE` 配置建议。
+
 ### 服务独立环境
 
 每个服务有自己的 env/ 目录：

@@ -36,6 +36,5 @@ litellm_settings:
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
   store_model_in_db: true
-  # 本地网关只保留用量统计，不持久化完整请求体/响应体，避免 spend log 长期膨胀。
-  store_prompts_in_spend_logs: false
+  store_prompts_in_spend_logs: true
   maximum_spend_logs_retention_period: "3d"

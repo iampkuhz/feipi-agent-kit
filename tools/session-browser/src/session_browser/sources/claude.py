@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections import Counter
 from pathlib import Path
 from typing import Iterator
 
@@ -85,11 +86,131 @@ def _parse_session_events(path: Path) -> list[dict]:
     return events
 
 
+def _assistant_message_key(ev: dict) -> str:
+    """Return a stable key for one logical assistant/LLM response."""
+    msg = ev.get("message", {})
+    if isinstance(msg, dict) and msg.get("id"):
+        return str(msg["id"])
+    return str(ev.get("uuid") or ev.get("parentUuid") or id(ev))
+
+
+def _merge_usage_dicts(usages: list[dict]) -> dict:
+    """Merge duplicated Claude usage snapshots for one logical response.
+
+    Claude Code may persist one assistant response as several JSONL rows
+    (thinking/text/tool_use fragments). The same usage snapshot can repeat
+    once per fragment or once per parallel tool_use. Taking the max per token
+    field preserves the logical response footprint without multiplying it by
+    the number of fragments.
+    """
+    if not usages:
+        return {}
+
+    merged: dict = {}
+    numeric_keys = {
+        "input_tokens",
+        "output_tokens",
+        "cache_read_input_tokens",
+        "cache_creation_input_tokens",
+    }
+    for usage in usages:
+        for key, value in usage.items():
+            if key in numeric_keys and isinstance(value, (int, float)):
+                merged[key] = max(int(value), int(merged.get(key, 0)))
+            elif key not in merged:
+                merged[key] = value
+    return merged
+
+
+def _assistant_records(events: list[dict]) -> list[dict]:
+    """Merge assistant fragments by message id.
+
+    Returns records with: id, timestamp, model, text_parts, tool_calls, usage,
+    and raw row count. This record is the parser's LLM-call-level view.
+    """
+    records: dict[str, dict] = {}
+    order: list[str] = []
+
+    for ev in events:
+        if ev.get("type") != "assistant":
+            continue
+        msg = ev.get("message", {})
+        if not isinstance(msg, dict):
+            continue
+
+        key = _assistant_message_key(ev)
+        if key not in records:
+            records[key] = {
+                "id": key,
+                "timestamp": ev.get("timestamp", ""),
+                "model": msg.get("model", ""),
+                "text_parts": [],
+                "tool_calls": [],
+                "usage_rows": [],
+                "stop_reason": "",
+                "row_count": 0,
+            }
+            order.append(key)
+
+        rec = records[key]
+        rec["row_count"] += 1
+        if ev.get("timestamp"):
+            rec["timestamp"] = ev.get("timestamp", "")
+        if msg.get("model"):
+            rec["model"] = msg.get("model", "")
+        if msg.get("stop_reason"):
+            rec["stop_reason"] = msg.get("stop_reason", "")
+
+        usage = msg.get("usage")
+        if isinstance(usage, dict):
+            rec["usage_rows"].append(usage)
+
+        content = msg.get("content", [])
+        if isinstance(content, list):
+            for item in content:
+                if not isinstance(item, dict):
+                    continue
+                if item.get("type") == "text":
+                    text = item.get("text", "")
+                    if text:
+                        rec["text_parts"].append(text)
+                elif item.get("type") == "tool_use":
+                    rec["tool_calls"].append({
+                        "id": item.get("id", ""),
+                        "name": item.get("name", ""),
+                        "parameters": item.get("input", {}),
+                    })
+
+    merged_records = []
+    for key in order:
+        rec = records[key]
+        rec["usage"] = _merge_usage_dicts(rec.pop("usage_rows"))
+        merged_records.append(rec)
+    return merged_records
+
+
+def _extract_user_text(ev: dict) -> str:
+    """Extract human-visible user text, ignoring tool_result-only events."""
+    msg = ev.get("message", {})
+    if not isinstance(msg, dict):
+        return ""
+    content = msg.get("content", "")
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if isinstance(item, dict) and item.get("type") == "text":
+                parts.append(item.get("text", ""))
+        return "\n".join(p for p in parts if p)
+    return ""
+
+
 def parse_session_detail(
     project_key: str,
     session_id: str,
     history_entry: dict | None = None,
-) -> tuple[SessionSummary, list[ChatMessage], list[ToolCall]]:
+) -> tuple[SessionSummary, list[ChatMessage], list[ToolCall], list[dict]]:
     """Parse a single Claude session's full event stream.
 
     Args:
@@ -97,7 +218,7 @@ def parse_session_detail(
         session_id: The session ID.
         history_entry: Optional history.jsonl entry for metadata fallback.
 
-    Returns (SessionSummary, chat_messages, tool_calls).
+    Returns (SessionSummary, chat_messages, tool_calls, subagent_runs).
     """
     # Locate the session file
     project_dir = CLAUDE_DATA_DIR / "projects" / _normalize_project_segment(project_key)
@@ -106,15 +227,21 @@ def parse_session_detail(
         # Try to find it by scanning
         session_file = _find_session_file(project_key, session_id)
         if session_file is None:
-            return _session_from_history(session_id, history_entry), [], []
+            s = _session_from_history(session_id, history_entry)
+            return s, [], [], []
 
     events = _parse_session_events(session_file)
+    subagent_runs = _parse_subagent_runs(session_file)
 
     summary = _build_summary_from_events(events, session_id, project_key)
     messages = _extract_messages(events)
     tool_calls = _extract_tool_calls(events, messages)
+    _attach_subagents_to_agent_tools(tool_calls, subagent_runs)
+    nested_tool_calls = _flatten_subagent_tool_calls(subagent_runs)
+    tool_calls.extend(nested_tool_calls)
+    _apply_subagent_totals(summary, subagent_runs, tool_calls)
 
-    return summary, messages, tool_calls
+    return summary, messages, tool_calls, subagent_runs
 
 
 def _normalize_project_segment(project_key: str) -> str:
@@ -281,13 +408,7 @@ def _build_summary_from_events(
     from pathlib import PurePosixPath
 
     user_count = 0
-    assistant_count = 0
-    tool_count = 0
     failed_tool_count = 0
-    input_tokens = 0
-    output_tokens = 0
-    cached_tokens = 0
-    cache_write_tokens = 0
     model = ""
     cwd = ""
     git_branch = ""
@@ -295,12 +416,34 @@ def _build_summary_from_events(
     first_ts = 0
     last_ts = 0
     title = ""
+    assistant_records = _assistant_records(events)
+    assistant_count = len(assistant_records)
+    tool_ids = set()
+    input_tokens = 0
+    output_tokens = 0
+    cached_tokens = 0
+    cache_write_tokens = 0
+
+    for rec in assistant_records:
+        usage = rec.get("usage", {})
+        if isinstance(usage, dict):
+            input_tokens += usage.get("input_tokens", 0)
+            output_tokens += usage.get("output_tokens", 0)
+            cached_tokens += usage.get("cache_read_input_tokens", 0)
+            cache_write_tokens += usage.get("cache_creation_input_tokens", 0)
+        for tc in rec.get("tool_calls", []):
+            tool_id = tc.get("id") or f"{rec.get('id')}:{tc.get('name')}:{len(tool_ids)}"
+            tool_ids.add(tool_id)
+        if not model and rec.get("model"):
+            model = rec.get("model", "")
 
     for ev in events:
         etype = ev.get("type", "")
 
         if etype == "user":
-            user_count += 1
+            user_text = _extract_user_text(ev)
+            if user_text:
+                user_count += 1
             ts_str = ev.get("timestamp", "")
             if ts_str and not first_ts:
                 from datetime import datetime
@@ -310,17 +453,8 @@ def _build_summary_from_events(
                 except (ValueError, TypeError):
                     pass
             # Extract title from first user message
-            if not title:
-                msg = ev.get("message", {})
-                if isinstance(msg, dict):
-                    content = msg.get("content", "")
-                    if isinstance(content, str):
-                        title = _extract_readable_title(content)
-                    elif isinstance(content, list):
-                        for item in content:
-                            if isinstance(item, dict) and item.get("type") == "text":
-                                title = _extract_readable_title(item.get("text", ""))
-                                break
+            if not title and user_text:
+                title = _extract_readable_title(user_text)
             if not cwd:
                 cwd = ev.get("cwd", "")
             if not source:
@@ -328,43 +462,12 @@ def _build_summary_from_events(
             if not git_branch:
                 git_branch = ev.get("gitBranch", "")
 
-        elif etype == "assistant":
-            assistant_count += 1
-            msg = ev.get("message", {})
-            if isinstance(msg, dict):
-                if not model:
-                    model = msg.get("model", "")
-                usage = msg.get("usage", {})
-                if isinstance(usage, dict):
-                    input_tokens += usage.get("input_tokens", 0)
-                    output_tokens += usage.get("output_tokens", 0)
-                    cached_tokens += usage.get("cache_read_input_tokens", 0)
-                    cache_write_tokens += usage.get("cache_creation_input_tokens", 0)
-                # Count tool_use in content
-                content = msg.get("content", [])
-                if isinstance(content, list):
-                    for item in content:
-                        if isinstance(item, dict) and item.get("type") == "tool_use":
-                            tool_count += 1
-
-            # Check for tool results that indicate failure
-            if etype == "user":
-                msg = ev.get("message", {})
-                if isinstance(msg, dict):
-                    content = msg.get("content", "")
-                    if isinstance(content, list):
-                        for item in content:
-                            if isinstance(item, dict) and item.get("type") == "tool_result":
-                                result_content = item.get("content", "")
-                                if isinstance(result_content, str) and ("error" in result_content.lower() or "failed" in result_content.lower()):
-                                    failed_tool_count += 1
-                                elif isinstance(result_content, list):
-                                    for rc in result_content:
-                                        if isinstance(rc, dict) and rc.get("type") == "text":
-                                            rc_text = rc.get("text", "")
-                                            if "error" in rc_text.lower() or "failed" in rc_text.lower():
-                                                failed_tool_count += 1
-                                            break
+            content = ev.get("message", {}).get("content", "") if isinstance(ev.get("message"), dict) else ""
+            if isinstance(content, list):
+                for item in content:
+                    if isinstance(item, dict) and item.get("type") == "tool_result":
+                        if item.get("is_error") is True or _tool_result_looks_failed(item.get("content", "")):
+                            failed_tool_count += 1
 
         ts_str = ev.get("timestamp", "")
         if ts_str:
@@ -399,7 +502,7 @@ def _build_summary_from_events(
         source=source,
         user_message_count=user_count,
         assistant_message_count=assistant_count,
-        tool_call_count=tool_count,
+        tool_call_count=len(tool_ids),
         input_tokens=input_tokens,
         output_tokens=output_tokens,
         cached_input_tokens=cached_tokens,
@@ -411,22 +514,16 @@ def _build_summary_from_events(
 def _extract_messages(events: list[dict]) -> list[ChatMessage]:
     """Extract user and assistant chat messages from Claude events."""
     messages = []
+    assistant_by_id = {rec["id"]: rec for rec in _assistant_records(events)}
+    emitted_assistant_ids: set[str] = set()
+
     for ev in events:
         etype = ev.get("type", "")
 
         if etype == "user":
-            msg = ev.get("message", {})
-            content = ""
-            if isinstance(msg, dict):
-                c = msg.get("content", "")
-                if isinstance(c, str):
-                    content = c
-                elif isinstance(c, list):
-                    parts = []
-                    for item in c:
-                        if isinstance(item, dict) and item.get("type") == "text":
-                            parts.append(item.get("text", ""))
-                    content = "\n".join(parts)
+            content = _extract_user_text(ev)
+            if not content:
+                continue
             ts_str = ev.get("timestamp", "")
             messages.append(ChatMessage(
                 role="user",
@@ -435,42 +532,221 @@ def _extract_messages(events: list[dict]) -> list[ChatMessage]:
             ))
 
         elif etype == "assistant":
-            msg = ev.get("message", {})
-            if not isinstance(msg, dict):
+            key = _assistant_message_key(ev)
+            if key in emitted_assistant_ids:
                 continue
-            model = msg.get("model", "")
-            content_parts = msg.get("content", [])
-            text_parts = []
-            tool_calls = []
-            if isinstance(content_parts, list):
-                for item in content_parts:
-                    if isinstance(item, dict):
-                        if item.get("type") == "text":
-                            text_parts.append(item.get("text", ""))
-                        elif item.get("type") == "tool_use":
-                            tool_calls.append({
-                                "name": item.get("name", ""),
-                                "parameters": item.get("input", {}),
-                            })
-            usage = msg.get("usage")
-            ts_str = ev.get("timestamp", "")
+            emitted_assistant_ids.add(key)
+            rec = assistant_by_id.get(key, {})
+            text_parts = rec.get("text_parts", [])
+            tool_calls = rec.get("tool_calls", [])
+            usage = rec.get("usage", {})
+            model = rec.get("model", "")
             if text_parts or tool_calls:
-                # Normalize token usage for this message
-                token_bd = None
-                if isinstance(usage, dict):
-                    token_bd = normalize_tokens(usage, model=model)
+                token_bd = normalize_tokens(usage, model=model) if usage else None
 
                 messages.append(ChatMessage(
                     role="assistant",
                     content="\n".join(text_parts),
-                    timestamp=ts_str,
+                    timestamp=rec.get("timestamp", ""),
                     model=model,
                     tool_calls=tool_calls,
-                    usage=usage if isinstance(usage, dict) else None,
+                    usage=usage if usage else None,
                     token_breakdown=token_bd,
+                    llm_call_id=rec.get("id", ""),
                 ))
 
     return messages
+
+
+def _stringify_tool_result(result_content) -> str:
+    """Convert Claude tool_result content into compact text."""
+    if result_content is None:
+        return ""
+    if isinstance(result_content, str):
+        return result_content
+    if isinstance(result_content, list):
+        parts = []
+        for item in result_content:
+            if isinstance(item, dict):
+                if item.get("type") == "text":
+                    parts.append(item.get("text", ""))
+                elif "content" in item:
+                    parts.append(str(item.get("content", "")))
+            else:
+                parts.append(str(item))
+        return "\n".join(p for p in parts if p)
+    if isinstance(result_content, dict):
+        return json.dumps(result_content, ensure_ascii=False)
+    return str(result_content)
+
+
+def _tool_result_looks_failed(result_content) -> bool:
+    """Heuristic for failed tool/model results in Claude logs."""
+    text = _stringify_tool_result(result_content).lower()
+    if not text:
+        return False
+    failure_markers = [
+        "api error",
+        "tool_use_error",
+        "user rejected",
+        "cancelled",
+        "failed",
+        "error:",
+        "exit code",
+        "key_model_access_denied",
+        "rate limit",
+        "timeout",
+        "overloaded",
+    ]
+    return any(marker in text for marker in failure_markers)
+
+
+def _usage_totals_from_messages(messages: list[ChatMessage]) -> dict:
+    """Aggregate merged per-message usage into token totals."""
+    totals = {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation_input_tokens": 0,
+    }
+    for msg in messages:
+        if msg.role != "assistant" or not msg.usage:
+            continue
+        totals["input_tokens"] += msg.usage.get("input_tokens", 0)
+        totals["output_tokens"] += msg.usage.get("output_tokens", 0)
+        totals["cache_read_input_tokens"] += msg.usage.get("cache_read_input_tokens", 0)
+        totals["cache_creation_input_tokens"] += msg.usage.get("cache_creation_input_tokens", 0)
+    return totals
+
+
+def _parse_subagent_runs(session_file: Path) -> list[dict]:
+    """Parse Claude Code subagent sidechain files for a parent session."""
+    subagents_dir = session_file.with_suffix("") / "subagents"
+    if not subagents_dir.exists():
+        return []
+
+    runs = []
+    for path in sorted(subagents_dir.glob("*.jsonl")):
+        events = _parse_session_events(path)
+        messages = _extract_messages(events)
+        tool_calls = _extract_tool_calls(events, messages)
+        usage_totals = _usage_totals_from_messages(messages)
+        llm_call_count = len([
+            m for m in messages
+            if m.role == "assistant" and m.llm_call_id
+        ])
+        failed_tool_count = sum(1 for tc in tool_calls if tc.is_failed)
+        tool_counts = Counter(tc.name for tc in tool_calls)
+
+        meta = {}
+        meta_path = path.with_suffix(".meta.json")
+        if meta_path.exists():
+            try:
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                meta = {}
+
+        started_at = ""
+        ended_at = ""
+        for ev in events:
+            if ev.get("timestamp"):
+                if not started_at:
+                    started_at = ev.get("timestamp", "")
+                ended_at = ev.get("timestamp", "")
+
+        agent_id = path.stem.replace("agent-", "")
+        summary = {
+            "agent_id": agent_id,
+            "agent_type": meta.get("agentType", ""),
+            "description": meta.get("description", ""),
+            "llm_call_count": llm_call_count,
+            "llm_error_count": 0,
+            "assistant_event_count": sum(1 for ev in events if ev.get("type") == "assistant"),
+            "tool_call_count": len(tool_calls),
+            "failed_tool_count": failed_tool_count,
+            "tool_counts": dict(tool_counts.most_common()),
+            "input_tokens": usage_totals["input_tokens"],
+            "output_tokens": usage_totals["output_tokens"],
+            "cache_read_input_tokens": usage_totals["cache_read_input_tokens"],
+            "cache_creation_input_tokens": usage_totals["cache_creation_input_tokens"],
+            "started_at": started_at,
+            "ended_at": ended_at,
+            "status": "error" if failed_tool_count else "ok",
+        }
+
+        for tc in tool_calls:
+            tc.scope = "subagent"
+            tc.subagent_id = agent_id
+
+        runs.append({
+            "path": path,
+            "summary": summary,
+            "tool_calls": tool_calls,
+            "messages": messages,
+        })
+
+    return runs
+
+
+def _attach_subagents_to_agent_tools(
+    tool_calls: list[ToolCall],
+    subagent_runs: list[dict],
+) -> None:
+    """Attach parsed sidechain summaries to the matching parent Agent tool."""
+    remaining = list(subagent_runs)
+    for tc in tool_calls:
+        if tc.name != "Agent" or not remaining:
+            continue
+        params = tc.parameters if isinstance(tc.parameters, dict) else {}
+        description = params.get("description", "")
+        subagent_type = params.get("subagent_type", "")
+
+        match_index = None
+        for idx, run in enumerate(remaining):
+            summary = run["summary"]
+            if description and summary.get("description") == description:
+                match_index = idx
+                break
+            if subagent_type and summary.get("agent_type") == subagent_type:
+                match_index = idx
+                break
+        if match_index is None:
+            match_index = 0
+
+        run = remaining.pop(match_index)
+        summary = run["summary"]
+        tc.subagent_summary = summary
+        tc.llm_call_count = summary.get("llm_call_count", 0)
+        tc.llm_error_count = summary.get("llm_error_count", 0)
+        tc.subagent_tool_call_count = summary.get("tool_call_count", 0)
+        tc.subagent_failed_tool_count = summary.get("failed_tool_count", 0)
+        for child in run["tool_calls"]:
+            child.parent_tool_use_id = tc.tool_use_id
+            child.parent_tool_name = tc.name
+
+
+def _flatten_subagent_tool_calls(subagent_runs: list[dict]) -> list[ToolCall]:
+    """Return all parsed child tool calls."""
+    flattened: list[ToolCall] = []
+    for run in subagent_runs:
+        flattened.extend(run["tool_calls"])
+    return flattened
+
+
+def _apply_subagent_totals(
+    summary: SessionSummary,
+    subagent_runs: list[dict],
+    tool_calls: list[ToolCall],
+) -> None:
+    """Add subagent traffic into session-level diagnostic totals."""
+    summary.tool_call_count = len(tool_calls)
+    summary.failed_tool_count = sum(1 for tc in tool_calls if tc.is_failed)
+    for run in subagent_runs:
+        s = run["summary"]
+        summary.input_tokens += s.get("input_tokens", 0)
+        summary.output_tokens += s.get("output_tokens", 0)
+        summary.cached_input_tokens += s.get("cache_read_input_tokens", 0)
+        summary.cached_output_tokens += s.get("cache_creation_input_tokens", 0)
 
 
 def _extract_tool_calls(
@@ -486,7 +762,7 @@ def _extract_tool_calls(
     """
     tool_calls = []
 
-    # Build a map of tool_use_id → tool_result for error detection
+    # Build a map of tool_use_id → tool_result for status/result display
     tool_results = {}
     for ev in events:
         if ev.get("type") != "user":
@@ -501,39 +777,26 @@ def _extract_tool_calls(
                     tool_use_id = item.get("tool_use_id", "")
                     result_content = item.get("content", "")
 
-                    is_error = False
+                    is_error = item.get("is_error") is True
                     exit_code = None
-                    error_msg = ""
+                    result_text = _stringify_tool_result(result_content)
+                    error_msg = result_text[:500] if is_error else ""
 
-                    if isinstance(result_content, str):
-                        if "error" in result_content.lower() or "exit code" in result_content.lower():
+                    if _tool_result_looks_failed(result_text):
+                        is_error = True
+                    exit_match = re.search(r"exit code[:\s]*(\d+)", result_text, re.IGNORECASE)
+                    if exit_match:
+                        exit_code = int(exit_match.group(1))
+                        if exit_code != 0:
                             is_error = True
-                        # Try to extract exit code
-                        exit_match = re.search(r"exit code[:\s]*(\d+)", result_content, re.IGNORECASE)
-                        if exit_match:
-                            exit_code = int(exit_match.group(1))
-                            if exit_code != 0:
-                                is_error = True
-                        error_msg = result_content[:500]
-
-                    elif isinstance(result_content, list):
-                        for rc in result_content:
-                            if isinstance(rc, dict) and rc.get("type") == "text":
-                                rc_text = rc.get("text", "")
-                                if "error" in rc_text.lower():
-                                    is_error = True
-                                    error_msg = rc_text[:500]
-                                exit_match = re.search(r"exit code[:\s]*(\d+)", rc_text, re.IGNORECASE)
-                                if exit_match:
-                                    exit_code = int(exit_match.group(1))
-                                    if exit_code != 0:
-                                        is_error = True
-                                break
+                    if is_error and not error_msg:
+                        error_msg = result_text[:500]
 
                     tool_results[tool_use_id] = {
                         "is_error": is_error,
                         "exit_code": exit_code,
                         "error_message": error_msg,
+                        "result": result_text[:2000],
                     }
 
     # Extract tool calls from assistant messages
@@ -541,15 +804,22 @@ def _extract_tool_calls(
         if msg.role != "assistant":
             continue
         for tc in msg.tool_calls:
+            tool_use_id = tc.get("id", "")
             name = tc.get("name", "")
             params = tc.get("parameters", {})
 
             # Try to find matching tool result
-            tool_use_id = ""  # We don't have this from assistant message directly
+            result_info = tool_results.get(tool_use_id, {})
             status = "completed"
             exit_code = None
             error_msg = ""
+            result = ""
             files_touched = []
+            if result_info:
+                status = "error" if result_info.get("is_error") else "completed"
+                exit_code = result_info.get("exit_code")
+                error_msg = result_info.get("error_message", "")
+                result = result_info.get("result", "")
 
             # For Read/Write/Edit tools, extract file path from params
             file_path = (
@@ -566,11 +836,13 @@ def _extract_tool_calls(
             tool_calls.append(ToolCall(
                 name=name,
                 parameters=params,
+                result=result,
                 status=status,
                 exit_code=exit_code,
                 error_message=error_msg,
                 files_touched=files_touched,
                 timestamp=msg.timestamp,
+                tool_use_id=tool_use_id,
             ))
 
     return tool_calls
