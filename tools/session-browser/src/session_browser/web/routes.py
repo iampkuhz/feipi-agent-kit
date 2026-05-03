@@ -163,7 +163,7 @@ def _build_rounds(
                 merged_user = _merge_messages(pending_users)
                 pending_users = []
             else:
-                merged_user = ChatMessage(role="user", content="", timestamp="")
+                merged_user = ChatMessage(role="user", content="", timestamp=msg.timestamp)
             rounds.append(
                 _make_round(merged_user, msg, tool_calls,
                             total_session_tokens, agent, session_cache_write_tokens)

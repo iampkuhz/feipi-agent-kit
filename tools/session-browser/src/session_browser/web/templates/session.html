@@ -26,34 +26,33 @@
 {% set total_llm_errors = rounds | sum(attribute='llm_error_count') %}
 {% set avg_tok_round = ((input_total + session.output_tokens) / (rounds | length)) | round(0) if rounds | length > 0 else 0 %}
 
-<!-- Session header: compact, responsive layout -->
-<div class="session-header-v2">
-    <!-- Top row: Agent badge + Title + Model -->
-    <div class="session-header-top">
+<!-- Session header: redesigned layout -->
+<div class="session-header-v3">
+    <!-- Title row: Agent badge + Title + Model -->
+    <div class="session-header-v3__title">
         <span class="badge {{ 'badge-claude' if session.agent == 'claude_code' else 'badge-codex' }}">
             {{ 'Claude Code' if session.agent == 'claude_code' else 'Codex' }}
         </span>
-        <h1 class="session-title-v2" data-tooltip="{{ session.title }}">{{ session.title[:120] or 'Untitled Session' }}</h1>
+        <h1 class="session-title-v3" data-tooltip="{{ session.title }}">{{ session.title[:120] or 'Untitled Session' }}</h1>
         {% if session.model %}
-        <span class="session-model-inline" data-tooltip="{{ session.model }}">{{ session.model[:60] }}</span>
+        <span class="session-model-badge" data-tooltip="{{ session.model }}">{{ session.model[:60] }}</span>
         {% endif %}
     </div>
 
-    <!-- Meta row: Project · Branch · Path -->
-    <div class="session-meta-row">
-        <a href="/projects/{{ session.project_key | urlencode }}" class="meta-link" data-tooltip="{{ session.project_key }}">{{ session.project_name }}</a>
+    <!-- Info row: compact inline chips -->
+    <div class="session-header-v3__info">
+        <a href="/projects/{{ session.project_key | urlencode }}" class="info-chip" data-tooltip="{{ session.project_key }}">
+            {{ session.project_name }}
+        </a>
         {% if session.git_branch and session.git_branch != 'main' %}
-        <span class="badge badge-muted">{{ session.git_branch }}</span>
+        <span class="info-chip info-chip--branch">{{ session.git_branch }}</span>
         {% endif %}
-        <code class="session-path" data-tooltip="Click to copy: {{ session.project_key }}" onclick="copyPath(this)">{{ session.project_key }}</code>
-    </div>
-
-    <!-- Time row -->
-    <div class="session-time-row">
-        <span class="text-xs text-muted">Started: {{ session.started_at[:19].replace('T', ' ') if session.started_at else '?' }}</span>
-        <span class="text-xs text-muted">·</span>
-        <span class="text-xs text-muted">Ended: {{ session.ended_at[:19].replace('T', ' ') if session.ended_at else '?' }}</span>
-        <span class="text-xs" style="font-weight:600">· {{ session.duration_seconds | format_duration }}</span>
+        {% if session.started_at %}
+        <span class="info-chip info-chip--time" data-tooltip="Started: {{ session.started_at[:19].replace('T', ' ') }}
+Ended: {{ session.ended_at[:19].replace('T', ' ') }}">
+            {{ session.started_at[:10] }} {{ session.duration_seconds | format_duration }}
+        </span>
+        {% endif %}
     </div>
 </div>
 
@@ -154,6 +153,7 @@
 <div class="tabs">
     <button class="tab active" data-tab="conversation" onclick="switchTab('conversation')">Conversation</button>
     <button class="tab" data-tab="timeline" onclick="switchTab('timeline')">Timeline</button>
+    <button class="tab" data-tab="hotspots" onclick="switchTab('hotspots')">Hotspots</button>
     <button class="tab" data-tab="profile" onclick="switchTab('profile')">Profile</button>
 </div>
 
@@ -256,8 +256,6 @@
                                 {% for sig in signals %}
                                 <span class="signal-badge signal-{{ sig }}">{{ sig }}</span>
                                 {% endfor %}
-                            {% else %}
-                                <span class="signal-badge signal-normal">normal</span>
                             {% endif %}
                         </td>
                         <td class="numeric mono text-xs">
@@ -335,7 +333,12 @@
                                         {# User message #}
                                         {% if round.user_msg.content %}
                                         <div class="timeline__user-msg">
-                                            <div class="msg-label">User</div>
+                                            <div class="msg-label">
+                                                User
+                                                {% if round.user_msg.timestamp %}
+                                                <span class="msg-label__time">{{ round.user_msg.timestamp[:19].replace('T', ' ') }}</span>
+                                                {% endif %}
+                                            </div>
                                             <div class="msg-body">{{ round.user_msg.content_html | safe }}</div>
                                             {% if round.user_msg.content_html | length > 600 %}
                                             <button class="show-more" onclick="toggleShowMoreBtn(this)">Show more</button>
@@ -354,6 +357,9 @@
                                                 {% else %}
                                                     Context carried forward
                                                 {% endif %}
+                                                {% if interaction.timestamp %}
+                                                <span class="flow-arrow__time">{{ interaction.timestamp[:19].replace('T', ' ') }}</span>
+                                                {% endif %}
                                             </div>
                                             {% endif %}
 
@@ -371,6 +377,9 @@
                                                         <span class="badge badge-muted" data-tooltip="Cache write: {{ interaction.cache_write_tokens }}">CW {{ interaction.cache_write_tokens | format_number }}</span>
                                                         {% endif %}
                                                     </span>
+                                                    {% if interaction.timestamp %}
+                                                    <span class="llm-card__time" data-tooltip="LLM call sent at">{{ interaction.timestamp[:19].replace('T', ' ') }}</span>
+                                                    {% endif %}
                                                     <span class="llm-card__chevron">&#8250;</span>
                                                 </div>
                                                 <div class="llm-card__body">
@@ -408,6 +417,12 @@
                                                             <div class="tool-detail-card__header" onclick="toggleToolDetail(this)">
                                                                 <span class="tool-detail-card__chevron">&#8250;</span>
                                                                 <span class="badge badge-primary">{{ tc.name }}</span>
+                                                                {% if tc.timestamp %}
+                                                                <span class="tool-card__time" data-tooltip="Tool call started at">{{ tc.timestamp[:19].replace('T', ' ') }}</span>
+                                                                {% endif %}
+                                                                {% if tc.duration_ms > 0 %}
+                                                                <span class="tool-card__duration" data-tooltip="Tool execution duration">{{ (tc.duration_ms / 1000) | round(1) }}s</span>
+                                                                {% endif %}
                                                                 <span class="tool-detail-card__summary">
                                                                     {% if tc.name == 'Bash' %}
                                                                         <code class="mono text-xs">{{ tc.parameters.get('command', '')[:100] }}</code>
@@ -460,6 +475,9 @@
                                                         <span>{{ interaction.tool_call_count }} tools</span>
                                                         <span>{{ interaction.output_tokens | format_number }} out</span>
                                                     </div>
+                                                    {% if interaction.timestamp %}
+                                                    <span class="llm-card__time">{{ interaction.timestamp[:19].replace('T', ' ') }}</span>
+                                                    {% endif %}
                                                     <span class="llm-card__chevron">&#8250;</span>
                                                 </div>
                                                 <div class="subagent-card__body">
@@ -479,6 +497,12 @@
                                                             <div class="tool-detail-card__header" onclick="toggleToolDetail(this)">
                                                                 <span class="tool-detail-card__chevron">&#8250;</span>
                                                                 <span class="badge badge-muted">{{ tc.name }}</span>
+                                                                {% if tc.timestamp %}
+                                                                <span class="tool-card__time">{{ tc.timestamp[:19].replace('T', ' ') }}</span>
+                                                                {% endif %}
+                                                                {% if tc.duration_ms > 0 %}
+                                                                <span class="tool-card__duration">{{ (tc.duration_ms / 1000) | round(1) }}s</span>
+                                                                {% endif %}
                                                                 <span class="tool-detail-card__summary">
                                                                     {% if tc.name == 'Bash' %}
                                                                         <code class="mono text-xs">{{ tc.parameters.get('command', '')[:100] }}</code>
@@ -535,6 +559,12 @@
                                             <div class="tool-detail-card__header" onclick="toggleToolDetail(this)">
                                                 <span class="tool-detail-card__chevron">&#8250;</span>
                                                 <span class="badge badge-primary">{{ tc.name }}</span>
+                                                {% if tc.timestamp %}
+                                                <span class="tool-card__time">{{ tc.timestamp[:19].replace('T', ' ') }}</span>
+                                                {% endif %}
+                                                {% if tc.duration_ms > 0 %}
+                                                <span class="tool-card__duration">{{ (tc.duration_ms / 1000) | round(1) }}s</span>
+                                                {% endif %}
                                                 <span class="tool-detail-card__summary">
                                                     {% if tc.parameters %}
                                                     {% if tc.name == 'Bash' %}
@@ -595,11 +625,14 @@
         <div class="empty-state">No conversation data available.</div>
         {% endif %}
     </div>
+</div>
 
-    <!-- Tool hotspots -->
+<!-- Tab: Hotspots -->
+<div id="hotspots" class="tab-content">
+    <!-- Tool usage summary -->
     {% if tool_calls %}
-    <div class="card" style="margin-top:12px">
-        <div class="card-title">Tool Hotspots</div>
+    <div class="card">
+        <div class="card-title">Tool Usage by Frequency</div>
         <div class="tool-hotspots">
             {% set ns = namespace(tool_counts={}) %}
             {% for tc in tool_calls %}
