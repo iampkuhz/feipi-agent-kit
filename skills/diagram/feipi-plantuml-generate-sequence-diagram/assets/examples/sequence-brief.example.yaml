@@ -86,7 +86,7 @@ messages:
     type: return
 
 layout:
-  direction: left_to_right
+  direction: top_to_bottom
   include_legend: false
 
 groups:
@@ -96,6 +96,7 @@ groups:
   - id: backend
     name: 后端层
     participants: [order_service, inventory_service, payment_gateway]
+    separator: true
   - id: data
     name: 数据层
     participants: [order_db, inventory_db]

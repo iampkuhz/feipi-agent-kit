@@ -92,7 +92,7 @@ fi
 # 注意：这是一个 soft check，只警告不报错
 while IFS= read -r line; do
   if [[ "$line" =~ ^package ]]; then
-    pkg_name="$(echo "$line" | grep -oP 'as \K[a-zA-Z_]+' || true)"
+    pkg_name="$(echo "$line" | sed -nE 's/.*[[:space:]]as[[:space:]]+([A-Za-z_][A-Za-z0-9_]*).*/\1/p' || true)"
     if [[ -n "$pkg_name" ]]; then
       # 提取该 package 内的组件数量
       comp_count="$(awk -v pkg="$pkg_name" '
@@ -124,4 +124,3 @@ fi
 echo "layout_check=ok"
 echo "layout_packages=$PACKAGE_COUNT"
 echo "include_legend=$INCLUDE_LEGEND"
-

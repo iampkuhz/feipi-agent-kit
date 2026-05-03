@@ -51,7 +51,7 @@ messages:
     type: return
 
 layout:
-  direction: left_to_right
+  direction: top_to_bottom
   include_legend: false
 
 groups:

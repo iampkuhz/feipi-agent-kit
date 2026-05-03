@@ -1,6 +1,5 @@
 @startuml
 title 电商下单链路时序图
-autonumber
 skinparam shadowing false
 skinparam sequenceStyle rectangle
 skinparam nodesep 30
@@ -22,6 +21,8 @@ box "数据层" #FFFFFF
   database "订单库" as order_db
   database "库存库" as inventory_db
 endbox
+
+autonumber
 
 user -> web_portal : M1 提交下单请求
 web_portal -> order_service : M2 转发创建订单请求

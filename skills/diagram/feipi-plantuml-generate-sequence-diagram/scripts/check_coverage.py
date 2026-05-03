@@ -190,11 +190,11 @@ def main() -> int:
             1 for group in expected_groups if isinstance(group, dict) and group.get("separator") is True
         )
         actual_separator_count = sum(
-            1 for line in raw_text.splitlines() if re.match(r"^\s*separator\b", line)
+            1 for line in raw_text.splitlines() if re.match(r"^\s*==\s*.+?\s*==\s*$", line)
         )
         if actual_separator_count != expected_separator_count:
             errors.append(
-                f"separator 数量与 brief 不一致：期望 {expected_separator_count}，实际 {actual_separator_count}"
+                f"消息区分隔线数量与 brief 不一致：期望 {expected_separator_count}，实际 {actual_separator_count}"
             )
 
     if isinstance(layout, dict) and layout.get("include_legend") is True:

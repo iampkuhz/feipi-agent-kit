@@ -1,6 +1,5 @@
 @startuml
 title 电商下单链路时序图
-autonumber
 skinparam shadowing false
 skinparam sequenceStyle rectangle
 skinparam nodesep 30
@@ -18,14 +17,15 @@ box "后端层" #EEEEEE
   participant "支付网关" as payment_gateway
 endbox
 
-separator
-
 box "数据层" #FFFFFF
   database "订单库" as order_db
   database "库存库" as inventory_db
 endbox
 
+autonumber
+
 user -> web_portal : M1 提交下单请求
+== 后端层 ==
 web_portal -> order_service : M2 转发创建订单请求
 order_service -> inventory_service : M3 预占库存
 inventory_service -> inventory_db : M6 更新库存状态

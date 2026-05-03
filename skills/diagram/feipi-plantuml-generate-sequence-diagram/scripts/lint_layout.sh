@@ -43,8 +43,23 @@ if [[ "$BOX_COUNT" -gt 0 && "$BOX_COUNT" -ne "$ENDBOX_COUNT" ]]; then
   exit 5
 fi
 
-if ! printf '%s\n' "$CONTENT" | grep -Eiq '^[[:space:]]*autonumber'; then
+if [[ "$BOX_COUNT" -gt 0 ]] && printf '%s\n' "$CONTENT" | grep -Eiq '^[[:space:]]*left[[:space:]]+to[[:space:]]+right[[:space:]]+direction'; then
+  echo "布局校验失败：sequence diagram 中 box 与 left to right direction 互斥" >&2
+  exit 6
+fi
+
+if printf '%s\n' "$CONTENT" | grep -Eiq '^[[:space:]]*separator\b'; then
+  echo "布局校验失败：不要使用 PlantUML separator 关键字；请改用 == 组名 == 分隔线" >&2
+  exit 7
+fi
+
+AUTONUMBER_LINE="$(grep -nE '^[[:space:]]*autonumber\b' "$INPUT_FILE" | head -1 | cut -d: -f1 || true)"
+LAST_PARTICIPANT_LINE="$(grep -nE '^[[:space:]]*(participant|actor|database)[[:space:]]+"[^"]+"' "$INPUT_FILE" | tail -1 | cut -d: -f1 || true)"
+if [[ -z "$AUTONUMBER_LINE" ]]; then
   echo "布局提示：建议包含 autonumber 以自动编号消息" >&2
+elif [[ -n "$LAST_PARTICIPANT_LINE" && "$AUTONUMBER_LINE" -le "$LAST_PARTICIPANT_LINE" ]]; then
+  echo "布局校验失败：autonumber 必须放在所有参与者声明之后、第一条消息之前" >&2
+  exit 8
 fi
 
 if ! printf '%s\n' "$CONTENT" | grep -Eiq '^[[:space:]]*skinparam[[:space:]]+nodesep[[:space:]]+[0-9]+'; then

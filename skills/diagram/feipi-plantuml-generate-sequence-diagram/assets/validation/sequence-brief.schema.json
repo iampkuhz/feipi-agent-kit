@@ -149,7 +149,7 @@
           },
           "separator": {
             "type": "boolean",
-            "description": "是否在组后添加 separator 分隔线"
+            "description": "是否在该组相关消息段前添加 == 组名 == 分隔线；不得生成 PlantUML separator 关键字"
           }
         }
       }

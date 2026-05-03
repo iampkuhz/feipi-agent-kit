@@ -8,16 +8,20 @@
 
 ## 分层（box / separator）
 
-- 如 brief 中包含 `groups`，必须使用 `box "组名" #颜色 { ... } endbox` 包裹对应参与者。
-- `box` 声明必须放在 `autonumber` 之后、消息之前。
-- 如组的 `separator=true`，必须在该 `endbox` 后添加 `separator`。
+- 如 brief 中包含 `groups`，且布局方向为 `top to bottom`（默认），使用 `box “组名” #颜色 { ... } endbox` 包裹对应参与者。
+- **`box` 与 `left to right direction` 互斥**：若 brief 要求使用 `box` 分层，必须使用默认的 `top to bottom` 方向，不得设置 `left to right`。
+- 若必须使用 `left to right direction`，放弃 `box`，只在消息区使用 `== 组名 ==` 作为视觉分隔。
+- `box` 只用于包裹参与者声明，必须出现在 `autonumber` 之前。
+- `autonumber` 必须放在所有参与者 / `box` 声明之后、第一条消息之前。
+- 不得生成 PlantUML `separator` 关键字；如组的 `separator=true`，在相关消息段开始处使用 `== 组名 ==` 分隔线。
 - 参与者只能属于一个 `box`，不得重复声明。
 - 颜色建议使用浅色系（如 `#DDDDDD`、`#EEEEEE`、`#FFFFFF`），避免干扰消息 readability。
 
 ## 消息
 
-- 同步消息使用 `->`，返回消息使用 `-->`。
-- 图中的每一条箭头消息都必须来自 brief；不得额外补一条“看起来合理”的返回或通知。
+- 同步消息使用 `->`，返回消息使用 `-->`，异步消息使用 `->>`。
+- brief 中 `type: async` 的消息在 `.puml` 中**必须**用 `->>`，不得用 `->`。
+- 图中的每一条箭头消息都必须来自 brief；不得额外补一条”看起来合理”的返回或通知。
 - 每条消息必须在箭头标签里落地 `Mx/Rx + 描述`。
 - 标签过长时允许插入 `\\n` 换行，但不能删掉编号或改写关键命名。
 - `activate` / `deactivate` 由绘图阶段按调用栈酌情添加，不作为 brief 必填字段。
@@ -30,10 +34,12 @@
 
 ## 布局
 
-- 默认使用 `left_to_right direction`。
+- 默认使用 `top to bottom` 方向。如需 `box` 分层，必须保持此默认方向。
+- 只有在不需要 `box` 且参与者较少时，才可选用 `left to right direction`。
 - 交付图必须同时设置 `skinparam nodesep` 与 `skinparam ranksep`。
 - `layout.include_legend=true` 时必须包含 `legend`。
 - 生命线过长时优先使用 `autonumber` 自动编号，不要手动维护序号。
+- `autonumber` 必须放在参与者声明之后、第一条消息之前，不得写在文件开头、参与者之前或 `box` 之前。
 
 ## 交付前检查
 

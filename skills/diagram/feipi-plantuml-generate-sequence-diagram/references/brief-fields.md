@@ -51,12 +51,12 @@
   - `id`：组的唯一标识。
   - `name`：组的展示名，会渲染为 `box` 标题。
   - `participants`：参与者 id 列表，必须引用 `participants[].id`。
-  - `separator`：是否在该组后添加 `separator` 分隔线。
+  - `separator`：是否在该组相关消息段前添加 `== 组名 ==` 分隔线；不得生成 PlantUML `separator` 关键字。
 - 生成图时，每个组会渲染为 `box "name" #颜色 { ... } endbox`。
 
 ### 可选字段
 
-- `layout.direction`：支持 `left_to_right`（默认）或 `top_to_bottom`。
+- `layout.direction`：支持 `top_to_bottom`（默认）或 `left_to_right`。存在 `groups` / `box` 时必须使用 `top_to_bottom`。
 - `layout.include_legend`：是否强制包含图例。
 - `out_of_scope`：明确不进入图中的内容，避免生成阶段脑补。
-- `groups`：可选分层信息；若存在且 `separator=true`，生成图时必须补对应的 `separator`。
+- `groups`：可选分层信息；若存在且 `separator=true`，生成图时必须补对应的 `== 组名 ==` 消息区分隔线。

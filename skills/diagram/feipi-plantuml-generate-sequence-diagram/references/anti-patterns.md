@@ -35,3 +35,35 @@
 - 表现：每条消息都加 `activate` / `deactivate`，导致图面杂乱。
 - 问题：核心调用链路不清晰。
 - 修复：只对真正的调用栈加激活框，数据存储类消息一般不需要。
+
+## 时序图高频语法错误（自循环修复重点）
+
+### autonumber 位置错误
+
+- 表现：`autonumber` 写在参与者声明之前。
+- 问题：PlantUML 解析失败或编号不生效。
+- 修复：`autonumber` 必须在所有参与者声明之后、第一条消息之前。
+
+### box 与方向冲突
+
+- 表现：同时使用 `box` 和 `left to right direction`。
+- 问题：PlantUML 不支持在 `left to right` 模式下使用 `box`，渲染失败。
+- 修复：需要 `box` 时改用默认 `top to bottom` 方向；若必须横向布局，放弃 `box` 改用 `== separator ==` 分组。
+
+### 异步消息箭头错误
+
+- 表现：异步消息使用 `->` 而非 `->>`。
+- 问题：虽然 PlantUML 能渲染，但语义不正确，且某些渲染器会报 warning。
+- 修复：同步消息用 `->`，异步消息用 `->>`。brief 中 `type: async` 的消息在 `.puml` 中必须用 `->>`。
+
+### autonumber 格式错误
+
+- 表现：`autonumber 1` 后消息编号不从 M1 开始。
+- 问题：PlantUML 默认从 1 开始编号，不自动加前缀。
+- 修复：使用 `autonumber "<b>M" ` 格式，或使用注释手动标注消息编号。
+
+### separator 关键字错误
+
+- 表现：在 `box` 之间或消息之间写入单独的 `separator` 行。
+- 问题：当前 PlantUML 渲染环境不支持该关键字，容易导致 render 失败。
+- 修复：删除 `separator` 关键字；需要视觉分隔时，在相关消息段开始处使用 `== 组名 ==`。
