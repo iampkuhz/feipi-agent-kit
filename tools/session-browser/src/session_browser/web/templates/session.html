@@ -277,8 +277,9 @@
 
 <!-- Tab: Conversation (default) -->
 <div id="conversation" class="tab-content active">
-    <div class="card">
+    <div class="card card--chat">
         <div class="card-title">All Messages</div>
+        <div class="msg-flow">
         {% for round in rounds %}
         {% if round.user_msg.content_html %}
         <div class="msg msg--user" style="margin-bottom:12px">
@@ -299,6 +300,7 @@
         </div>
         {% endif %}
         {% endfor %}
+        </div>
     </div>
 </div>
 

@@ -559,14 +559,29 @@
             border-radius: var(--radius);
             font-size: var(--text-sm);
             line-height: 1.6;
+            max-width: 92%;
         }
         .msg--user {
             background: var(--accent-bg);
-            border-left: 2px solid var(--accent);
+            border: 1px solid var(--accent);
+            float: right;
+            clear: right;
+            margin-left: 8%;
+            border-radius: var(--radius) var(--radius) 2px var(--radius);
         }
         .msg--assistant {
             background: var(--surface-hover);
-            border-left: 2px solid var(--border);
+            border: 1px solid var(--border);
+            float: left;
+            clear: left;
+            margin-right: 8%;
+            border-radius: var(--radius) var(--radius) var(--radius) 2px;
+        }
+        .msg-flow {
+            display: flow-root;
+        }
+        .card--chat .card-title {
+            margin-bottom: 12px;
         }
         .msg__meta {
             font-size: var(--text-micro);
