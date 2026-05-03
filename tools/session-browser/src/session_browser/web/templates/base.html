@@ -2543,6 +2543,13 @@
             grid-template-columns: 140px 1fr;
             gap: 16px;
             align-items: center;
+            align-self: flex-start;
+            max-width: 55%;
+        }
+        @media (max-width: 900px) {
+            .overview__token-panel {
+                max-width: 100%;
+            }
         }
         @media (max-width: 600px) {
             .overview__token-panel {
@@ -2661,15 +2668,50 @@
             margin-top: 4px;
         }
 
-        /* Round chart (vertical mini bars) */
+        /* Round chart sparkline */
         .overview__round-chart {
             margin-top: 4px;
         }
+        .sparkline-wrap {
+            position: relative;
+            margin-top: 6px;
+        }
+        .sparkline {
+            width: 100%;
+            height: 50px;
+            display: block;
+        }
+        .sparkline__area {
+            fill: var(--token-input-fresh);
+            opacity: 0.1;
+        }
+        .sparkline__line {
+            fill: none;
+            stroke: var(--token-input-fresh);
+            stroke-width: 1.5;
+            stroke-linejoin: round;
+            stroke-linecap: round;
+        }
+        .sparkline__dot {
+            fill: var(--accent);
+            stroke: var(--surface);
+            stroke-width: 1.5;
+            cursor: help;
+        }
+        .sparkline__labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: var(--text-micro);
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+            margin-top: 2px;
+        }
+        /* Old round chart bar (deprecated, kept for backward compat) */
         .round-chart-bar {
             display: flex;
             align-items: flex-end;
             gap: 1px;
-            height: 48px;
+            height: 90px;
             padding: 0 4px;
             margin-top: 6px;
         }

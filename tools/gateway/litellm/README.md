@@ -92,6 +92,8 @@ curl -s http://localhost:4000/v1/chat/completions \
 | `LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_NAME` | 上游补全模型 ID | 可选 |
 | `LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_BASE` | 上游补全端点 | 可选 |
 | `LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_KEY` | 上游补全密钥 | 可选 |
+| `SPEND_LOG_CLEANUP_BATCH_SIZE` | spend logs 清理任务每批处理行数，调小可降低内存峰值 | 可选 |
+| `SPEND_LOG_RUN_LOOPS` | spend logs 清理任务单轮最多执行批次数，调小可降低单轮压力 | 可选 |
 
 ### config.yaml 结构
 
@@ -110,12 +112,14 @@ litellm_settings:
 
 general_settings:
   master_key: <访问密钥>
-  store_prompts_in_spend_logs: false
+  store_prompts_in_spend_logs: true
+  maximum_spend_logs_retention_period: "1d"
+  maximum_spend_logs_retention_interval: "1d"
 ```
 
 注意：`litellm_settings:` 不能只写键名和注释、不写任何子项。那样在 YAML 里会被解析为 `null`，LiteLLM 1.81.x 的 Playground/UI 配置读取流程会报 `'NoneType' object has no attribute 'get'`。
 
-本地网关默认只保留用量统计，不保存完整请求体和响应体。`store_prompts_in_spend_logs: false` 可以避免 `LiteLLM_SpendLogs.proxy_server_request` 在长期运行后快速膨胀，尤其适合 Podman VM 内存较小的个人环境。
+本地网关默认保存完整请求体和响应体到 spend logs，并将保留期限制为 1 天。`maximum_spend_logs_retention_period: "1d"` 控制保留窗口，`maximum_spend_logs_retention_interval: "1d"` 控制清理任务运行间隔。Podman VM 内存较小时，可通过 `SPEND_LOG_CLEANUP_BATCH_SIZE` 和 `SPEND_LOG_RUN_LOOPS` 降低清理任务的单轮内存峰值。
 
 ### PostgreSQL 数据持久化
 
@@ -205,7 +209,7 @@ podman exec litellm-db-podman psql -U litellm -d litellm \
   -c "select relname, pg_size_pretty(pg_total_relation_size(relid)) from pg_catalog.pg_statio_user_tables order by pg_total_relation_size(relid) desc limit 10;"
 ```
 
-当前 compose 已对 LiteLLM 设置 `mem_limit: 1536m`，并关闭完整 prompt 持久化。修改 compose 或镜像版本后，使用 `./scripts/litellm.sh restart`，脚本会重新创建 LiteLLM 容器以应用资源限制和镜像变更。
+当前 compose 已对 LiteLLM 设置 `mem_limit: 2048m`，并保留完整 prompt 持久化；通过 1 天 spend logs 保留期、较小清理批次、较小 DB 连接池和请求/响应体大小限制降低内存峰值。修改 compose 或镜像版本后，使用 `./scripts/litellm.sh restart`，脚本会重新创建 LiteLLM 容器以应用资源限制和镜像变更。
 
 如果 `podman compose up -d` 一开始就打印 `no container with name or ID ... found`、`not all containers could be removed from pod ...`、`compose_default has associated containers with it` 这类报错，通常不是 LiteLLM 配置本身坏了，而是多个服务都曾从各自的 `compose/` 目录启动，默认项目名都变成了 `compose`。当前配置已固定项目名为 `litellm`；若本机还残留旧的 `compose` 项目，可先在对应目录执行一次 `podman compose down`，或手动清理旧的 `pod_compose` / `compose_default` 资源后再重启。
 

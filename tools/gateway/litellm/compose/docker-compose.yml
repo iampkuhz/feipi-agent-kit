@@ -41,8 +41,8 @@ services:
     image: docker.litellm.ai/berriai/litellm:v1.83.7-stable
     container_name: litellm-proxy-podman
     restart: unless-stopped
-    mem_limit: 1536m
-    mem_reservation: 768m
+    mem_limit: 2048m
+    mem_reservation: 1024m
     pids_limit: 256
     ports:
       - "4000:4000"
@@ -75,6 +75,9 @@ services:
       - https_proxy=
       - NO_PROXY=127.0.0.1,localhost,host.containers.internal
       - no_proxy=127.0.0.1,localhost,host.containers.internal
+      # 降低 spend logs 清理任务的单批内存峰值，适合 Podman VM 小内存环境。
+      - SPEND_LOG_CLEANUP_BATCH_SIZE=${SPEND_LOG_CLEANUP_BATCH_SIZE:-200}
+      - SPEND_LOG_RUN_LOOPS=${SPEND_LOG_RUN_LOOPS:-50}
       # Podman Compose 不保证 container_name 自动成为可解析别名，
       # 这里固定使用 postgres 服务暴露出的 litellm-db 网络别名连接数据库。
       - DATABASE_URL=postgresql://litellm:${POSTGRES_PASSWORD}@litellm-db:5432/litellm

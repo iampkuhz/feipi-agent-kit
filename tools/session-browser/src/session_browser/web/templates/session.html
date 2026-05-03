@@ -230,31 +230,49 @@
         </div>
     </div>
 
-    <!-- Tokens per round mini-chart (was in Profile tab) -->
+    <!-- Tokens per round sparkline (was in Profile tab) -->
     {% if rounds and rounds | length > 1 %}
     <div class="overview__round-chart">
         <div class="metric-section-label">Tokens per Round</div>
-        <div class="round-chart-bar">
-            {% set max_round_total = namespace(val=0) %}
-            {% for round in rounds %}
-                {% set rb = round.token_breakdown() %}
-                {% set rt = rb.input + rb.cache_read + rb.cache_write + rb.output %}
-                {% if rt > max_round_total.val %}{% set max_round_total.val = rt %}{% endif %}
-            {% endfor %}
-            {% for round in rounds %}
-                {% set rb = round.token_breakdown() %}
-                {% set rt = rb.input + rb.cache_read + rb.cache_write + rb.output %}
-                {% if rt > 0 and max_round_total.val > 0 %}
-                <div class="round-chart-bar__col" data-tooltip="#{{ loop.index }}: {{ rt | format_number }} tokens&#10;Fresh: {{ rb.input | format_number }}&#10;Cache R: {{ rb.cache_read | format_number }}&#10;Cache W: {{ rb.cache_write | format_number }}&#10;Output: {{ rb.output | format_number }}">
-                    <div class="round-chart-bar__stack" style="height:{{ (rt / max_round_total.val * 100) | round(0) }}%">
-                        <div class="round-chart-bar__seg round-chart-bar__seg--fresh" style="height:{{ (rb.input / rt * 100) | round(0) }}%"></div>
-                        <div class="round-chart-bar__seg round-chart-bar__seg--cr" style="height:{{ (rb.cache_read / rt * 100) | round(0) }}%"></div>
-                        <div class="round-chart-bar__seg round-chart-bar__seg--cw" style="height:{{ (rb.cache_write / rt * 100) | round(0) }}%"></div>
-                        <div class="round-chart-bar__seg round-chart-bar__seg--out" style="height:{{ (rb.output / rt * 100) | round(0) }}%"></div>
-                    </div>
-                </div>
+        <div class="sparkline-wrap">
+            <svg class="sparkline" viewBox="0 0 600 50" preserveAspectRatio="none">
+                {% set spark_data = [] %}
+                {% for round in rounds %}
+                    {% set rb = round.token_breakdown() %}
+                    {% set rt = rb.input + rb.cache_read + rb.cache_write + rb.output %}
+                    {% if rt > 0 %}
+                        {% set _ = spark_data.append({'idx': loop.index, 'rt': rt, 'fresh': rb.input, 'cr': rb.cache_read, 'cw': rb.cache_write, 'out': rb.output}) %}
+                    {% endif %}
+                {% endfor %}
+                {% if spark_data | length > 0 %}
+                    {% set max_rt = spark_data | map(attribute='rt') | max %}
+                    {% set min_rt = spark_data | map(attribute='rt') | min %}
+                    {% set range_rt = max_rt - min_rt if max_rt != min_rt else 1 %}
+                    {# Background area fill #}
+                    <polygon class="sparkline__area" points="
+                        {% for d in spark_data %}
+                            {{ ((d.idx - 1) / (spark_data | length - 1 if spark_data | length > 1 else 1)) * 600 }},{{ 45 - ((d.rt - min_rt) / range_rt) * 40 }}
+                        {% endfor %}
+                        600,45 0,45" />
+                    {# Main line #}
+                    <polyline class="sparkline__line" points="
+                        {% for d in spark_data %}
+                            {{ ((d.idx - 1) / (spark_data | length - 1 if spark_data | length > 1 else 1)) * 600 }},{{ 45 - ((d.rt - min_rt) / range_rt) * 40 }}
+                        {% endfor %}" />
+                    {# Peak dot #}
+                    {% set peak = spark_data | selectattr('rt', 'equalto', max_rt) | list | first %}
+                    {% if peak %}
+                        {% set peak_x = ((peak.idx - 1) / (spark_data | length - 1 if spark_data | length > 1 else 1)) * 600 %}
+                        <circle class="sparkline__dot" cx="{{ peak_x }}" cy="{{ 45 - ((peak.rt - min_rt) / range_rt) * 40 }}" r="2.5"
+                              data-tooltip="#{{ peak.idx }}: {{ peak.rt | format_number }} tokens&#10;Fresh: {{ peak.fresh | format_number }}&#10;Cache R: {{ peak.cr | format_number }}&#10;Cache W: {{ peak.cw | format_number }}&#10;Output: {{ peak.out | format_number }}" />
+                    {% endif %}
                 {% endif %}
-            {% endfor %}
+            </svg>
+            <div class="sparkline__labels">
+                <span>Min: {{ spark_data | map(attribute='rt') | min | format_number if spark_data else '—' }}</span>
+                <span>Avg: {{ (spark_data | map(attribute='rt') | sum / spark_data | length) | round(0) | format_number if spark_data else '—' }}</span>
+                <span>Max: {{ spark_data | map(attribute='rt') | max | format_number if spark_data else '—' }}</span>
+            </div>
         </div>
         <div class="chart-legend" style="margin-top:4px">
             <span class="chart-legend__item"><span class="chart-legend__dot" style="background:var(--token-input-fresh)"></span> Fresh</span>

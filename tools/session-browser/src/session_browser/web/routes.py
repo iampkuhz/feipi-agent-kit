@@ -71,6 +71,7 @@ _template_env.filters["format_number"] = lambda n: (
     else f"{n / 1_000:.1f}K" if n >= 1_000
     else str(n)
 )
+_template_env.globals["max"] = max
 _template_env.filters["truncate_path"] = lambda path: (
     _truncate_path(path)
 )
