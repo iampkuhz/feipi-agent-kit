@@ -22,7 +22,7 @@
 <!-- Compact header -->
 <h1 style="font-size:16px; font-weight:600; margin-bottom:2px" data-tooltip="{{ project.project_key }}">{{ project.project_name }}</h1>
 <p class="text-xs text-muted mono mb-3" style="max-width:600px">
-    <span class="path-text truncate" style="display:inline-block; max-width:500px; vertical-align:middle" data-tooltip="{{ project.project_key }}">{{ project.project_key | truncate_path }}</span>
+    <span class="path-text truncate" style="display:inline-block; max-width:500px; vertical-align:middle" data-tooltip="{{ project.project_key }}">{{ project.project_key | relative_to_repo | truncate_path }}</span>
     <button class="path-copy-btn" style="opacity:1; vertical-align:middle" onclick="copyProjectPath(this, '{{ project.project_key }}')" title="Copy full path">⧉</button>
 </p>
 

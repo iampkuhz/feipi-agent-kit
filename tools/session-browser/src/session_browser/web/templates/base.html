@@ -1604,18 +1604,21 @@
         /* ─── Signal badges for round summary ───────────────────────── */
         .signals-cell {
             display: flex;
-            gap: 3px;
-            flex-wrap: wrap;
-            max-width: 140px;
+            gap: 4px;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            max-width: 300px;
+            min-width: 0;
         }
         .signal-badge {
             display: inline-block;
-            padding: 1px 5px;
+            padding: 2px 8px;
             border-radius: 3px;
-            font-size: 10px;
-            font-weight: 500;
+            font-size: var(--text-micro);
+            font-weight: 600;
             white-space: nowrap;
-            line-height: 1.2;
+            line-height: 1.4;
+            flex-shrink: 0;
         }
         .signal-normal {
             background: var(--status-success-bg);
@@ -2128,7 +2131,7 @@
         .round-llm-dot--subagent { background: var(--token-tool); }
         .round-llm-dot--error { background: var(--status-error); }
 
-        /* Token bar in summary table row */
+        /* Token bar in summary table row - compact fixed width */
         .round-token-bar {
             display: flex;
             height: 4px;
@@ -2137,6 +2140,7 @@
             overflow: hidden;
             gap: 1px;
             margin-top: 2px;
+            width: 60px;
         }
         .round-token-bar__fresh { background: var(--token-input-fresh); }
         .round-token-bar__cache-read { background: var(--token-cache-read); }

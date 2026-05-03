@@ -339,8 +339,6 @@
                         <th class="numeric">#</th>
                         <th>Signal</th>
                         <th class="numeric">Tokens</th>
-                        <th class="numeric">Cache R</th>
-                        <th class="numeric">Cache W</th>
                         <th class="numeric">LLM</th>
                         <th class="numeric">Tools</th>
                         <th>Time</th>
@@ -402,10 +400,34 @@
                                 <div class="round-token-bar">
                                     {% set rt = round_input_total + rb.output %}
                                     {% if rt > 0 %}
-                                    <div class="round-token-bar__fresh" style="width:{{ (rb.input / rt * 100) | round(0) }}%"></div>
-                                    <div class="round-token-bar__cache-read" style="width:{{ (rb.cache_read / rt * 100) | round(0) }}%"></div>
-                                    <div class="round-token-bar__cache-write" style="width:{{ (rb.cache_write / rt * 100) | round(0) }}%"></div>
-                                    <div class="round-token-bar__output" style="width:{{ (rb.output / rt * 100) | round(0) }}%"></div>
+                                    {% set p_f = rb.input | round(0) %}
+                                    {% set p_cr = rb.cache_read | round(0) %}
+                                    {% set p_cw = rb.cache_write | round(0) %}
+                                    {% set p_o = rb.output | round(0) %}
+                                    {% set total = p_f + p_cr + p_cw + p_o %}
+                                    {# Squashed widths: min 8% for visible, rest proportional, sum=100 #}
+                                    {% set mn = 8 %}
+                                    {% set v_f = 1 if p_f > 0 else 0 %}
+                                    {% set v_cr = 1 if p_cr > 0 else 0 %}
+                                    {% set v_cw = 1 if p_cw > 0 else 0 %}
+                                    {% set v_o = 1 if p_o > 0 else 0 %}
+                                    {% set cnt = v_f + v_cr + v_cw + v_o %}
+                                    {% if total > 0 and cnt > 0 %}
+                                    {% set rest = 100 - mn * cnt %}
+                                    {% set w_f = mn + (p_f / total * rest) %}
+                                    {% set w_cr = mn * v_cr + (p_cr / total * rest) %}
+                                    {% set w_cw = mn * v_cw + (p_cw / total * rest) %}
+                                    {% set w_o = mn * v_o + (p_o / total * rest) %}
+                                    {% else %}
+                                    {% set w_f = 100 if v_f else 0 %}
+                                    {% set w_cr = 100 if v_cr else 0 %}
+                                    {% set w_cw = 100 if v_cw else 0 %}
+                                    {% set w_o = 100 if v_o else 0 %}
+                                    {% endif %}
+                                    <div class="round-token-bar__fresh" style="width:{{ w_f | round(0) }}%"></div>
+                                    <div class="round-token-bar__cache-read" style="width:{{ w_cr | round(0) }}%"></div>
+                                    <div class="round-token-bar__cache-write" style="width:{{ w_cw | round(0) }}%"></div>
+                                    <div class="round-token-bar__output" style="width:{{ w_o | round(0) }}%"></div>
                                     {% endif %}
                                 </div>
                                 <div class="token-bar-tooltip">
@@ -441,8 +463,6 @@
                                 </div>
                             </div>
                         </td>
-                        <td class="numeric mono text-xs">{{ rb.cache_read | format_number }}</td>
-                        <td class="numeric mono text-xs">{{ rb.cache_write | format_number }}</td>
                         <td class="numeric mono text-xs">
                             <div class="round-llm-dots">
                                 {% for ix in round.interactions %}
@@ -464,7 +484,7 @@
                         <td class="text-xs text-muted">{{ round.user_msg.timestamp[:16].replace('T', ' ') if round.user_msg.timestamp else '' }}</td>
                     </tr>
                     <tr class="round-detail-row" data-round-idx="{{ loop.index }}" style="display:none">
-                        <td colspan="8" class="round-detail-cell">
+                        <td colspan="6" class="round-detail-cell">
                             <div class="round {{ 'has-failed' if has_failed_tools else '' }}">
                                 <div class="round-content">
                                     <div class="timeline">
@@ -567,7 +587,7 @@
                                                                     {% elif tc.name == 'Agent' and tc.subagent_summary %}
                                                                         <span class="subagent-inline">Agent: {{ tc.subagent_summary.description or tc.subagent_summary.agent_type }}</span>
                                                                     {% elif tc.parameters.get('file_path') %}
-                                                                        <code class="mono text-xs">{{ tc.parameters.file_path }}</code>
+                                                                        <code class="mono text-xs">{{ tc.parameters.file_path | relative_to_repo }}</code>
                                                                     {% else %}
                                                                         <span class="mono text-xs">{{ tc.parameters | tojson | truncate(80) }}</span>
                                                                     {% endif %}
@@ -645,7 +665,7 @@
                                                                     {% if tc.name == 'Bash' %}
                                                                         <code class="mono text-xs">{{ tc.parameters.get('command', '')[:100] }}</code>
                                                                     {% elif tc.parameters.get('file_path') %}
-                                                                        <code class="mono text-xs">{{ tc.parameters.file_path }}</code>
+                                                                        <code class="mono text-xs">{{ tc.parameters.file_path | relative_to_repo }}</code>
                                                                     {% else %}
                                                                         <span class="mono text-xs">{{ tc.parameters | tojson | truncate(80) }}</span>
                                                                     {% endif %}
@@ -708,7 +728,7 @@
                                                     {% if tc.name == 'Bash' %}
                                                         <code class="mono text-xs">{{ tc.parameters.get('command', '')[:100] }}</code>
                                                     {% elif tc.parameters.get('file_path') %}
-                                                        <code class="mono text-xs">{{ tc.parameters.file_path }}</code>
+                                                        <code class="mono text-xs">{{ tc.parameters.file_path | relative_to_repo }}</code>
                                                     {% else %}
                                                         <span class="mono text-xs">{{ tc.parameters | tojson | truncate(80) }}</span>
                                                     {% endif %}

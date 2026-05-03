@@ -2,13 +2,15 @@
 
 Manages a local SQLite index of all sessions from both Claude Code and Codex.
 Supports:
-- Full initial scan
-- Incremental refresh (based on file mtimes)
+- Full initial scan (drops old schema, rebuilds)
+- Incremental refresh (mtime-based: only re-parse changed .jsonl files)
+- Tiered background scanning (hot/warm/cold by session age)
 - Query interface for dashboard, project, and session pages
 """
 
 from __future__ import annotations
 
+import os
 import json
 import sqlite3
 import time
@@ -19,6 +21,13 @@ from session_browser.config import INDEX_PATH, ensure_index_dir
 from session_browser.domain.models import SessionSummary, ProjectStats
 from session_browser.sources import claude as claude_source
 from session_browser.sources import codex as codex_source
+
+# ─── Tiered background scan config ────────────────────────────────────────
+
+TIER_HOT_SECONDS = 30 * 60       # ended_at < 30min → scan every 30s
+TIER_HOT_INTERVAL = 30            # seconds between hot scans
+TIER_WARM_SECONDS = 24 * 3600    # ended_at 30min~24h → scan every 5min
+TIER_WARM_INTERVAL = 5 * 60       # seconds between warm scans
 
 
 def _get_connection(db_path: Path | None = None) -> sqlite3.Connection:
@@ -33,12 +42,19 @@ def _get_connection(db_path: Path | None = None) -> sqlite3.Connection:
 
 
 def init_schema(conn: sqlite3.Connection | None = None) -> sqlite3.Connection:
-    """Create the index schema if it doesn't exist."""
+    """Drop old schema and recreate with current structure.
+
+    Adds file_mtime and file_path columns for incremental scan support.
+    NOTE: This drops all existing data — run a full scan afterwards.
+    """
     if conn is None:
         conn = _get_connection()
 
     conn.executescript("""
-        CREATE TABLE IF NOT EXISTS sessions (
+        DROP TABLE IF EXISTS sessions;
+        DROP TABLE IF EXISTS scan_log;
+
+        CREATE TABLE sessions (
             session_key TEXT PRIMARY KEY,
             agent TEXT NOT NULL,
             session_id TEXT NOT NULL,
@@ -60,26 +76,24 @@ def init_schema(conn: sqlite3.Connection | None = None) -> sqlite3.Connection:
             cached_input_tokens INTEGER NOT NULL DEFAULT 0,
             cached_output_tokens INTEGER NOT NULL DEFAULT 0,
             failed_tool_count INTEGER NOT NULL DEFAULT 0,
-            indexed_at REAL NOT NULL DEFAULT 0
+            indexed_at REAL NOT NULL DEFAULT 0,
+            file_mtime REAL NOT NULL DEFAULT 0,
+            file_path TEXT NOT NULL DEFAULT ''
         );
 
-        CREATE INDEX IF NOT EXISTS idx_sessions_project
-            ON sessions(project_key);
-        CREATE INDEX IF NOT EXISTS idx_sessions_agent
-            ON sessions(agent);
-        CREATE INDEX IF NOT EXISTS idx_sessions_ended_at
-            ON sessions(ended_at DESC);
-        CREATE INDEX IF NOT EXISTS idx_sessions_model
-            ON sessions(model);
-        CREATE INDEX IF NOT EXISTS idx_sessions_title
-            ON sessions(title);
+        CREATE INDEX idx_sessions_project ON sessions(project_key);
+        CREATE INDEX idx_sessions_agent ON sessions(agent);
+        CREATE INDEX idx_sessions_ended_at ON sessions(ended_at DESC);
+        CREATE INDEX idx_sessions_model ON sessions(model);
+        CREATE INDEX idx_sessions_title ON sessions(title);
 
-        CREATE TABLE IF NOT EXISTS scan_log (
+        CREATE TABLE scan_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             started_at REAL NOT NULL,
             finished_at REAL,
             claude_count INTEGER DEFAULT 0,
             codex_count INTEGER DEFAULT 0,
+            mode TEXT DEFAULT 'full',
             status TEXT DEFAULT 'running'
         );
     """)
@@ -87,7 +101,12 @@ def init_schema(conn: sqlite3.Connection | None = None) -> sqlite3.Connection:
     return conn
 
 
-def upsert_session(conn: sqlite3.Connection, summary: SessionSummary) -> None:
+def upsert_session(
+    conn: sqlite3.Connection,
+    summary: SessionSummary,
+    file_mtime: float = 0,
+    file_path: str = "",
+) -> None:
     """Insert or update a single session in the index."""
     conn.execute(
         """
@@ -96,8 +115,8 @@ def upsert_session(conn: sqlite3.Connection, summary: SessionSummary) -> None:
             cwd, started_at, ended_at, duration_seconds, model, git_branch,
             source, user_message_count, assistant_message_count, tool_call_count,
             input_tokens, output_tokens, cached_input_tokens, cached_output_tokens,
-            failed_tool_count, indexed_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            failed_tool_count, indexed_at, file_mtime, file_path
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(session_key) DO UPDATE SET
             title=excluded.title,
             project_key=excluded.project_key,
@@ -117,7 +136,9 @@ def upsert_session(conn: sqlite3.Connection, summary: SessionSummary) -> None:
             cached_input_tokens=excluded.cached_input_tokens,
             cached_output_tokens=excluded.cached_output_tokens,
             failed_tool_count=excluded.failed_tool_count,
-            indexed_at=excluded.indexed_at
+            indexed_at=excluded.indexed_at,
+            file_mtime=excluded.file_mtime,
+            file_path=excluded.file_path
         """,
         (
             summary.session_key,
@@ -142,6 +163,8 @@ def upsert_session(conn: sqlite3.Connection, summary: SessionSummary) -> None:
             summary.cached_output_tokens,
             summary.failed_tool_count,
             time.time(),
+            file_mtime,
+            file_path,
         ),
     )
 
@@ -166,7 +189,7 @@ def full_scan(
     init_schema(conn)
 
     log_id = conn.execute(
-        "INSERT INTO scan_log (started_at, status) VALUES (?, 'running')",
+        "INSERT INTO scan_log (started_at, mode, status) VALUES (?, 'full', 'running')",
         (time.time(),),
     ).lastrowid
     conn.commit()
@@ -181,8 +204,28 @@ def full_scan(
     if scan_claude:
         if verbose:
             print("Scanning Claude Code...")
-        for summary in claude_source.scan_all_sessions():
-            upsert_session(conn, summary)
+        # Pre-load history to build session→project mapping
+        history = claude_source.parse_history()
+        session_projects = {e["session_id"]: e["project"] for e in history}
+
+        for entry in history:
+            sid = entry["session_id"]
+            project = entry["project"]
+            summary, _msgs, _tcs, _sa = claude_source.parse_session_detail(
+                project, sid, history_entry=entry
+            )
+            if not summary.title and entry.get("display"):
+                summary.title = claude_source._extract_readable_title(entry["display"])
+
+            # Record file mtime + path for future incremental scans
+            file_mtime = 0.0
+            file_path = ""
+            fpath = _locate_claude_session_file(project, sid)
+            if fpath and fpath.exists():
+                file_path = str(fpath)
+                file_mtime = os.path.getmtime(fpath)
+
+            upsert_session(conn, summary, file_mtime=file_mtime, file_path=file_path)
             claude_count += 1
             if verbose and claude_count % 50 == 0:
                 print(f"  Claude: {claude_count} sessions")
@@ -195,7 +238,17 @@ def full_scan(
             print("Scanning Codex...")
         threads_db = codex_source.read_threads_db()
         for summary in codex_source.scan_all_sessions(threads_db):
-            upsert_session(conn, summary)
+            # Record file mtime + path for future incremental scans
+            file_mtime = 0.0
+            file_path = ""
+            thread_info = threads_db.get(summary.session_id, {})
+            rollout_path = thread_info.get("rollout_path", "")
+            fpath = _locate_codex_session_file(summary.session_id, rollout_path)
+            if fpath and fpath.exists():
+                file_path = str(fpath)
+                file_mtime = os.path.getmtime(fpath)
+
+            upsert_session(conn, summary, file_mtime=file_mtime, file_path=file_path)
             codex_count += 1
             if verbose and codex_count % 50 == 0:
                 print(f"  Codex: {codex_count} sessions")
@@ -213,6 +266,284 @@ def full_scan(
         "claude_count": claude_count,
         "codex_count": codex_count,
         "total": claude_count + codex_count,
+    }
+
+
+# ─── File location helpers ────────────────────────────────────────────────
+
+
+def _locate_claude_session_file(project_key: str, session_id: str) -> Path | None:
+    """Find a Claude session .jsonl file on disk."""
+    from session_browser.config import CLAUDE_DATA_DIR
+
+    projects_dir = CLAUDE_DATA_DIR / "projects"
+    if not projects_dir.exists():
+        return None
+
+    # Try direct match
+    candidate = projects_dir / project_key / f"{session_id}.jsonl"
+    if candidate.exists():
+        return candidate
+
+    # Search all project directories
+    for proj_dir in projects_dir.iterdir():
+        if not proj_dir.is_dir():
+            continue
+        candidate = proj_dir / f"{session_id}.jsonl"
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _locate_codex_session_file(session_id: str, rollout_path: str = "") -> Path | None:
+    """Find a Codex session .jsonl file on disk."""
+    if rollout_path:
+        p = Path(rollout_path)
+        if p.exists():
+            return p
+
+    from session_browser.config import CODEX_DATA_DIR
+
+    sessions_dir = CODEX_DATA_DIR / "sessions"
+    if not sessions_dir.exists():
+        return None
+
+    for year_dir in sorted(sessions_dir.iterdir()):
+        if not year_dir.is_dir():
+            continue
+        for month_dir in sorted(year_dir.iterdir()):
+            if not month_dir.is_dir():
+                continue
+            for day_dir in sorted(month_dir.iterdir()):
+                if not day_dir.is_dir():
+                    continue
+                found = list(day_dir.glob(f"rollout-*-{session_id}.jsonl"))
+                if found:
+                    return found[0]
+    return None
+
+
+# ─── Incremental scan ─────────────────────────────────────────────────────
+
+
+def incremental_scan(
+    conn: sqlite3.Connection | None = None,
+    verbose: bool = False,
+    agent: str | None = None,
+    max_age_seconds: float | None = None,
+) -> dict:
+    """Scan only sessions whose source files have changed.
+
+    Uses file mtime comparison to skip sessions that haven't been modified
+    since the last index. Only scans sessions within max_age_seconds (by
+    ended_at) if specified; older sessions are skipped.
+
+    Args:
+        conn: SQLite connection.
+        verbose: Print progress messages.
+        agent: If provided, only scan this agent.
+        max_age_seconds: If set, only scan sessions whose ended_at is within
+            this many seconds from now. Sessions older than this are skipped.
+
+    Returns a dict with scan statistics.
+    """
+    if conn is None:
+        conn = _get_connection()
+
+    log_id = conn.execute(
+        "INSERT INTO scan_log (started_at, mode, status) VALUES (?, 'incremental', 'running')",
+        (time.time(),),
+    ).lastrowid
+    conn.commit()
+
+    now = time.time()
+    cutoff_iso = None
+    if max_age_seconds is not None:
+        from datetime import datetime, timezone, timedelta
+        cutoff_dt = datetime.now(timezone.utc) - timedelta(seconds=max_age_seconds)
+        cutoff_iso = cutoff_dt.isoformat()
+
+    # Load existing sessions from DB: session_key → {ended_at, file_mtime, file_path, agent}
+    existing = {}
+    for row in conn.execute(
+        "SELECT session_key, ended_at, file_mtime, file_path, agent FROM sessions"
+    ).fetchall():
+        existing[row["session_key"]] = {
+            "ended_at": row["ended_at"],
+            "file_mtime": row["file_mtime"],
+            "file_path": row["file_path"],
+            "agent": row["agent"],
+        }
+
+    # Also load session_id → project_key mapping from DB for Claude sessions
+    claude_project_map = {}
+    for row in conn.execute(
+        "SELECT session_id, project_key FROM sessions WHERE agent='claude_code'"
+    ).fetchall():
+        claude_project_map[row["session_id"]] = row["project_key"]
+
+    claude_count = 0
+    codex_count = 0
+    skipped_count = 0
+
+    scan_claude = agent is None or agent == "claude_code"
+    scan_codex = agent is None or agent == "codex"
+
+    # ── Scan Claude ──────────────────────────────────────────────────
+    if scan_claude:
+        history = claude_source.parse_history()
+        if verbose:
+            print(f"Incremental scan: {len(history)} Claude sessions in history...")
+
+        for entry in history:
+            sid = entry["session_id"]
+            project = entry["project"]
+            skey = f"claude_code:{sid}"
+
+            # Check if session exists in DB and is within age window
+            info = existing.get(skey)
+            if info:
+                ended_at = info["ended_at"] or ""
+                if cutoff_iso and ended_at < cutoff_iso:
+                    skipped_count += 1
+                    continue
+
+                # Check file mtime — skip if unchanged
+                stored_mtime = info["file_mtime"]
+                stored_path = info["file_path"]
+                if stored_path:
+                    fpath = Path(stored_path)
+                    if fpath.exists():
+                        current_mtime = os.path.getmtime(fpath)
+                        if current_mtime <= stored_mtime:
+                            skipped_count += 1
+                            continue
+                        # File changed — re-parse
+                    else:
+                        # File deleted, try to locate it again
+                        fpath = _locate_claude_session_file(project, sid)
+                else:
+                    # No stored path — try to locate
+                    fpath = _locate_claude_session_file(project, sid)
+
+                if fpath and fpath.exists():
+                    current_mtime = os.path.getmtime(fpath)
+                    if current_mtime <= stored_mtime:
+                        skipped_count += 1
+                        continue
+                else:
+                    # Can't find file, skip
+                    skipped_count += 1
+                    continue
+            # else: new session (not in DB), parse it
+
+            # Parse session detail
+            summary, _msgs, _tcs, _sa = claude_source.parse_session_detail(
+                project, sid, history_entry=entry
+            )
+            if not summary.title and entry.get("display"):
+                summary.title = claude_source._extract_readable_title(entry["display"])
+
+            # Record file info
+            file_mtime = 0.0
+            file_path_str = ""
+            fpath = _locate_claude_session_file(project, sid)
+            if fpath and fpath.exists():
+                file_path_str = str(fpath)
+                file_mtime = os.path.getmtime(fpath)
+
+            upsert_session(conn, summary, file_mtime=file_mtime, file_path=file_path_str)
+            claude_count += 1
+
+        conn.commit()
+
+    # ── Scan Codex ───────────────────────────────────────────────────
+    if scan_codex:
+        threads_db = codex_source.read_threads_db()
+        # Also load session_index.jsonl for fallback discovery
+        index_entries = {e["id"]: e for e in codex_source.parse_session_index()}
+
+        all_ids = set(threads_db.keys()) | set(index_entries.keys())
+        if verbose:
+            print(f"Incremental scan: {len(all_ids)} Codex sessions...")
+
+        for sid in all_ids:
+            skey = f"codex:{sid}"
+
+            info = existing.get(skey)
+            if info:
+                ended_at = info["ended_at"] or ""
+                if cutoff_iso and ended_at < cutoff_iso:
+                    skipped_count += 1
+                    continue
+
+                stored_mtime = info["file_mtime"]
+                stored_path = info["file_path"]
+                if stored_path:
+                    fpath = Path(stored_path)
+                    if fpath.exists():
+                        current_mtime = os.path.getmtime(fpath)
+                        if current_mtime <= stored_mtime:
+                            skipped_count += 1
+                            continue
+                    else:
+                        # File moved/deleted, try to locate again
+                        thread_info = threads_db.get(sid, {})
+                        rollout_path = thread_info.get("rollout_path", "")
+                        fpath = _locate_codex_session_file(sid, rollout_path)
+                else:
+                    thread_info = threads_db.get(sid, {})
+                    rollout_path = thread_info.get("rollout_path", "")
+                    fpath = _locate_codex_session_file(sid, rollout_path)
+
+                if fpath and fpath.exists():
+                    current_mtime = os.path.getmtime(fpath)
+                    if current_mtime <= stored_mtime:
+                        skipped_count += 1
+                        continue
+                else:
+                    skipped_count += 1
+                    continue
+
+            # Parse session
+            thread_info = threads_db.get(sid, {})
+            summary, _msgs, _tcs, _sa = codex_source.parse_session_detail(
+                sid, threads_db
+            )
+            # Enrich title from index if empty
+            if not summary.title:
+                idx_entry = index_entries.get(sid)
+                if idx_entry and idx_entry.get("thread_name"):
+                    summary.title = idx_entry["thread_name"][:120]
+                elif thread_info.get("first_user_message"):
+                    summary.title = thread_info["first_user_message"][:120]
+
+            # Record file info
+            file_mtime = 0.0
+            file_path_str = ""
+            rollout_path = thread_info.get("rollout_path", "")
+            fpath = _locate_codex_session_file(sid, rollout_path)
+            if fpath and fpath.exists():
+                file_path_str = str(fpath)
+                file_mtime = os.path.getmtime(fpath)
+
+            upsert_session(conn, summary, file_mtime=file_mtime, file_path=file_path_str)
+            codex_count += 1
+
+        conn.commit()
+
+    # Update log
+    conn.execute(
+        "UPDATE scan_log SET finished_at=?, claude_count=?, codex_count=?, status='done' WHERE id=?",
+        (time.time(), claude_count, codex_count, log_id),
+    )
+    conn.commit()
+
+    return {
+        "claude_count": claude_count,
+        "codex_count": codex_count,
+        "total": claude_count + codex_count,
+        "skipped": skipped_count,
     }
 
 

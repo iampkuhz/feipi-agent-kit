@@ -7,6 +7,8 @@ No external web framework needed for MVP.
 from __future__ import annotations
 
 import json
+import os
+import subprocess
 import urllib.parse
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
@@ -54,6 +56,24 @@ _template_env = jinja2.Environment(
     autoescape=True,
 )
 
+
+def _get_repo_root(cwd: str | None = None) -> str | None:
+    """Detect git repo root from cwd. Returns None if not in a git repo."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            cwd=cwd or os.getcwd(),
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except Exception:
+        pass
+    return None
+
+# Cache the repo root at server startup
+_REPO_ROOT = _get_repo_root()
+
 # Markdown renderer (shared instance)
 _md = MarkdownIt().enable("table")
 
@@ -74,6 +94,9 @@ _template_env.filters["format_number"] = lambda n: (
 _template_env.globals["max"] = max
 _template_env.filters["truncate_path"] = lambda path: (
     _truncate_path(path)
+)
+_template_env.filters["relative_to_repo"] = lambda path: (
+    _relative_to_repo(path)
 )
 _template_env.filters["format_duration"] = lambda seconds: (
     f"{int(seconds // 3600)}h {int((seconds % 3600) // 60)}min" if seconds >= 3600
@@ -98,6 +121,19 @@ def _truncate_path(path: str) -> str:
         return path[:40] + "…"
     # Keep first 2 and last 2 segments
     return "/".join(parts[:2]) + "/…/" + "/".join(parts[-2:])
+
+
+def _relative_to_repo(path: str) -> str:
+    """If path is within the git repo, return relative path. Otherwise return absolute path."""
+    if not path or not _REPO_ROOT:
+        return path or ""
+    try:
+        abs_path = os.path.abspath(path)
+        if abs_path.startswith(_REPO_ROOT + os.sep) or abs_path == _REPO_ROOT:
+            return os.path.relpath(abs_path, _REPO_ROOT)
+    except Exception:
+        pass
+    return path
 
 
 def _relative_time(iso_str: str) -> str:

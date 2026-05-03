@@ -84,7 +84,7 @@
                     data-total-failed="{{ p.total_failed_tools }}">
                     <td><a href="/projects/{{ p.project_key | urlencode }}" class="link">{{ p.project_name }}</a></td>
                     <td class="path-cell">
-                        <span class="path-text truncate" style="max-width:200px; display:block" data-tooltip="{{ p.project_key }}">{{ p.project_key | truncate_path }}</span>
+                        <span class="path-text truncate" style="max-width:200px; display:block" data-tooltip="{{ p.project_key }}">{{ p.project_key | relative_to_repo | truncate_path }}</span>
                         <button class="path-copy-btn" onclick="copyProjectPath(this, '{{ p.project_key }}')" title="Copy full path">⧉</button>
                     </td>
                     <td class="numeric"><strong>{{ p.total_sessions }}</strong></td>
