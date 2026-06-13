@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # scripts/repo/check_agent_checkpoint.sh
-# 检查 .agent/ 任务状态与 task-results 的一致性
+# 检查 tmp/ 任务状态与 task-results 的一致性
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -10,14 +10,14 @@ REPO_ROOT="$(find_git_root)"
 warns=0
 blocks=0
 
-# --- 前置检查：.agent/ 目录存在性 ---
-if [[ ! -d "$REPO_ROOT/.agent" ]]; then
-  log_skip ".agent/" "directory not found"
+# --- 前置检查：tmp/ 目录存在性 ---
+if [[ ! -d "$REPO_ROOT/tmp" ]]; then
+  log_skip "tmp/" "directory not found"
   exit_with_status "$warns" "$blocks"
 fi
 
-LEDGER="$REPO_ROOT/.agent/task-ledger.md"
-RESULTS_DIR="$REPO_ROOT/.agent/task-results"
+LEDGER="$REPO_ROOT/tmp/task-ledger.md"
+RESULTS_DIR="$REPO_ROOT/tmp/task-results"
 
 if [[ ! -f "$LEDGER" ]]; then
   log_block "task-ledger.md" "not found"

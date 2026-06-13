@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/common.sh"
 
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-LEDGER="$REPO_ROOT/.agent/task-ledger.md"
+LEDGER="$REPO_ROOT/tmp/task-ledger.md"
 FAIL=0
 
 # 1. 账本文件存在
@@ -33,7 +33,7 @@ fi
 # 4. 结果文件存在性
 if [[ -n "$CURRENT_TASK" ]]; then
   padded=$(printf "%03d" "$((10#$CURRENT_TASK))")
-  RESULT="$REPO_ROOT/.agent/task-results/${padded}-*.md"
+  RESULT="$REPO_ROOT/tmp/task-results/${padded}-*.md"
   if ! ls $RESULT >/dev/null 2>&1; then
     hook_log "WARN" "缺少结果文件: ${padded}-*.md"
     FAIL=1
