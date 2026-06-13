@@ -11,7 +11,6 @@ make install-links
 # 启动服务
 make searxng-up          # SearXNG 搜索
 make litellm-up          # LiteLLM 模型网关
-make session-browser-serve  # 前台启动 session-browser (127.0.0.1:18999)
 ```
 
 ## 目录结构
@@ -35,8 +34,7 @@ feipi-agent-kit/
 tools/
 ├── search/searxng/     # SearXNG 搜索引擎
 ├── crawl/crawl4ai/     # Crawl4AI 网页抓取
-├── gateway/litellm/    # LiteLLM 模型网关
-└── session-browser/    # Claude/Codex 会话浏览器
+└── gateway/litellm/    # LiteLLM 模型网关
 ```
 
 ## 核心目录职责
@@ -74,17 +72,6 @@ make searxng-up
 
 网页抓取与内容提取。详情：[tools/crawl/crawl4ai/README.md](tools/crawl/crawl4ai/README.md)
 
-### Session Browser
-
-Claude Code / Codex / Qoder 会话浏览器与 Token 分析。默认 `http://127.0.0.1:18999`。
-
-```bash
-make session-browser-serve              # 本地验证
-make session-browser-deploy VERSION=0.2.0  # 构建并部署
-```
-
-详情：[tools/session-browser/README.md](tools/session-browser/README.md)
-
 ## Skills 列表
 
 | Skill | 用途 |
@@ -114,7 +101,6 @@ cp .env.example .env
 make install-links              # 安装 skills
 make searxng-up / searxng-down  # 启停 SearXNG
 make litellm-up / litellm-down  # 启停 LiteLLM
-make session-browser-serve      # 前台启动 session-browser
 ./scripts/bootstrap/setup.sh    # 初始化设置
 ./scripts/doctor/check.sh       # 健康检查
 ```

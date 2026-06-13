@@ -17,7 +17,5 @@ node_modules/
 
 # 本地服务密钥配置
 tools/gateway/litellm/env/.env
-/docs/session-browser-ui-serial-prompts/
 /tools/search/searxng/settings/settings.yml.new
 /output/*
-/tools/session-browser/tasks/

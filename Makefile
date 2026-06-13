@@ -18,14 +18,11 @@ RESOLVED_PROJECT := $(or $(PROJECT),$(DIR))
 # Services
 SEARXNG_DIR := tools/search/searxng
 LITELLM_DIR := tools/gateway/litellm
-SESSION_BROWSER_DIR := tools/session-browser
 
 .PHONY: help install install-links install-project
 .PHONY: searxng-up searxng-down searxng-restart searxng-logs
 .PHONY: litellm-up litellm-down litellm-restart litellm-logs
 .PHONY: searxng-mcp-run searxng-mcp-http searxng-mcp-test  # [已退役]
-.PHONY: session-browser-deps session-browser-serve session-browser-dev session-browser-test session-browser-build session-browser-release
-.PHONY: session-browser-up session-browser-deploy session-browser-down session-browser-logs session-browser-status
 .PHONY: doctor setup
 .PHONY: model-download
 .PHONY: harness-doctor validate-harness
@@ -54,17 +51,6 @@ help:
 	@echo "  make searxng-mcp-run     # [已退役] SearXNG MCP 服务已移除"
 	@echo "  make searxng-mcp-http    # [已退役] SearXNG MCP 服务已移除"
 	@echo "  make searxng-mcp-test    # [已退役] SearXNG MCP 服务已移除"
-	@echo ""
-	@echo "  make session-browser-deps    # 安装 session-browser 本地依赖"
-	@echo "  make session-browser-serve   # 本地前台启动 127.0.0.1:18999，独立测试索引"
-	@echo "  make session-browser-test    # 执行 session-browser 单元测试"
-	@echo "  make session-browser-release [VERSION=x.y.z]"
-	@echo "                              # 测试后构建本地 Podman 镜像"
-	@echo "  make session-browser-deploy [VERSION=x.y.z]"
-	@echo "                              # 构建镜像并用 Podman 本地部署"
-	@echo "  make session-browser-up      # 使用已有本地镜像启动 Podman 容器"
-	@echo "  make session-browser-down    # 停止并移除 Podman 容器"
-	@echo "  make session-browser-logs    # 查看 Podman 容器日志"
 	@echo ""
 	@echo "===== 模型管理 ====="
 	@echo "  make model-download MODEL=<id> [PROXY=<url>] [OUTPUT=<dir>]"
@@ -149,40 +135,6 @@ searxng-mcp-http:
 
 searxng-mcp-test:
 	@echo "[已退役] SearXNG MCP 服务（tools/search/searxng-mcp/）已移除"
-
-# ===== Session Browser =====
-
-session-browser-deps:
-	@cd $(SESSION_BROWSER_DIR) && ./scripts/session-browser.sh deps
-
-session-browser-serve:
-	@cd $(SESSION_BROWSER_DIR) && ./scripts/session-browser.sh serve
-
-session-browser-dev: session-browser-serve
-
-session-browser-test:
-	@cd $(SESSION_BROWSER_DIR) && ./scripts/session-browser.sh test
-
-session-browser-build:
-	@cd $(SESSION_BROWSER_DIR) && ./scripts/session-browser.sh build $(VERSION)
-
-session-browser-release:
-	@cd $(SESSION_BROWSER_DIR) && ./scripts/session-browser.sh release $(VERSION)
-
-session-browser-deploy:
-	@cd $(SESSION_BROWSER_DIR) && ./scripts/session-browser.sh deploy $(VERSION)
-
-session-browser-up:
-	@cd $(SESSION_BROWSER_DIR) && ./scripts/session-browser.sh podman-up $(VERSION)
-
-session-browser-down:
-	@cd $(SESSION_BROWSER_DIR) && ./scripts/session-browser.sh podman-down
-
-session-browser-logs:
-	@cd $(SESSION_BROWSER_DIR) && ./scripts/session-browser.sh podman-logs
-
-session-browser-status:
-	@cd $(SESSION_BROWSER_DIR) && ./scripts/session-browser.sh podman-status
 
 # ===== 仓库维护 =====
 
