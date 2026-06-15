@@ -38,7 +38,7 @@ services:
 
   # LiteLLM Proxy - 模型网关
   litellm:
-    image: docker.litellm.ai/berriai/litellm:v1.83.7-stable
+    image: docker.litellm.ai/berriai/litellm:v1.89.0
     container_name: litellm-proxy-podman
     restart: unless-stopped
     mem_limit: 2048m
@@ -49,38 +49,26 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    # 环境变量从宿主机继承（确保启动前已 source ~/.env 或对应文件）
     environment:
-      # ===== 基础配置（必需） =====
-      - LITELLM_MASTER_KEY
-      # 百炼 OpenAI 兼容模型
-      - LITELLM_CODE_MODEL_OPENAI
-      - LITELLM_UPSTREAM_CODE_MODEL_OPENAI_NAME
-      - LITELLM_UPSTREAM_CODE_MODEL_OPENAI_BASE
-      - LITELLM_UPSTREAM_CODE_MODEL_OPENAI_KEY
-      # 百炼 Anthropic 兼容模型
-      - LITELLM_CODE_MODEL_ANTHROPIC
-      - LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_NAME
-      - LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_BASE
-      - LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_KEY
-      # 本地补全模型
-      - LITELLM_AUTOCOMPLETE_MODEL_OPENAI
-      - LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_NAME
-      - LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_BASE
-      - LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_KEY
-      # 容器内访问宿主机端口，需清空代理避免请求被错误转发
-      - HTTP_PROXY=
-      - HTTPS_PROXY=
-      - http_proxy=
-      - https_proxy=
-      - NO_PROXY=127.0.0.1,localhost,host.containers.internal
-      - no_proxy=127.0.0.1,localhost,host.containers.internal
-      # 降低 spend logs 清理任务的单批内存峰值，适合 Podman VM 小内存环境。
-      - SPEND_LOG_CLEANUP_BATCH_SIZE=${SPEND_LOG_CLEANUP_BATCH_SIZE:-200}
-      - SPEND_LOG_RUN_LOOPS=${SPEND_LOG_RUN_LOOPS:-50}
+      # ===== 只保留需要从宿主机传入的少量变量 =====
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-litellm-local-dev}
+      LITELLM_SALT_KEY: sk-litellm-local-salt
+      # Codex / Responses API 只走 ChatGPT Subscription provider。
+      LITELLM_CODEX_MODEL: ${LITELLM_CODEX_MODEL:-codex-chatgpt}
+      LITELLM_UPSTREAM_CODEX_MODEL: ${LITELLM_UPSTREAM_CODEX_MODEL:-chatgpt/gpt-5.5}
+      # 代理：使用 LiteLLM 专用变量，避免继承宿主机 HTTP_PROXY/https_proxy。
+      # 默认指向宿主机代理端口；如需禁用，在当前 shell 环境中把 LITELLM_CONTAINER_*_PROXY 设为空字符串。
+      HTTP_PROXY: ${LITELLM_CONTAINER_HTTP_PROXY-http://host.containers.internal:7890}
+      HTTPS_PROXY: ${LITELLM_CONTAINER_HTTPS_PROXY-http://host.containers.internal:7890}
+      http_proxy: ${LITELLM_CONTAINER_HTTP_PROXY-http://host.containers.internal:7890}
+      https_proxy: ${LITELLM_CONTAINER_HTTPS_PROXY-http://host.containers.internal:7890}
+      NO_PROXY: 127.0.0.1,localhost,litellm-db,postgres,host.containers.internal
+      no_proxy: 127.0.0.1,localhost,litellm-db,postgres,host.containers.internal
+      # ChatGPT Subscription OAuth token 持久化
+      CHATGPT_TOKEN_DIR: /app/chatgpt-tokens
       # Podman Compose 不保证 container_name 自动成为可解析别名，
       # 这里固定使用 postgres 服务暴露出的 litellm-db 网络别名连接数据库。
-      - DATABASE_URL=postgresql://litellm:${POSTGRES_PASSWORD}@litellm-db:5432/litellm
+      DATABASE_URL: postgresql://litellm:${POSTGRES_PASSWORD:-litellm_password}@litellm-db:5432/litellm
     command:
       - "--config"
       - "/app/config.yaml"
@@ -90,6 +78,10 @@ services:
       - "--use_prisma_db_push"
     volumes:
       - ../config/config.yaml:/app/config.yaml:ro
+      # ChatGPT OAuth token 持久化目录（宿主机 <-> 容器）
+      - type: bind
+        source: /Users/zhehan/Documents/service-data/litellm/chatgpt-tokens
+        target: /app/chatgpt-tokens
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:4000/health/readiness', timeout=3).read()\""]
       interval: 30s
