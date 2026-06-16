@@ -25,25 +25,45 @@ model_list:
       api_key: dummy-key
 
   # Codex / Responses API
-  # 只走 ChatGPT Subscription provider。默认值由 docker-compose.yml 提供：
-  # LITELLM_CODEX_MODEL=codex-chatgpt
-  # LITELLM_UPSTREAM_CODEX_MODEL=chatgpt/gpt-5.5
-  - model_name: os.environ/LITELLM_CODEX_MODEL
+  # 严格转发：客户端请求哪个 Codex 标准模型名，就转到同名 chatgpt/... 上游。
+  # 这些 deployment 共用同一个 LiteLLM chatgpt/ provider 和 CHATGPT_TOKEN_DIR/auth.json，
+  # 只需要完成一次 ChatGPT device code 绑定，不按模型重复绑定。
+  # 不暴露任何内部逻辑模型名。
+  - model_name: gpt-5.5
     model_info:
       mode: responses
     litellm_params:
-      model: os.environ/LITELLM_UPSTREAM_CODEX_MODEL
+      model: chatgpt/gpt-5.5
 
-# Codex CLI 会发送自己的原生模型名。这里把这些名字映射到同一个
-# ChatGPT 订阅转发模型，避免客户端必须改成自定义的 codex-chatgpt。
-router_settings:
-  model_group_alias:
-    gpt-5.3-codex: os.environ/LITELLM_CODEX_MODEL
-    gpt-5.3-codex-spark: os.environ/LITELLM_CODEX_MODEL
-    gpt-5.4: os.environ/LITELLM_CODEX_MODEL
-    gpt-5.4-mini: os.environ/LITELLM_CODEX_MODEL
-    gpt-5.5: os.environ/LITELLM_CODEX_MODEL
-    gpt-5.2: os.environ/LITELLM_CODEX_MODEL
+  - model_name: gpt-5.4
+    model_info:
+      mode: responses
+    litellm_params:
+      model: chatgpt/gpt-5.4
+
+  - model_name: gpt-5.4-mini
+    model_info:
+      mode: responses
+    litellm_params:
+      model: chatgpt/gpt-5.4-mini
+
+  - model_name: gpt-5.3-codex
+    model_info:
+      mode: responses
+    litellm_params:
+      model: chatgpt/gpt-5.3-codex
+
+  - model_name: gpt-5.3-codex-spark
+    model_info:
+      mode: responses
+    litellm_params:
+      model: chatgpt/gpt-5.3-codex-spark
+
+  - model_name: gpt-5.2
+    model_info:
+      mode: responses
+    litellm_params:
+      model: chatgpt/gpt-5.2
 
 # ===== LiteLLM 运行时设置 =====
 # 这里不能只保留注释而没有实际键值；YAML 会把 `litellm_settings` 解析成 null，

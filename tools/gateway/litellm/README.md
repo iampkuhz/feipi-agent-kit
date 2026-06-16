@@ -52,7 +52,7 @@ Codex CLI
 
 #### 2.2.1 在 `~/.env` 配置本地变量
 
-Codex / Responses API 默认只走 ChatGPT 订阅，上游默认是 `chatgpt/gpt-5.5`。因此 `~/.env` 不需要配置普通 OpenAI provider，也不需要配置 `LITELLM_UPSTREAM_CODEX_API_BASE` 或 `LITELLM_UPSTREAM_CODEX_API_KEY`。
+Codex / Responses API 默认只走 ChatGPT 订阅，并按标准模型名严格转发：客户端请求 `gpt-5.5` 就调用 `chatgpt/gpt-5.5`，请求 `gpt-5.4` 就调用 `chatgpt/gpt-5.4`。因此 `~/.env` 不需要配置普通 OpenAI provider，也不需要配置 `LITELLM_UPSTREAM_CODEX_API_BASE`、`LITELLM_UPSTREAM_CODEX_API_KEY`、`LITELLM_CODEX_MODEL` 或 `LITELLM_UPSTREAM_CODEX_MODEL`。
 
 本地建议只配置网关管理 key 和客户端 private key。这里使用 `export`，保证 zsh 加载后子进程和 compose 都能拿到。
 
@@ -65,12 +65,6 @@ export LITELLM_API_KEY_OPENAI=<key-for-openai 的 secret key>
 export LITELLM_API_KEY_ANTHROPIC=<key-for-claude-code 的 secret key>
 ```
 
-只有你要切换 ChatGPT 上游模型时，才额外覆盖：
-
-```bash
-export LITELLM_UPSTREAM_CODEX_MODEL=chatgpt/gpt-5.5
-```
-
 容器访问宿主机代理默认使用 `http://host.containers.internal:7890`。只有你的宿主机代理端口不是 `7890`，或需要禁用代理时，才额外配置：
 
 ```bash
@@ -78,13 +72,15 @@ export LITELLM_CONTAINER_HTTP_PROXY=http://host.containers.internal:7890
 export LITELLM_CONTAINER_HTTPS_PROXY=http://host.containers.internal:7890
 ```
 
-Codex CLI 默认推荐把上游设为 `chatgpt/gpt-5.5`。`chatgpt/gpt-5.4` 也可以作为备选。不要把上游设为 `chatgpt/gpt-5.3-codex`，ChatGPT Codex 账号链路会返回 `model is not supported`。`chatgpt/gpt-5.3-codex-spark` 可用于基础 Responses API 验证，但 Codex CLI 会发送 `image_generation` 等工具，spark 会拒绝这类请求，因此不作为默认值。
+严格转发会让不受当前 ChatGPT 账号支持的模型真实失败。例如 `gpt-5.3-codex` 会转发到 `chatgpt/gpt-5.3-codex`，如果账号侧不支持该上游，Responses API 会直接返回 `model is not supported`；`gpt-5.3-codex-spark` 也可能因为 Codex CLI 发送的工具不被该上游支持而失败。
+
+这些 Codex deployment 都使用 LiteLLM 的 `chatgpt/` provider。ChatGPT OAuth token 持久化在同一个 `CHATGPT_TOKEN_DIR/auth.json`，所以只需要完成一次 device code 绑定；不同标准模型只是转发时传入不同的上游 model 字符串。
 
 `LITELLM_MASTER_KEY` 是网关管理 key，用于 Dashboard 登录、脚本诊断和管理接口。客户端不要直接使用 master key；你在 LiteLLM Dashboard 的 Virtual Keys 里手工创建的 private key，按客户端协议分别放到：
 
 | 客户端类型 | 环境变量 | 典型模型 |
 |------|------|------|
-| OpenAI / Codex / OpenAI-compatible | `LITELLM_API_KEY_OPENAI` | `gpt-5.5`、`gpt-5.4`、`gpt-5.4-mini`、`gpt-5.3-codex`、`gpt-5.2`、`codex-chatgpt`、`litellm-code-openai` |
+| OpenAI / Codex / OpenAI-compatible | `LITELLM_API_KEY_OPENAI` | `gpt-5.5`、`gpt-5.4`、`gpt-5.4-mini`、`gpt-5.3-codex`、`gpt-5.3-codex-spark`、`gpt-5.2`、`litellm-code-openai` |
 | Anthropic / Claude-code / Anthropic-compatible | `LITELLM_API_KEY_ANTHROPIC` | `litellm-code-anthropic` |
 
 这两个客户端 private key 不参与容器启动。如果是首次搭建、还没有创建 Virtual Keys，可以先只配置 `LITELLM_MASTER_KEY`，启动 Dashboard 后创建 private key，再补进 `~/.env` 并打开新的 zsh。
@@ -96,13 +92,13 @@ gpt-5.5
 gpt-5.4
 gpt-5.4-mini
 gpt-5.3-codex
+gpt-5.3-codex-spark
 gpt-5.2
-codex-chatgpt
 litellm-code-openai
 litellm-autocomplate-openai
 ```
 
-这里的 `gpt-5.5`、`gpt-5.4` 等是 Codex 客户端看到和请求的模型名；LiteLLM 会在后端把它们通过 `router_settings.model_group_alias` 映射到 `codex-chatgpt`。如果 Virtual Key 只允许 `codex-chatgpt`，Codex CLI 选择 `gpt-5.5` 或 `gpt-5.3-codex` 时仍会被 LiteLLM 拦截为 `key not allowed to access model`。
+这里的 `gpt-5.5`、`gpt-5.4` 等是 Codex 客户端看到和请求的模型名；LiteLLM 后端会把它们转发到同名 `chatgpt/...` 上游。如果 Virtual Key 没有允许 Codex 客户端实际选择的标准模型名，Codex CLI 会被 LiteLLM 拦截为 `key not allowed to access model`。
 
 保存后打开一个新的 zsh，或用你现有的 zsh 启动加载机制重新加载 `~/.env`。脚本不会主动读取任何仓库内 `.env` 文件。
 
@@ -145,9 +141,9 @@ LiteLLM 的 `chatgpt/` provider 会打开 `https://auth.openai.com/codex/device`
 
 日志中出现 device code 后，打开提示的 URL，使用 ChatGPT 订阅账号登录并输入 code。
 
-#### 2.2.5 确认 `codex-chatgpt` 和 Codex CLI 别名已被当前容器加载
+#### 2.2.5 确认 Codex 标准模型名已被当前容器加载
 
-先检查三层状态是否一致：当前 zsh 环境、compose 展开值、容器运行态环境。
+先检查 compose、容器配置和 `/v1/models` 暴露状态是否一致：
 
 ```bash
 ./scripts/litellm.sh check-chatgpt-runtime
@@ -156,8 +152,8 @@ LiteLLM 的 `chatgpt/` provider 会打开 `https://auth.openai.com/codex/device`
 预期最后几行包含：
 
 ```txt
-✅ Codex CLI/App 可见模型名已映射到 codex-chatgpt：gpt-5.5 gpt-5.4 gpt-5.4-mini gpt-5.3-codex gpt-5.2
-✅ 容器运行态已加载并暴露 codex-chatgpt
+✅ Codex CLI/App 可见模型名均为标准模型名：gpt-5.5 gpt-5.4 gpt-5.4-mini gpt-5.3-codex gpt-5.3-codex-spark gpt-5.2
+✅ 容器运行态已加载 Codex 严格转发配置
 ```
 
 再检查 LiteLLM 对外暴露的模型列表：
@@ -174,11 +170,11 @@ gpt-5.5
 gpt-5.4
 gpt-5.4-mini
 gpt-5.3-codex
+gpt-5.3-codex-spark
 gpt-5.2
-codex-chatgpt
 ```
 
-如果没有 `codex-chatgpt`，说明当前容器还没有按当前 compose/config 重建，或 ChatGPT OAuth 初始化失败。先检查有效配置，再重建：
+如果缺少上述任意标准模型名，说明当前容器还没有按当前 compose/config 重建，或 ChatGPT OAuth 初始化失败。先检查有效配置，再重建：
 
 ```bash
 ./scripts/litellm.sh check-chatgpt-env
@@ -186,9 +182,7 @@ codex-chatgpt
 ./scripts/litellm.sh check-chatgpt-runtime
 ```
 
-如果有 `codex-chatgpt` 但缺少 `gpt-5.5`、`gpt-5.4`、`gpt-5.4-mini`、`gpt-5.3-codex`、`gpt-5.2` 中任意一个，说明容器还没有加载最新的 `router_settings.model_group_alias`，执行 `./scripts/litellm.sh restart-chatgpt` 重建即可。
-
-如果 `check-chatgpt-runtime` 显示容器环境已经是 `codex-chatgpt`，但 `/v1/models` 仍没有 `codex-chatgpt`，通常是启动时 ChatGPT OAuth 轮询 `auth.openai.com` 超时，LiteLLM 会忽略这条 deployment。先检查容器网络，再重启：
+如果 `/v1/models` 仍暴露非标准内部名，说明当前运行中的 LiteLLM 还没加载最新配置。先检查容器网络，再重启：
 
 ```bash
 ./scripts/litellm.sh check-chatgpt-network
@@ -209,7 +203,7 @@ curl -s http://localhost:4000/v1/responses \
   -H "Authorization: Bearer ${LITELLM_API_KEY_OPENAI}" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "codex-chatgpt",
+    "model": "gpt-5.5",
     "input": [
       {
         "role": "user",
@@ -237,14 +231,14 @@ curl -s http://localhost:4000/v1/responses \
 hello
 ```
 
-再用 Codex CLI/App 可见的默认模型名验证 alias。这个请求会被 LiteLLM 映射到 `codex-chatgpt`，因此 Dashboard -> Virtual Keys 中的 `key-for-openai` 必须允许 `gpt-5.5`：
+再用另一个标准模型名验证严格转发。这个请求会被 LiteLLM 转发到 `chatgpt/gpt-5.4`，因此 Dashboard -> Virtual Keys 中的 `key-for-openai` 必须允许 `gpt-5.4`：
 
 ```bash
 curl -s http://localhost:4000/v1/responses \
   -H "Authorization: Bearer ${LITELLM_API_KEY_OPENAI}" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gpt-5.5",
+    "model": "gpt-5.4",
     "input": [
       {
         "role": "user",
@@ -280,22 +274,22 @@ Device code: XXXX-XXXX
 
 #### 2.2.7 为什么 LiteLLM Playground 看不到 ChatGPT 候选
 
-`http://localhost:4000/ui/?login=success&page=llm-playground` 是 LiteLLM 的聊天 Playground，主要面向 chat/completions 类模型。`codex-chatgpt` 在 `config/config.yaml` 中声明为：
+`http://localhost:4000/ui/?login=success&page=llm-playground` 是 LiteLLM 的聊天 Playground，主要面向 chat/completions 类模型。Codex 标准模型在 `config/config.yaml` 中声明为：
 
 ```yaml
 model_info:
   mode: responses
 ```
 
-所以它可能不会出现在聊天 Playground 的模型下拉里。这个现象不代表 ChatGPT 订阅链路失败。
+所以它们可能不会出现在聊天 Playground 的模型下拉里。这个现象不代表 ChatGPT 订阅链路失败。
 
 验证 ChatGPT 订阅链路是否可用，以这三个结果为准：
 
-1. `./scripts/litellm.sh check-chatgpt-runtime` 显示 `codex-chatgpt` 已暴露，并且 Codex CLI/App 可见模型名已映射。
-2. `/v1/models` 输出包含 `codex-chatgpt`、`gpt-5.5`、`gpt-5.4`、`gpt-5.4-mini`、`gpt-5.3-codex`、`gpt-5.2`。
+1. `./scripts/litellm.sh check-chatgpt-runtime` 显示 Codex 严格转发配置已加载。
+2. `/v1/models` 输出包含 `gpt-5.5`、`gpt-5.4`、`gpt-5.4-mini`、`gpt-5.3-codex`、`gpt-5.3-codex-spark`、`gpt-5.2`，且不包含内部逻辑模型名。
 3. `2.2.6` 的 `/v1/responses` 调用返回 `hello`。
 
-另外，Playground 也不会展示 `chatgpt/gpt-5.3-codex-spark`、`chatgpt/gpt-5.5` 这类上游候选值。LiteLLM 对客户端暴露的是逻辑模型名和别名，例如 `codex-chatgpt`、`gpt-5.5`、`gpt-5.3-codex`；具体上游由 `LITELLM_UPSTREAM_CODEX_MODEL` 决定。
+另外，Playground 不会展示 `chatgpt/gpt-5.3-codex-spark`、`chatgpt/gpt-5.5` 这类上游候选值。LiteLLM 对客户端暴露的是标准模型名，例如 `gpt-5.5`、`gpt-5.4`、`gpt-5.3-codex`；具体上游在 `config/config.yaml` 中逐项写成同名 `chatgpt/...`。
 
 #### 2.2.8 配置 Codex CLI 使用本地网关
 
@@ -316,8 +310,12 @@ model_info:
 ```toml
 model = "gpt-5.5"
 model_provider = "litellm-local"
-model_reasoning_effort = "medium"
+model_reasoning_effort = "xhigh"
+service_tier = "priority"
 model_catalog_json = "/Users/zhehan/.codex/model-catalogs/litellm-local.json"
+
+[features]
+fast_mode = true
 
 [model_providers.litellm-local]
 name = "LiteLLM Local"
@@ -332,7 +330,7 @@ wire_api = "responses"
 export LITELLM_API_KEY_OPENAI=<LiteLLM Virtual Keys 中 key-for-openai 的 secret key>
 ```
 
-不要把 Codex CLI 的 `model` 写成 `codex-chatgpt`。那是 LiteLLM 内部逻辑模型名，Codex CLI 找不到它的模型元数据时会退回 fallback metadata，可能发送上游不支持的工具。CLI 使用 Codex 原生模型名，例如 `gpt-5.5`，LiteLLM 会通过 `router_settings.model_group_alias` 映射到 `codex-chatgpt`。
+`model_reasoning_effort` 是 Codex 客户端的 thinking effort 配置；当前本地 Codex catalog 中这些模型支持 `low`、`medium`、`high`、`xhigh`。Fast mode 也属于 Codex 客户端配置；当前本地 Codex catalog 中 `gpt-5.5` / `gpt-5.4` 的 Fast tier id 是 `priority`，所以推荐用 `service_tier = "priority"` 并开启 `[features].fast_mode = true`。不要把这些配置写进 LiteLLM 的 `litellm_params`，否则会覆盖客户端每次请求里的选择。
 
 之后运行 Codex CLI 即可通过 LiteLLM 网关调用 ChatGPT 订阅链路。这份 `~/.codex/config.toml` 是 Codex 用户级配置；CLI 会读取它，Codex App / IDE 也使用同一套配置层，但 GUI App 是否能拿到 `LITELLM_API_KEY_OPENAI` 取决于 App 进程启动时的环境变量。后续如果要让 Codex App 也稳定走这条链路，重点是确保 Codex App 进程也能看到同名环境变量，并在改完配置后重启 App 或开新线程。
 
@@ -342,9 +340,9 @@ export LITELLM_API_KEY_OPENAI=<LiteLLM Virtual Keys 中 key-for-openai 的 secre
 
 1. `~/.codex/model-catalogs/litellm-local.json` 控制 Codex CLI/App 本地候选列表和模型元数据。用 `./scripts/litellm.sh write-codex-model-catalog` 生成。当前推荐候选是 `gpt-5.5`、`gpt-5.4`、`gpt-5.4-mini`、`gpt-5.3-codex`、`gpt-5.2`。
 2. LiteLLM Dashboard -> Virtual Keys 控制某个 private key 能访问哪些客户端模型名。`key-for-openai` 至少要允许你希望 Codex 能选择的候选模型名，否则会报 `key not allowed to access model`。
-3. `config/config.yaml` 的 `router_settings.model_group_alias` 控制这些客户端模型名实际路由到哪里。当前全部路由到 `codex-chatgpt`。
+3. `config/config.yaml` 控制这些客户端模型名实际路由到哪里。当前逐项严格转发到同名 `chatgpt/...` 上游，不再使用内部逻辑模型名或 alias。
 
-真实调用的 ChatGPT 订阅上游只由 `LITELLM_UPSTREAM_CODEX_MODEL` 决定。也就是说，Codex CLI 里选择 `gpt-5.5`，LiteLLM 对外收到的也是 `gpt-5.5`，但后端会转到 `codex-chatgpt`，再调用 `chatgpt/gpt-5.5`。如果你以后只想让 Codex App/CLI 显示更少候选，同时改两处：本地 `model_catalog_json` 和 Virtual Key 允许模型；`config/config.yaml` 可以保留更多兼容 alias。
+也就是说，Codex CLI 里选择 `gpt-5.5`，LiteLLM 对外收到的是 `gpt-5.5`，后端调用的是 `chatgpt/gpt-5.5`；选择 `gpt-5.4`，后端调用的是 `chatgpt/gpt-5.4`。如果你以后只想让 Codex App/CLI 显示更少候选，同时改两处：本地 `model_catalog_json` 和 Virtual Key 允许模型；`config/config.yaml` 可以保留更多标准模型 deployment。
 
 ### 2.3 Token 过期处理
 
@@ -366,8 +364,6 @@ rm /Users/zhehan/Documents/service-data/litellm/chatgpt-tokens/auth.json
 | `LITELLM_MASTER_KEY` | 网关管理密钥，用于 Dashboard、脚本诊断和管理接口 | `sk-litellm-local-dev` |
 | `LITELLM_API_KEY_OPENAI` | OpenAI / Codex / OpenAI-compatible 客户端访问 LiteLLM 的 private key | 无 |
 | `LITELLM_API_KEY_ANTHROPIC` | Anthropic / Claude-code / Anthropic-compatible 客户端访问 LiteLLM 的 private key | 无 |
-| `LITELLM_CODEX_MODEL` | Codex / Responses API 逻辑模型名，通常不要覆盖 | `codex-chatgpt` |
-| `LITELLM_UPSTREAM_CODEX_MODEL` | ChatGPT 订阅上游模型 | `chatgpt/gpt-5.5` |
 | `LITELLM_CONTAINER_HTTP_PROXY` / `LITELLM_CONTAINER_HTTPS_PROXY` | 容器访问外网的代理地址 | `http://host.containers.internal:7890` |
 | `POSTGRES_PASSWORD` | 沿用旧 PostgreSQL 数据库密码时才需要配置 | `litellm_password` |
 
@@ -501,9 +497,9 @@ curl -s http://localhost:4000/v1/messages \
 
 通常是网络问题。检查当前 zsh 环境中的 `LITELLM_CONTAINER_HTTP_PROXY` / `LITELLM_CONTAINER_HTTPS_PROXY` 是否设置正确，且宿主机代理服务正在运行。
 
-### 6.5 Responses API 报 `Invalid model name passed in model=codex-chatgpt`
+### 6.5 Responses API 报标准 Codex 模型不存在
 
-当前容器没有加载 `codex-chatgpt`。先运行 `/v1/models` 确认模型列表；如果缺少 `codex-chatgpt` 和 `gpt-5.5` 等 Codex 候选，说明容器还没有按当前配置重建，或 ChatGPT OAuth 初始化失败。执行：
+先运行 `/v1/models` 确认模型列表；如果缺少 `gpt-5.5`、`gpt-5.4` 等 Codex 候选，说明容器还没有按当前配置重建，或 ChatGPT OAuth 初始化失败。执行：
 
 ```bash
 ./scripts/litellm.sh check-chatgpt-env
@@ -519,14 +515,14 @@ curl -s http://localhost:4000/v1/messages \
 ./scripts/litellm.sh check-chatgpt-runtime
 ```
 
-如果 `check-chatgpt-runtime` 里容器环境已经是 `codex-chatgpt`，但模型列表仍没有 `codex-chatgpt`，看日志中是否有下面这类错误：
+如果模型列表仍缺少标准 Codex 模型，看日志中是否有下面这类错误：
 
 ```txt
 Error creating deployment ... chatgpt/... Polling failed ... timed out
 Initialized Model List ['litellm-code-openai', ...]
 ```
 
-这表示 LiteLLM 启动时访问 ChatGPT OAuth 地址超时，于是跳过了 `codex-chatgpt` deployment。先确保宿主机代理可用，再执行：
+这表示 LiteLLM 启动时访问 ChatGPT OAuth 地址超时，于是跳过了 Codex Responses deployment。先确保宿主机代理可用，再执行：
 
 ```bash
 ./scripts/litellm.sh check-chatgpt-network
@@ -542,20 +538,7 @@ Initialized Model List ['litellm-code-openai', ...]
 The 'gpt-5.3-codex' model is not supported when using Codex with a ChatGPT account.
 ```
 
-这表示 ChatGPT 登录态已经成功，但 `LITELLM_UPSTREAM_CODEX_MODEL` 配成了当前账号不支持的上游模型。把 `~/.env` 改成：
-
-```bash
-export LITELLM_UPSTREAM_CODEX_MODEL=chatgpt/gpt-5.5
-```
-
-然后打开新的 zsh，执行：
-
-```bash
-./scripts/litellm.sh check-chatgpt-env
-./scripts/litellm.sh restart-chatgpt
-```
-
-`chatgpt/gpt-5.4` 可以作为备选。不建议把上游设为 `chatgpt/gpt-5.3-codex`。
+这表示 ChatGPT 登录态已经成功，但严格转发后的同名上游 `chatgpt/gpt-5.3-codex` 不被当前账号支持。切换 Codex CLI/App 到 `gpt-5.5` 或 `gpt-5.4`，或者在 `config/config.yaml` 中移除不希望客户端选择的标准模型 deployment。
 
 ### 6.7 Codex CLI 报 `key not allowed` 或 `image_generation is not supported`
 
@@ -572,7 +555,7 @@ key not allowed to access model ... Tried to access gpt-5.5
 ./scripts/litellm.sh check-chatgpt-runtime
 ```
 
-`check-chatgpt-runtime` 需要显示 `gpt-5.5 gpt-5.4 gpt-5.4-mini gpt-5.3-codex gpt-5.2` 已映射到 `codex-chatgpt`。如果映射已经存在但仍然 403，到 Dashboard -> Virtual Keys 编辑当前 `LITELLM_API_KEY_OPENAI` 对应的 key，把 Codex 客户端会选择的模型名加入允许列表。
+`check-chatgpt-runtime` 需要显示 `gpt-5.5 gpt-5.4 gpt-5.4-mini gpt-5.3-codex gpt-5.3-codex-spark gpt-5.2` 均已作为标准模型名暴露。如果配置已经加载但仍然 403，到 Dashboard -> Virtual Keys 编辑当前 `LITELLM_API_KEY_OPENAI` 对应的 key，把 Codex 客户端会选择的模型名加入允许列表。
 
 症状 2：
 
@@ -580,18 +563,7 @@ key not allowed to access model ... Tried to access gpt-5.5
 Tool 'image_generation' is not supported with gpt-5.3-codex-spark.
 ```
 
-这表示模型映射已经进入上游调用阶段，但 `~/.env` 里的 `LITELLM_UPSTREAM_CODEX_MODEL` 仍是 `chatgpt/gpt-5.3-codex-spark`。Codex CLI 会按原生模型元数据发送 `image_generation` 等工具，spark 会拒绝。改成：
-
-```bash
-export LITELLM_UPSTREAM_CODEX_MODEL=chatgpt/gpt-5.5
-```
-
-然后打开新的 zsh，执行：
-
-```bash
-./scripts/litellm.sh check-chatgpt-env
-./scripts/litellm.sh restart-chatgpt
-```
+这表示严格转发已经进入上游调用阶段，但 `chatgpt/gpt-5.3-codex-spark` 不支持 Codex CLI 当前发送的工具。切换 Codex CLI/App 到 `gpt-5.5` 或 `gpt-5.4`，或者从 Virtual Key / 本地模型目录中移除不希望用户选择的 spark 模型。
 
 ### 6.8 ChatGPT 授权页提示需要启用 Codex 设备代码授权
 
@@ -655,13 +627,13 @@ location.href = "/ui";
 
 ### 6.10 `check-chatgpt-env` 报覆盖变量不合法
 
-脚本不会读取仓库内 `.env` 文件。默认已经是 ChatGPT 订阅配置；如果 `check-chatgpt-env` 报错，通常是 `~/.env` 里覆盖了不合法的 `LITELLM_CODEX_MODEL` 或 `LITELLM_UPSTREAM_CODEX_MODEL`。参考 `./scripts/litellm.sh print-chatgpt-env` 的输出修正后，打开一个新的 zsh 重试。
+脚本不会读取仓库内 `.env` 文件。`LITELLM_CODEX_MODEL` 和 `LITELLM_UPSTREAM_CODEX_MODEL` 已不再参与 Codex 严格转发配置；如果当前 shell 仍设置了它们，`check-chatgpt-env` 会提示这些变量已被忽略。参考 `./scripts/litellm.sh print-chatgpt-env` 的输出修正后，打开一个新的 zsh 重试。
 
 ### 6.11 当前 shell 已设置变量，但 compose 仍像默认配置
 
 脚本会传入 `--env-file /dev/null`，避免 compose 自动读取本地 `.env`。确认变量已经 export，而不是只在 shell 里赋值：
 
 ```bash
-export LITELLM_UPSTREAM_CODEX_MODEL=chatgpt/gpt-5.4
-printenv LITELLM_UPSTREAM_CODEX_MODEL
+export LITELLM_MASTER_KEY=sk-...
+printenv LITELLM_MASTER_KEY
 ```

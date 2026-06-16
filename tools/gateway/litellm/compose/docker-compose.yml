@@ -53,9 +53,7 @@ services:
       # ===== 只保留需要从宿主机传入的少量变量 =====
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-litellm-local-dev}
       LITELLM_SALT_KEY: sk-litellm-local-salt
-      # Codex / Responses API 只走 ChatGPT Subscription provider。
-      LITELLM_CODEX_MODEL: ${LITELLM_CODEX_MODEL:-codex-chatgpt}
-      LITELLM_UPSTREAM_CODEX_MODEL: ${LITELLM_UPSTREAM_CODEX_MODEL:-chatgpt/gpt-5.5}
+      # Codex / Responses API 在 config.yaml 中按标准模型名严格转发到 chatgpt/...。
       # 代理：使用 LiteLLM 专用变量，避免继承宿主机 HTTP_PROXY/https_proxy。
       # 默认指向宿主机代理端口；如需禁用，在当前 shell 环境中把 LITELLM_CONTAINER_*_PROXY 设为空字符串。
       HTTP_PROXY: ${LITELLM_CONTAINER_HTTP_PROXY-http://host.containers.internal:7890}

@@ -15,8 +15,6 @@ apply_defaults() {
   POSTGRES_DATA_DIR="/Users/zhehan/Documents/service-data/postgres"
   CHATGPT_TOKEN_HOST_DIR="/Users/zhehan/Documents/service-data/litellm/chatgpt-tokens"
   export LITELLM_MASTER_KEY="${LITELLM_MASTER_KEY:-sk-litellm-local-dev}"
-  export LITELLM_CODEX_MODEL="${LITELLM_CODEX_MODEL:-codex-chatgpt}"
-  export LITELLM_UPSTREAM_CODEX_MODEL="${LITELLM_UPSTREAM_CODEX_MODEL:-chatgpt/gpt-5.5}"
   export LITELLM_CONTAINER_HTTP_PROXY="${LITELLM_CONTAINER_HTTP_PROXY-http://host.containers.internal:7890}"
   export LITELLM_CONTAINER_HTTPS_PROXY="${LITELLM_CONTAINER_HTTPS_PROXY-http://host.containers.internal:7890}"
 }
@@ -27,8 +25,8 @@ print_chatgpt_env() {
 # 网关访问密钥。默认可本地启动；建议替换为：openssl rand -hex 16
 export LITELLM_MASTER_KEY=<替换为随机 token>
 
-# Codex 默认只走 ChatGPT 订阅。只有需要换上游模型时才覆盖：
-# export LITELLM_UPSTREAM_CODEX_MODEL=chatgpt/gpt-5.5
+# Codex 标准模型名在 config.yaml 中严格转发到同名 chatgpt/... 上游。
+# 不需要配置 LITELLM_CODEX_MODEL 或 LITELLM_UPSTREAM_CODEX_MODEL。
 
 # 可选：只有宿主机代理端口不是 7890，或需要禁用代理时才配置。
 # export LITELLM_CONTAINER_HTTP_PROXY=http://host.containers.internal:7890
@@ -56,8 +54,12 @@ print_codex_config() {
 # 根级配置必须写在 [model_providers.*] 表之前。
 model = "gpt-5.5"
 model_provider = "litellm-local"
-model_reasoning_effort = "medium"
+model_reasoning_effort = "xhigh"
+service_tier = "priority"
 model_catalog_json = "${catalog_path}"
+
+[features]
+fast_mode = true
 
 [model_providers.litellm-local]
 name = "LiteLLM Local"
@@ -122,35 +124,13 @@ env_value() {
 check_chatgpt_env() {
   apply_defaults
 
-  local failed=0
+  for deprecated_key in LITELLM_CODEX_MODEL LITELLM_UPSTREAM_CODEX_MODEL; do
+    if env_is_set "$deprecated_key"; then
+      echo "⚠️  $deprecated_key 已不再参与 Codex 严格转发配置，当前值会被忽略：$(env_value "$deprecated_key")"
+    fi
+  done
 
-  if env_is_set LITELLM_CODEX_MODEL && [[ "$(env_value LITELLM_CODEX_MODEL)" != "codex-chatgpt" ]]; then
-    echo "❌ LITELLM_CODEX_MODEL 当前为 '$(env_value LITELLM_CODEX_MODEL)'，ChatGPT 订阅模式需要 codex-chatgpt"
-    failed=1
-  fi
-
-  if env_is_set LITELLM_UPSTREAM_CODEX_MODEL && [[ "$(env_value LITELLM_UPSTREAM_CODEX_MODEL)" != chatgpt/* ]]; then
-    echo "❌ LITELLM_UPSTREAM_CODEX_MODEL 当前为 '$(env_value LITELLM_UPSTREAM_CODEX_MODEL)'，ChatGPT 订阅模式需要 chatgpt/... 模型"
-    failed=1
-  fi
-
-  if env_is_set LITELLM_UPSTREAM_CODEX_MODEL && [[ "$(env_value LITELLM_UPSTREAM_CODEX_MODEL)" == "chatgpt/gpt-5.3-codex" ]]; then
-    echo "❌ chatgpt/gpt-5.3-codex 不能用于当前 ChatGPT Codex 账号链路，请改用 chatgpt/gpt-5.5 或 chatgpt/gpt-5.4"
-    failed=1
-  fi
-
-  if env_is_set LITELLM_UPSTREAM_CODEX_MODEL && [[ "$(env_value LITELLM_UPSTREAM_CODEX_MODEL)" == "chatgpt/gpt-5.3-codex-spark" ]]; then
-    echo "⚠️  chatgpt/gpt-5.3-codex-spark 可用于基础 Responses API 验证，但 Codex CLI 会发送 image_generation 等工具；建议改用 chatgpt/gpt-5.5 或 chatgpt/gpt-5.4"
-  fi
-
-  if [[ "$failed" -ne 0 ]]; then
-    echo
-    echo "请修正 ~/.env 中覆盖的变量，并打开一个新的 zsh 后重试。可参考："
-    print_chatgpt_env
-    exit 1
-  fi
-
-  echo "✅ ChatGPT 订阅配置已就绪（未设置的变量使用内置默认值）"
+  echo "✅ ChatGPT 订阅配置已就绪（Codex 标准模型名由 config.yaml 严格转发）"
 }
 
 check_client_env() {
@@ -336,38 +316,33 @@ PY'
 check_chatgpt_runtime() {
   check_chatgpt_env
 
-  echo "宿主当前 zsh 环境："
-  echo "  LITELLM_CODEX_MODEL=$(env_value LITELLM_CODEX_MODEL)"
-  echo "  LITELLM_UPSTREAM_CODEX_MODEL=$(env_value LITELLM_UPSTREAM_CODEX_MODEL)"
-  echo
-
-  echo "Compose 展开环境："
-  compose config | awk '
-    /LITELLM_CODEX_MODEL:/ ||
-    /LITELLM_UPSTREAM_CODEX_MODEL:/ {
-      print "  " $0
-    }
-  '
-  echo
-
   if ! container_is_running; then
     echo "❌ litellm-proxy-podman 未运行。请先执行：./scripts/litellm.sh restart-chatgpt"
     exit 1
   fi
 
-  echo "容器运行态环境："
-  podman_exec_litellm sh -lc '
-    printf "  LITELLM_CODEX_MODEL=%s\n" "${LITELLM_CODEX_MODEL:-<unset>}"
-    printf "  LITELLM_UPSTREAM_CODEX_MODEL=%s\n" "${LITELLM_UPSTREAM_CODEX_MODEL:-<unset>}"
-  '
+  echo "Compose 中已废弃 Codex 环境变量检查："
+  if compose config | grep -Eq 'LITELLM_CODEX_MODEL:|LITELLM_UPSTREAM_CODEX_MODEL:'; then
+    echo "❌ compose 展开结果仍包含 LITELLM_CODEX_MODEL 或 LITELLM_UPSTREAM_CODEX_MODEL"
+    exit 1
+  fi
+  echo "  未发现 LITELLM_CODEX_MODEL / LITELLM_UPSTREAM_CODEX_MODEL"
   echo
 
   echo "容器内 /app/config.yaml 的 Codex 配置："
-  podman_exec_litellm sh -lc "grep -n 'LITELLM_CODEX\\|LITELLM_UPSTREAM_CODEX_MODEL\\|model_group_alias\\|gpt-5' /app/config.yaml || true" | sed 's/^/  /'
+  podman_exec_litellm sh -lc "grep -n 'codex-chatgpt\\|model_group_alias\\|model_name: gpt-5\\|model: chatgpt/gpt-5' /app/config.yaml || true" | sed 's/^/  /'
   echo
 
-  if [[ "$(podman_exec_litellm sh -lc 'printf "%s" "${LITELLM_CODEX_MODEL:-}"')" != "codex-chatgpt" ]]; then
-    echo "❌ 容器内 LITELLM_CODEX_MODEL 不是 codex-chatgpt。请执行：./scripts/litellm.sh restart-chatgpt"
+  if ! podman_exec_litellm sh -lc "python - <<'PY'
+import yaml
+with open('/app/config.yaml') as f:
+    data = yaml.safe_load(f)
+models = [m.get('model_name') for m in data.get('model_list', [])]
+upstreams = [m.get('litellm_params', {}).get('model') for m in data.get('model_list', [])]
+if any(value == 'codex-chatgpt' for value in models + upstreams) or 'router_settings' in data:
+    raise SystemExit(1)
+PY"; then
+    echo "❌ 容器配置仍包含 codex-chatgpt 或 model_group_alias。请执行：./scripts/litellm.sh restart-chatgpt"
     exit 1
   fi
 
@@ -379,12 +354,10 @@ check_chatgpt_runtime() {
   fi
 
   printf "%s" "$models_json" | print_model_ids_from_json | sed 's/^/  /'
-  if ! printf "%s" "$models_json" | grep -Eq '"id"[[:space:]]*:[[:space:]]*"codex-chatgpt"'; then
+  if printf "%s" "$models_json" | grep -Eq '"id"[[:space:]]*:[[:space:]]*"codex-chatgpt"'; then
     echo
-    echo "❌ 容器环境已加载 codex-chatgpt，但 LiteLLM 没有把它暴露到 /v1/models。"
-    echo "常见原因：启动时 ChatGPT OAuth 轮询 auth.openai.com 超时，LiteLLM 会忽略该 deployment。"
+    echo "❌ /v1/models 仍暴露 codex-chatgpt。请确认容器已按最新 config.yaml 重建。"
     echo "请执行："
-    echo "  ./scripts/litellm.sh check-chatgpt-network"
     echo "  ./scripts/litellm.sh restart-chatgpt"
     echo "  ./scripts/litellm.sh logs litellm"
     exit 1
@@ -392,19 +365,21 @@ check_chatgpt_runtime() {
 
   local codex_model
   local missing_codex_models=()
-  for codex_model in gpt-5.5 gpt-5.4 gpt-5.4-mini gpt-5.3-codex gpt-5.2; do
+  for codex_model in gpt-5.5 gpt-5.4 gpt-5.4-mini gpt-5.3-codex gpt-5.3-codex-spark gpt-5.2; do
     if ! printf "%s" "$models_json" | grep -Eq '"id"[[:space:]]*:[[:space:]]*"'"$codex_model"'"'; then
       missing_codex_models+=("$codex_model")
     fi
   done
 
   if [[ "${#missing_codex_models[@]}" -eq 0 ]]; then
-    echo "✅ Codex CLI/App 可见模型名已映射到 codex-chatgpt：gpt-5.5 gpt-5.4 gpt-5.4-mini gpt-5.3-codex gpt-5.2"
+    echo "✅ Codex CLI/App 可见模型名均为标准模型名：gpt-5.5 gpt-5.4 gpt-5.4-mini gpt-5.3-codex gpt-5.3-codex-spark gpt-5.2"
   else
-    echo "⚠️  /v1/models 缺少 Codex 候选模型：${missing_codex_models[*]}；如果 Codex CLI 仍报 key not allowed，请执行：./scripts/litellm.sh restart-chatgpt"
+    echo "❌ /v1/models 缺少 Codex 标准模型：${missing_codex_models[*]}"
+    echo "请执行：./scripts/litellm.sh restart-chatgpt"
+    exit 1
   fi
 
-  echo "✅ 容器运行态已加载并暴露 codex-chatgpt"
+  echo "✅ 容器运行态已加载 Codex 严格转发配置"
 }
 
 check_dashboard_auth() {
