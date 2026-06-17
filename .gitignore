@@ -17,5 +17,10 @@ node_modules/
 
 # 本地服务密钥配置
 tools/gateway/litellm/env/.env
+# ChatGPT OAuth token 持久化（不得提交）
+**/chatgpt-tokens/
+**/auth.json
+# LiteLLM 日志
+tools/gateway/litellm/**/*.log
 /tools/search/searxng/settings/settings.yml.new
 /output/*

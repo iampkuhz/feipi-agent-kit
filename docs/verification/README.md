@@ -40,9 +40,8 @@ curl -s "http://localhost:8873/search?q=test&format=json" | jq '.results | lengt
 ### 3. LiteLLM 服务验证
 
 ```bash
-# 配置环境变量
-cp tools/gateway/litellm/env/.env.example tools/gateway/litellm/env/.env
-# 编辑 .env 填入真实值（至少 BAILIAN_API_KEY）
+# LiteLLM 脚本只读取当前 shell 环境，不读取仓库内 .env 文件。
+# 如需覆盖默认值，把变量配置到你自己的 ~/.env，并打开新的 zsh。
 
 # 启动服务
 make litellm-up
@@ -57,7 +56,7 @@ curl -s http://localhost:4000/health
 ```bash
 # 测试模型调用
 curl -s http://localhost:4000/v1/models \
-  -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" | jq .
+  -H "Authorization: Bearer ${LITELLM_MASTER_KEY:-sk-litellm-local-dev}" | jq .
 ```
 
 **预期结果**：返回配置的模型列表
