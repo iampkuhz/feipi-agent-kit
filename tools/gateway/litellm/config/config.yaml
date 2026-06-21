@@ -6,23 +6,23 @@ model_list:
   - model_name: litellm-code-openai
     litellm_params:
       # 百炼 OpenAI 兼容端点
-      model: openai/qwen-plus
-      api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
-      api_key: dummy-key
+      model: os.environ/LITELLM_UPSTREAM_CODE_MODEL_OPENAI_NAME
+      api_base: os.environ/LITELLM_UPSTREAM_CODE_MODEL_OPENAI_BASE
+      api_key: os.environ/LITELLM_UPSTREAM_CODE_MODEL_OPENAI_KEY
 
   - model_name: litellm-code-anthropic
     litellm_params:
       # 百炼 Anthropic 兼容端点
-      model: anthropic/qwen-plus
-      api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
-      api_key: dummy-key
+      model: os.environ/LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_NAME
+      api_base: os.environ/LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_BASE
+      api_key: os.environ/LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_KEY
 
   - model_name: litellm-autocomplate-openai
     litellm_params:
       # 本地 OMLX 端点
-      model: openai/qwen-turbo
-      api_base: http://host.containers.internal:11434/v1
-      api_key: dummy-key
+      model: os.environ/LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_NAME
+      api_base: os.environ/LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_BASE
+      api_key: os.environ/LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_KEY
 
   # Codex / Responses API
   # 严格转发：客户端请求哪个 Codex 标准模型名，就转到同名 chatgpt/... 上游。

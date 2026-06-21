@@ -102,7 +102,7 @@ litellm-autocomplate-openai
 
 保存后打开一个新的 zsh，或用你现有的 zsh 启动加载机制重新加载 `~/.env`。脚本不会主动读取任何仓库内 `.env` 文件。
 
-> 百炼和本地补全的默认 deployment 已固定在 `config/config.yaml`，不再要求你通过环境变量维护。
+> 百炼和本地补全的逻辑模型名固定在 `config/config.yaml`。上游模型、base URL 和 API key 有默认值，也可以通过 `~/.env` 覆盖。
 
 #### 2.2.2 检查 ChatGPT 订阅有效配置
 
@@ -364,6 +364,15 @@ rm /Users/zhehan/Documents/service-data/litellm/chatgpt-tokens/auth.json
 | `LITELLM_MASTER_KEY` | 网关管理密钥，用于 Dashboard、脚本诊断和管理接口 | `sk-litellm-local-dev` |
 | `LITELLM_API_KEY_OPENAI` | OpenAI / Codex / OpenAI-compatible 客户端访问 LiteLLM 的 private key | 无 |
 | `LITELLM_API_KEY_ANTHROPIC` | Anthropic / Claude-code / Anthropic-compatible 客户端访问 LiteLLM 的 private key | 无 |
+| `LITELLM_UPSTREAM_CODE_MODEL_OPENAI_NAME` | `litellm-code-openai` 的百炼 OpenAI 兼容上游模型 | `openai/qwen-plus` |
+| `LITELLM_UPSTREAM_CODE_MODEL_OPENAI_BASE` | `litellm-code-openai` 的百炼 OpenAI 兼容 base URL | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
+| `LITELLM_UPSTREAM_CODE_MODEL_OPENAI_KEY` | `litellm-code-openai` 的百炼 API key；脚本会优先复用 `BAILIAN_CODING_PLAN_API_KEY` 或 `BAILIAN_API_KEY` | `dummy-key` |
+| `LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_NAME` | `litellm-code-anthropic` 的百炼 Anthropic 兼容上游模型 | `anthropic/qwen-plus` |
+| `LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_BASE` | `litellm-code-anthropic` 的百炼 Anthropic 兼容 base URL | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
+| `LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_KEY` | `litellm-code-anthropic` 的百炼 API key；脚本会优先复用 `BAILIAN_CODING_PLAN_API_KEY` 或 `BAILIAN_API_KEY` | `dummy-key` |
+| `LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_NAME` | 本地补全 OpenAI 兼容上游模型 | `openai/qwen-turbo` |
+| `LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_BASE` | 本地补全 OpenAI 兼容 base URL | `http://host.containers.internal:11434/v1` |
+| `LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_KEY` | 本地补全 OpenAI 兼容 API key | `dummy-key` |
 | `LITELLM_CONTAINER_HTTP_PROXY` / `LITELLM_CONTAINER_HTTPS_PROXY` | 容器访问外网的代理地址 | `http://host.containers.internal:7890` |
 | `POSTGRES_PASSWORD` | 沿用旧 PostgreSQL 数据库密码时才需要配置 | `litellm_password` |
 
@@ -378,7 +387,7 @@ rm /Users/zhehan/Documents/service-data/litellm/chatgpt-tokens/auth.json
 | Anthropic 兼容逻辑模型 | `litellm-code-anthropic` |
 | 本地补全逻辑模型 | `litellm-autocomplate-openai` |
 
-这些固定默认值在 `compose/docker-compose.yml` 和 `config/config.yaml` 中维护，不要求写入 `~/.env`。如果要改非 ChatGPT 的默认 deployment，直接编辑 `config/config.yaml`。
+这些逻辑模型名在 `compose/docker-compose.yml` 和 `config/config.yaml` 中维护，不要求写入 `~/.env`。如果只是切换百炼上游模型、base URL 或 API key，优先使用上面的环境变量覆盖，不需要修改 `config.yaml`。
 
 ---
 
@@ -625,11 +634,29 @@ location.href = "/ui";
 3. 用当前 `LITELLM_MASTER_KEY` 重新登录 Dashboard。
 4. 如果刚改过 `LITELLM_MASTER_KEY`，先执行 `./scripts/litellm.sh restart`，再重新登录。
 
-### 6.10 `check-chatgpt-env` 报覆盖变量不合法
+### 6.10 客户端调用报 `Invalid proxy server token passed`
+
+如果 curl、Codex、Claude-code 等客户端调用时报：
+
+```txt
+Authentication Error, Invalid proxy server token passed
+Unable to find token in cache or LiteLLM_VerificationTokenTable
+```
+
+这表示当前 `LITELLM_API_KEY_OPENAI` 或 `LITELLM_API_KEY_ANTHROPIC` 对应的 Virtual Key 不在当前 PostgreSQL 数据库里，和百炼或 ChatGPT 上游配置无关。常见原因是换过数据库目录、重建过数据、或 `~/.env` 里还保留着旧 key。
+
+处理方式：
+
+1. 用当前 `LITELLM_MASTER_KEY` 登录 Dashboard。
+2. 在 Virtual Keys 重新创建对应 key。
+3. 把新的 secret key 更新到 `~/.env` 的 `LITELLM_API_KEY_OPENAI` 或 `LITELLM_API_KEY_ANTHROPIC`。
+4. 打开新的 zsh 后重试客户端调用。
+
+### 6.11 `check-chatgpt-env` 报覆盖变量不合法
 
 脚本不会读取仓库内 `.env` 文件。`LITELLM_CODEX_MODEL` 和 `LITELLM_UPSTREAM_CODEX_MODEL` 已不再参与 Codex 严格转发配置；如果当前 shell 仍设置了它们，`check-chatgpt-env` 会提示这些变量已被忽略。参考 `./scripts/litellm.sh print-chatgpt-env` 的输出修正后，打开一个新的 zsh 重试。
 
-### 6.11 当前 shell 已设置变量，但 compose 仍像默认配置
+### 6.12 当前 shell 已设置变量，但 compose 仍像默认配置
 
 脚本会传入 `--env-file /dev/null`，避免 compose 自动读取本地 `.env`。确认变量已经 export，而不是只在 shell 里赋值：
 
