@@ -551,6 +551,126 @@ else
   stub_fail_msg "network-probe-cache" "缺少 .network-ready 缓存逻辑"
 fi
 
+# 测试 11e-1：Bilibili 网络失败必须输出可判别诊断，且不得拼装内部重试命令
+if rg -q 'diagnostic_code=bilibili_network_preflight_failed' "$BILIBILI_SCRIPT" \
+  && rg -q 'probe_unavailable' "$BILIBILI_SCRIPT" \
+  && rg -q 'retry_action=rerun_same_unified_command' "$BILIBILI_SCRIPT" \
+  && ! rg -q 'retry_cmd=.*download_bilibili\.sh' "$BILIBILI_SCRIPT" \
+  && rg -q 'report_bilibili_network_failure' "$EXTRACT_SCRIPT"; then
+  stub_pass "bili-network-diagnostic"
+else
+  stub_fail_msg "bili-network-diagnostic" "Bilibili 网络诊断字段、端口未知状态或统一入口重试动作不完整"
+fi
+
+# 测试 11e-2：离线执行代理端口状态机，不把检测工具缺失误报为端口未监听
+BILI_NETWORK_BIN="$STUB_DIR/bili-network-bin"
+mkdir -p "$BILI_NETWORK_BIN"
+ln -s "$(command -v dirname)" "$BILI_NETWORK_BIN/dirname"
+ln -s "$(command -v mkdir)" "$BILI_NETWORK_BIN/mkdir"
+ln -s "$(type -P false)" "$BILI_NETWORK_BIN/curl"
+ln -s "$(type -P false)" "$BILI_NETWORK_BIN/yt-dlp"
+
+run_bili_network_stub() {
+  local output_dir="$1"
+  local result_var="$2"
+  local code_var="$3"
+  local command_output command_code
+
+  set +e
+  command_output="$(PATH="$BILI_NETWORK_BIN" /bin/bash "$BILIBILI_SCRIPT" \
+    "https://www.bilibili.com/video/BV1Q5411x7LJ" "$output_dir" dryrun 2>&1)"
+  command_code=$?
+  set -e
+  printf -v "$result_var" '%s' "$command_output"
+  printf -v "$code_var" '%s' "$command_code"
+}
+
+run_bili_network_stub "$STUB_DIR/bili-probe-unavailable" probe_unavailable_output probe_unavailable_code
+if [[ "$probe_unavailable_code" -eq 1 ]] \
+  && printf '%s\n' "$probe_unavailable_output" | rg -q '^proxy_port_state=probe_unavailable$' \
+  && printf '%s\n' "$probe_unavailable_output" | rg -q '^retry_action=rerun_same_unified_command$' \
+  && ! printf '%s\n' "$probe_unavailable_output" | rg -q 'download_bilibili\.sh|<实际监听端口>'; then
+  stub_pass "bili-proxy-probe-unavailable"
+else
+  stub_fail_msg "bili-proxy-probe-unavailable" "检测工具缺失时未输出 probe_unavailable，或仍包含不可执行重试示例"
+fi
+
+ln -s "$(type -P false)" "$BILI_NETWORK_BIN/nc"
+run_bili_network_stub "$STUB_DIR/bili-not-listening" not_listening_output not_listening_code
+if [[ "$not_listening_code" -eq 1 ]] \
+  && printf '%s\n' "$not_listening_output" | rg -q '^proxy_port_state=not_listening$'; then
+  stub_pass "bili-proxy-not-listening"
+else
+  stub_fail_msg "bili-proxy-not-listening" "端口关闭时未输出 not_listening"
+fi
+
+rm -f "$BILI_NETWORK_BIN/nc"
+ln -s "$(type -P true)" "$BILI_NETWORK_BIN/nc"
+run_bili_network_stub "$STUB_DIR/bili-listening-probe-failed" listening_output listening_code
+if [[ "$listening_code" -eq 1 ]] \
+  && printf '%s\n' "$listening_output" | rg -q '^proxy_port_state=listening_but_probe_failed$'; then
+  stub_pass "bili-proxy-listening-probe-failed"
+else
+  stub_fail_msg "bili-proxy-listening-probe-failed" "端口监听但代理探测失败时状态不正确"
+fi
+
+# 测试 11e-3：只按本次模式日志判定单模式、共享与混合失败范围
+bili_report_block="$(awk '/^report_bilibili_network_failure\(\)/,/^}/' "$EXTRACT_SCRIPT")"
+if [[ -z "$bili_report_block" ]]; then
+  stub_fail_msg "bili-failure-scope-function" "未找到 Bilibili 失败范围判定函数"
+else
+  eval "$bili_report_block"
+  BILI_DIAGNOSTIC_CONTENT='diagnostic_code=bilibili_network_preflight_failed
+direct_probe=failed
+proxy_port_state=not_listening
+retry_action=rerun_same_unified_command'
+
+  BILI_SINGLE_DIR="$STUB_DIR/bili-scope-single"
+  mkdir -p "$BILI_SINGLE_DIR"
+  printf '%s\n' "$BILI_DIAGNOSTIC_CONTENT" > "$BILI_SINGLE_DIR/bilibili-subtitle.log"
+  single_scope_output="$(report_bilibili_network_failure "$BILI_SINGLE_DIR" subtitle 2>&1)"
+  if printf '%s\n' "$single_scope_output" | rg -q '^failure_scope=network_preflight$' \
+    && ! printf '%s\n' "$single_scope_output" | rg -q '^failure_scope=shared_network_preflight$'; then
+    stub_pass "bili-failure-scope-single"
+  else
+    stub_fail_msg "bili-failure-scope-single" "单模式网络失败范围标记不正确"
+  fi
+
+  BILI_SHARED_DIR="$STUB_DIR/bili-scope-shared"
+  mkdir -p "$BILI_SHARED_DIR"
+  printf '%s\n' "$BILI_DIAGNOSTIC_CONTENT" > "$BILI_SHARED_DIR/bilibili-subtitle.log"
+  printf '%s\n' "$BILI_DIAGNOSTIC_CONTENT" > "$BILI_SHARED_DIR/bilibili-whisper.log"
+  shared_scope_output="$(report_bilibili_network_failure "$BILI_SHARED_DIR" auto 2>&1)"
+  if printf '%s\n' "$shared_scope_output" | rg -q '^failure_scope=shared_network_preflight$'; then
+    stub_pass "bili-failure-scope-shared"
+  else
+    stub_fail_msg "bili-failure-scope-shared" "双模式同因失败未标记为 shared_network_preflight"
+  fi
+
+  BILI_MIXED_DIR="$STUB_DIR/bili-scope-mixed"
+  mkdir -p "$BILI_MIXED_DIR"
+  printf '%s\n' "$BILI_DIAGNOSTIC_CONTENT" > "$BILI_MIXED_DIR/bilibili-subtitle.log"
+  printf '%s\n' 'whisper_model_missing' > "$BILI_MIXED_DIR/bilibili-whisper.log"
+  mixed_scope_output="$(report_bilibili_network_failure "$BILI_MIXED_DIR" auto 2>&1)"
+  if printf '%s\n' "$mixed_scope_output" | rg -q '^failure_scope=mixed_failures$'; then
+    stub_pass "bili-failure-scope-mixed"
+  else
+    stub_fail_msg "bili-failure-scope-mixed" "不同失败原因被误标为共享网络失败"
+  fi
+
+  BILI_STALE_DIR="$STUB_DIR/bili-scope-stale"
+  mkdir -p "$BILI_STALE_DIR"
+  printf '%s\n' 'subtitle_missing' > "$BILI_STALE_DIR/bilibili-subtitle.log"
+  printf '%s\n' "$BILI_DIAGNOSTIC_CONTENT" > "$BILI_STALE_DIR/bilibili-whisper.log"
+  if stale_scope_output="$(report_bilibili_network_failure "$BILI_STALE_DIR" subtitle 2>&1)"; then
+    stub_fail_msg "bili-failure-scope-ignores-stale" "单模式错误读取了另一模式的历史诊断日志"
+  elif [[ -z "$stale_scope_output" ]]; then
+    stub_pass "bili-failure-scope-ignores-stale"
+  else
+    stub_fail_msg "bili-failure-scope-ignores-stale" "未忽略非本次模式的历史诊断日志"
+  fi
+fi
+
 # 测试 11f：client fallback 仅在 whisper 模式触发
 if rg -q 'MODE.*==.*whisper.*is_retryable' "$YOUTUBE_SCRIPT"; then
   stub_pass "client-fallback-whisper-only"
@@ -572,6 +692,15 @@ if rg -qi '单前台.*阻塞|阻塞.*命令|不要.*轮询|不.*额外.*轮询|�
   stub_pass "openai-single-command"
 else
   stub_fail_msg "openai-single-command" "agents/openai.yaml 缺少单命令阻塞执行约束"
+fi
+
+# 测试 12b-1：Skill 与 Agent prompt 均要求先做网络权限复验，再判断代理
+if rg -q '网络权限.*重跑同一|提升后的网络权限.*重跑同一个' "$SKILL_DIR/SKILL.md" \
+  && rg -q '网络权限.*重跑同一' "$SKILL_DIR/agents/openai.yaml" \
+  && rg -q '禁止.*猜测.*7890.*7891' "$SKILL_DIR/SKILL.md"; then
+  stub_pass "bili-network-permission-retry"
+else
+  stub_fail_msg "bili-network-permission-retry" "缺少权限复验优先或禁止猜测代理端口的执行契约"
 fi
 
 # 测试 12c：输出包含关键状态字段

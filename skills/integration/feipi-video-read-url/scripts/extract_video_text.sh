@@ -474,6 +474,52 @@ run_mode_with_fallback() {
   return 1
 }
 
+report_bilibili_network_failure() {
+  local log_dir="$1"
+  local requested_mode="$2"
+  local log_file first_diagnostic_log=""
+  local diagnostic_count=0
+  local -a expected_logs=()
+
+  case "$requested_mode" in
+    auto)
+      expected_logs=(
+        "$log_dir/bilibili-subtitle.log"
+        "$log_dir/bilibili-whisper.log"
+      )
+      ;;
+    subtitle|whisper)
+      expected_logs=("$log_dir/bilibili-${requested_mode}.log")
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+
+  for log_file in "${expected_logs[@]}"; do
+    [[ -f "$log_file" ]] || continue
+    if rg -q '^diagnostic_code=bilibili_network_preflight_failed$' "$log_file"; then
+      diagnostic_count=$((diagnostic_count + 1))
+      if [[ -z "$first_diagnostic_log" ]]; then
+        first_diagnostic_log="$log_file"
+      fi
+    fi
+  done
+
+  if [[ "$diagnostic_count" -eq 0 ]]; then
+    return 1
+  fi
+
+  if [[ "${#expected_logs[@]}" -gt 1 && "$diagnostic_count" -eq "${#expected_logs[@]}" ]]; then
+    echo "failure_scope=shared_network_preflight" >&2
+  elif [[ "${#expected_logs[@]}" -eq 1 && "$diagnostic_count" -eq 1 ]]; then
+    echo "failure_scope=network_preflight" >&2
+  else
+    echo "failure_scope=mixed_failures" >&2
+  fi
+  rg '^(diagnostic_code|direct_probe|proxy_url|proxy_port_state|retry_action)=' "$first_diagnostic_log" >&2
+}
+
 TEXT_FILE=""
 USED_MODE=""
 STRATEGY=""
@@ -508,6 +554,9 @@ fi
 
 if [[ -z "$TEXT_FILE" ]]; then
   echo "文本提取失败: source=$SOURCE mode=$MODE strategy=$STRATEGY whisper_profile=$WHISPER_PROFILE" >&2
+  if [[ "$SOURCE" == "bilibili" ]]; then
+    report_bilibili_network_failure "$LOG_DIR" "$MODE" || true
+  fi
   echo "请检查日志目录: $LOG_DIR" >&2
   exit 1
 fi

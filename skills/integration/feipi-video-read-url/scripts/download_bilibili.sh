@@ -117,20 +117,28 @@ build_proxy_url() {
   echo "$YT_PROXY_SCHEME_DEFAULT://$YT_PROXY_HOST_DEFAULT:$port"
 }
 
-is_proxy_port_listening() {
+probe_proxy_port_state() {
   local port="$1"
 
   if command -v nc >/dev/null 2>&1; then
-    nc -z -w 1 "$YT_PROXY_HOST_DEFAULT" "$port" >/dev/null 2>&1
-    return $?
+    if nc -z -w 1 "$YT_PROXY_HOST_DEFAULT" "$port" >/dev/null 2>&1; then
+      echo "listening"
+    else
+      echo "not_listening"
+    fi
+    return 0
   fi
 
   if command -v lsof >/dev/null 2>&1; then
-    lsof -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1
-    return $?
+    if lsof -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then
+      echo "listening"
+    else
+      echo "not_listening"
+    fi
+    return 0
   fi
 
-  return 1
+  echo "probe_unavailable"
 }
 
 enable_proxy_for_yt_dlp() {
@@ -187,23 +195,25 @@ probe_bilibili_connectivity() {
   "${curl_cmd[@]}" >/dev/null 2>&1
 }
 
-print_proxy_port_guidance() {
+print_network_guidance() {
   local tested_proxy="$1"
-  local retry_cmd
+  local proxy_port_state="$2"
 
-  if [[ "$MODE" == "whisper" ]]; then
-    retry_cmd="AGENT_VIDEO_PROXY_PORT=7891 bash scripts/download_bilibili.sh \"$URL\" \"$OUT_DIR_RAW\" \"$MODE\" \"$WHISPER_PROFILE\""
-  else
-    retry_cmd="AGENT_VIDEO_PROXY_PORT=7891 bash scripts/download_bilibili.sh \"$URL\" \"$OUT_DIR_RAW\" \"$MODE\""
+  echo "diagnostic_code=bilibili_network_preflight_failed" >&2
+  echo "direct_probe=failed" >&2
+  echo "proxy_url=$tested_proxy" >&2
+  echo "proxy_port_state=$proxy_port_state" >&2
+  echo "Bilibili 网络预检未通过；这可能是公网不可达，也可能是 Codex/沙箱网络权限受限。" >&2
+  echo "若运行在受限环境，请先申请网络权限并重跑同一统一入口命令；不要仅凭本日志更换代理端口。" >&2
+  if [[ "$proxy_port_state" == "probe_unavailable" ]]; then
+    echo "当前缺少 nc/lsof，无法判断候选代理端口是否监听。" >&2
   fi
-
-  echo "直连 Bilibili 失败，且本地代理不可用: $tested_proxy" >&2
-  echo "如需走代理，请提供可用端口后重试，例如:" >&2
-  echo "  $retry_cmd" >&2
+  echo "只有确认本机代理实际监听后，才设置 AGENT_VIDEO_PROXY_PORT，并原样重跑刚才的统一入口命令。" >&2
+  echo "retry_action=rerun_same_unified_command" >&2
 }
 
 ensure_bilibili_network_ready() {
-  local fallback_proxy proxy_port
+  local fallback_proxy proxy_port proxy_port_state
 
   # 同一次 extract 中若已有其他模式完成过网络探测，复用结果。
   if [[ -n "$NETWORK_READY_FILE" && -f "$NETWORK_READY_FILE" ]]; then
@@ -225,7 +235,9 @@ ensure_bilibili_network_ready() {
 
   proxy_port="${AGENT_VIDEO_PROXY_PORT:-$YT_PROXY_PORT_DEFAULT}"
   fallback_proxy="$(build_proxy_url)"
-  if is_proxy_port_listening "$proxy_port"; then
+  proxy_port_state="$(probe_proxy_port_state "$proxy_port")"
+  if [[ "$proxy_port_state" == "listening" ]]; then
+    proxy_port_state="listening_but_probe_failed"
     echo "直连失败，检测到代理端口可用，尝试代理: $fallback_proxy" >&2
     if probe_bilibili_connectivity "$fallback_proxy"; then
       enable_proxy_for_yt_dlp "$fallback_proxy"
@@ -235,7 +247,7 @@ ensure_bilibili_network_ready() {
     fi
   fi
 
-  print_proxy_port_guidance "$fallback_proxy"
+  print_network_guidance "$fallback_proxy" "$proxy_port_state"
   return 1
 }
 

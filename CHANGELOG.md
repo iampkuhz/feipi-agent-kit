@@ -4,6 +4,9 @@
 - feipi-patent-generate-innovation-disclosure v4：补强内容门禁与可追溯图包
 - feipi-plantuml-generate-diagram v2：补齐图型与编号契约
 
+## 2026-08-07
+- feipi-video-read-url v2：修正沙箱网络误判与代理提示
+
 ## 2026-05-12
 - `feipi-plantuml-generate-diagram` v1：新增 PlantUML 通用作图统一入口；支持 fallback 模式、类型路由、架构图/时序图 typed profile；保留旧 skill 作为兼容入口。
 

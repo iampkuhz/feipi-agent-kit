@@ -121,7 +121,14 @@ description: 用于按用户意图处理视频网站 URL（如 YouTube、Bilibil
 - 长视频保护：whisper 模式会输出 `duration_sec`、`long_video` 和 `estimated_risk`，执行方可据此预估耗时，不做交互式确认。用户显式传 `accurate` 仍可按设计执行。
 - 中断后残留的 `.whisper.wav` + `.srt` 会被自动复用，不会触发重复下载或重复转写。执行方不要删除 run_dir 下已有的媒体文件，除非是本次 run 明确的临时文件。
 
-9. 最终输出结构约束（强制）
+9. Bilibili 网络诊断契约（强制）
+- 若日志出现 `diagnostic_code=bilibili_network_preflight_failed`，只能说明当前执行环境的网络预检失败，不能直接断言 Bilibili 不可访问或代理未启动。
+- 若当前执行环境支持网络权限提升，先以提升后的网络权限重跑同一个统一入口命令一次；这仍属于原命令的权限复验，不得同时换 URL、模式或输出目录。
+- 权限复验成功后继续原提取链路；复验仍失败时，再区分 `proxy_port_state=not_listening`、`proxy_port_state=listening_but_probe_failed` 与检测工具缺失时的 `proxy_port_state=probe_unavailable`。
+- 禁止根据历史 session、默认值或示例猜测 `7890`、`7891` 等代理端口。只有用户明确提供端口，或已通过只读监听检查证明端口存在时，才设置 `AGENT_VIDEO_PROXY_PORT`。
+- 网络预检日志应只检查本次实际模式对应的日志：单模式使用 `failure_scope=network_preflight`，两个模式均为同一预检失败时才使用 `failure_scope=shared_network_preflight`，原因不一致时使用 `failure_scope=mixed_failures`。
+
+10. 最终输出结构约束（强制）
 - 摘要结果 `summary_result.md` 的顶层标题必须且仅包含：`## 摘要概述`、`## 来源状态`、`## 附件`
 - `## 摘要概述` 第一段必须是总述（先总后分），后续可按视频类型使用三级标题组织（如核心内容、论证结构、操作步骤、嘉宾观点等）
 - `## 来源状态` 必须显式输出文本来源、完整性、时间戳状态、外部资料使用状态、主要风险
@@ -209,6 +216,7 @@ description: 用于按用户意图处理视频网站 URL（如 YouTube、Bilibil
 - 再判断背景阶段是否明确要求“相关新闻/最新进展”；未明确时默认 `--news off`。
 - 若检测到 YouTube 在 Cookie、浏览器认证或风控相关失败，会自动以“无 Cookie”重试，并输出 `*-noauth.log` 便于排查；若日志不含认证/风控信号，不把普通字幕缺失或转写失败误报为 Cookie 问题。
 - 若转写失败，只能回到当前 skill 的本地脚本排查网络、认证或模型缺失；禁止切换转写工具。
+- Bilibili 日志若出现 `bilibili_network_preflight_failed`，先按“网络权限复验 -> 代理监听状态”的顺序诊断；不得直接猜测代理端口或要求用户启动代理。
 - 如需配置 YouTube 登录态，优先引导用户运行 `scripts/setup_youtube_cookies.sh`，按向导导出 Netscape `cookies.txt` 并设置 `AGENT_YOUTUBE_COOKIE_FILE`；`AGENT_CHROME_PROFILE` 仅作为备用方式。
 
 2. Plan
