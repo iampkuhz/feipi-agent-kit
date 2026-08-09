@@ -1,0 +1,17 @@
+diagram_id: D1
+diagram_type: component
+title: "跨域凭据组件总览图"
+summary: "展示凭据申请域、签发系统与离线使用端点之间的边界和归属。"
+view: overview
+groups:
+  - {id: request_domain, name: 申请业务域, description: 负责提交凭据申请}
+  - {id: issue_domain, name: 凭据签发域, description: 负责生成受约束凭据}
+nodes:
+  - {id: request_system, name: 凭据申请系统, group: request_domain, type: system, description: 接收并规范化申请}
+  - {id: issue_system, name: 凭据签发系统, group: issue_domain, type: system, description: 生成受约束凭据}
+  - {id: offline_endpoint, name: 离线使用端点, group: issue_domain, type: physical_endpoint, description: 在离线环境使用凭据}
+relations:
+  - {id: E1, from: request_system, to: issue_system, description: 传递规范化申请}
+  - {id: E2, from: issue_system, to: offline_endpoint, description: 交付受约束凭据}
+layout: {direction: top_to_bottom, include_legend: true}
+out_of_scope: [类名与函数调用]

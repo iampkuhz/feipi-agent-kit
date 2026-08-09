@@ -1,0 +1,41 @@
+{
+  "schema_version": "1.1",
+  "skill_name": "feipi-plantuml-generate-diagram",
+  "diagram_id": "D1",
+  "diagram_type": "component",
+  "profile": "component",
+  "profile_version": "1.0",
+  "brief_path": "brief.normalized.yaml",
+  "diagram_path": "diagram.puml",
+  "svg_path": "diagram.svg",
+  "brief_check": "ok",
+  "coverage_check": "ok",
+  "layout_check": "ok",
+  "render_result": "ok",
+  "render_server": "synthetic_fixture",
+  "brief_sha256": "bcf6633d21d03b4bd7cbf7129125db5e44d1a11ba5be2c480e5c744d0d9019dd",
+  "puml_sha256": "13506fdd461bde89ce959dbd2b471c9e0b4b515e54192ffcf32c7c56c9a1d55c",
+  "normalized_puml_sha256": "13506fdd461bde89ce959dbd2b471c9e0b4b515e54192ffcf32c7c56c9a1d55c",
+  "svg_sha256": "0fd96457954f916895712d13feface041748294a3dc5e5dac542c03c7d5af01a",
+  "artifacts": {
+    "brief": {
+      "path": "brief.normalized.yaml",
+      "sha256": "bcf6633d21d03b4bd7cbf7129125db5e44d1a11ba5be2c480e5c744d0d9019dd"
+    },
+    "diagram": {
+      "path": "diagram.puml",
+      "sha256": "13506fdd461bde89ce959dbd2b471c9e0b4b515e54192ffcf32c7c56c9a1d55c"
+    },
+    "svg": {
+      "path": "diagram.svg",
+      "sha256": "0fd96457954f916895712d13feface041748294a3dc5e5dac542c03c7d5af01a"
+    }
+  },
+  "metrics": {
+    "node_count": 5,
+    "edge_count": 5,
+    "max_degree": 3
+  },
+  "final_status": "success",
+  "blocked_reason": ""
+}

@@ -1,0 +1,21 @@
+@startuml
+title 在线离线凭据交付边界图
+left to right direction
+skinparam nodesep 35
+skinparam ranksep 60
+skinparam linetype ortho
+node "在线签发区" as online_zone {
+  component "在线签发系统" as issue_system
+}
+node "人工交接区" as transfer_zone {
+  node "人工摆渡点" as transfer_point
+}
+node "离线使用区" as offline_zone {
+  node "离线使用端点" as offline_endpoint
+}
+issue_system --> transfer_point : E1
+transfer_point --> offline_endpoint : E2
+legend right
+  E1...En：物理连接，详细说明见图下正文
+endlegend
+@enduml

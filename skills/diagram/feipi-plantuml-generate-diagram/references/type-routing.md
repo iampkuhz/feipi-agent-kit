@@ -12,13 +12,13 @@ Router 只负责判断用户意图属于哪种 PlantUML 图，不做复杂校验
 
 | 关键词示例 | 路由到 profile |
 |-----------|---------------|
-| 架构图、系统架构、模块分层、组件关系图 | `architecture` |
+| 架构图、系统架构、模块分层 | `architecture` |
 | 时序图、交互图、调用链路、消息流转 | `sequence` |
-| 类图、class diagram | `class` |
 | 活动图、流程图、activity diagram | `activity` |
-| 状态图、状态机、state diagram | `state` |
-| 用例图、use case | `usecase` |
-| 组件图、component diagram | `component` |
+| 组件图、组件关系图、component diagram | `component` |
+| 部署图、物理边界、deployment diagram | `deployment` |
+
+`class`、`state`、`usecase` 等未注册类型保留请求类型，但进入 `fallback`；不得因为文档提到该类型就当作 typed profile。
 
 ### 可推断类型
 
@@ -26,6 +26,8 @@ Router 只负责判断用户意图属于哪种 PlantUML 图，不做复杂校验
 
 - "参与者"、"调用"、"返回"、"时序"、"消息" → 推断 `sequence`
 - "层"、"组件"、"依赖"、"架构"、"分层" → 推断 `architecture`
+- "步骤"、"分支"、"活动"、"流程" → 推断 `activity`
+- "物理区"、"跨网"、"离线"、"HSM"、"人工交接" → 推断 `deployment`
 
 ### 不确定类型
 
@@ -40,4 +42,4 @@ Router 只负责判断用户意图属于哪种 PlantUML 图，不做复杂校验
 
 - 用户请求中无图类型关键词
 - 描述同时匹配多个类型且无法消歧
-- brief 未提供 `diagram_type` 或值不合法
+- brief 未提供 `diagram_type`、类型未注册或值不合法

@@ -1,0 +1,19 @@
+diagram_id: D4
+diagram_type: sequence
+numbering_scheme: process_s
+title: "跨端凭据交付时序图"
+summary: "展示在线签发系统与离线端点之间的受控凭据交付过程。"
+participants:
+  - {id: requester, name: 申请端, type: actor, description: 发起凭据申请}
+  - {id: issuer, name: 签发系统, type: participant, description: 生成受约束凭据}
+  - {id: verifier, name: 约束校验器, type: participant, description: 校验交付约束}
+  - {id: endpoint, name: 离线端点, type: participant, description: 接收并使用凭据}
+messages:
+  - {id: S1, from: requester, to: issuer, description: 提交申请, type: sync}
+  - {id: S2, from: issuer, to: verifier, description: 校验约束, type: sync}
+  - {id: S3, from: verifier, to: issuer, description: 返回校验, type: return}
+  - {id: S4, from: issuer, to: endpoint, description: 交付凭据, type: sync}
+  - {id: S4.1, from: endpoint, to: issuer, description: 确认接收, type: return}
+  - {id: S5, from: issuer, to: requester, description: 返回结果, type: return}
+layout: {direction: top_to_bottom, include_legend: false}
+out_of_scope: [异常重试参数]

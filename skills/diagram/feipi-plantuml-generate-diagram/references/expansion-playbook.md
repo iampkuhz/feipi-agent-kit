@@ -2,13 +2,13 @@
 
 ## 何时扩展
 
-当用户需求无法被现有 typed profile（architecture / sequence）覆盖时，按本流程新增图类型。
+当用户需求无法被现有 typed profile（architecture / sequence / component / activity / deployment）覆盖时，按本流程新增图类型。
 
 ## 步骤
 
 ### 1. 确认图类型
 
-- 确定 PlantUML 支持的图类型（class / activity / state / usecase / component 等）。
+- 确定 PlantUML 支持的未注册图类型（class / state / usecase 等）。
 - 确认该类型的核心元素（如类图的 class/relationship，活动图的 node/transition）。
 
 ### 2. 创建 profile 文件

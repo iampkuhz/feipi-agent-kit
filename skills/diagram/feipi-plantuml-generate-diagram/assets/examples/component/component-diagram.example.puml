@@ -1,0 +1,19 @@
+@startuml
+title 跨域凭据组件总览图
+top to bottom direction
+skinparam nodesep 30
+skinparam ranksep 60
+skinparam linetype ortho
+package "申请业务域" as request_domain {
+  component "凭据申请系统" as request_system
+}
+package "凭据签发域" as issue_domain {
+  component "凭据签发系统" as issue_system
+  node "离线使用端点" as offline_endpoint
+}
+request_system --> issue_system : E1
+issue_system --> offline_endpoint : E2
+legend right
+  E1...En：结构关系，详细说明见图下正文
+endlegend
+@enduml

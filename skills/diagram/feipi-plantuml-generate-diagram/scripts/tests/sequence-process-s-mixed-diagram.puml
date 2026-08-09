@@ -1,0 +1,11 @@
+@startuml
+skinparam nodesep 30
+skinparam ranksep 50
+actor "申请端" as requester
+participant "签发系统" as issuer
+participant "离线端点" as endpoint
+requester -> issuer : S1 提交申请
+issuer -> endpoint : M1 交付凭据
+endpoint --> issuer : S2.1 返回校验结果
+issuer --> requester : S3 返回交付结果
+@enduml

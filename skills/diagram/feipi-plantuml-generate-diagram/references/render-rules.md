@@ -15,7 +15,8 @@
 ## 渲染失败处理
 
 - HTTP 非 200：尝试下一个候选 server。
-- 全部候选 server 不可达：标记 `render_result=server_unavailable`。
+- 全部候选 server 不可达：标记 `render_result=skipped`、`final_status=blocked`、`blocked_reason=render_server_unavailable`。
+- renderer 脚本或 renderer 身份缺失、当前运行未生成 SVG 时一律阻塞；开始验证前必须让旧 SVG 失效。
 - PlantUML 返回语法错误：标记 `render_result=syntax_error`。
 - 渲染成功但 SVG 为空或过小：标记 `render_result=skipped`。
 

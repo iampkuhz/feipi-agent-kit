@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$(cd "$SKILL_DIR/../../.." && pwd)"
 TEST_DIR="$SCRIPT_DIR/tests"
 
 PASS=0
@@ -75,8 +76,18 @@ ARCH_BRIEF="$SKILL_DIR/assets/examples/architecture/architecture-brief.example.y
 ARCH_DIAGRAM="$SKILL_DIR/assets/examples/architecture/architecture-diagram.example.puml"
 SEQ_BRIEF="$SKILL_DIR/assets/examples/sequence/sequence-brief.example.yaml"
 SEQ_DIAGRAM="$SKILL_DIR/assets/examples/sequence/sequence-diagram.example.puml"
+SEQ_S_BRIEF="$SKILL_DIR/assets/examples/sequence/sequence-process-s-brief.example.yaml"
+SEQ_S_DIAGRAM="$SKILL_DIR/assets/examples/sequence/sequence-process-s-diagram.example.puml"
+COMPONENT_BRIEF="$SKILL_DIR/assets/examples/component/component-brief.example.yaml"
+COMPONENT_DIAGRAM="$SKILL_DIR/assets/examples/component/component-diagram.example.puml"
+ACTIVITY_BRIEF="$SKILL_DIR/assets/examples/activity/activity-brief.example.yaml"
+ACTIVITY_DIAGRAM="$SKILL_DIR/assets/examples/activity/activity-diagram.example.puml"
+DEPLOYMENT_BRIEF="$SKILL_DIR/assets/examples/deployment/deployment-brief.example.yaml"
+DEPLOYMENT_DIAGRAM="$SKILL_DIR/assets/examples/deployment/deployment-diagram.example.puml"
 SERVER_CANDIDATES="$SKILL_DIR/assets/server_candidates.txt"
-for f in "$FALLBACK_DIAGRAM" "$ARCH_BRIEF" "$ARCH_DIAGRAM" "$SEQ_BRIEF" "$SEQ_DIAGRAM" "$SERVER_CANDIDATES"; do
+for f in "$FALLBACK_DIAGRAM" "$ARCH_BRIEF" "$ARCH_DIAGRAM" "$SEQ_BRIEF" "$SEQ_DIAGRAM" \
+  "$SEQ_S_BRIEF" "$SEQ_S_DIAGRAM" "$COMPONENT_BRIEF" "$COMPONENT_DIAGRAM" \
+  "$ACTIVITY_BRIEF" "$ACTIVITY_DIAGRAM" "$DEPLOYMENT_BRIEF" "$DEPLOYMENT_DIAGRAM" "$SERVER_CANDIDATES"; do
   if [[ -f "$f" ]]; then
     pass "文件存在：$(basename "$f")"
   else
@@ -96,7 +107,8 @@ if [[ -f "$FALLBACK_OUT/validation.json" ]]; then
   check_json_field "$FALLBACK_OUT/validation.json" skill_name "feipi-plantuml-generate-diagram" "skill_name"
   check_json_field "$FALLBACK_OUT/validation.json" diagram_type "fallback" "diagram_type"
   check_json_field "$FALLBACK_OUT/validation.json" profile "fallback" "profile"
-  check_json_field_in "$FALLBACK_OUT/validation.json" final_status "final_status" "success" "render_server_unavailable"
+  check_json_field "$FALLBACK_OUT/validation.json" schema_version "1.1" "schema_version"
+  check_json_field_in "$FALLBACK_OUT/validation.json" final_status "final_status" "success" "blocked"
 else
   fail "validation.json 未生成"
 fi
@@ -139,7 +151,7 @@ if [[ -f "$ARCH_OUT/validation.json" ]]; then
   check_json_field "$ARCH_OUT/validation.json" brief_check "ok" "brief_check"
   check_json_field "$ARCH_OUT/validation.json" coverage_check "ok" "coverage_check"
   check_json_field "$ARCH_OUT/validation.json" layout_check "ok" "layout_check"
-  check_json_field_in "$ARCH_OUT/validation.json" final_status "final_status" "success" "render_server_unavailable"
+  check_json_field_in "$ARCH_OUT/validation.json" final_status "final_status" "success" "blocked"
 else
   fail "architecture validation.json 未生成"
 fi
@@ -187,7 +199,7 @@ if [[ -f "$SEQ_OUT/validation.json" ]]; then
   check_json_field "$SEQ_OUT/validation.json" brief_check "ok" "brief_check"
   check_json_field "$SEQ_OUT/validation.json" coverage_check "ok" "coverage_check"
   check_json_field "$SEQ_OUT/validation.json" layout_check "ok" "layout_check"
-  check_json_field_in "$SEQ_OUT/validation.json" final_status "final_status" "success" "render_server_unavailable"
+  check_json_field_in "$SEQ_OUT/validation.json" final_status "final_status" "success" "blocked"
 else
   fail "sequence validation.json 未生成"
 fi
@@ -231,9 +243,136 @@ else
 fi
 
 # =============================================================================
-# Step 9: Python 语法与 Shell 语法检查
+# Step 9: 新 typed profiles 与 process_s
 # =============================================================================
-echo "=== Step 9: 脚本语法检查 ==="
+echo "=== Step 9: 新 typed profiles 与 process_s ==="
+for spec in \
+  "component|$COMPONENT_BRIEF|$COMPONENT_DIAGRAM" \
+  "activity|$ACTIVITY_BRIEF|$ACTIVITY_DIAGRAM" \
+  "deployment|$DEPLOYMENT_BRIEF|$DEPLOYMENT_DIAGRAM" \
+  "sequence|$SEQ_S_BRIEF|$SEQ_S_DIAGRAM"; do
+  IFS='|' read -r profile brief diagram <<< "$spec"
+  out_dir="/tmp/plantuml-${profile}-v2-smoke-test"
+  [[ "$brief" == "$SEQ_S_BRIEF" ]] && out_dir="/tmp/plantuml-sequence-process-s-smoke-test"
+  run_validate "$out_dir" --diagram-type "$profile" --brief "$brief" --diagram "$diagram"
+  if [[ -f "$out_dir/validation.json" ]]; then
+    check_json_field "$out_dir/validation.json" schema_version "1.1" "$profile schema_version"
+    check_json_field "$out_dir/validation.json" profile "$profile" "$profile profile"
+    check_json_field "$out_dir/validation.json" brief_check "ok" "$profile brief_check"
+    check_json_field "$out_dir/validation.json" coverage_check "ok" "$profile coverage_check"
+    check_json_field "$out_dir/validation.json" layout_check "ok" "$profile layout_check"
+    check_json_field_in "$out_dir/validation.json" final_status "$profile final_status" "success" "blocked"
+  else
+    fail "$profile validation.json 未生成"
+  fi
+done
+
+if python3 "$SCRIPT_DIR/check_coverage.py" --type sequence --brief "$SEQ_S_BRIEF" \
+  --diagram "$TEST_DIR/sequence-process-s-mixed-diagram.puml" >/dev/null 2>&1; then
+  fail "process_s 混用 M/R 应被拦截"
+else
+  pass "process_s 混用 M/R 正确拦截"
+fi
+
+UNLABELED_COMPONENT="/tmp/plantuml-component-unlabeled.puml"
+sed -E 's/[[:space:]]*:[[:space:]]*E[1-9][0-9]*[[:space:]]*$//' "$COMPONENT_DIAGRAM" > "$UNLABELED_COMPONENT"
+if python3 "$SCRIPT_DIR/check_coverage.py" --type component --brief "$COMPONENT_BRIEF" \
+  --diagram "$UNLABELED_COMPONENT" >/dev/null 2>&1; then
+  pass "component 关系允许无文字标签"
+else
+  fail "component 无文字关系应被允许"
+fi
+
+PROCESS_S_AUTONUMBER="/tmp/plantuml-process-s-autonumber.puml"
+awk '{print} /skinparam ranksep/ {print "autonumber"}' "$SEQ_S_DIAGRAM" > "$PROCESS_S_AUTONUMBER"
+if bash "$SCRIPT_DIR/lint_layout.sh" --type sequence "$PROCESS_S_AUTONUMBER" "$SEQ_S_BRIEF" >/dev/null 2>&1; then
+  fail "process_s autonumber 应被拦截"
+else
+  pass "process_s autonumber 正确拦截"
+fi
+
+if python3 "$TEST_DIR/test_profile_validators.py" >/dev/null 2>&1; then
+  pass "profile 边界与编号单元测试"
+else
+  fail "profile 边界与编号单元测试"
+fi
+
+if python3 "$TEST_DIR/test_package_verifier.py" >/dev/null 2>&1; then
+  pass "v1.1 package 安全与双向合同单元测试"
+else
+  fail "v1.1 package 安全与双向合同单元测试"
+fi
+
+# 未注册图型只能进入 fallback，不得跳过 typed schema 后伪装成 typed profile。
+UNKNOWN_OUT="/tmp/plantuml-unknown-fallback-test"
+run_validate "$UNKNOWN_OUT" --diagram-type class --diagram "$FALLBACK_DIAGRAM"
+if [[ -f "$UNKNOWN_OUT/validation.json" ]]; then
+  check_json_field "$UNKNOWN_OUT/validation.json" diagram_type "class" "保留请求图型"
+  check_json_field "$UNKNOWN_OUT/validation.json" profile "fallback" "未注册图型路由 fallback"
+else
+  fail "未知图型 fallback 未生成 validation.json"
+fi
+
+# v1.1 hash 合同必须可复核，任一 artifact 被篡改都失败。
+HASH_OUT="/tmp/plantuml-component-v2-smoke-test"
+if python3 - "$HASH_OUT/validation.json" <<'PY' >/dev/null 2>&1
+import json
+import sys
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+required = {
+    "diagram_id", "profile_version", "brief_sha256", "puml_sha256",
+    "normalized_puml_sha256", "artifacts", "metrics",
+}
+assert required.issubset(data)
+assert data["diagram_id"] == "D1"
+assert data["brief_path"] == "brief.normalized.yaml"
+assert data["diagram_path"] == "diagram.puml"
+assert data["brief_sha256"] == data["artifacts"]["brief"]["sha256"]
+assert data["puml_sha256"] == data["artifacts"]["diagram"]["sha256"]
+assert data["metrics"] == {"node_count": 3, "edge_count": 2, "max_degree": 2}
+PY
+then
+  pass "v1.1 字段、相对路径与 metrics 合同"
+else
+  fail "v1.1 字段、相对路径与 metrics 合同"
+fi
+HASH_STATUS="$(python3 -c "import json; print(json.load(open('$HASH_OUT/validation.json'))['final_status'])")"
+if [[ "$HASH_STATUS" == "success" ]]; then
+  if python3 "$SCRIPT_DIR/verify_package.py" "$HASH_OUT" >/dev/null 2>&1; then
+    pass "v1.1 package hash 复核"
+  else
+    fail "v1.1 package hash 复核"
+  fi
+  printf '\n' >> "$HASH_OUT/diagram.puml"
+  if python3 "$SCRIPT_DIR/verify_package.py" "$HASH_OUT" >/dev/null 2>&1; then
+    fail "篡改 diagram.puml 应导致 hash 复核失败"
+  else
+    pass "篡改 diagram.puml 正确拦截"
+  fi
+else
+  check_json_field "$HASH_OUT/validation.json" blocked_reason "render_server_unavailable" "离线渲染如实阻塞"
+fi
+
+# renderer 缺失时不得复用旧 SVG 或写出 success。
+MISSING_RENDER_ROOT="$(mktemp -d /tmp/plantuml-missing-render.XXXXXX)"
+mkdir -p "$MISSING_RENDER_ROOT/scripts" "$MISSING_RENDER_ROOT/out"
+cp "$SCRIPT_DIR/validate_package.sh" "$MISSING_RENDER_ROOT/scripts/validate_package.sh"
+cp -R "$SCRIPT_DIR/lib" "$MISSING_RENDER_ROOT/scripts/lib"
+printf '<svg>stale</svg>\n' > "$MISSING_RENDER_ROOT/out/diagram.svg"
+if bash "$MISSING_RENDER_ROOT/scripts/validate_package.sh" \
+  --diagram "$FALLBACK_DIAGRAM" --diagram-type fallback --out-dir "$MISSING_RENDER_ROOT/out" >/dev/null 2>&1; then
+  fail "renderer 缺失不应返回 success"
+elif [[ -f "$MISSING_RENDER_ROOT/out/diagram.svg" ]]; then
+  fail "renderer 缺失时旧 SVG 未失效"
+else
+  check_json_field "$MISSING_RENDER_ROOT/out/validation.json" final_status "blocked" "renderer 缺失正确阻塞"
+  check_json_field "$MISSING_RENDER_ROOT/out/validation.json" blocked_reason "renderer_missing" "旧 SVG 不进入合同"
+fi
+
+# =============================================================================
+# Step 10: Python 语法与 Shell 语法检查
+# =============================================================================
+echo "=== Step 10: 脚本语法检查 ==="
 if python3 -m py_compile $(find "$SCRIPT_DIR" -type f -name '*.py' | sort) 2>/dev/null; then
   pass "Python 语法检查"
 else
@@ -246,16 +385,16 @@ else
 fi
 
 # =============================================================================
-# Step 10: 触发边界一致 & 旧 skill 保护
+# Step 11: 触发边界一致 & 旧 skill 保护
 # =============================================================================
-echo "=== Step 10: 触发边界 & 旧 skill 保护 ==="
+echo "=== Step 11: 触发边界 & 旧 skill 保护 ==="
 if rg -q 'fallback' "$SKILL_DIR/SKILL.md"; then
   pass "SKILL.md 包含 fallback"
 else
   fail "SKILL.md 缺少 fallback"
 fi
-ARCH_OLD_SKILL="skills/diagram/feipi-plantuml-generate-architecture-diagram/SKILL.md"
-SEQ_OLD_SKILL="skills/diagram/feipi-plantuml-generate-sequence-diagram/SKILL.md"
+ARCH_OLD_SKILL="$REPO_ROOT/skills/diagram/feipi-plantuml-generate-architecture-diagram/SKILL.md"
+SEQ_OLD_SKILL="$REPO_ROOT/skills/diagram/feipi-plantuml-generate-sequence-diagram/SKILL.md"
 if [[ -f "$ARCH_OLD_SKILL" && -f "$SEQ_OLD_SKILL" ]]; then
   pass "旧 skill 未被删除"
 else

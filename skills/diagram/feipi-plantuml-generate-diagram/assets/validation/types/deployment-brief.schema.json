@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "deployment-brief",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["diagram_id", "diagram_type", "title", "summary", "zones", "nodes", "connections", "boundary_triggers", "layout"],
+  "properties": {
+    "diagram_id": {"type": "string", "pattern": "^(D[1-9][0-9]*|[a-z][a-z0-9-]*)$"},
+    "diagram_type": {"type": "string", "enum": ["deployment"]},
+    "title": {"type": "string", "minLength": 2, "maxLength": 80},
+    "summary": {"type": "string", "minLength": 10, "maxLength": 200},
+    "zones": {
+      "type": "array", "minItems": 2, "maxItems": 8,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "name", "type", "description"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+          "name": {"type": "string", "minLength": 2, "maxLength": 30},
+          "type": {"type": "string", "enum": ["physical", "network", "security"]},
+          "description": {"type": "string", "minLength": 2, "maxLength": 80}
+        }
+      }
+    },
+    "nodes": {
+      "type": "array", "minItems": 2, "maxItems": 8,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "name", "zone", "type", "mode", "network_id", "chain_id", "description"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+          "name": {"type": "string", "minLength": 2, "maxLength": 40},
+          "zone": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+          "type": {"type": "string", "enum": ["system", "endpoint", "hsm", "human_transfer", "human_handoff", "database", "network_device"]},
+          "mode": {"type": "string", "enum": ["online", "offline", "hybrid"]},
+          "network_id": {"type": "string", "pattern": "^[a-z][a-z0-9_-]*$"},
+          "chain_id": {"type": "string", "pattern": "^[a-z][a-z0-9_-]*$"},
+          "description": {"type": "string", "minLength": 2, "maxLength": 100}
+        }
+      }
+    },
+    "connections": {
+      "type": "array", "minItems": 1, "maxItems": 10,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "from", "to", "description"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^E[1-9][0-9]*$"},
+          "from": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+          "to": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+          "description": {"type": "string", "minLength": 2, "maxLength": 100}
+        }
+      }
+    },
+    "boundary_triggers": {
+      "type": "object", "additionalProperties": false,
+      "required": ["cross_network", "cross_chain", "online_offline", "hsm", "manual_transfer", "manual_handoff"],
+      "properties": {
+        "cross_network": {"type": "boolean"},
+        "cross_chain": {"type": "boolean"},
+        "online_offline": {"type": "boolean"},
+        "hsm": {"type": "boolean"},
+        "manual_transfer": {"type": "boolean"},
+        "manual_handoff": {"type": "boolean"}
+      }
+    },
+    "layout": {
+      "type": "object", "additionalProperties": false,
+      "required": ["direction", "include_legend"],
+      "properties": {
+        "direction": {"type": "string", "enum": ["top_to_bottom", "left_to_right"]},
+        "include_legend": {"type": "boolean"}
+      }
+    },
+    "out_of_scope": {"type": "array", "items": {"type": "string", "minLength": 2, "maxLength": 80}}
+  }
+}

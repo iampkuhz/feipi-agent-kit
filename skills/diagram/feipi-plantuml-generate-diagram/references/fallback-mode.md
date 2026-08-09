@@ -14,11 +14,11 @@
 ## 最低校验
 
 1. `.puml` 包含 `@startuml` 与 `@enduml`
-2. 渲染脚本可执行（若 server 不可用，标记为 `render_server_unavailable`）
+2. 渲染脚本可执行（若 server 不可用，标记为 `blocked`，原因写入 `render_server_unavailable`）
 3. `validation.json` 能区分以下状态：
    - `success` - 全部通过
    - `blocked` - 语法错误或渲染失败
-   - `render_server_unavailable` - 渲染服务不可达
+   - `blocked` + `blocked_reason=render_server_unavailable` - 渲染服务不可达
    - `syntax_error` - PlantUML 语法错误
 
 ## 不要求
@@ -31,15 +31,20 @@
 
 ```json
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "skill_name": "feipi-plantuml-generate-diagram",
+  "diagram_id": "diagram",
   "diagram_type": "fallback",
   "profile": "fallback",
+  "profile_version": "1.0",
   "brief_check": "skipped",
   "coverage_check": "skipped",
   "layout_check": "skipped",
-  "render_result": "ok | skipped | syntax_error | server_unavailable",
-  "final_status": "success | blocked | render_server_unavailable",
+  "render_result": "ok | skipped | syntax_error",
+  "normalized_puml_sha256": "<sha256>",
+  "artifacts": {"diagram": {"path": "diagram.puml", "sha256": "<sha256>"}},
+  "metrics": {"node_count": 0, "edge_count": 0, "max_degree": 0},
+  "final_status": "success | blocked",
   "blocked_reason": ""
 }
 ```

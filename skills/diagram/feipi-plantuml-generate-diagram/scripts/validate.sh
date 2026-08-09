@@ -177,11 +177,16 @@ if ! rg -q '^interface:' "$OPENAI_FILE"; then
   exit 1
 fi
 for field in display_name short_description default_prompt; do
-  if ! rg -q "^[[:space:]]+$field:[[:space:]]*.+$" "$OPENAI_FILE"; then
+  if ! rg -q "^[[:space:]]+$field:[[:space:]]*\"[^\"]+\"[[:space:]]*$" "$OPENAI_FILE"; then
     echo "agents/openai.yaml 缺少字段：$field" >&2
     exit 1
   fi
 done
+DEFAULT_PROMPT_LINE="$(rg '^[[:space:]]+default_prompt:' "$OPENAI_FILE" | head -n1)"
+if [[ "$DEFAULT_PROMPT_LINE" != *"\$$BASE"* ]]; then
+  echo "agents/openai.yaml default_prompt 必须显式引用 \$$BASE" >&2
+  exit 1
+fi
 
 for placeholder in '{{SKILL_NAME}}' '{{SKILL_DESCRIPTION}}' '{{TITLE}}' '{{DISPLAY_NAME}}' '{{SHORT_DESCRIPTION}}' '{{DEFAULT_PROMPT}}'; do
   if rg -Fq "$placeholder" "$SKILL_FILE" "$OPENAI_FILE" "$TEST_SCRIPT"; then

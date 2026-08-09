@@ -1,0 +1,195 @@
+{
+  "schema_version": "1.0",
+  "patent": {
+    "title": "一种冷链运输异常分层处置方法/系统",
+    "use_case": "冷链运输在途阶段发生连续温度偏离，需要在不改变设备采集频率的前提下完成异常识别、责任派发和回执闭环。"
+  },
+  "input_completeness": {
+    "technical_objects": ["分层处置单"],
+    "core_mechanisms": ["阶段化异常窗口", "责任域映射", "回执证据约束"],
+    "necessary_constraints": ["保持设备采集频率", "复用既有工单接口"],
+    "existing_problem_facts": ["同一阶段的多次越界会形成重复任务", "判定依据、责任记录和回执材料分散"]
+  },
+  "boundaries": {
+    "business_domains": [
+      {
+        "id": "BD1",
+        "name": "运输监测业务域",
+        "scope": "提供带运输单、箱体和阶段上下文的温控事件，不承担处置判定。"
+      }
+    ],
+    "system_ownership": [
+      {
+        "id": "SYS1",
+        "name": "事件汇聚系统",
+        "owner": "运输数据服务方",
+        "boundary": "对齐多源事件并输出有序事件流，不生成处置结论。"
+      },
+      {
+        "id": "SYS2",
+        "name": "异常处置系统",
+        "owner": "运输处置服务方",
+        "boundary": "维护异常窗口、生成分层处置单并匹配责任域。"
+      },
+      {
+        "id": "SYS3",
+        "name": "回执审计系统",
+        "owner": "质量审计服务方",
+        "boundary": "校验回执约束并返回审计结论，不修改原始监测事件。"
+      }
+    ],
+    "physical_boundaries": [
+      {
+        "id": "PB1",
+        "type": "现场执行端",
+        "description": "只接收处置任务并提交现场动作与恢复证据。"
+      }
+    ],
+    "deployment_triggers": []
+  },
+  "sources": {
+    "source_facts": [
+      {
+        "id": "SF1",
+        "statement": "现有流程按单点阈值逐条派发，短时波动与持续异常被等价处理，会在同一运输阶段形成重复任务。",
+        "source_locator": "synthetic-input:problem-1"
+      },
+      {
+        "id": "SF2",
+        "statement": "温度、轨迹和现场动作已有采集记录，但缺少贯穿判定、派发和回执的统一处置对象。",
+        "source_locator": "synthetic-input:problem-2"
+      },
+      {
+        "id": "SF3",
+        "statement": "方案不能改变设备采集频率，并需要复用既有工单接口。",
+        "source_locator": "synthetic-input:constraint-1"
+      }
+    ],
+    "invention_extensions": [
+      {
+        "id": "IE1",
+        "statement": "按运输阶段维护异常窗口，并把同一窗口内相关事件聚合为一张活动处置单。",
+        "basis_source_ids": ["SF1", "SF3"]
+      },
+      {
+        "id": "IE2",
+        "statement": "把责任域映射结果和回执证据约束写入同一处置单，并在关闭前校验。",
+        "basis_source_ids": ["SF2", "SF3"]
+      }
+    ],
+    "external_materials": [],
+    "term_generalizations": [
+      {
+        "original": "原型中的内部告警任务类型名",
+        "generalized": "分层处置单",
+        "reason": "使用稳定的技术对象表达，避免把内部实现名限定为发明边界。"
+      }
+    ],
+    "abbreviation_allowlist": []
+  },
+  "keywords": {
+    "technical_objects": [
+      {"term": "分层处置单", "anchor": "I1"}
+    ],
+    "core_mechanisms": [
+      {"term": "阶段化异常窗口", "anchor": "S3"},
+      {"term": "责任域映射", "anchor": "S5"},
+      {"term": "回执证据约束", "anchor": "S6"}
+    ],
+    "key_constraints": [
+      {"term": "采集频率保持", "anchor": "S1"}
+    ]
+  },
+  "core_invention_claim": "本方案在保持设备采集频率并复用既有工单接口的约束下，以运输阶段为边界聚合异常事件，形成同时固化判定依据、责任域和回执要求的分层处置单。",
+  "innovations": [
+    {
+      "id": "I1",
+      "core_mechanism": "按运输阶段维护异常窗口，并把窗口结果固化为分层处置单。",
+      "necessary_constraint": "不改变设备采集频率，且同一窗口只保留一张活动处置单。",
+      "substantive_difference": "处置对象从单条越界记录变为受阶段边界约束的事件集合。",
+      "anchors": ["S2", "S3", "S4", "D2"]
+    },
+    {
+      "id": "I2",
+      "core_mechanism": "把责任域映射结果和回执证据约束写入同一处置单。",
+      "necessary_constraint": "复用既有工单接口，且关闭前必须通过证据校验。",
+      "substantive_difference": "判定、责任和回执不再由分散记录事后拼接。",
+      "anchors": ["S5", "S6", "S7", "E3", "E4", "E5"]
+    }
+  ],
+  "effects": [
+    {
+      "id": "T1",
+      "innovation_id": "I1",
+      "original_problem": "同一阶段的多次越界形成重复任务。",
+      "mechanism": "阶段化异常窗口聚合同一窗口内相关事件，并约束只保留一张活动处置单。",
+      "observable_result": "按运输单和阶段窗口统计的活动处置单数量不超过一。",
+      "verification_status": "expected_observable",
+      "evidence_source_ids": []
+    },
+    {
+      "id": "T2",
+      "innovation_id": "I2",
+      "original_problem": "判定依据、责任记录和回执材料分散。",
+      "mechanism": "责任域映射与回执证据约束随同一处置单传递并在关闭前校验。",
+      "observable_result": "每张已关闭处置单均包含触发依据、责任依据和规定证据字段。",
+      "verification_status": "expected_observable",
+      "evidence_source_ids": []
+    }
+  ],
+  "competitors": {
+    "status": "pending_retrieval",
+    "evidence": []
+  },
+  "diagrams": [
+    {
+      "id": "D1",
+      "role": "component_overview",
+      "package_path": "diagrams/D1-component-overview",
+      "purpose": "说明运输监测业务域、三个独立系统和现场执行端之间的职责边界。"
+    },
+    {
+      "id": "D2",
+      "role": "main_flow",
+      "package_path": "diagrams/D2-main-flow",
+      "purpose": "说明温控事件从汇聚、阶段窗口判定到责任派发和回执闭环的连续流程。"
+    }
+  ],
+  "reviews": {
+    "generalization_test": {
+      "status": "pass",
+      "reviewer": "合成样例复核",
+      "notes": "替换冷链、运输阶段和温控事件后，阶段边界与处置对象的必要关系无法直接套用于任意系统，核心主张仍保留明确技术约束。"
+    },
+    "causal_deletion_tests": [
+      {
+        "innovation_id": "I1",
+        "status": "pass",
+        "reviewer": "合成样例复核",
+        "notes": "删除阶段化异常窗口后，无法约束同一运输阶段窗口内只保留一张活动处置单，T1 不成立。"
+      },
+      {
+        "innovation_id": "I2",
+        "status": "pass",
+        "reviewer": "合成样例复核",
+        "notes": "删除责任与证据同对象机制后，关闭处置单不能保证同时具有三类依据，T2 不成立。"
+      }
+    ],
+    "visual_reviews": [
+      {
+        "diagram_id": "D1",
+        "svg_sha256": "0fd96457954f916895712d13feface041748294a3dc5e5dac542c03c7d5af01a",
+        "status": "pass",
+        "reviewer": "合成样例复核",
+        "notes": "已检查最终 SVG，未发现连线交叉或文字遮挡。"
+      },
+      {
+        "diagram_id": "D2",
+        "svg_sha256": "802ce0719bb51691e60fcaf07d1723662375250f408338e8119f0874fc90d7c2",
+        "status": "pass",
+        "reviewer": "合成样例复核",
+        "notes": "已检查最终 SVG，S1 至 S7 自上而下排列，未发现连线交叉或文字遮挡。"
+      }
+    ]
+  }
+}

@@ -1,0 +1,15 @@
+@startuml
+title 冷链异常处置组件总览
+left to right direction
+skinparam linetype ortho
+rectangle "运输监测业务域" as monitor
+rectangle "事件汇聚系统" as ingest
+rectangle "异常处置系统" as dispose
+rectangle "现场执行端" as execute
+rectangle "回执审计系统" as audit
+monitor --> ingest : E1
+ingest --> dispose : E2
+dispose --> execute : E3
+execute --> audit : E4
+audit --> dispose : E5
+@enduml

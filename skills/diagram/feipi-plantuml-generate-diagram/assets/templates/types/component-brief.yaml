@@ -1,0 +1,45 @@
+# 组件图需求模板。overview 只放业务域、独立系统和物理端点；module_detail 只展开一个 parent_component_id。
+diagram_id: D1
+diagram_type: component
+title: "<组件总览图标题>"
+summary: "<说明本图唯一要回答的系统边界与归属问题>"
+view: overview
+
+# view=module_detail 时必须取消注释并填写。overview_brief_path 只能指向
+# 当前 brief 目录内的安全相对路径，hash/diagram_id/component_id 会共同复核。
+# parent_component_id: parent_system
+# parent_component_ref:
+#   overview_diagram_id: D1
+#   component_id: parent_system
+#   overview_brief_path: evidence/D1-overview-brief.yaml
+#   overview_brief_sha256: <64位小写SHA-256>
+
+groups:
+  - id: business
+    name: <业务域>
+    description: <该分组的边界与归属>
+
+nodes:
+  - id: source_system
+    name: <来源系统>
+    group: business
+    type: system
+    description: <系统职责>
+  - id: target_endpoint
+    name: <目标物理端点>
+    group: business
+    type: physical_endpoint
+    description: <端点职责>
+
+relations:
+  - id: E1
+    from: source_system
+    to: target_endpoint
+    description: <完整关系解释，仅在图下正文使用>
+
+layout:
+  direction: top_to_bottom
+  include_legend: true
+
+out_of_scope:
+  - <不进入本图的实现细节>

@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="310" viewBox="0 0 920 310" role="img" aria-labelledby="title desc">
+  <title id="title">冷链异常处置组件总览</title>
+  <desc id="desc">五个顶层对象由 E1 至 E5 连接，E5 沿底部返回异常处置系统。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#334155"/>
+    </marker>
+    <style>
+      .node { fill: #f8fafc; stroke: #334155; stroke-width: 1.5; rx: 8; }
+      .edge { fill: none; stroke: #334155; stroke-width: 1.5; marker-end: url(#arrow); }
+      .name { font: 15px sans-serif; fill: #0f172a; text-anchor: middle; }
+      .label { font: 13px sans-serif; fill: #475569; text-anchor: middle; }
+      .heading { font: 20px sans-serif; font-weight: 600; fill: #0f172a; text-anchor: middle; }
+    </style>
+  </defs>
+  <text class="heading" x="460" y="30">冷链异常处置组件总览</text>
+  <rect class="node" x="20" y="85" width="150" height="64"/>
+  <text class="name" x="95" y="122">运输监测业务域</text>
+  <rect class="node" x="205" y="85" width="150" height="64"/>
+  <text class="name" x="280" y="122">事件汇聚系统</text>
+  <rect class="node" x="390" y="85" width="150" height="64"/>
+  <text class="name" x="465" y="122">异常处置系统</text>
+  <rect class="node" x="575" y="85" width="150" height="64"/>
+  <text class="name" x="650" y="122">现场执行端</text>
+  <rect class="node" x="760" y="85" width="140" height="64"/>
+  <text class="name" x="830" y="122">回执审计系统</text>
+  <path class="edge" d="M170 117 L205 117"/>
+  <text class="label" x="187" y="105">E1</text>
+  <path class="edge" d="M355 117 L390 117"/>
+  <text class="label" x="372" y="105">E2</text>
+  <path class="edge" d="M540 117 L575 117"/>
+  <text class="label" x="557" y="105">E3</text>
+  <path class="edge" d="M725 117 L760 117"/>
+  <text class="label" x="742" y="105">E4</text>
+  <path class="edge" d="M830 149 L830 235 L465 235 L465 149"/>
+  <text class="label" x="648" y="225">E5</text>
+</svg>

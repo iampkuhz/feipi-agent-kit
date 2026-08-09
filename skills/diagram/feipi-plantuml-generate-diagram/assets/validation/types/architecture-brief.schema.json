@@ -15,9 +15,9 @@
   "properties": {
     "diagram_id": {
       "type": "string",
-      "minLength": 3,
+      "minLength": 2,
       "maxLength": 50,
-      "pattern": "^[a-z][a-z0-9-]*$"
+      "pattern": "^(D[1-9][0-9]*|[a-z][a-z0-9-]*)$"
     },
     "diagram_type": {
       "type": "string",

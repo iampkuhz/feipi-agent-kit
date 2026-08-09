@@ -1,0 +1,31 @@
+# 部署/物理边界图需求模板。跨网、跨链、在线/离线、HSM 或人工交接场景使用。
+diagram_id: D3
+diagram_type: deployment
+title: "<部署与物理边界图标题>"
+summary: "<说明部署位置、物理端点及跨边界连接>"
+
+zones:
+  - {id: online_zone, name: <在线区>, type: network, description: <在线区域边界>}
+  - {id: offline_zone, name: <离线区>, type: security, description: <离线区域边界>}
+
+nodes:
+  - {id: online_service, name: <在线服务>, zone: online_zone, type: system, mode: online, network_id: business_net, chain_id: no_chain, description: <在线职责>}
+  - {id: offline_endpoint, name: <离线端点>, zone: offline_zone, type: endpoint, mode: offline, network_id: offline_net, chain_id: no_chain, description: <离线职责>}
+
+connections:
+  - {id: E1, from: online_service, to: offline_endpoint, description: <跨边界物理连接>}
+
+boundary_triggers:
+  cross_network: true
+  cross_chain: false
+  online_offline: true
+  hsm: false
+  manual_transfer: false
+  manual_handoff: false
+
+layout:
+  direction: top_to_bottom
+  include_legend: true
+
+out_of_scope:
+  - <逻辑实现细节>

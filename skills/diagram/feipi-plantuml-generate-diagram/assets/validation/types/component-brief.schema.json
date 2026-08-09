@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "component-brief",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["diagram_id", "diagram_type", "title", "summary", "view", "groups", "nodes", "relations", "layout"],
+  "properties": {
+    "diagram_id": {"type": "string", "pattern": "^(D[1-9][0-9]*|[a-z][a-z0-9-]*)$"},
+    "diagram_type": {"type": "string", "enum": ["component"]},
+    "title": {"type": "string", "minLength": 2, "maxLength": 80},
+    "summary": {"type": "string", "minLength": 10, "maxLength": 200},
+    "view": {"type": "string", "enum": ["overview", "module_detail"]},
+    "parent_component_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+    "parent_component_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["overview_diagram_id", "component_id", "overview_brief_path", "overview_brief_sha256"],
+      "properties": {
+        "overview_diagram_id": {"type": "string", "pattern": "^(D[1-9][0-9]*|[a-z][a-z0-9-]*)$"},
+        "component_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+        "overview_brief_path": {
+          "type": "string",
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._/-]+$"
+        },
+        "overview_brief_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "groups": {
+      "type": "array", "minItems": 1, "maxItems": 8,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "name", "description"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+          "name": {"type": "string", "minLength": 2, "maxLength": 30},
+          "description": {"type": "string", "minLength": 2, "maxLength": 80}
+        }
+      }
+    },
+    "nodes": {
+      "type": "array", "minItems": 2, "maxItems": 8,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "name", "group", "type", "description"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+          "name": {"type": "string", "minLength": 2, "maxLength": 40},
+          "group": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+          "type": {"type": "string", "enum": ["business_domain", "system", "physical_endpoint", "component", "module"]},
+          "description": {"type": "string", "minLength": 2, "maxLength": 100}
+        }
+      }
+    },
+    "relations": {
+      "type": "array", "minItems": 1, "maxItems": 10,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "from", "to", "description"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^E[1-9][0-9]*$"},
+          "from": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+          "to": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+          "description": {"type": "string", "minLength": 2, "maxLength": 100}
+        }
+      }
+    },
+    "layout": {
+      "type": "object", "additionalProperties": false,
+      "required": ["direction", "include_legend"],
+      "properties": {
+        "direction": {"type": "string", "enum": ["top_to_bottom", "left_to_right"]},
+        "include_legend": {"type": "boolean"}
+      }
+    },
+    "out_of_scope": {"type": "array", "items": {"type": "string", "minLength": 2, "maxLength": 80}}
+  }
+}

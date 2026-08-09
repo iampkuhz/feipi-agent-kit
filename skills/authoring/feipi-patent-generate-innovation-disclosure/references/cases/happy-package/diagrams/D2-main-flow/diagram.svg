@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="720" viewBox="0 0 520 720" role="img" aria-labelledby="title desc">
+  <title id="title">冷链异常分层处置主流程</title>
+  <desc id="desc">S1 至 S7 自上而下连续排列，无交叉和文字遮挡。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#334155"/>
+    </marker>
+    <style>
+      .step { fill: #eff6ff; stroke: #2563eb; stroke-width: 1.5; rx: 10; }
+      .edge { stroke: #334155; stroke-width: 1.5; marker-end: url(#arrow); }
+      .name { font: 16px sans-serif; fill: #0f172a; text-anchor: middle; }
+      .heading { font: 20px sans-serif; font-weight: 600; fill: #0f172a; text-anchor: middle; }
+      .terminal { fill: #334155; }
+    </style>
+  </defs>
+  <text class="heading" x="260" y="30">冷链异常分层处置主流程</text>
+  <circle class="terminal" cx="260" cy="65" r="10"/>
+  <line class="edge" x1="260" y1="75" x2="260" y2="98"/>
+  <rect class="step" x="150" y="100" width="220" height="52"/>
+  <text class="name" x="260" y="132">S1 汇聚事件</text>
+  <line class="edge" x1="260" y1="152" x2="260" y2="177"/>
+  <rect class="step" x="150" y="180" width="220" height="52"/>
+  <text class="name" x="260" y="212">S2 识别阶段</text>
+  <line class="edge" x1="260" y1="232" x2="260" y2="257"/>
+  <rect class="step" x="150" y="260" width="220" height="52"/>
+  <text class="name" x="260" y="292">S3 计算窗口</text>
+  <line class="edge" x1="260" y1="312" x2="260" y2="337"/>
+  <rect class="step" x="150" y="340" width="220" height="52"/>
+  <text class="name" x="260" y="372">S4 生成处置单</text>
+  <line class="edge" x1="260" y1="392" x2="260" y2="417"/>
+  <rect class="step" x="150" y="420" width="220" height="52"/>
+  <text class="name" x="260" y="452">S5 匹配责任域</text>
+  <line class="edge" x1="260" y1="472" x2="260" y2="497"/>
+  <rect class="step" x="150" y="500" width="220" height="52"/>
+  <text class="name" x="260" y="532">S6 校验回执</text>
+  <line class="edge" x1="260" y1="552" x2="260" y2="577"/>
+  <rect class="step" x="150" y="580" width="220" height="52"/>
+  <text class="name" x="260" y="612">S7 完成闭环</text>
+  <line class="edge" x1="260" y1="632" x2="260" y2="657"/>
+  <circle cx="260" cy="677" r="13" fill="none" stroke="#334155" stroke-width="2"/>
+  <circle class="terminal" cx="260" cy="677" r="7"/>
+</svg>

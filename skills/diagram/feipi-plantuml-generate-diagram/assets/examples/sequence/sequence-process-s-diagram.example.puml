@@ -1,0 +1,15 @@
+@startuml
+title 跨端凭据交付时序图
+skinparam nodesep 30
+skinparam ranksep 50
+actor "申请端" as requester
+participant "签发系统" as issuer
+participant "约束校验器" as verifier
+participant "离线端点" as endpoint
+requester -> issuer : S1 提交申请
+issuer -> verifier : S2 校验约束
+verifier --> issuer : S3 返回校验
+issuer -> endpoint : S4 交付凭据
+endpoint --> issuer : S4.1 确认接收
+issuer --> requester : S5 返回结果
+@enduml

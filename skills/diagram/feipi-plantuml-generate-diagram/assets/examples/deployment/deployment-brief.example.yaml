@@ -1,0 +1,18 @@
+diagram_id: D3
+diagram_type: deployment
+title: "在线离线凭据交付边界图"
+summary: "展示在线签发区、人工交接点和离线使用区之间的物理连接。"
+zones:
+  - {id: online_zone, name: 在线签发区, type: network, description: 连接业务网络}
+  - {id: transfer_zone, name: 人工交接区, type: physical, description: 承载受控人工摆渡}
+  - {id: offline_zone, name: 离线使用区, type: security, description: 与业务网络隔离}
+nodes:
+  - {id: issue_system, name: 在线签发系统, zone: online_zone, type: system, mode: online, network_id: business_net, chain_id: no_chain, description: 生成待交付凭据}
+  - {id: transfer_point, name: 人工摆渡点, zone: transfer_zone, type: human_transfer, mode: hybrid, network_id: transfer_net, chain_id: no_chain, description: 执行受控摆渡}
+  - {id: offline_endpoint, name: 离线使用端点, zone: offline_zone, type: endpoint, mode: offline, network_id: offline_net, chain_id: no_chain, description: 使用离线凭据}
+connections:
+  - {id: E1, from: issue_system, to: transfer_point, description: 交付待摆渡介质}
+  - {id: E2, from: transfer_point, to: offline_endpoint, description: 交付离线介质}
+boundary_triggers: {cross_network: true, cross_chain: false, online_offline: true, hsm: false, manual_transfer: true, manual_handoff: false}
+layout: {direction: left_to_right, include_legend: true}
+out_of_scope: [逻辑签名算法]

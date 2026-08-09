@@ -1,0 +1,50 @@
+diagram_id: D2
+diagram_type: activity
+title: 冷链异常分层处置主流程
+summary: 说明温控事件从汇聚、阶段窗口判定到责任派发和回执闭环的连续流程。
+steps:
+  - id: S1
+    name: 汇聚事件
+    lane: 事件汇聚系统
+  - id: S2
+    name: 识别阶段
+    lane: 异常处置系统
+  - id: S3
+    name: 计算窗口
+    lane: 异常处置系统
+  - id: S4
+    name: 生成处置单
+    lane: 异常处置系统
+  - id: S5
+    name: 匹配责任域
+    lane: 异常处置系统
+  - id: S6
+    name: 校验回执
+    lane: 回执审计系统
+  - id: S7
+    name: 完成闭环
+    lane: 异常处置系统
+transitions:
+  - from: S1
+    to: S2
+  - from: S2
+    to: S3
+  - from: S3
+    to: S4
+  - from: S4
+    to: S5
+  - from: S5
+    to: S6
+  - from: S6
+    to: S7
+narrative_step_ids:
+  - S1
+  - S2
+  - S3
+  - S4
+  - S5
+  - S6
+  - S7
+layout:
+  direction: top_to_bottom
+  include_legend: false

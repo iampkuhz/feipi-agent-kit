@@ -1,0 +1,18 @@
+diagram_id: D2
+diagram_type: activity
+title: "受约束凭据生成主流程"
+summary: "展示从接收申请到交付受约束凭据的五步端到端主流程。"
+steps:
+  - {id: S1, name: 接收申请}
+  - {id: S2, name: 校验边界}
+  - {id: S3, name: 生成约束}
+  - {id: S4, name: 签发凭据}
+  - {id: S5, name: 交付凭据}
+transitions:
+  - {from: S1, to: S2}
+  - {from: S2, to: S3}
+  - {from: S3, to: S4}
+  - {from: S4, to: S5}
+narrative_step_ids: [S1, S2, S3, S4, S5]
+layout: {direction: top_to_bottom, include_legend: false}
+out_of_scope: [异常分支与参数明细]

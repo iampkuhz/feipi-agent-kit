@@ -1,0 +1,199 @@
+{
+  "schema_version": "1.0",
+  "patent": {
+    "title": "一种{{专利名}}方法/系统",
+    "use_case": "{{使用场景}}"
+  },
+  "input_completeness": {
+    "technical_objects": [
+      "{{技术对象}}"
+    ],
+    "core_mechanisms": [
+      "{{核心机制}}"
+    ],
+    "necessary_constraints": [
+      "{{必要约束或边界}}"
+    ],
+    "existing_problem_facts": [
+      "{{现有问题事实}}"
+    ]
+  },
+  "boundaries": {
+    "business_domains": [
+      {
+        "id": "BD1",
+        "name": "{{业务域}}",
+        "scope": "{{业务域职责范围}}"
+      }
+    ],
+    "system_ownership": [
+      {
+        "id": "SYS1",
+        "name": "{{独立系统}}",
+        "owner": "{{拥有方}}",
+        "boundary": "{{系统边界}}"
+      }
+    ],
+    "physical_boundaries": [
+      {
+        "id": "PB1",
+        "type": "{{网络区/物理端点/在线离线边界}}",
+        "description": "{{物理边界说明}}"
+      }
+    ],
+    "deployment_triggers": []
+  },
+  "sources": {
+    "source_facts": [
+      {
+        "id": "SF1",
+        "statement": "{{用户材料中的可核对事实}}",
+        "source_locator": "user-input:{{消息或材料定位}}"
+      }
+    ],
+    "invention_extensions": [
+      {
+        "id": "IE1",
+        "statement": "{{基于来源事实提出的发明扩展}}",
+        "basis_source_ids": [
+          "SF1"
+        ]
+      }
+    ],
+    "external_materials": [],
+    "term_generalizations": [
+      {
+        "original": "{{内部实现名}}",
+        "generalized": "{{通用技术表达}}",
+        "reason": "避免把实现细节误写为发明边界"
+      }
+    ],
+    "abbreviation_allowlist": []
+  },
+  "keywords": {
+    "technical_objects": [
+      {
+        "term": "{{技术对象关键词}}",
+        "anchor": "详细描述/D1"
+      }
+    ],
+    "core_mechanisms": [
+      {
+        "term": "{{核心机制关键词1}}",
+        "anchor": "I1"
+      },
+      {
+        "term": "{{核心机制关键词2}}",
+        "anchor": "I2"
+      },
+      {
+        "term": "{{核心机制关键词3}}",
+        "anchor": "详细描述/D2"
+      }
+    ],
+    "key_constraints": [
+      {
+        "term": "{{关键约束关键词}}",
+        "anchor": "本方案的背景是什么/必要约束"
+      }
+    ]
+  },
+  "core_invention_claim": "{{一句话写清技术对象、核心机制、必要约束以及实质差异}}",
+  "innovations": [
+    {
+      "id": "I1",
+      "core_mechanism": "{{核心机制1}}",
+      "necessary_constraint": "{{必要约束1}}",
+      "substantive_difference": "{{与现有方案的实质差异1}}",
+      "anchors": [
+        "S2",
+        "D2"
+      ]
+    },
+    {
+      "id": "I2",
+      "core_mechanism": "{{核心机制2}}",
+      "necessary_constraint": "{{必要约束2}}",
+      "substantive_difference": "{{与现有方案的实质差异2}}",
+      "anchors": [
+        "S4",
+        "D1"
+      ]
+    }
+  ],
+  "effects": [
+    {
+      "id": "T1",
+      "innovation_id": "I1",
+      "original_problem": "{{原问题1}}",
+      "mechanism": "{{采用机制1}}",
+      "observable_result": "{{可观察结果1}}",
+      "verification_status": "expected_observable",
+      "evidence_source_ids": []
+    },
+    {
+      "id": "T2",
+      "innovation_id": "I2",
+      "original_problem": "{{原问题2}}",
+      "mechanism": "{{采用机制2}}",
+      "observable_result": "{{可观察结果2}}",
+      "verification_status": "expected_observable",
+      "evidence_source_ids": []
+    }
+  ],
+  "competitors": {
+    "status": "pending_retrieval",
+    "evidence": []
+  },
+  "diagrams": [
+    {
+      "id": "D1",
+      "role": "component_overview",
+      "package_path": "diagrams/D1-component-overview",
+      "purpose": "说明业务域、独立系统和物理端点的边界及结构关系"
+    },
+    {
+      "id": "D2",
+      "role": "main_flow",
+      "package_path": "diagrams/D2-main-flow",
+      "purpose": "说明最常见场景从输入到闭环的连续主流程"
+    }
+  ],
+  "reviews": {
+    "generalization_test": {
+      "status": "pending",
+      "reviewer": "待指定",
+      "notes": "替换领域名词后，检查核心主张是否仍可套用于任意系统"
+    },
+    "causal_deletion_tests": [
+      {
+        "innovation_id": "I1",
+        "status": "pending",
+        "reviewer": "待指定",
+        "notes": "删除 I1 核心机制后，检查 T1 是否仍能成立"
+      },
+      {
+        "innovation_id": "I2",
+        "status": "pending",
+        "reviewer": "待指定",
+        "notes": "删除 I2 核心机制后，检查 T2 是否仍能成立"
+      }
+    ],
+    "visual_reviews": [
+      {
+        "diagram_id": "D1",
+        "svg_sha256": "{{D1_SVG_SHA256}}",
+        "status": "pending",
+        "reviewer": "待指定",
+        "notes": "检查零交叉和零文字遮挡"
+      },
+      {
+        "diagram_id": "D2",
+        "svg_sha256": "{{D2_SVG_SHA256}}",
+        "status": "pending",
+        "reviewer": "待指定",
+        "notes": "检查零交叉和零文字遮挡"
+      }
+    ]
+  }
+}

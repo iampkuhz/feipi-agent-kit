@@ -1,0 +1,15 @@
+@startuml
+title 受约束凭据生成主流程
+top to bottom direction
+skinparam nodesep 30
+skinparam ranksep 50
+activity "S1 接收申请" as S1
+activity "S2 校验边界" as S2
+activity "S3 生成约束" as S3
+activity "S4 签发凭据" as S4
+activity "S5 交付凭据" as S5
+S1 --> S2
+S2 --> S3
+S3 --> S4
+S4 --> S5
+@enduml

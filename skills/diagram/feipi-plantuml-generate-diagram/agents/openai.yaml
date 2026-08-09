@@ -1,5 +1,5 @@
-version: 1
+version: 2
 interface:
-  display_name: "PlantUML 通用作图生成与校验（中文）"
-  short_description: "PlantUML 通用作图入口；支持架构图、时序图及未指定类型的 fallback 模式。"
-  default_prompt: "请使用 feipi-plantuml-generate-diagram：当用户要求用 PlantUML 画图时触发，无论是否指定图类型。若用户指定架构图、时序图、类图等，路由到对应 typed profile；若用户只说'用 PlantUML 画个图'或描述模糊，进入 fallback mode。优先让用户提供或补齐 brief，若只有自然语言则先识别类型、必要时进入 fallback 直接生成。生成 PlantUML 时，必须产出 diagram package（diagram.puml、diagram.svg、validation.json）；只有 validation.json 中 final_status=success 且 render_result=ok 时才算完成。若渲染不可用，final_status 应为 blocked 或 render_server_unavailable。fallback 模式下 .puml 必须包含 @startuml 和 @enduml。遇到治理或重构 skill 本身的请求时，不要触发本 skill，应使用 feipi-skill-govern。"
+  display_name: "PlantUML 通用作图生成与校验"
+  short_description: "PlantUML 多类型作图、校验与 diagram package 输出。"
+  default_prompt: "使用 $feipi-plantuml-generate-diagram 生成并校验 PlantUML diagram package。"

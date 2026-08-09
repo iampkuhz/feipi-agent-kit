@@ -60,8 +60,11 @@ def validate_schema(instance: Any, schema: dict, path: str, errors: list[str]) -
 
     if isinstance(instance, list):
         min_items = schema.get("minItems")
+        max_items = schema.get("maxItems")
         if min_items is not None and len(instance) < min_items:
             errors.append(f"{path or 'root'} 至少需要 {min_items} 项")
+        if max_items is not None and len(instance) > max_items:
+            errors.append(f"{path or 'root'} 最多允许 {max_items} 项")
         item_schema = schema.get("items")
         if item_schema:
             for index, item in enumerate(instance):

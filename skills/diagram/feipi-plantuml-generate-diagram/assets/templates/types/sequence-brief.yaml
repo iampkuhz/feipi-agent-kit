@@ -8,6 +8,8 @@
 
 diagram_id: <diagram-id>
 diagram_type: sequence
+# interaction_mr（默认）使用 M/R；process_s 使用 Sx/Sx.y，禁止混用。
+numbering_scheme: interaction_mr
 title: "<图标题>"
 summary: "<这张图要表达的核心交互流程>"
 

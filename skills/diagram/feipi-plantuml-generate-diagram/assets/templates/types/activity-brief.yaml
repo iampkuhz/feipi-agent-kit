@@ -1,0 +1,27 @@
+# 活动图需求模板。图中只显示 S 编号与单一动作短语；参数、异常与长说明移到图下正文。
+diagram_id: D2
+diagram_type: activity
+title: "<主流程图标题>"
+summary: "<说明本图覆盖的端到端主流程>"
+
+steps:
+  - {id: S1, name: <接收输入>}
+  - {id: S2, name: <校验约束>}
+  - {id: S3, name: <执行机制>}
+  - {id: S4, name: <生成结果>}
+  - {id: S5, name: <输出结果>}
+
+transitions:
+  - {from: S1, to: S2}
+  - {from: S2, to: S3}
+  - {from: S3, to: S4}
+  - {from: S4, to: S5}
+
+narrative_step_ids: [S1, S2, S3, S4, S5]
+
+layout:
+  direction: top_to_bottom
+  include_legend: false
+
+out_of_scope:
+  - <图下说明但不进入图面的细节>

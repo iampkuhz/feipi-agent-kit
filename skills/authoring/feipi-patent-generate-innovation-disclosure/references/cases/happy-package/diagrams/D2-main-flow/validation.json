@@ -1,0 +1,41 @@
+{
+  "schema_version": "1.1",
+  "skill_name": "feipi-plantuml-generate-diagram",
+  "diagram_id": "D2",
+  "diagram_type": "activity",
+  "profile": "activity",
+  "profile_version": "1.0",
+  "brief_path": "brief.normalized.yaml",
+  "diagram_path": "diagram.puml",
+  "svg_path": "diagram.svg",
+  "brief_check": "ok",
+  "coverage_check": "ok",
+  "layout_check": "ok",
+  "render_result": "ok",
+  "render_server": "synthetic_fixture",
+  "brief_sha256": "434492c9685d8e670cb619cbf1d3273c33216710f326aabbd9dd4c0397219636",
+  "puml_sha256": "13d8c62403031ad9becb24b8dd9999ebd9854e7caca8562585e4232d75560c1c",
+  "normalized_puml_sha256": "13d8c62403031ad9becb24b8dd9999ebd9854e7caca8562585e4232d75560c1c",
+  "svg_sha256": "802ce0719bb51691e60fcaf07d1723662375250f408338e8119f0874fc90d7c2",
+  "artifacts": {
+    "brief": {
+      "path": "brief.normalized.yaml",
+      "sha256": "434492c9685d8e670cb619cbf1d3273c33216710f326aabbd9dd4c0397219636"
+    },
+    "diagram": {
+      "path": "diagram.puml",
+      "sha256": "13d8c62403031ad9becb24b8dd9999ebd9854e7caca8562585e4232d75560c1c"
+    },
+    "svg": {
+      "path": "diagram.svg",
+      "sha256": "802ce0719bb51691e60fcaf07d1723662375250f408338e8119f0874fc90d7c2"
+    }
+  },
+  "metrics": {
+    "node_count": 7,
+    "edge_count": 6,
+    "max_degree": 2
+  },
+  "final_status": "success",
+  "blocked_reason": ""
+}

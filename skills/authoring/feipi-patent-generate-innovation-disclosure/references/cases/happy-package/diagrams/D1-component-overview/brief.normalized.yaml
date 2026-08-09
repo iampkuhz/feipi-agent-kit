@@ -1,0 +1,59 @@
+diagram_id: D1
+diagram_type: component
+title: 冷链异常处置组件总览
+summary: 说明运输监测业务域、三个独立系统和现场执行端之间的职责边界。
+view: overview
+groups:
+  - id: cold_chain_context
+    name: 冷链运输异常处置
+    description: 覆盖监测事件输入、处置判定、现场执行和回执审计。
+nodes:
+  - id: monitor
+    name: 运输监测业务域
+    group: cold_chain_context
+    type: business_domain
+    description: 提供带运输上下文的温控事件。
+  - id: ingest
+    name: 事件汇聚系统
+    group: cold_chain_context
+    type: system
+    description: 对齐多源事件并形成有序事件流。
+  - id: dispose
+    name: 异常处置系统
+    group: cold_chain_context
+    type: system
+    description: 维护异常窗口并生成分层处置单。
+  - id: execute
+    name: 现场执行端
+    group: cold_chain_context
+    type: physical_endpoint
+    description: 接收任务并提交现场证据。
+  - id: audit
+    name: 回执审计系统
+    group: cold_chain_context
+    type: system
+    description: 校验回执约束并返回审计结论。
+relations:
+  - id: E1
+    from: monitor
+    to: ingest
+    description: 监测事件输入。
+  - id: E2
+    from: ingest
+    to: dispose
+    description: 有序事件流。
+  - id: E3
+    from: dispose
+    to: execute
+    description: 处置任务。
+  - id: E4
+    from: execute
+    to: audit
+    description: 回执证据。
+  - id: E5
+    from: audit
+    to: dispose
+    description: 审计结论。
+layout:
+  direction: left_to_right
+  include_legend: false
