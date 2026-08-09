@@ -38,7 +38,7 @@ services:
 
   # LiteLLM Proxy - 模型网关
   litellm:
-    image: docker.litellm.ai/berriai/litellm:v1.89.0
+    image: docker.litellm.ai/berriai/litellm:v1.94.2
     container_name: litellm-proxy-podman
     restart: unless-stopped
     mem_limit: 2048m

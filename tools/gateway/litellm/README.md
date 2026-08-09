@@ -382,7 +382,7 @@ rm /Users/zhehan/Documents/service-data/litellm/chatgpt-tokens/auth.json
 |------|--------|
 | PostgreSQL 数据目录 | `/Users/zhehan/Documents/service-data/postgres` |
 | ChatGPT OAuth token 目录 | `/Users/zhehan/Documents/service-data/litellm/chatgpt-tokens` |
-| LiteLLM 镜像 | `docker.litellm.ai/berriai/litellm:v1.89.0` |
+| LiteLLM 镜像 | `docker.litellm.ai/berriai/litellm:v1.94.2` |
 | OpenAI 兼容逻辑模型 | `litellm-code-openai` |
 | Anthropic 兼容逻辑模型 | `litellm-code-anthropic` |
 | 本地补全逻辑模型 | `litellm-autocomplate-openai` |
