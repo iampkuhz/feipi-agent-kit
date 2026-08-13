@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "1.2",
   "patent": {
     "title": "一种{{专利名}}方法/系统",
     "use_case": "{{使用场景}}"
@@ -49,6 +49,11 @@
         "id": "SF1",
         "statement": "{{用户材料中的可核对事实}}",
         "source_locator": "user-input:{{消息或材料定位}}"
+      },
+      {
+        "id": "SF2",
+        "statement": "{{用户材料中的第二条可核对事实}}",
+        "source_locator": "user-input:{{第二条消息或材料定位}}"
       }
     ],
     "invention_extensions": [
@@ -102,9 +107,27 @@
   "innovations": [
     {
       "id": "I1",
+      "implementation_basis": {
+        "technical_object": "{{已实现的通用技术对象1}}",
+        "trigger_or_input": "{{实际触发条件或输入1}}",
+        "processing": "{{经泛化的实际处理路径1}}",
+        "constraint": "{{实际约束或接口边界1}}",
+        "output_or_state": "{{实际输出或状态变化1}}",
+        "source_fact_ids": ["SF1"]
+      },
+      "protection_extensions": [
+        {
+          "extension_id": "IE1",
+          "scope": "{{基于来源事实提出的发明扩展}}",
+          "rationale": "{{该扩展与核心机制保持一致的理由1}}"
+        }
+      ],
+      "comparison_baseline": "{{来源事实支持的现有做法或通用技术基线1}}",
       "core_mechanism": "{{核心机制1}}",
       "necessary_constraint": "{{必要约束1}}",
       "substantive_difference": "{{与现有方案的实质差异1}}",
+      "value_link": "{{上述差异为什么会产生对应价值1}}",
+      "effect_id": "T1",
       "anchors": [
         "S2",
         "D2"
@@ -112,9 +135,21 @@
     },
     {
       "id": "I2",
+      "implementation_basis": {
+        "technical_object": "{{已实现的通用技术对象2}}",
+        "trigger_or_input": "{{实际触发条件或输入2}}",
+        "processing": "{{经泛化的实际处理路径2}}",
+        "constraint": "{{实际约束或接口边界2}}",
+        "output_or_state": "{{实际输出或状态变化2}}",
+        "source_fact_ids": ["SF2"]
+      },
+      "protection_extensions": [],
+      "comparison_baseline": "{{来源事实支持的现有做法或通用技术基线2}}",
       "core_mechanism": "{{核心机制2}}",
       "necessary_constraint": "{{必要约束2}}",
       "substantive_difference": "{{与现有方案的实质差异2}}",
+      "value_link": "{{上述差异为什么会产生对应价值2}}",
+      "effect_id": "T2",
       "anchors": [
         "S4",
         "D1"
@@ -142,8 +177,38 @@
     }
   ],
   "competitors": {
-    "status": "pending_retrieval",
-    "evidence": []
+    "status": "evidence_found",
+    "research_summary": "{{公开资料支持的竞品相关性结论；不得写待检索}}",
+    "search_records": [
+      {
+        "focus": "technical_object",
+        "basis_terms": ["{{必须来自 input_completeness.technical_objects 的技术对象}}"],
+        "context_terms": ["{{来自核心机制关键词或原样落入 patent.use_case 的上下文词}}"],
+        "query": "{{技术对象 + 上下文词 + 产品/官方/专利/论文/标准等限定词}}",
+        "searched_at": "{{YYYY-MM-DD}}",
+        "consulted_locators": ["{{实际查阅的公开页面 URL}}"],
+        "result_summary": "{{该组检索的结果摘要}}"
+      },
+      {
+        "focus": "core_mechanism",
+        "basis_terms": ["{{必须来自 input_completeness.core_mechanisms 的核心机制}}"],
+        "context_terms": ["{{来自技术对象关键词或原样落入 patent.use_case 的上下文词}}"],
+        "query": "{{核心机制 + 上下文词 + 产品/官方/专利/论文/标准等限定词}}",
+        "searched_at": "{{YYYY-MM-DD}}",
+        "consulted_locators": ["{{实际查阅的公开页面 URL}}"],
+        "result_summary": "{{该组检索的结果摘要}}"
+      }
+    ],
+    "evidence": [
+      {
+        "id": "C1",
+        "name": "{{竞品或相似方案名称}}",
+        "product_or_business": "{{相关业务、产品及公开能力}}",
+        "locator": "{{必须出现在 search_records.consulted_locators 中的公开页面 URL}}",
+        "retrieved_at": "{{YYYY-MM-DD}}",
+        "evidence_type": "public_fact"
+      }
+    ]
   },
   "diagrams": [
     {
@@ -185,14 +250,14 @@
         "svg_sha256": "{{D1_SVG_SHA256}}",
         "status": "pending",
         "reviewer": "待指定",
-        "notes": "检查零交叉和零文字遮挡"
+        "notes": "检查零交叉和零文字遮挡，并确认仅呈现已实现路径"
       },
       {
         "diagram_id": "D2",
         "svg_sha256": "{{D2_SVG_SHA256}}",
         "status": "pending",
         "reviewer": "待指定",
-        "notes": "检查零交叉和零文字遮挡"
+        "notes": "检查零交叉和零文字遮挡，并确认仅呈现已实现路径"
       }
     ]
   }

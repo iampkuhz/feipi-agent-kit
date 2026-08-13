@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """专利创新交底书草稿与完整交付包校验器。
 
-仅使用 Python 标准库。完整交付模式会始终在包目录写入
+仅使用 Python 标准库。完整交付模式默认在交底书目录下的内部工作区写入
 ``disclosure-validation.json``，并以 0/1/2 分别表示
 ``success``/``blocked``/``review_required``。
 """
@@ -10,17 +10,22 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import html
+import ipaddress
 import json
 import re
 import subprocess
 import sys
+import unicodedata
 from dataclasses import dataclass, asdict
 from datetime import date, datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable
+from urllib.parse import urlsplit
 
 
 SKILL_NAME = "feipi-patent-generate-innovation-disclosure"
+DISCLOSURE_WORKSPACE_DIR = "disclosure-workspace"
 VALIDATION_SCHEMA_VERSION = "1.0"
 EXIT_BY_STATUS = {"success": 0, "blocked": 1, "review_required": 2}
 MANIFEST_SCHEMA_PATH = Path(__file__).resolve().parents[1] / "assets" / "disclosure-manifest.schema.json"
@@ -47,6 +52,15 @@ REQUIRED_DISCLOSURE_H3 = (
     "提炼本方案的关键技术创新点",
 )
 COMPETITOR_SECTION_HEADING = REQUIRED_DISCLOSURE_H3[5]
+ALTERNATIVE_SECTION_HEADING = REQUIRED_DISCLOSURE_H3[9]
+EXTENSION_REFERENCE_TEXT = "拟扩展保护已在对应创新点下高亮列出，本节不重复。"
+NO_USABLE_COMPETITOR_EVIDENCE_SUMMARY = "已完成公开资料检索，但未发现足以形成具名对比的可靠证据；本节不对具体产品能力作断言。"
+COMPETITOR_RESEARCH_INTENT_PATTERN = re.compile(
+    r"竞品|相似方案|行业方案|现有技术|公开(?:方案|实现|产品|资料)|官方|专利|论文|标准|产品|"
+    r"prior[\s-]+art|competitor|alternative|official|patent|paper|standard|product|solution|"
+    r"documentation|repository",
+    re.IGNORECASE,
+)
 
 GENERIC_KEYWORDS = {
     "平台",
@@ -72,6 +86,36 @@ INTERNAL_IDENTIFIER_PATTERN = re.compile(
     r"\b[A-Za-z_$][A-Za-z0-9_$]*(?:Handler|Processor|ServiceImpl|Controller|Repository|Dao)\b|"
     r"\b[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*\b)"
 )
+PUBLIC_PROTECTION_EXTENSION_MARKER = "> **拟扩展保护**"
+INTERNAL_APPENDIX_HEADING = "## 内部追溯附录（禁止对外）"
+INTERNAL_APPENDIX_NOTICE = "> 本附录仅供内部评审、事实核对和校验使用。对外发送时只使用交底书目录根部的 disclosure.md，不得包含本附录。"
+REQUIRED_INTERNAL_APPENDIX_H3 = (
+    "来源事实台账",
+    "发明扩展台账",
+    "外部资料台账",
+    "创新与效果映射",
+    "效果证据",
+    "竞品证据",
+)
+INTERNAL_TRACE_ID_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9_])(?:SF|IE|EM|C|BD|SYS|PB)[1-9]\d*(?![A-Za-z0-9_])",
+    re.IGNORECASE,
+)
+PUBLIC_RAW_ENUM_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9_])(?:expected_observable|verified|public_fact|reasonable_inference|"
+    r"pending_retrieval|evidence_found|searched_no_usable_evidence)(?![A-Za-z0-9_])",
+    re.IGNORECASE,
+)
+HTML_COMMENT_PATTERN = re.compile(r"<!--.*?-->", re.DOTALL)
+DIAGRAM_ID_COMMENT_PATTERN = re.compile(r"<!--\s*diagram-id:\s*D[1-9]\d*\s*-->", re.IGNORECASE)
+PUBLIC_EFFECT_STATUS = {
+    "expected_observable": "预期可观察",
+    "verified": "已有证据支持",
+}
+PUBLIC_EVIDENCE_TYPE = {
+    "public_fact": "公开事实",
+    "reasonable_inference": "合理推断",
+}
 STRUCTURAL_DECLARATION_PATTERN = re.compile(
     r"^\s*(?P<kind>actor|boundary|control|entity|database|collections|queue|rectangle|component|node|"
     r"cloud|folder|frame|package|artifact|card|file|storage|agent|usecase|interface|class|object|enum|annotation)\s+"
@@ -148,6 +192,8 @@ class ValidationContext:
             "diagnostics": [asdict(item) for item in self.diagnostics],
             "limitations": [
                 "本地校验不证明外部资料真实性、专利新颖性或法律可专利性。",
+                "本地校验只检查竞品检索记录完整且自洽，不能证明网络检索动作真实发生。",
+                "本地校验只确认检索式包含已绑定的技术依据、上下文和研究意图词，不判断其余自由文本的语义相关性。",
                 "零交叉和零遮挡依赖人工 SVG 复核；脚本仅验证复核记录与当前哈希绑定。",
                 "真实 Session 回归需在获得脱敏样本后另行完成。",
             ],
@@ -164,7 +210,7 @@ def _review_check_state(diagnostics: list[Diagnostic], prefixes: tuple[str, ...]
 
 
 def _is_nonempty_string(value: Any) -> bool:
-    return isinstance(value, str) and bool(value.strip())
+    return isinstance(value, str) and bool(_rendered_scan_text(value).strip())
 
 
 def _is_nonempty_scalar(value: Any) -> bool:
@@ -176,7 +222,7 @@ def _is_nonempty_scalar(value: Any) -> bool:
 def _string_list(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
-    return [item.strip() for item in value if isinstance(item, str) and item.strip()]
+    return [item.strip() for item in value if _is_nonempty_string(item)]
 
 
 def _is_iso_date(value: Any) -> bool:
@@ -187,6 +233,25 @@ def _is_iso_date(value: Any) -> bool:
     except ValueError:
         return False
     return True
+
+
+def _is_public_http_locator(value: Any) -> bool:
+    if not _is_nonempty_string(value):
+        return False
+    try:
+        parsed = urlsplit(value.strip())
+    except ValueError:
+        return False
+    if parsed.scheme.lower() not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password:
+        return False
+    hostname = parsed.hostname.casefold()
+    if hostname == "localhost" or hostname.endswith((".local", ".invalid", ".test")):
+        return False
+    try:
+        address = ipaddress.ip_address(hostname)
+    except ValueError:
+        return "." in hostname and " " not in hostname
+    return not (address.is_private or address.is_loopback or address.is_link_local or address.is_reserved)
 
 
 def _schema_errors(
@@ -316,6 +381,13 @@ def _dict_list(value: Any) -> list[dict[str, Any]]:
     return [item for item in value if isinstance(item, dict)]
 
 
+def _contains_internal_identifier(text: str, internal_originals: Iterable[str]) -> bool:
+    folded = text.casefold()
+    return bool(IMPLEMENTATION_PATTERN.search(text)) or any(
+        original.casefold() in folded for original in internal_originals if original
+    )
+
+
 def _collect_manifest_text(value: Any, *, skipped_key: str = "") -> str:
     if isinstance(value, str):
         return value
@@ -328,6 +400,203 @@ def _collect_manifest_text(value: Any, *, skipped_key: str = "") -> str:
             if key != skipped_key
         )
     return ""
+
+
+def _term_originals(manifest: dict[str, Any]) -> list[str]:
+    sources = manifest.get("sources") if isinstance(manifest.get("sources"), dict) else {}
+    return [
+        str(item.get("original"))
+        for item in _dict_list(sources.get("term_generalizations"))
+        if _is_nonempty_string(item.get("original"))
+    ]
+
+
+def _rendered_scan_text(text: str) -> str:
+    """近似浏览器可见文本，用于识别 entity、全角字符和零宽字符绕过。"""
+
+    normalized = unicodedata.normalize("NFKC", html.unescape(text))
+    return re.sub(r"[\u200b-\u200d\u2060\ufeff]", "", normalized)
+
+
+def _competitor_plain_text(text: str) -> str:
+    """竞品检索字段的纯文本视图；不把 HTML entity 解码成检索词。"""
+
+    normalized = unicodedata.normalize("NFKC", text)
+    return "".join(character for character in normalized if unicodedata.category(character) not in {"Cf", "Cc"})
+
+
+def _has_competitor_encoding(value: Any) -> bool:
+    if not isinstance(value, str):
+        return False
+    return html.unescape(value) != value or any(unicodedata.category(character) in {"Cf", "Cc"} for character in value)
+
+
+def _contains_competitor_term(query: str, term: str) -> bool:
+    normalized_query = _competitor_plain_text(query).casefold()
+    normalized_term = _competitor_plain_text(term).strip().casefold()
+    if not normalized_term:
+        return False
+    if normalized_term.isascii():
+        return bool(re.search(rf"(?<![\w]){re.escape(normalized_term)}(?![\w])", normalized_query))
+    return normalized_term in normalized_query
+
+
+def _contains_term_original(text: str, original: str) -> bool:
+    """按标识符边界匹配 ASCII 原名，避免单字符原名误伤普通单词。"""
+
+    if not original:
+        return False
+    if re.fullmatch(r"[A-Za-z0-9_]+", original):
+        return re.search(
+            rf"(?<![A-Za-z0-9_]){re.escape(original)}(?![A-Za-z0-9_])",
+            text,
+            flags=re.IGNORECASE,
+        ) is not None
+    return original.casefold() in text.casefold()
+
+
+def _leaked_term_originals(text: str, manifest: dict[str, Any]) -> list[str]:
+    return [original for original in _term_originals(manifest) if _contains_term_original(text, original)]
+
+
+def _source_fact_locators(manifest: dict[str, Any]) -> list[str]:
+    sources = manifest.get("sources") if isinstance(manifest.get("sources"), dict) else {}
+    return [
+        str(item.get("source_locator"))
+        for item in _dict_list(sources.get("source_facts"))
+        if _is_nonempty_string(item.get("source_locator"))
+    ]
+
+
+def _protection_extension_texts(manifest: dict[str, Any]) -> list[str]:
+    sources = manifest.get("sources") if isinstance(manifest.get("sources"), dict) else {}
+    values = [
+        str(item.get("statement"))
+        for item in _dict_list(sources.get("invention_extensions"))
+        if _is_nonempty_string(item.get("statement"))
+    ]
+    for innovation in _dict_list(manifest.get("innovations")):
+        for extension in _dict_list(innovation.get("protection_extensions")):
+            for field in ("scope", "rationale"):
+                if _is_nonempty_string(extension.get(field)):
+                    values.append(str(extension[field]))
+    return values
+
+
+def _trace_value(value: Any) -> str:
+    normalized = re.sub(r"\s+", " ", str(value) if value is not None else "").strip()
+    return normalized or "未提供"
+
+
+def _public_competitor_section_lines(competitors: dict[str, Any]) -> list[str]:
+    search_records = _dict_list(competitors.get("search_records"))
+    queries = "；".join(_trace_value(item.get("query")) for item in search_records)
+    dates = list(
+        dict.fromkeys(
+            _trace_value(item.get("searched_at"))
+            for item in search_records
+        )
+    )
+    lines = [
+        f"检索范围：{queries}",
+        f"检索日期：{'、'.join(dates)}",
+        f"检索结论：{_trace_value(competitors.get('research_summary'))}",
+    ]
+    for item in _dict_list(competitors.get("evidence")):
+        evidence_label = PUBLIC_EVIDENCE_TYPE.get(str(item.get("evidence_type", "")), "未提供")
+        lines.append(
+            f"- 名称：{_trace_value(item.get('name'))}；"
+            f"相关业务或产品：{_trace_value(item.get('product_or_business'))}；"
+            f"来源：{_trace_value(item.get('locator'))}；"
+            f"检索日期：{_trace_value(item.get('retrieved_at'))}；"
+            f"证据属性：{evidence_label}"
+        )
+    return lines
+
+
+def _expected_internal_trace_lines(manifest: dict[str, Any]) -> list[str]:
+    """生成内部附录必须逐行覆盖的追溯合同。"""
+
+    sources = manifest.get("sources") if isinstance(manifest.get("sources"), dict) else {}
+    lines: list[str] = []
+    source_facts = _dict_list(sources.get("source_facts"))
+    if source_facts:
+        for item in source_facts:
+            lines.append(
+                f"- {_trace_value(item.get('id'))}｜陈述：{_trace_value(item.get('statement'))}｜"
+                f"输入定位：{_trace_value(item.get('source_locator'))}"
+            )
+    else:
+        lines.append("- 来源事实：无")
+
+    invention_extensions = _dict_list(sources.get("invention_extensions"))
+    if invention_extensions:
+        for item in invention_extensions:
+            basis_ids = "、".join(_string_list(item.get("basis_source_ids"))) or "无"
+            lines.append(
+                f"- {_trace_value(item.get('id'))}｜扩展内容：{_trace_value(item.get('statement'))}｜依据：{basis_ids}"
+            )
+    else:
+        lines.append("- 发明扩展：无")
+
+    external_materials = _dict_list(sources.get("external_materials"))
+    if external_materials:
+        for item in external_materials:
+            lines.append(
+                f"- {_trace_value(item.get('id'))}｜标题：{_trace_value(item.get('title'))}｜"
+                f"定位：{_trace_value(item.get('locator'))}｜检索日期：{_trace_value(item.get('retrieved_at'))}｜"
+                f"证据属性：{_trace_value(item.get('evidence_type'))}"
+            )
+    else:
+        lines.append("- 外部资料：无")
+
+    for item in _dict_list(manifest.get("innovations")):
+        implementation = item.get("implementation_basis") if isinstance(item.get("implementation_basis"), dict) else {}
+        source_ids = "、".join(_string_list(implementation.get("source_fact_ids"))) or "无"
+        extension_ids = "、".join(
+            str(extension.get("extension_id"))
+            for extension in _dict_list(item.get("protection_extensions"))
+            if _is_nonempty_string(extension.get("extension_id"))
+        ) or "无"
+        lines.append(
+            f"- {_trace_value(item.get('id'))}｜已实现依据：{source_ids}｜"
+            f"拟扩展：{extension_ids}｜效果：{_trace_value(item.get('effect_id'))}"
+        )
+
+    for item in _dict_list(manifest.get("effects")):
+        evidence_ids = "、".join(_string_list(item.get("evidence_source_ids"))) or "无"
+        lines.append(
+            f"- {_trace_value(item.get('id'))}｜验证状态：{_trace_value(item.get('verification_status'))}｜"
+            f"证据：{evidence_ids}"
+        )
+
+    competitors = manifest.get("competitors") if isinstance(manifest.get("competitors"), dict) else {}
+    lines.append(
+        f"- 检索状态：{_trace_value(competitors.get('status'))}｜"
+        f"检索结论：{_trace_value(competitors.get('research_summary'))}"
+    )
+    for index, item in enumerate(_dict_list(competitors.get("search_records")), start=1):
+        consulted = "、".join(_string_list(item.get("consulted_locators"))) or "无"
+        basis_terms = "、".join(_string_list(item.get("basis_terms"))) or "无"
+        context_terms = "、".join(_string_list(item.get("context_terms"))) or "无"
+        lines.append(
+            f"- 检索记录 {index}｜焦点：{_trace_value(item.get('focus'))}｜"
+            f"依据词：{basis_terms}｜上下文词：{context_terms}｜检索式：{_trace_value(item.get('query'))}｜"
+            f"检索日期：{_trace_value(item.get('searched_at'))}｜"
+            f"查阅：{consulted}｜结果：{_trace_value(item.get('result_summary'))}"
+        )
+    competitor_evidence = _dict_list(competitors.get("evidence"))
+    if competitor_evidence:
+        for item in competitor_evidence:
+            lines.append(
+                f"- {_trace_value(item.get('id'))}｜名称：{_trace_value(item.get('name'))}｜"
+                f"相关业务或产品：{_trace_value(item.get('product_or_business'))}｜"
+                f"定位：{_trace_value(item.get('locator'))}｜检索日期：{_trace_value(item.get('retrieved_at'))}｜"
+                f"证据属性：{_trace_value(item.get('evidence_type'))}"
+            )
+    else:
+        lines.append("- 竞品证据：无")
+    return lines
 
 
 def _visible_structural_labels(puml_text: str) -> str:
@@ -474,6 +743,22 @@ def _validate_input_and_boundaries(ctx: ValidationContext, manifest: dict[str, A
                 ctx.error("INP-002", f"input_completeness.{field} 必须是非空字符串数组且至少一项", f"disclosure-manifest.json#/input_completeness/{field}")
             elif len(set(values)) != len(values):
                 ctx.error("INP-002", f"input_completeness.{field} 不得重复", f"disclosure-manifest.json#/input_completeness/{field}")
+
+        keywords = manifest.get("keywords") if isinstance(manifest.get("keywords"), dict) else {}
+        for field in ("technical_objects", "core_mechanisms"):
+            input_terms = set(_string_list(completeness.get(field)))
+            keyword_terms = {
+                str(item.get("term")).strip()
+                for item in _dict_list(keywords.get(field))
+                if _is_nonempty_string(item.get("term"))
+            }
+            missing_anchors = sorted(input_terms - keyword_terms)
+            if missing_anchors:
+                ctx.error(
+                    "INP-004",
+                    f"input_completeness.{field} 必须在同类关键词中保留精确落点，缺少={missing_anchors}",
+                    f"disclosure-manifest.json#/input_completeness/{field}",
+                )
 
     boundaries = manifest.get("boundaries")
     if not isinstance(boundaries, dict):
@@ -651,33 +936,145 @@ def _validate_innovations_and_effects(ctx: ValidationContext, manifest: dict[str
     if not _is_nonempty_string(claim) or len(claim.strip()) < 20:
         ctx.error("INV-001", "必须提供不少于 20 字的唯一核心发明主张", "disclosure-manifest.json#/core_invention_claim")
 
+    sources = manifest.get("sources") if isinstance(manifest.get("sources"), dict) else {}
+    source_fact_ids = {
+        str(item.get("id"))
+        for item in _dict_list(sources.get("source_facts"))
+        if _is_nonempty_string(item.get("id"))
+    }
+    internal_originals = [
+        str(item.get("original"))
+        for item in _dict_list(sources.get("term_generalizations"))
+        if _is_nonempty_string(item.get("original"))
+    ]
+    invention_extension_ids = [
+        str(item.get("id"))
+        for item in _dict_list(sources.get("invention_extensions"))
+        if _is_nonempty_string(item.get("id"))
+    ]
+    invention_extension_id_set = set(invention_extension_ids)
     innovations_raw = manifest.get("innovations")
     innovations = _dict_list(innovations_raw)
     if not isinstance(innovations_raw, list) or len(innovations) != len(innovations_raw) or not 2 <= len(innovations) <= 4:
         ctx.error("INV-002", f"innovations 必须包含 2-4 条对象，当前={len(innovations)}", "disclosure-manifest.json#/innovations")
     innovation_ids: list[str] = []
-    required_innovation_fields = ("id", "core_mechanism", "necessary_constraint", "substantive_difference")
+    innovation_effect_pairs: list[tuple[str, str]] = []
+    bound_extension_ids: list[str] = []
+    required_innovation_fields = (
+        "id",
+        "comparison_baseline",
+        "core_mechanism",
+        "necessary_constraint",
+        "substantive_difference",
+        "value_link",
+        "effect_id",
+    )
     for index, item in enumerate(innovations):
         location = f"disclosure-manifest.json#/innovations/{index}"
         _require_object_fields(ctx, item, required_innovation_fields, "INV-003", location)
+        implementation = item.get("implementation_basis")
+        if not isinstance(implementation, dict):
+            ctx.error("INV-007", "创新点必须提供 implementation_basis 已实现基础对象", f"{location}/implementation_basis")
+        else:
+            _require_object_fields(
+                ctx,
+                implementation,
+                ("technical_object", "trigger_or_input", "processing", "constraint", "output_or_state"),
+                "INV-007",
+                f"{location}/implementation_basis",
+            )
+            basis_source_raw = implementation.get("source_fact_ids")
+            basis_source_ids = _string_list(basis_source_raw)
+            if (
+                not isinstance(basis_source_raw, list)
+                or not basis_source_ids
+                or len(basis_source_ids) != len(basis_source_raw)
+                or len(basis_source_ids) != len(set(basis_source_ids))
+                or any(source_id not in source_fact_ids for source_id in basis_source_ids)
+            ):
+                ctx.error("INV-007", "已实现基础必须引用至少一条已存在且不重复的 SF 来源事实", f"{location}/implementation_basis/source_fact_ids")
+            implementation_text = " ".join(
+                str(implementation.get(field, ""))
+                for field in ("technical_object", "trigger_or_input", "processing", "constraint", "output_or_state")
+            )
+            if _contains_internal_identifier(implementation_text, internal_originals):
+                ctx.error("INV-007", "已实现基础必须保留具体技术路径但泛化类名、函数、字段、表结构和内部产品标识", f"{location}/implementation_basis")
+        protection_raw = item.get("protection_extensions")
+        protection_extensions = _dict_list(protection_raw)
+        if not isinstance(protection_raw, list) or len(protection_extensions) != len(protection_raw):
+            ctx.error("INV-007", "protection_extensions 必须是对象数组，允许为空", f"{location}/protection_extensions")
+        else:
+            for extension_index, extension in enumerate(protection_extensions):
+                _require_object_fields(
+                    ctx,
+                    extension,
+                    ("extension_id", "scope", "rationale"),
+                    "INV-007",
+                    f"{location}/protection_extensions/{extension_index}",
+                )
+                extension_id = extension.get("extension_id")
+                if _is_nonempty_string(extension_id):
+                    bound_extension_ids.append(extension_id)
+                    if extension_id not in invention_extension_id_set:
+                        ctx.error(
+                            "INV-007",
+                            f"拟扩展保护引用了不存在的发明扩展台账编号：{extension_id}",
+                            f"{location}/protection_extensions/{extension_index}/extension_id",
+                        )
+                extension_text = " ".join(
+                    str(extension.get(field, "")) for field in ("scope", "rationale")
+                )
+                if _contains_internal_identifier(extension_text, internal_originals):
+                    ctx.error(
+                        "INV-007",
+                        "拟扩展保护必须泛化类名、函数、字段、表结构和内部产品标识",
+                        f"{location}/protection_extensions/{extension_index}",
+                    )
         if _is_nonempty_string(item.get("id")):
             innovation_ids.append(item["id"])
+        if _is_nonempty_string(item.get("id")) and _is_nonempty_string(item.get("effect_id")):
+            innovation_effect_pairs.append((item["id"], item["effect_id"]))
         anchors = _string_list(item.get("anchors"))
         if not anchors or len(anchors) != len(item.get("anchors", [])):
             ctx.error("INV-004", "创新点必须提供至少一个正文或图示落点", location)
+        baseline = str(item.get("comparison_baseline", "")).strip()
         mechanism = str(item.get("core_mechanism", "")).strip()
         difference = str(item.get("substantive_difference", "")).strip()
+        value_link = str(item.get("value_link", "")).strip()
         if mechanism in {"模块拆分", "组件拆分", "模块组合", "组件组合"} or difference in {"结构不同", "模块不同", "实现不同"}:
             ctx.error("INV-005", "普通模块拆分或空泛差异不能作为创新机制", location)
+        if (
+            value_link in {"提升效率", "增强安全", "优化体验", "产生价值", "效果更好", "显著提升"}
+            or value_link in {mechanism, difference}
+            or baseline in {mechanism, difference}
+        ):
+            ctx.error("INV-006", "创新点必须区分对比基线、处理方式、实质差异和具体价值因果，不能只写做法或泛化好处", location)
     _check_sequential_ids(ctx, innovation_ids, "innovation", "INV-002", "disclosure-manifest.json#/innovations")
+    duplicate_extension_ids = sorted(
+        extension_id
+        for extension_id in set(bound_extension_ids)
+        if bound_extension_ids.count(extension_id) > 1
+    )
+    orphan_extension_ids = sorted(invention_extension_id_set - set(bound_extension_ids))
+    if duplicate_extension_ids:
+        ctx.error(
+            "INV-007",
+            f"每个 IE 发明扩展只能绑定一个创新点保护项，重复={duplicate_extension_ids}",
+            "disclosure-manifest.json#/innovations",
+        )
+    if orphan_extension_ids:
+        ctx.error(
+            "INV-007",
+            f"发明扩展台账不得存在未绑定到创新点的孤立项：{orphan_extension_ids}",
+            "disclosure-manifest.json#/sources/invention_extensions",
+        )
 
     effects_raw = manifest.get("effects")
     effects = _dict_list(effects_raw)
     if not isinstance(effects_raw, list) or len(effects) != len(effects_raw) or not 2 <= len(effects) <= 4:
         ctx.error("EFF-001", "effects 必须包含 2-4 条对象", "disclosure-manifest.json#/effects")
     effect_ids: list[str] = []
-    mapped: list[str] = []
-    sources = manifest.get("sources") if isinstance(manifest.get("sources"), dict) else {}
+    effect_innovation_pairs: list[tuple[str, str]] = []
     evidence_source_ids = {
         str(item.get("id"))
         for field in ("source_facts", "external_materials")
@@ -690,8 +1087,8 @@ def _validate_innovations_and_effects(ctx: ValidationContext, manifest: dict[str
         _require_object_fields(ctx, item, required, "EFF-002", location)
         if _is_nonempty_string(item.get("id")):
             effect_ids.append(item["id"])
-        if _is_nonempty_string(item.get("innovation_id")):
-            mapped.append(item["innovation_id"])
+        if _is_nonempty_string(item.get("id")) and _is_nonempty_string(item.get("innovation_id")):
+            effect_innovation_pairs.append((item["innovation_id"], item["id"]))
         verification_status = item.get("verification_status")
         if not isinstance(verification_status, str) or verification_status not in {"verified", "expected_observable"}:
             ctx.error("EFF-002", "verification_status 仅允许 verified 或 expected_observable", location)
@@ -707,8 +1104,12 @@ def _validate_innovations_and_effects(ctx: ValidationContext, manifest: dict[str
         if result in {"提升效率", "增强安全", "优化体验", "显著提升", "全面提升"}:
             ctx.error("EFF-004", "可观察结果不得仅使用无法验证的泛化结论", location)
     _check_sequential_ids(ctx, effect_ids, "effect", "EFF-001", "disclosure-manifest.json#/effects")
-    if sorted(mapped) != sorted(innovation_ids) or len(mapped) != len(set(mapped)):
-        ctx.error("EFF-003", "每个创新点必须与且仅与一个技术效果双射", "disclosure-manifest.json#/effects")
+    if (
+        sorted(effect_innovation_pairs) != sorted(innovation_effect_pairs)
+        or len(effect_innovation_pairs) != len(set(effect_innovation_pairs))
+        or len(innovation_effect_pairs) != len(set(innovation_effect_pairs))
+    ):
+        ctx.error("EFF-003", "每个创新点与技术效果必须通过 effect_id/innovation_id 双向一致且唯一映射", "disclosure-manifest.json#/effects")
 
 
 def _validate_competitors(ctx: ValidationContext, manifest: dict[str, Any]) -> None:
@@ -717,28 +1118,185 @@ def _validate_competitors(ctx: ValidationContext, manifest: dict[str, Any]) -> N
         ctx.error("CMP-001", "缺少 competitors 对象", "disclosure-manifest.json#/competitors")
         return
     status = competitors.get("status")
+    research_summary = competitors.get("research_summary")
+    search_records_raw = competitors.get("search_records")
+    search_records = _dict_list(search_records_raw)
     evidence_raw = competitors.get("evidence")
     evidence = _dict_list(evidence_raw)
-    if not isinstance(status, str) or status not in {"ready", "pending_retrieval"} or not isinstance(evidence_raw, list) or len(evidence) != len(evidence_raw):
-        ctx.error("CMP-001", "competitors.status 仅允许 ready/pending_retrieval，evidence 必须为对象数组", "disclosure-manifest.json#/competitors")
-        return
-    if status == "pending_retrieval":
-        if evidence:
-            ctx.error("CMP-001", "pending_retrieval 状态不得混入未完成证据", "disclosure-manifest.json#/competitors/evidence")
+    allowed_statuses = {"evidence_found", "searched_no_usable_evidence"}
+    if not isinstance(status, str) or status not in allowed_statuses:
+        ctx.error(
+            "CMP-001",
+            "competitors.status 仅允许 evidence_found/searched_no_usable_evidence，旧 pending_retrieval 不再允许",
+            "disclosure-manifest.json#/competitors/status",
+        )
+    if not isinstance(evidence_raw, list) or len(evidence) != len(evidence_raw):
+        ctx.error("CMP-001", "competitors.evidence 必须为对象数组", "disclosure-manifest.json#/competitors/evidence")
+        evidence = []
+    if status == "evidence_found" and not 1 <= len(evidence) <= 3:
+        ctx.error("CMP-001", f"evidence_found 必须有 1-3 条完整证据，当前={len(evidence)}", "disclosure-manifest.json#/competitors/evidence")
+    if status == "searched_no_usable_evidence" and evidence:
+        ctx.error("CMP-001", "searched_no_usable_evidence 不得混入具名竞品证据", "disclosure-manifest.json#/competitors/evidence")
+
+    normalized_summary = re.sub(
+        r"\s+",
+        " ",
+        _rendered_scan_text(str(research_summary) if research_summary is not None else ""),
+    ).strip()
+    placeholder_pattern = re.compile(
+        r"待检索|待补充|后续补充|当前输入未包含|尚未检索|尚未完成|"
+        r"\b(?:tbd|todo)\b|research\s+is\s+incomplete|(?:will\s+be|to\s+be)\s+added\s+later",
+        re.IGNORECASE,
+    )
+    if len(normalized_summary) < 20 or placeholder_pattern.search(normalized_summary):
+        ctx.error("CMP-003", "竞品研究必须提供不少于 20 字的具体检索结论，不得使用待检索占位", "disclosure-manifest.json#/competitors/research_summary")
+    normalized_no_evidence_summary = re.sub(
+        r"\s+",
+        " ",
+        _rendered_scan_text(NO_USABLE_COMPETITOR_EVIDENCE_SUMMARY),
+    ).strip()
+    if status == "searched_no_usable_evidence" and normalized_summary != normalized_no_evidence_summary:
+        ctx.error(
+            "CMP-003",
+            "无可用证据状态必须使用固定无具名断言结论，详细检索发现仅写入 search_records",
+            "disclosure-manifest.json#/competitors/research_summary",
+        )
+    if not isinstance(search_records_raw, list) or len(search_records) != len(search_records_raw):
+        ctx.error("CMP-003", "search_records 必须为对象数组", "disclosure-manifest.json#/competitors/search_records")
+        search_records = []
+    if not 2 <= len(search_records) <= 6:
+        ctx.error("CMP-003", f"竞品研究必须包含 2-6 组实际检索记录，当前={len(search_records)}", "disclosure-manifest.json#/competitors/search_records")
+
+    focuses: set[str] = set()
+    normalized_queries: list[str] = []
+    consulted_dates: dict[str, set[str]] = {}
+    input_completeness = manifest.get("input_completeness") if isinstance(manifest.get("input_completeness"), dict) else {}
+    keywords = manifest.get("keywords") if isinstance(manifest.get("keywords"), dict) else {}
+    input_terms = {
+        "technical_object": set(_string_list(input_completeness.get("technical_objects"))),
+        "core_mechanism": set(_string_list(input_completeness.get("core_mechanisms"))),
+    }
+    keyword_terms = {
+        "technical_object": {
+            str(item.get("term")).strip()
+            for item in _dict_list(keywords.get("technical_objects"))
+            if _is_nonempty_string(item.get("term"))
+        },
+        "core_mechanism": {
+            str(item.get("term")).strip()
+            for item in _dict_list(keywords.get("core_mechanisms"))
+            if _is_nonempty_string(item.get("term"))
+        },
+    }
+    grounded_terms = {
+        focus: input_terms[focus] & keyword_terms[focus]
+        for focus in ("technical_object", "core_mechanism")
+    }
+    use_case = str((manifest.get("patent") or {}).get("use_case", "")) if isinstance(manifest.get("patent"), dict) else ""
+    for index, item in enumerate(search_records):
+        location = f"disclosure-manifest.json#/competitors/search_records/{index}"
+        _require_object_fields(
+            ctx,
+            item,
+            ("focus", "query", "searched_at", "result_summary"),
+            "CMP-003",
+            location,
+        )
+        focus = item.get("focus")
+        if not isinstance(focus, str) or focus not in {"technical_object", "core_mechanism"}:
+            ctx.error("CMP-003", "focus 仅允许 technical_object 或 core_mechanism", location)
         else:
-            ctx.warning("CMP-003", "竞品证据待检索；允许交付，但不得据此声称已完成竞品检索", "disclosure-manifest.json#/competitors")
-        return
-    if not 1 <= len(evidence) <= 3:
-        ctx.error("CMP-001", f"ready 状态必须有 1-3 条完整证据，当前={len(evidence)}", "disclosure-manifest.json#/competitors/evidence")
+            focuses.add(focus)
+        query = item.get("query")
+        raw_query = query if isinstance(query, str) else ""
+        normalized_query = re.sub(
+            r"\s+",
+            " ",
+            _competitor_plain_text(raw_query),
+        ).strip()
+        if len(normalized_query) < 3 or placeholder_pattern.search(normalized_query):
+            ctx.error("CMP-003", "检索式不得为空、过短或使用待检索占位", location)
+        else:
+            normalized_queries.append(normalized_query.casefold())
+        if _has_competitor_encoding(query):
+            ctx.error("CMP-005", "检索式必须记录实际纯文本，不得包含 HTML entity、零宽字符或控制字符", location)
+        if normalized_query and not COMPETITOR_RESEARCH_INTENT_PATTERN.search(normalized_query):
+            ctx.error("CMP-005", "检索式必须包含产品、官方、专利、论文、标准或相似方案等研究限定词", location)
+        basis_raw = item.get("basis_terms")
+        basis_terms = _string_list(basis_raw)
+        if not isinstance(basis_raw, list) or len(basis_terms) != len(basis_raw) or not 1 <= len(basis_terms) <= 3:
+            ctx.error("CMP-003", "每组检索必须绑定 1-3 个 manifest 技术依据词", location)
+        allowed_terms = grounded_terms.get(str(focus), set())
+        for basis_term in basis_terms:
+            if _has_competitor_encoding(basis_term):
+                ctx.error("CMP-005", "技术依据词不得包含 HTML entity、零宽字符或控制字符", location)
+            if basis_term not in allowed_terms:
+                ctx.error("CMP-005", "basis_terms 必须同时存在于对应的输入完整性与关键词分类", location)
+            if not _contains_competitor_term(raw_query, basis_term):
+                ctx.error("CMP-005", "每个 basis_terms 依据词必须以纯文本原样出现在实际检索式中", location)
+
+        context_raw = item.get("context_terms")
+        context_terms = _string_list(context_raw)
+        if not isinstance(context_raw, list) or len(context_terms) != len(context_raw) or not 1 <= len(context_terms) <= 3:
+            ctx.error("CMP-005", "每组检索必须绑定 1-3 个使用场景或跨分类上下文词", location)
+        opposite_focus = "core_mechanism" if focus == "technical_object" else "technical_object"
+        opposite_terms = grounded_terms.get(opposite_focus, set())
+        for context_term in context_terms:
+            if _has_competitor_encoding(context_term):
+                ctx.error("CMP-005", "上下文词不得包含 HTML entity、零宽字符或控制字符", location)
+            visible_context = _competitor_plain_text(context_term).strip()
+            grounded_in_use_case = len(visible_context) >= 2 and _contains_competitor_term(use_case, context_term)
+            if context_term not in opposite_terms and not grounded_in_use_case:
+                ctx.error("CMP-005", "context_terms 必须来自另一技术分类或原样落入已确认使用场景", location)
+            if not _contains_competitor_term(raw_query, context_term):
+                ctx.error("CMP-005", "每个 context_terms 上下文词必须以纯文本原样出现在实际检索式中", location)
+        searched_at = item.get("searched_at")
+        if not _is_iso_date(searched_at):
+            ctx.error("CMP-003", "searched_at 必须为有效 YYYY-MM-DD", location)
+        locators_raw = item.get("consulted_locators")
+        locators = _string_list(locators_raw)
+        if not isinstance(locators_raw, list) or len(locators) != len(locators_raw) or not 1 <= len(locators) <= 5:
+            ctx.error("CMP-003", "每组检索必须记录 1-5 个实际查阅页面", location)
+        for locator in locators:
+            if not _is_public_http_locator(locator):
+                ctx.error("CMP-003", "实际查阅页面必须为可定位的 HTTP(S) 地址", location)
+            if _is_iso_date(searched_at):
+                consulted_dates.setdefault(locator, set()).add(str(searched_at))
+        result_summary = item.get("result_summary")
+        normalized_result = re.sub(
+            r"\s+",
+            " ",
+            _rendered_scan_text(str(result_summary) if result_summary is not None else ""),
+        ).strip()
+        if len(normalized_result) < 10 or placeholder_pattern.search(normalized_result):
+            ctx.error("CMP-003", "每组检索必须给出不少于 10 字的结果摘要，不得使用待检索占位", location)
+    if focuses != {"technical_object", "core_mechanism"}:
+        ctx.error("CMP-003", "检索记录必须同时覆盖技术对象和核心机制两类焦点", "disclosure-manifest.json#/competitors/search_records")
+    if len(normalized_queries) != len(set(normalized_queries)):
+        ctx.error("CMP-003", "多组检索式必须互不相同，不能复制同一查询凑数量", "disclosure-manifest.json#/competitors/search_records")
+
+    evidence_ids: list[str] = []
     for index, item in enumerate(evidence):
         location = f"disclosure-manifest.json#/competitors/evidence/{index}"
         _require_object_fields(ctx, item, ("id", "name", "product_or_business", "locator", "retrieved_at", "evidence_type"), "CMP-002", location)
         _require_id_pattern(ctx, item.get("id"), r"C[1-9]\d*", "CMP-002", location)
+        if _is_nonempty_string(item.get("id")):
+            evidence_ids.append(str(item["id"]))
+        locator = item.get("locator")
+        if not _is_public_http_locator(locator):
+            ctx.error("CMP-002", "竞品证据定位必须为实际公开页面的 HTTP(S) 地址", location)
         if _is_nonempty_string(item.get("retrieved_at")) and not _is_iso_date(item["retrieved_at"]):
             ctx.error("CMP-002", "retrieved_at 必须为 YYYY-MM-DD", location)
         evidence_type = item.get("evidence_type")
         if not isinstance(evidence_type, str) or evidence_type not in {"public_fact", "reasonable_inference"}:
             ctx.error("CMP-002", "evidence_type 仅允许 public_fact 或 reasonable_inference", location)
+        if _is_public_http_locator(locator):
+            matching_dates = consulted_dates.get(str(locator), set())
+            if not matching_dates or str(item.get("retrieved_at", "")) not in matching_dates:
+                ctx.error("CMP-002", "竞品证据的定位地址和检索日期必须回溯到 search_records", location)
+    expected_ids = [f"C{index}" for index in range(1, len(evidence_ids) + 1)]
+    if evidence_ids != expected_ids:
+        ctx.error("CMP-002", f"竞品证据编号必须从 C1 连续且不重复，当前={evidence_ids}", "disclosure-manifest.json#/competitors/evidence")
 
 
 def _extract_embedded_diagrams(markdown: str) -> tuple[dict[str, str], int]:
@@ -787,6 +1345,39 @@ def _validate_document(ctx: ValidationContext, package_dir: Path, manifest: dict
     missing_headings = [heading for heading in REQUIRED_DISCLOSURE_H3 if heading not in headings]
     if missing_headings:
         ctx.error("DOC-002", f"完整交底书缺少固定三级章节：{', '.join(missing_headings)}", "disclosure.md")
+    scan_text = _rendered_scan_text(text)
+    leaked_trace_ids = sorted(set(INTERNAL_TRACE_ID_PATTERN.findall(scan_text)), key=str.casefold)
+    if leaked_trace_ids:
+        ctx.error("DOC-004", f"对外版不得出现内部追溯编号：{leaked_trace_ids}", "disclosure.md")
+    leaked_locators = [
+        locator
+        for locator in _source_fact_locators(manifest)
+        if _rendered_scan_text(locator) in scan_text
+    ]
+    if leaked_locators:
+        ctx.error("DOC-004", "对外版不得出现来源事实的内部输入定位", "disclosure.md")
+    leaked_originals = _leaked_term_originals(scan_text, manifest)
+    if leaked_originals:
+        ctx.error("DOC-004", "对外版不得出现术语泛化前的内部标识", "disclosure.md")
+    if "来源依据" in scan_text:
+        ctx.error("DOC-004", "对外版不得保留“来源依据”追溯标签", "disclosure.md")
+    if INTERNAL_APPENDIX_HEADING in scan_text:
+        ctx.error("DOC-004", "内部追溯附录不得出现在对外版", "disclosure.md")
+    raw_enums = sorted(set(PUBLIC_RAW_ENUM_PATTERN.findall(scan_text)), key=str.casefold)
+    if raw_enums:
+        ctx.error("DOC-004", f"对外版不得出现机器枚举原值：{raw_enums}", "disclosure.md")
+    if "待检索" in scan_text:
+        ctx.error("CMP-004", "对外版不得使用“待检索”占位；竞品章节必须呈现已完成的检索范围、日期和结论", "disclosure.md")
+    invalid_comments = [
+        comment
+        for comment in HTML_COMMENT_PATTERN.findall(text)
+        if DIAGRAM_ID_COMMENT_PATTERN.fullmatch(comment) is None
+    ]
+    if invalid_comments:
+        ctx.error("DOC-004", "对外版除规范 diagram-id 外不得保留 HTML 注释", "disclosure.md")
+    scan_without_diagram_comments = DIAGRAM_ID_COMMENT_PATTERN.sub("", scan_text)
+    if "<!--" in scan_without_diagram_comments:
+        ctx.error("DOC-004", "对外版不得用编码或全角字符伪装 HTML 注释", "disclosure.md")
     required_content: list[tuple[str, str]] = []
     if _is_nonempty_string(patent.get("use_case")):
         required_content.append(("使用场景", patent["use_case"]))
@@ -798,23 +1389,139 @@ def _validate_document(ctx: ValidationContext, package_dir: Path, manifest: dict
             if _is_nonempty_string(item.get("term")):
                 required_content.append(("关键词", item["term"]))
     for item in _dict_list(manifest.get("innovations")):
-        for field in ("id", "core_mechanism", "necessary_constraint", "substantive_difference"):
+        implementation = item.get("implementation_basis") if isinstance(item.get("implementation_basis"), dict) else {}
+        for field in ("technical_object", "trigger_or_input", "processing", "constraint", "output_or_state"):
+            if _is_nonempty_string(implementation.get(field)):
+                required_content.append((f"创新点 {item.get('id', '')} 已实现基础", implementation[field]))
+        for extension in _dict_list(item.get("protection_extensions")):
+            for field in ("scope", "rationale"):
+                if _is_nonempty_string(extension.get(field)):
+                    required_content.append((f"创新点 {item.get('id', '')} 拟扩展保护", extension[field]))
+        for field in (
+            "id",
+            "comparison_baseline",
+            "core_mechanism",
+            "necessary_constraint",
+            "substantive_difference",
+            "value_link",
+            "effect_id",
+        ):
             if _is_nonempty_string(item.get(field)):
                 required_content.append((f"创新点 {item.get('id', '')}", item[field]))
     for item in _dict_list(manifest.get("effects")):
-        for field in ("id", "original_problem", "mechanism", "observable_result", "verification_status"):
+        for field in ("id", "original_problem", "mechanism", "observable_result"):
             if _is_nonempty_string(item.get(field)):
                 required_content.append((f"技术效果 {item.get('id', '')}", item[field]))
+        public_status = PUBLIC_EFFECT_STATUS.get(str(item.get("verification_status", "")))
+        if public_status:
+            required_content.append((f"技术效果 {item.get('id', '')} 验证状态", public_status))
+    effects_by_id = {
+        item["id"]: item
+        for item in _dict_list(manifest.get("effects"))
+        if _is_nonempty_string(item.get("id"))
+    }
+    for item in _dict_list(manifest.get("innovations")):
+        innovation_id = str(item.get("id", "")).strip()
+        section_text = "\n".join(_markdown_h4_body(text, innovation_id)) if innovation_id else ""
+        effect = effects_by_id.get(item.get("effect_id"), {})
+        implementation = item.get("implementation_basis") if isinstance(item.get("implementation_basis"), dict) else {}
+        protection_extensions = _dict_list(item.get("protection_extensions"))
+        chain_values = [
+            implementation.get("technical_object"),
+            implementation.get("trigger_or_input"),
+            implementation.get("processing"),
+            implementation.get("constraint"),
+            implementation.get("output_or_state"),
+            item.get("comparison_baseline"),
+            item.get("core_mechanism"),
+            item.get("substantive_difference"),
+            item.get("value_link"),
+            item.get("effect_id"),
+            effect.get("observable_result"),
+            *(extension.get("scope") for extension in protection_extensions),
+            *(extension.get("rationale") for extension in protection_extensions),
+        ]
+        if not section_text or any(_is_nonempty_string(value) and value not in section_text for value in chain_values):
+            ctx.error(
+                "INV-006",
+                f"{innovation_id or '创新点'} 必须在同一小节连续呈现对比基线、处理方式、实质差异、价值关联和对应可观察效果",
+                "disclosure.md",
+            )
+        section_lines = _markdown_h4_body(text, innovation_id) if innovation_id else []
+        basis_markers = [
+            index for index, line in enumerate(section_lines) if line == "- **已实现基础**"
+        ]
+        if len(basis_markers) != 1:
+            ctx.error(
+                "INV-007",
+                f"{innovation_id or '创新点'} 必须且只能有一个未引用的已实现基础标签",
+                "disclosure.md",
+            )
+        else:
+            basis_index = basis_markers[0]
+            implementation_fields = (
+                ("技术对象", implementation.get("technical_object")),
+                ("触发或输入", implementation.get("trigger_or_input")),
+                ("实际处理", implementation.get("processing")),
+                ("必要边界", implementation.get("constraint")),
+                ("输出或状态", implementation.get("output_or_state")),
+            )
+            for field_label, field_value in implementation_fields:
+                if _is_nonempty_string(field_value) and not _has_exact_unquoted_field_after(
+                    section_lines, basis_index, field_label, field_value
+                ):
+                    ctx.error(
+                        "INV-007",
+                        f"{innovation_id or '创新点'} 的已实现基础字段必须位于标签后且处于扩展引用块外：{field_label}",
+                        "disclosure.md",
+                    )
+        blocks = _public_protection_extension_blocks(section_lines)
+        marker_like_lines = [line for line in section_lines if "拟扩展保护" in line]
+        if protection_extensions:
+            invalid_markers = [
+                line
+                for line in marker_like_lines
+                if line != PUBLIC_PROTECTION_EXTENSION_MARKER
+            ]
+            if invalid_markers or len(blocks) != len(protection_extensions):
+                ctx.error(
+                    "INV-007",
+                    f"{innovation_id or '创新点'} 必须为每个扩展使用无内部编号的 > **拟扩展保护** 高亮块",
+                    "disclosure.md",
+                )
+            for extension, block in zip(protection_extensions, blocks):
+                for field_label, field_name in (("保护范围", "scope"), ("扩展理由", "rationale")):
+                    field_value = extension.get(field_name)
+                    if _is_nonempty_string(field_value) and not _has_exact_quoted_field(
+                        block, field_label, field_value
+                    ):
+                        ctx.error(
+                            "INV-007",
+                            f"{innovation_id or '创新点'} 的 {field_label}必须原样位于对应引用块内",
+                            "disclosure.md",
+                        )
+        elif marker_like_lines:
+            ctx.error("DOC-004", f"{innovation_id or '创新点'} 无扩展时对外版不得显示占位块", "disclosure.md")
+    has_protection_extensions = any(
+        _dict_list(item.get("protection_extensions"))
+        for item in _dict_list(manifest.get("innovations"))
+    )
+    expected_alternative_body = [EXTENSION_REFERENCE_TEXT if has_protection_extensions else "无。"]
+    if _markdown_h3_body(text, ALTERNATIVE_SECTION_HEADING) != expected_alternative_body:
+        ctx.error(
+            "INV-008",
+            "其他解决方案章节不得重复裸写拟扩展内容；只能引用创新点高亮块，或在无扩展时写“无”",
+            "disclosure.md",
+        )
     competitors = manifest.get("competitors") if isinstance(manifest.get("competitors"), dict) else {}
-    if competitors.get("status") == "ready":
-        for item in _dict_list(competitors.get("evidence")):
-            for field in ("id", "name", "product_or_business", "locator", "retrieved_at", "evidence_type"):
-                if _is_nonempty_string(item.get(field)):
-                    required_content.append((f"竞品证据 {item.get('id', '')}", item[field]))
-    elif competitors.get("status") == "pending_retrieval":
-        competitor_body = _markdown_h3_body(text, COMPETITOR_SECTION_HEADING)
-        if len(competitor_body) != 1 or not competitor_body[0].startswith("待检索"):
-            ctx.error("CMP-004", "pending_retrieval 时竞品章节只能保留一条以“待检索”开头的诚实说明", "disclosure.md")
+    competitor_body = _markdown_h3_body(text, COMPETITOR_SECTION_HEADING)
+    expected_competitor_body = _public_competitor_section_lines(competitors)
+    if competitor_body != expected_competitor_body:
+        ctx.error(
+            "CMP-004",
+            "竞品章节必须从 manifest 原样呈现检索范围、日期、结论及可用证据，且不得增加无来源断言",
+            "disclosure.md",
+        )
     for label, content in required_content:
         if content not in text:
             ctx.error("DOC-003", f"正文未原样呈现 manifest 内容：{label} / {content}", "disclosure.md")
@@ -825,6 +1532,66 @@ def _validate_document(ctx: ValidationContext, package_dir: Path, manifest: dict
     if re.search(r"\b[MR][1-9]\d*(?:\.\d+)?\b", text):
         ctx.error("FLOW-004", "专利文档不得出现 M/R 编号，只允许 E/S/I/T/D", "disclosure.md")
     return text, embedded
+
+
+def _validate_internal_document(
+    ctx: ValidationContext,
+    package_dir: Path,
+    manifest: dict[str, Any],
+    public_text: str,
+) -> None:
+    internal_path = package_dir / "disclosure-internal.md"
+    try:
+        internal_text = internal_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        ctx.error("PKG-011", f"无法读取 disclosure-internal.md：{exc}", "disclosure-internal.md")
+        return
+
+    heading_count = sum(
+        1 for line in internal_text.splitlines() if line.strip() == INTERNAL_APPENDIX_HEADING
+    )
+    if heading_count != 1:
+        ctx.error("DOC-005", "内部版必须且只能包含一个内部追溯附录", "disclosure-internal.md")
+        return
+    public_part, _, appendix = internal_text.partition(INTERNAL_APPENDIX_HEADING)
+    if public_part.rstrip() != public_text.rstrip():
+        ctx.error("DOC-005", "内部版的公开正文必须与 disclosure.md 完全同源", "disclosure-internal.md")
+
+    appendix_lines = [line.strip() for line in appendix.splitlines() if line.strip()]
+    if HTML_COMMENT_PATTERN.search(appendix):
+        ctx.error("DOC-005", "内部追溯附录不得把追溯记录隐藏在 HTML 注释中", "disclosure-internal.md")
+    if appendix_lines.count(INTERNAL_APPENDIX_NOTICE) != 1:
+        ctx.error("DOC-005", "内部追溯附录必须包含且只能包含一条禁止对外说明", "disclosure-internal.md")
+    missing_headings = [
+        heading
+        for heading in REQUIRED_INTERNAL_APPENDIX_H3
+        if appendix_lines.count(f"### {heading}") != 1
+    ]
+    if missing_headings:
+        ctx.error(
+            "DOC-005",
+            f"内部追溯附录缺少或重复固定小节：{', '.join(missing_headings)}",
+            "disclosure-internal.md",
+        )
+    missing_lines = [
+        line
+        for line in _expected_internal_trace_lines(manifest)
+        if appendix_lines.count(line) != 1
+    ]
+    if missing_lines:
+        preview = "；".join(missing_lines[:5])
+        suffix = f"；另有 {len(missing_lines) - 5} 条" if len(missing_lines) > 5 else ""
+        ctx.error("DOC-005", f"内部追溯附录缺少或重复追溯记录：{preview}{suffix}", "disclosure-internal.md")
+    allowed_lines = {
+        INTERNAL_APPENDIX_NOTICE,
+        *(f"### {heading}" for heading in REQUIRED_INTERNAL_APPENDIX_H3),
+        *_expected_internal_trace_lines(manifest),
+    }
+    unexpected_lines = [line for line in appendix_lines if line not in allowed_lines]
+    if unexpected_lines:
+        preview = "；".join(unexpected_lines[:5])
+        suffix = f"；另有 {len(unexpected_lines) - 5} 条" if len(unexpected_lines) > 5 else ""
+        ctx.error("DOC-005", f"内部追溯附录存在 manifest 之外的记录或结构：{preview}{suffix}", "disclosure-internal.md")
 
 
 def _tokens(text: str, prefix: str) -> list[str]:
@@ -848,6 +1615,60 @@ def _markdown_h3_body(text: str, heading: str) -> list[str]:
         if collecting and raw_line.strip() and not raw_line.lstrip().startswith("<!--"):
             lines.append(raw_line.strip())
     return lines
+
+
+def _markdown_h4_body(text: str, heading_id: str) -> list[str]:
+    collecting = False
+    lines: list[str] = []
+    for raw_line in text.splitlines():
+        if raw_line.startswith("### "):
+            if collecting:
+                break
+            continue
+        if raw_line.startswith("#### "):
+            current = raw_line[5:].strip()
+            if collecting:
+                break
+            collecting = current == heading_id or current.startswith(f"{heading_id} ")
+            continue
+        if collecting and raw_line.strip() and not raw_line.lstrip().startswith("<!--"):
+            lines.append(raw_line.strip())
+    return lines
+
+
+def _public_protection_extension_blocks(lines: list[str]) -> list[list[str]]:
+    blocks: list[list[str]] = []
+    index = 0
+    while index < len(lines):
+        if lines[index] != PUBLIC_PROTECTION_EXTENSION_MARKER:
+            index += 1
+            continue
+        block = [lines[index]]
+        index += 1
+        while index < len(lines) and lines[index].startswith(">"):
+            if lines[index] == PUBLIC_PROTECTION_EXTENSION_MARKER:
+                break
+            block.append(lines[index])
+            index += 1
+        blocks.append(block)
+    return blocks
+
+
+def _has_exact_unquoted_field_after(
+    lines: list[str],
+    start_index: int,
+    label: str,
+    value: str,
+) -> bool:
+    expected = f"- {label}：{value}"
+    return any(
+        index > start_index and line == expected and not line.startswith(">")
+        for index, line in enumerate(lines)
+    )
+
+
+def _has_exact_quoted_field(block: list[str], label: str, value: str) -> bool:
+    return f"> - {label}：{value}" in block
 
 
 def _validate_flow_numbers(ctx: ValidationContext, text: str, location: str) -> None:
@@ -961,7 +1782,7 @@ def _validate_diagrams(
             ctx.error("FIG-002", f"未知图示职责：{role}", location)
         package_path = _safe_package_path(package_dir, item.get("package_path"))
         if package_path is None:
-            ctx.error("PKG-005", "diagram.package_path 必须是包内相对路径且不得包含 ..", location)
+            ctx.error("PKG-005", "diagram.package_path 必须是工作区内相对路径且不得包含 ..", location)
             continue
         if not package_path.is_dir():
             ctx.error("PKG-006", f"图包目录不存在：{item.get('package_path')}", location)
@@ -1006,10 +1827,23 @@ def _validate_diagrams(
         try:
             brief_text = required_files["brief"].read_text(encoding="utf-8")
             puml_text = required_files["puml"].read_text(encoding="utf-8")
-            required_files["svg"].read_text(encoding="utf-8")
+            svg_text = required_files["svg"].read_text(encoding="utf-8")
         except (OSError, UnicodeError) as exc:
             ctx.error("PKG-006", f"图包文本工件必须为可读 UTF-8：{exc}", str(item.get("package_path")))
             continue
+        public_artifact_text = _rendered_scan_text(f"{puml_text}\n{svg_text}")
+        leaked_original = bool(_leaked_term_originals(public_artifact_text, manifest))
+        leaked_extensions = [
+            value
+            for value in _protection_extension_texts(manifest)
+            if _rendered_scan_text(value) in public_artifact_text
+        ]
+        if INTERNAL_TRACE_ID_PATTERN.search(public_artifact_text) or leaked_original or leaked_extensions:
+            ctx.error(
+                "FIG-010",
+                "共享 PlantUML/SVG 只能呈现已实现路径，不得出现内部编号、原始术语或拟扩展内容",
+                str(item.get("package_path")),
+            )
         brief_hash = _sha256_file(required_files["brief"])
         normalized_hash = _normalized_puml_sha256(puml_text)
         svg_hash = _sha256_file(required_files["svg"])
@@ -1159,6 +1993,8 @@ def _validate_reviews(
         else:
             seen_diagrams.add(diagram_id)
         _validate_review_status(ctx, item, "REV-004", location)
+        if "仅呈现已实现路径" not in str(item.get("notes", "")):
+            ctx.error("FIG-010", "每张图的视觉复核记录必须确认仅呈现已实现路径", location)
         if diagram_id in svg_hashes and item.get("svg_sha256") != svg_hashes[diagram_id]:
             ctx.error("REV-005", "视觉复核记录未绑定当前 svg_sha256，旧复核已失效", location)
     if seen_diagrams != set(svg_hashes) or len(seen_diagrams) != len(visual):
@@ -1178,16 +2014,52 @@ def _validate_review_status(ctx: ValidationContext, item: dict[str, Any], rule_i
         ctx.review(rule_id, "复核尚未完成", location)
 
 
-def validate_package(package_dir: Path) -> tuple[ValidationContext, dict[str, Any]]:
-    ctx = ValidationContext(package_dir)
-    if not package_dir.is_dir():
-        ctx.error("PKG-001", f"交付包目录不存在：{package_dir}")
+def validate_package(disclosure_dir: Path) -> tuple[ValidationContext, dict[str, Any]]:
+    ctx = ValidationContext()
+    if not disclosure_dir.is_dir():
+        ctx.error("PKG-001", f"交底书目录不存在：{disclosure_dir}")
         return ctx, ctx.result("package")
+
+    workspace_dir = disclosure_dir / DISCLOSURE_WORKSPACE_DIR
+    nested_manifest = workspace_dir / "disclosure-manifest.json"
+    legacy_manifest = disclosure_dir / "disclosure-manifest.json"
+    workspace_exists = workspace_dir.exists() or workspace_dir.is_symlink()
+    if workspace_exists and (workspace_dir.is_symlink() or not _resolved_within(workspace_dir, disclosure_dir)):
+        ctx.error("PKG-012", f"{DISCLOSURE_WORKSPACE_DIR} 必须是交底书目录内的真实子目录", DISCLOSURE_WORKSPACE_DIR)
+        return ctx, ctx.result("package")
+    if nested_manifest.is_file() and legacy_manifest.is_file():
+        ctx.package_dir = workspace_dir
+        ctx.error("PKG-012", "新旧两套 manifest 同时存在，无法确定内部工作区", str(disclosure_dir))
+        return ctx, ctx.result("package")
+    if nested_manifest.is_file():
+        ctx.package_dir = workspace_dir
+        misplaced = [
+            name
+            for name in ("disclosure-internal.md", "disclosure-manifest.json", "disclosure-validation.json", "diagrams")
+            if (disclosure_dir / name).exists()
+        ]
+        if misplaced:
+            ctx.error("PKG-012", f"内部工件不得与外发稿并列：{misplaced}", str(disclosure_dir))
+        if (workspace_dir / "disclosure.md").exists():
+            ctx.error("PKG-012", "内部工作区不得复制 disclosure.md；目录根部外发稿是唯一公开版本", DISCLOSURE_WORKSPACE_DIR)
+        package_dir = workspace_dir
+    elif legacy_manifest.is_file() and not workspace_exists:
+        ctx.package_dir = disclosure_dir
+        package_dir = disclosure_dir
+        ctx.warning("PKG-013", f"检测到旧版平铺布局；新产出必须迁移到 {DISCLOSURE_WORKSPACE_DIR}/", str(disclosure_dir))
+    else:
+        ctx.package_dir = workspace_dir
+        if workspace_exists:
+            ctx.error("PKG-002", f"{DISCLOSURE_WORKSPACE_DIR}/disclosure-manifest.json 不存在或不可读取", DISCLOSURE_WORKSPACE_DIR)
+        else:
+            ctx.error("PKG-012", f"缺少固定内部工作区 {DISCLOSURE_WORKSPACE_DIR}/", str(disclosure_dir))
+        return ctx, ctx.result("package")
+
     manifest = _read_json(ctx, package_dir / "disclosure-manifest.json", "PKG-002")
     if manifest is None:
         return ctx, ctx.result("package")
-    if str(manifest.get("schema_version")) != "1.0":
-        ctx.error("PKG-003", "disclosure-manifest.json schema_version 必须为 1.0", "disclosure-manifest.json#/schema_version")
+    if str(manifest.get("schema_version")) != "1.2":
+        ctx.error("PKG-003", "disclosure-manifest.json schema_version 必须为 1.2", "disclosure-manifest.json#/schema_version")
     if "{{" in json.dumps(manifest, ensure_ascii=False) or "XXX" in json.dumps(manifest, ensure_ascii=False):
         ctx.error("PKG-004", "disclosure-manifest.json 仍包含模板占位符", "disclosure-manifest.json")
 
@@ -1197,7 +2069,8 @@ def validate_package(package_dir: Path) -> tuple[ValidationContext, dict[str, An
     _validate_keywords(ctx, manifest)
     _validate_innovations_and_effects(ctx, manifest)
     _validate_competitors(ctx, manifest)
-    document_text, embedded = _validate_document(ctx, package_dir, manifest)
+    document_text, embedded = _validate_document(ctx, disclosure_dir, manifest)
+    _validate_internal_document(ctx, package_dir, manifest, document_text)
     svg_hashes = _validate_diagrams(ctx, package_dir, manifest, embedded, document_text)
     _validate_innovation_anchors(ctx, manifest, document_text)
     _validate_reviews(ctx, manifest, svg_hashes)
@@ -1220,6 +2093,31 @@ def validate_draft(doc_path: Path) -> tuple[ValidationContext, dict[str, Any]]:
         ctx.error("PKG-902", "标题必须为“# 一种XXX方法/系统”", f"{doc_path}:1")
     if "{{" in text or "XXX" in text:
         ctx.error("PKG-903", "草稿仍包含模板占位符", str(doc_path))
+    draft_scan_text = _rendered_scan_text(text)
+    if (
+        INTERNAL_TRACE_ID_PATTERN.search(draft_scan_text)
+        or PUBLIC_RAW_ENUM_PATTERN.search(draft_scan_text)
+        or "来源依据" in draft_scan_text
+        or INTERNAL_APPENDIX_HEADING in draft_scan_text
+    ):
+        ctx.error("DOC-004", "对外草稿不得出现内部追溯编号、标签、附录或机器枚举", str(doc_path))
+    invalid_comments = [
+        comment
+        for comment in HTML_COMMENT_PATTERN.findall(text)
+        if DIAGRAM_ID_COMMENT_PATTERN.fullmatch(comment) is None
+    ]
+    if invalid_comments:
+        ctx.error("DOC-004", "对外草稿除规范 diagram-id 外不得保留 HTML 注释", str(doc_path))
+    competitor_body = _markdown_h3_body(text, COMPETITOR_SECTION_HEADING)
+    if "待检索" in draft_scan_text:
+        ctx.error("CMP-004", "对外草稿不得使用“待检索”占位", str(doc_path))
+    if (
+        len(competitor_body) < 3
+        or not competitor_body[0].startswith("检索范围：")
+        or not competitor_body[1].startswith("检索日期：")
+        or not competitor_body[2].startswith("检索结论：")
+    ):
+        ctx.error("CMP-004", "竞品章节必须呈现已完成的检索范围、日期和结论", str(doc_path))
     for heading in ("## 基本信息", "## 提案内容"):
         if heading not in lines:
             ctx.error("PKG-904", f"缺少章节标题：{heading}", str(doc_path))
@@ -1260,21 +2158,21 @@ def _print_summary(result: dict[str, Any]) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description="校验专利创新交底书草稿或完整交付包")
     mode = parser.add_mutually_exclusive_group(required=True)
-    mode.add_argument("--package", type=Path, help="完整交付包目录")
+    mode.add_argument("--package", type=Path, help="交底书目录；外发稿位于根部，内部工件位于 disclosure-workspace/")
     mode.add_argument("--draft", type=Path, help="仅做草稿格式兼容检查")
-    parser.add_argument("--output", type=Path, help="自定义验证报告路径；完整包默认写入包根目录")
+    parser.add_argument("--output", type=Path, help="自定义验证报告路径；默认写入 disclosure-workspace/")
     args = parser.parse_args()
 
     if args.package is not None:
-        package_dir = args.package.resolve()
+        disclosure_dir = args.package.resolve()
         try:
-            ctx, result = validate_package(package_dir)
+            ctx, result = validate_package(disclosure_dir)
         except Exception as exc:  # 保证畸形输入仍产出结构化三态报告
-            ctx = ValidationContext(package_dir)
-            ctx.error("PKG-999", f"校验器无法处理输入：{type(exc).__name__}: {exc}", str(package_dir))
+            ctx = ValidationContext()
+            ctx.error("PKG-999", f"校验器无法处理输入：{type(exc).__name__}: {exc}", str(disclosure_dir))
             result = ctx.result("package")
-        output = args.output or (package_dir / "disclosure-validation.json")
-        if package_dir.is_dir():
+        output = args.output or ((ctx.package_dir / "disclosure-validation.json") if ctx.package_dir else None)
+        if output is not None and disclosure_dir.is_dir():
             _write_result(output, result)
     else:
         ctx, result = validate_draft(args.draft.resolve())

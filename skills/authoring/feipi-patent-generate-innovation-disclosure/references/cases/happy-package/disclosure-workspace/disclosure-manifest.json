@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "1.2",
   "patent": {
     "title": "一种冷链运输异常分层处置方法/系统",
     "use_case": "冷链运输在途阶段发生连续温度偏离，需要在不改变设备采集频率的前提下完成异常识别、责任派发和回执闭环。"
@@ -63,18 +63,28 @@
         "id": "SF3",
         "statement": "方案不能改变设备采集频率，并需要复用既有工单接口。",
         "source_locator": "synthetic-input:constraint-1"
+      },
+      {
+        "id": "SF4",
+        "statement": "当前实现已按运输阶段维护异常窗口，并将同一窗口内相关事件固化为一张活动处置单。",
+        "source_locator": "synthetic-input:implemented-path-1"
+      },
+      {
+        "id": "SF5",
+        "statement": "当前实现已将责任域映射结果和回执证据要求写入同一处置单，并在关闭前校验。",
+        "source_locator": "synthetic-input:implemented-path-2"
       }
     ],
     "invention_extensions": [
       {
         "id": "IE1",
-        "statement": "按运输阶段维护异常窗口，并把同一窗口内相关事件聚合为一张活动处置单。",
-        "basis_source_ids": ["SF1", "SF3"]
+        "statement": "将固定运输阶段窗口扩展为同时受阶段和近期波动范围约束的组合窗口。",
+        "basis_source_ids": ["SF4"]
       },
       {
         "id": "IE2",
-        "statement": "把责任域映射结果和回执证据约束写入同一处置单，并在关闭前校验。",
-        "basis_source_ids": ["SF2", "SF3"]
+        "statement": "将单一责任域映射扩展为带人工确认的候选责任集合。",
+        "basis_source_ids": ["SF5"]
       }
     ],
     "external_materials": [],
@@ -104,16 +114,52 @@
   "innovations": [
     {
       "id": "I1",
+      "implementation_basis": {
+        "technical_object": "分层处置单",
+        "trigger_or_input": "同一运输阶段内连续产生的温度异常事件",
+        "processing": "按运输阶段维护异常窗口，并把窗口内相关事件聚合到同一活动处置单",
+        "constraint": "不改变设备采集频率，且同一窗口只保留一张活动处置单",
+        "output_or_state": "形成带阶段边界和事件集合的活动处置单",
+        "source_fact_ids": ["SF4"]
+      },
+      "protection_extensions": [
+        {
+          "extension_id": "IE1",
+          "scope": "将固定运输阶段窗口扩展为同时受阶段和近期波动范围约束的组合窗口",
+          "rationale": "扩展后仍以窗口边界聚合相关事件并约束单窗口单活动处置单"
+        }
+      ],
+      "comparison_baseline": "现有做法按单条温度越界记录分别形成处置任务。",
       "core_mechanism": "按运输阶段维护异常窗口，并把窗口结果固化为分层处置单。",
       "necessary_constraint": "不改变设备采集频率，且同一窗口只保留一张活动处置单。",
       "substantive_difference": "处置对象从单条越界记录变为受阶段边界约束的事件集合。",
+      "value_link": "由于同一阶段窗口内的相关事件被固化到同一处置对象，因此可以避免同一窗口产生多张活动处置单。",
+      "effect_id": "T1",
       "anchors": ["S2", "S3", "S4", "D2"]
     },
     {
       "id": "I2",
+      "implementation_basis": {
+        "technical_object": "分层处置单",
+        "trigger_or_input": "异常窗口完成判定并进入责任派发",
+        "processing": "将责任域映射结果和回执证据要求写入同一处置单并在关闭前校验",
+        "constraint": "复用既有工单接口，且关闭前必须通过规定证据校验",
+        "output_or_state": "形成同时包含判定依据、责任依据和回执状态的已关闭处置单",
+        "source_fact_ids": ["SF5"]
+      },
+      "protection_extensions": [
+        {
+          "extension_id": "IE2",
+          "scope": "将单一责任域映射扩展为带人工确认的候选责任集合",
+          "rationale": "扩展后确认结果仍写回同一处置单并参与关闭前证据校验"
+        }
+      ],
+      "comparison_baseline": "现有做法将异常判定、责任记录和回执材料分散保存并在事后拼接。",
       "core_mechanism": "把责任域映射结果和回执证据约束写入同一处置单。",
       "necessary_constraint": "复用既有工单接口，且关闭前必须通过证据校验。",
       "substantive_difference": "判定、责任和回执不再由分散记录事后拼接。",
+      "value_link": "由于判定依据、责任依据和回执要求随同一处置单传递并校验，因此已关闭处置单可以直接核对三类依据是否齐备。",
+      "effect_id": "T2",
       "anchors": ["S5", "S6", "S7", "E3", "E4", "E5"]
     }
   ],
@@ -138,8 +184,52 @@
     }
   ],
   "competitors": {
-    "status": "pending_retrieval",
-    "evidence": []
+    "status": "evidence_found",
+    "research_summary": "官方页面可确认 Tive 与 Sensitech 均提供冷链运输监控和告警能力；所查页面未直接说明按运输阶段聚合异常、责任域派发及回执证据闭环，因此仅作为相关行业方案，不据此断言其不具备上述能力。",
+    "search_records": [
+      {
+        "focus": "technical_object",
+        "basis_terms": ["分层处置单"],
+        "context_terms": ["阶段化异常窗口"],
+        "query": "分层处置单 阶段化异常窗口 cold chain monitoring real-time temperature platform Tive Sensitech official",
+        "searched_at": "2026-08-09",
+        "consulted_locators": [
+          "https://www.tive.com/solutions/cold-chain-monitoring",
+          "https://www.sensitech.com/en/solutions/cold-chain/"
+        ],
+        "result_summary": "官方页面显示两家公司均提供面向冷链运输的实时状态监控能力。"
+      },
+      {
+        "focus": "core_mechanism",
+        "basis_terms": ["阶段化异常窗口"],
+        "context_terms": ["分层处置单"],
+        "query": "阶段化异常窗口 分层处置单 cold chain anomaly alert workflow assignment audit trail official",
+        "searched_at": "2026-08-09",
+        "consulted_locators": [
+          "https://www.tive.com/solutions/cold-chain-monitoring",
+          "https://www.sensitech.com/en/products/sensiwatch-platform/"
+        ],
+        "result_summary": "页面公开了越界告警、审计记录和可行动洞察，但未直接公开阶段聚合、责任域派发与回执闭环的组合机制。"
+      }
+    ],
+    "evidence": [
+      {
+        "id": "C1",
+        "name": "Tive",
+        "product_or_business": "Cold Chain Monitoring；实时监测温度、湿度、光照和位置，并提供越界告警与运输记录",
+        "locator": "https://www.tive.com/solutions/cold-chain-monitoring",
+        "retrieved_at": "2026-08-09",
+        "evidence_type": "public_fact"
+      },
+      {
+        "id": "C2",
+        "name": "Sensitech",
+        "product_or_business": "SensiWatch Platform；提供端到端实时供应链可视性、告警和可行动洞察",
+        "locator": "https://www.sensitech.com/en/products/sensiwatch-platform/",
+        "retrieved_at": "2026-08-09",
+        "evidence_type": "public_fact"
+      }
+    ]
   },
   "diagrams": [
     {
@@ -181,14 +271,14 @@
         "svg_sha256": "0fd96457954f916895712d13feface041748294a3dc5e5dac542c03c7d5af01a",
         "status": "pass",
         "reviewer": "合成样例复核",
-        "notes": "已检查最终 SVG，未发现连线交叉或文字遮挡。"
+        "notes": "已检查最终 SVG，未发现连线交叉或文字遮挡，并确认仅呈现已实现路径。"
       },
       {
         "diagram_id": "D2",
         "svg_sha256": "802ce0719bb51691e60fcaf07d1723662375250f408338e8119f0874fc90d7c2",
         "status": "pass",
         "reviewer": "合成样例复核",
-        "notes": "已检查最终 SVG，S1 至 S7 自上而下排列，未发现连线交叉或文字遮挡。"
+        "notes": "已检查最终 SVG，S1 至 S7 自上而下排列，未发现连线交叉或文字遮挡，并确认仅呈现已实现路径。"
       }
     ]
   }

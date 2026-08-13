@@ -2,23 +2,18 @@
   "schema_version": "1.0",
   "skill_name": "feipi-patent-generate-innovation-disclosure",
   "mode": "package",
-  "validated_at": "2026-08-09T08:42:51.227604+00:00",
+  "validated_at": "2026-08-09T14:57:56.558021+00:00",
   "final_status": "success",
   "checks": {
     "deterministic": "passed",
     "semantic_review": "passed",
     "visual_review": "passed"
   },
-  "diagnostics": [
-    {
-      "rule_id": "CMP-003",
-      "severity": "warning",
-      "message": "竞品证据待检索；允许交付，但不得据此声称已完成竞品检索",
-      "location": "disclosure-manifest.json#/competitors"
-    }
-  ],
+  "diagnostics": [],
   "limitations": [
     "本地校验不证明外部资料真实性、专利新颖性或法律可专利性。",
+    "本地校验只检查竞品检索记录完整且自洽，不能证明网络检索动作真实发生。",
+    "本地校验只确认检索式包含已绑定的技术依据、上下文和研究意图词，不判断其余自由文本的语义相关性。",
     "零交叉和零遮挡依赖人工 SVG 复核；脚本仅验证复核记录与当前哈希绑定。",
     "真实 Session 回归需在获得脱敏样本后另行完成。"
   ]

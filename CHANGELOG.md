@@ -1,7 +1,7 @@
 # 变更记录
 
 ## 2026-08-09
-- feipi-patent-generate-innovation-disclosure v4：补强内容门禁与可追溯图包
+- feipi-patent-generate-innovation-disclosure v4：补强确认、竞品、内外稿与目录隔离
 - feipi-plantuml-generate-diagram v2：补齐图型与编号契约
 
 ## 2026-08-07

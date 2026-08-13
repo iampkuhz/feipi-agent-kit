@@ -172,3 +172,42 @@ stop
 >
 > - 保护范围：将单一责任域映射扩展为带人工确认的候选责任集合
 > - 扩展理由：扩展后确认结果仍写回同一处置单并参与关闭前证据校验
+
+## 内部追溯附录（禁止对外）
+
+> 本附录仅供内部评审、事实核对和校验使用。对外发送时只使用交底书目录根部的 disclosure.md，不得包含本附录。
+
+### 来源事实台账
+
+- SF1｜陈述：现有流程按单点阈值逐条派发，短时波动与持续异常被等价处理，会在同一运输阶段形成重复任务。｜输入定位：synthetic-input:problem-1
+- SF2｜陈述：温度、轨迹和现场动作已有采集记录，但缺少贯穿判定、派发和回执的统一处置对象。｜输入定位：synthetic-input:problem-2
+- SF3｜陈述：方案不能改变设备采集频率，并需要复用既有工单接口。｜输入定位：synthetic-input:constraint-1
+- SF4｜陈述：当前实现已按运输阶段维护异常窗口，并将同一窗口内相关事件固化为一张活动处置单。｜输入定位：synthetic-input:implemented-path-1
+- SF5｜陈述：当前实现已将责任域映射结果和回执证据要求写入同一处置单，并在关闭前校验。｜输入定位：synthetic-input:implemented-path-2
+
+### 发明扩展台账
+
+- IE1｜扩展内容：将固定运输阶段窗口扩展为同时受阶段和近期波动范围约束的组合窗口。｜依据：SF4
+- IE2｜扩展内容：将单一责任域映射扩展为带人工确认的候选责任集合。｜依据：SF5
+
+### 外部资料台账
+
+- 外部资料：无
+
+### 创新与效果映射
+
+- I1｜已实现依据：SF4｜拟扩展：IE1｜效果：T1
+- I2｜已实现依据：SF5｜拟扩展：IE2｜效果：T2
+
+### 效果证据
+
+- T1｜验证状态：expected_observable｜证据：无
+- T2｜验证状态：expected_observable｜证据：无
+
+### 竞品证据
+
+- 检索状态：evidence_found｜检索结论：官方页面可确认 Tive 与 Sensitech 均提供冷链运输监控和告警能力；所查页面未直接说明按运输阶段聚合异常、责任域派发及回执证据闭环，因此仅作为相关行业方案，不据此断言其不具备上述能力。
+- 检索记录 1｜焦点：technical_object｜依据词：分层处置单｜上下文词：阶段化异常窗口｜检索式：分层处置单 阶段化异常窗口 cold chain monitoring real-time temperature platform Tive Sensitech official｜检索日期：2026-08-09｜查阅：https://www.tive.com/solutions/cold-chain-monitoring、https://www.sensitech.com/en/solutions/cold-chain/｜结果：官方页面显示两家公司均提供面向冷链运输的实时状态监控能力。
+- 检索记录 2｜焦点：core_mechanism｜依据词：阶段化异常窗口｜上下文词：分层处置单｜检索式：阶段化异常窗口 分层处置单 cold chain anomaly alert workflow assignment audit trail official｜检索日期：2026-08-09｜查阅：https://www.tive.com/solutions/cold-chain-monitoring、https://www.sensitech.com/en/products/sensiwatch-platform/｜结果：页面公开了越界告警、审计记录和可行动洞察，但未直接公开阶段聚合、责任域派发与回执闭环的组合机制。
+- C1｜名称：Tive｜相关业务或产品：Cold Chain Monitoring；实时监测温度、湿度、光照和位置，并提供越界告警与运输记录｜定位：https://www.tive.com/solutions/cold-chain-monitoring｜检索日期：2026-08-09｜证据属性：public_fact
+- C2｜名称：Sensitech｜相关业务或产品：SensiWatch Platform；提供端到端实时供应链可视性、告警和可行动洞察｜定位：https://www.sensitech.com/en/products/sensiwatch-platform/｜检索日期：2026-08-09｜证据属性：public_fact

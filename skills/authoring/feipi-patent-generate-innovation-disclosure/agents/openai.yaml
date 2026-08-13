@@ -2,4 +2,4 @@ version: 4
 interface:
   display_name: "专利创新交底包生成"
   short_description: "将零散技术事实整理为含证据、图示与质量门禁的专利创新交底包"
-  default_prompt: "请使用 $feipi-patent-generate-innovation-disclosure，把我提供的技术事实整理为可校验的完整专利创新交底包。"
+  default_prompt: "请使用 $feipi-patent-generate-innovation-disclosure，先整理技术事实、主动检索行业竞品并提交写作思路供我确认；收到确认后再生成最终内容，将唯一外发稿放在交底书目录根部，将内部工件统一放入 disclosure-workspace，并区分已实现基础与拟扩展保护。"

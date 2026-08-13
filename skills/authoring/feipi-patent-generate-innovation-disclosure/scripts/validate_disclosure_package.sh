@@ -4,7 +4,11 @@ set -euo pipefail
 usage() {
   cat <<'USAGE'
 用法:
-  bash scripts/validate_disclosure_package.sh <package-dir>
+  bash scripts/validate_disclosure_package.sh <disclosure-dir>
+
+目录要求:
+  <disclosure-dir>/disclosure.md
+  <disclosure-dir>/disclosure-workspace/...
 
 退出码:
   0  success
@@ -12,6 +16,11 @@ usage() {
   2  review_required
 USAGE
 }
+
+if [[ $# -eq 1 && ( "$1" == "-h" || "$1" == "--help" ) ]]; then
+  usage
+  exit 0
+fi
 
 if [[ $# -ne 1 ]]; then
   usage >&2
