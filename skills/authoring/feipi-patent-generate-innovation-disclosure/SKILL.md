@@ -39,15 +39,17 @@ subagent 最多累计 3 个、同时最多 1 个；子 agent 禁止继续派生�
 
 派发时使用 `fork_turns: none`，只传精简任务包，不复制完整对话；指定模型不可用时省略 model override 并保留原 effort，不得把所有角色静默升级为最高模型。运行环境不支持 subagent 时由主 agent 执行同一职责，不降低确认和验证门禁。
 
+每个任务包必须包含输入路径或摘要、当前冻结合同、允许写入路径、禁止动作、返回格式和 timing log。`permission`/`writes` 是主 agent 必须写入任务包并复核的协作合同，不代表宿主额外创建了 OS sandbox。
+
 ## 耗时观测（必做）
 
-真实执行开始时读取 `references/session-timing.md`，立即在 `disclosure-workspace/working/session-timing.jsonl` 初始化新 session。主 agent 是 timing log 的唯一写入协调者，并按以下口径记录：
+真实执行开始时读取 `references/session-timing.md`，先确定交底输出目录，再在 `disclosure-workspace/working/session-timing.jsonl` 初始化新 session；跨对话恢复时使用 `init --resume`，不得用第二次 `init` 隐藏未闭 span。主 agent 是 timing log 的唯一写入协调者，并按以下口径记录：
 
 - 四个阶段分别记录 start/end；阶段 2 包含等待用户明确确认的墙钟时间。
-- 每次资源读取记录 `resource_read`；竞品研究记录 `retrieval`；制图 worker 记录 `diagram_generation`。
-- PlantUML 图包完成后使用 `ingest-diagram` 导入真实 `render_ms` 与 `static_validation_ms`；完整交底校验必须通过 `session_timing.py run` 包装。
-- subagent 派发成功后记录 role、agent id、model、effort；从派发完成到结果返回记录 `subagent_execution`，只有主 agent 实际阻塞时才记录 `subagent_wait`。
-- 交付前生成 `session-timing-summary.json` 并确认 `incomplete_spans` 为空。活动可能并行，禁止把各活动耗时简单相加当作 session 总耗时。
+- 每批资源读取记录 `resource_read`；竞品研究记录 `retrieval`；制图 worker 记录 `diagram_generation`，避免为每个小文件反复启动观测进程。
+- PlantUML 图包完成后使用 `ingest-diagram` 导入本次真实 `render_ms`、`static_validation_ms`、HTTP 请求数、渲染轮次、图包校验数、verifier 数和 cache hit 数；缺字段时必须报错，不能按 0 猜测。完整交底校验必须通过 `session_timing.py run --result-json disclosure-workspace/disclosure-validation.json` 包装，同时导入阶段 4 内部的逐图 verifier 次数。
+- subagent 派发成功后记录 role、agent id、请求/实际 model 与 effort；宿主不暴露实际值时记 `unknown`，不得把请求值伪装成实际值。从派发完成到结果返回记录 `subagent_execution`，只有主 agent 实际阻塞时才记录 `subagent_wait`。
+- 交付前使用 `summarize --require-complete --close-session` 生成 `session-timing-summary.json`；四阶段、五类必记活动或任一 span 缺失时均不得宣称观测完整。活动可能并行，禁止把各活动耗时简单相加当作 session 总耗时。
 
 ## 输出目录合同
 

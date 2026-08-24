@@ -4,6 +4,15 @@
   "max_total_subagents": 3,
   "allow_recursive_spawn": false,
   "context_policy": "distilled_task_packet_only",
+  "permission_enforcement": "task_contract_not_os_sandbox",
+  "task_packet_required_fields": [
+    "input_paths_or_summary",
+    "frozen_contract",
+    "allowed_writes",
+    "forbidden_actions",
+    "return_format",
+    "timing_log"
+  ],
   "telemetry": {
     "coordinator": "main_agent",
     "log_path": "disclosure-workspace/working/session-timing.jsonl",
@@ -19,7 +28,7 @@
   "roles": [
     {
       "name": "patent_prior_art_researcher",
-      "stage": "material_modeling",
+      "stage": "phase_1_material_modeling",
       "model": "gpt-5.6-luna",
       "reasoning_effort": "medium",
       "fork_turns": "none",
@@ -29,7 +38,7 @@
     },
     {
       "name": "patent_diagram_engineer",
-      "stage": "final_drafting",
+      "stage": "phase_3_final_drafting",
       "model": "gpt-5.6-terra",
       "reasoning_effort": "medium",
       "fork_turns": "none",
@@ -41,7 +50,7 @@
     },
     {
       "name": "patent_final_reviewer",
-      "stage": "final_review",
+      "stage": "phase_4_review_delivery",
       "model": "gpt-5.6-sol",
       "reasoning_effort": "high",
       "fork_turns": "none",

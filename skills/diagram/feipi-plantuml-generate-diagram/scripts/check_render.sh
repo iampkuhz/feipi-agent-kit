@@ -18,6 +18,7 @@ SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 SERVERS_CONFIG="$SKILL_DIR/assets/server_candidates.txt"
 DEFAULT_TIMEOUT=20
 DEFAULT_LOCAL_PORT="${AGENT_PLANTUML_SERVER_PORT:-8199}"
+REQUEST_COUNT=0
 
 trim() {
   printf '%s' "$1" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'
@@ -147,6 +148,11 @@ if ! [[ "$TIMEOUT" =~ ^[0-9]+$ ]] || [[ "$TIMEOUT" -lt 1 ]]; then
   exit 1
 fi
 
+# 调用者显式指定的旧产物不能在本轮失败后继续存在。
+if [[ -n "$SVG_OUTPUT" ]]; then
+  rm -f -- "$SVG_OUTPUT"
+fi
+
 declare -a CANDIDATES=()
 append_candidate() {
   local value=""
@@ -179,6 +185,7 @@ fi
 if [[ "${#CANDIDATES[@]}" -eq 0 ]]; then
   echo "render_result=skipped"
   echo "render_reason=no_server_candidates"
+  echo "render_http_requests=$REQUEST_COUNT"
   exit 4
 fi
 
@@ -189,22 +196,35 @@ for candidate in "${CANDIDATES[@]}"; do
   REQUEST_SVG="$(mktemp -t plantuml-render-response.XXXXXX.svg)"
   SVG_CODE="$(mktemp)"
   SVG_ERR="$(mktemp)"
-  if ! curl -sS --connect-timeout 2 --max-time "$TIMEOUT" -o "$REQUEST_SVG" -w '%{http_code}' "$candidate/svg/$ENCODED" >"$SVG_CODE" 2>"$SVG_ERR"; then
+  SVG_HEADERS="$(mktemp)"
+  REQUEST_COUNT=$((REQUEST_COUNT + 1))
+  if ! curl -sS --connect-timeout 2 --max-time "$TIMEOUT" -D "$SVG_HEADERS" -o "$REQUEST_SVG" -w '%{http_code}' "$candidate/svg/$ENCODED" >"$SVG_CODE" 2>"$SVG_ERR"; then
     LAST_ERROR="$(cat "$SVG_ERR")"
-    rm -f "$REQUEST_SVG" "$SVG_CODE" "$SVG_ERR"
+    rm -f "$REQUEST_SVG" "$SVG_CODE" "$SVG_ERR" "$SVG_HEADERS"
     continue
   fi
 
   STATUS="$(cat "$SVG_CODE")"
   rm -f "$SVG_CODE" "$SVG_ERR"
-  if grep -Eqi 'syntax error|\[from string' "$REQUEST_SVG"; then
+  set +e
+  SVG_STATE="$(python3 "$SCRIPT_DIR/lib/svg_validation.py" "$REQUEST_SVG" 2>/dev/null)"
+  SVG_CHECK_EXIT=$?
+  set -e
+  HAS_ERROR_HEADER=false
+  grep -Eqi '^X-PlantUML-Diagram-Error:' "$SVG_HEADERS" && HAS_ERROR_HEADER=true
+  HAS_SVG_CONTENT_TYPE=false
+  grep -Eqi '^Content-Type:[[:space:]]*image/svg\+xml([[:space:];]|$)' "$SVG_HEADERS" && HAS_SVG_CONTENT_TYPE=true
+  rm -f "$SVG_HEADERS"
+
+  if [[ "$SVG_CHECK_EXIT" -ne 1 && ("$HAS_ERROR_HEADER" == "true" || "$SVG_STATE" == "error") \
+    && ("$STATUS" =~ ^2[0-9][0-9]$ || "$STATUS" == "400") ]]; then
     echo "render_result=syntax_error"
-    cat "$REQUEST_SVG"
+    echo "render_http_requests=$REQUEST_COUNT"
     rm -f "$REQUEST_SVG"
     exit 2
   fi
-  if [[ "$STATUS" != "200" ]] || ! grep -qi '<svg' "$REQUEST_SVG"; then
-    LAST_ERROR="svg 接口不可用，HTTP $STATUS"
+  if [[ ! "$STATUS" =~ ^2[0-9][0-9]$ || "$SVG_STATE" != "valid" || "$HAS_SVG_CONTENT_TYPE" != "true" ]]; then
+    LAST_ERROR="svg 响应无效，HTTP $STATUS"
     rm -f "$REQUEST_SVG"
     continue
   fi
@@ -217,9 +237,11 @@ for candidate in "${CANDIDATES[@]}"; do
   echo "render_result=ok"
   echo "render_server=$candidate"
   echo "render_svg=$SVG_OUTPUT"
+  echo "render_http_requests=$REQUEST_COUNT"
   exit 0
 done
 
 echo "render_result=skipped"
 echo "render_reason=${LAST_ERROR:-no_available_server}"
+echo "render_http_requests=$REQUEST_COUNT"
 exit 4

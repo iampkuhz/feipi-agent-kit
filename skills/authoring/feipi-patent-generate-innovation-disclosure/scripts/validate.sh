@@ -72,8 +72,8 @@ if [[ "$FRONTMATTER_NAME" != "feipi-patent-generate-innovation-disclosure" ]]; t
   echo "SKILL.md name 与目录名不一致：$FRONTMATTER_NAME" >&2
   exit 1
 fi
-if ! rg -q '^version:[[:space:]]*5[[:space:]]*$' "$TARGET_DIR/agents/openai.yaml"; then
-  echo "agents/openai.yaml version 必须为 5" >&2
+if ! rg -q '^version:[[:space:]]*6[[:space:]]*$' "$TARGET_DIR/agents/openai.yaml"; then
+  echo "agents/openai.yaml version 必须为 6" >&2
   exit 1
 fi
 
@@ -106,6 +106,11 @@ assert data.get("schema_version") == "1.0", "subagent schema_version 必须为 1
 assert data.get("max_active_subagents") == 1, "同时只能启用一个 subagent"
 assert data.get("max_total_subagents") == 3, "累计 subagent 必须为 3"
 assert data.get("allow_recursive_spawn") is False, "禁止 subagent 递归派生"
+assert data.get("permission_enforcement") == "task_contract_not_os_sandbox", "必须声明 permission 的执行边界"
+assert set(data.get("task_packet_required_fields", [])) == {
+    "input_paths_or_summary", "frozen_contract", "allowed_writes",
+    "forbidden_actions", "return_format", "timing_log",
+}, "subagent 精简任务包字段不完整"
 roles = data.get("roles")
 assert isinstance(roles, list) and len(roles) == 3, "必须配置三个分级角色"
 names = [item.get("name") for item in roles]
@@ -116,6 +121,9 @@ required = {
     "patent_final_reviewer",
 }
 assert set(names) == required, "subagent role 集合不完整"
+assert {item.get("stage") for item in roles} == {
+    "phase_1_material_modeling", "phase_3_final_drafting", "phase_4_review_delivery",
+}, "subagent stage 必须与 timing stage 同源"
 models = {item.get("model") for item in roles}
 assert models == {"gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"}, "model 分级不符合合同"
 efforts = [item.get("reasoning_effort") for item in roles]
@@ -123,6 +131,26 @@ assert all(value in {"low", "medium", "high"} for value in efforts), "reasoning_
 assert efforts.count("high") == 1, "只有最终 reviewer 使用 high"
 assert all(item.get("fork_turns") == "none" for item in roles), "subagent 必须使用精简上下文"
 assert all(item.get("permission") in {"read_only", "workspace_write"} for item in roles), "permission 非法"
+role_map = {item["name"]: item for item in roles}
+expected_roles = {
+    "patent_prior_art_researcher": (
+        "phase_1_material_modeling", "gpt-5.6-luna", "medium", "none", "read_only", [],
+    ),
+    "patent_diagram_engineer": (
+        "phase_3_final_drafting", "gpt-5.6-terra", "medium", "none", "workspace_write",
+        ["disclosure-workspace/diagrams/"],
+    ),
+    "patent_final_reviewer": (
+        "phase_4_review_delivery", "gpt-5.6-sol", "high", "none", "read_only", [],
+    ),
+}
+for name, expected in expected_roles.items():
+    item = role_map[name]
+    actual = (
+        item.get("stage"), item.get("model"), item.get("reasoning_effort"),
+        item.get("fork_turns"), item.get("permission"), item.get("writes"),
+    )
+    assert actual == expected, f"{name} 分级或权限映射不正确：{actual}"
 diagram = next(item for item in roles if item.get("name") == "patent_diagram_engineer")
 assert diagram.get("writes") == ["disclosure-workspace/diagrams/"], "diagram engineer 写入边界不正确"
 assert data.get("fallback", {}).get("forbid_silent_upgrade_to_highest") is True, "必须禁止静默升级最高模型"

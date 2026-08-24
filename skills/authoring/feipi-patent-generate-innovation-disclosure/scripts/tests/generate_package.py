@@ -474,6 +474,7 @@ def write_diagram(root: Path, spec: dict[str, Any], blocked: bool) -> str:
     (directory / "diagram.svg").write_bytes(svg)
     validation = {
         "schema_version": "1.1",
+        "render_contract_version": "2",
         "skill_name": "feipi-plantuml-generate-diagram",
         "diagram_id": spec["id"],
         "diagram_type": spec["profile"],
@@ -495,6 +496,18 @@ def write_diagram(root: Path, spec: dict[str, Any], blocked: bool) -> str:
             "svg": {"path": "diagram.svg", "sha256": sha256(svg)},
         },
         "metrics": spec["metrics"],
+        "timings": {"total_ms": 3.0, "render_ms": 1.0, "static_validation_ms": 2.0},
+        "last_run_timings": {
+            "total_ms": 3.0, "render_ms": 1.0, "static_validation_ms": 2.0, "cache_hit": False,
+        },
+        "counters": {
+            "render_http_requests": 1, "render_rounds": 1,
+            "package_validation_runs": 1, "package_verifier_runs": 1, "cache_hits": 0,
+        },
+        "last_run_counters": {
+            "render_http_requests": 1, "render_rounds": 1,
+            "package_validation_runs": 1, "package_verifier_runs": 1, "cache_hits": 0,
+        },
         "render_result": "ok",
         "render_server": "synthetic_fixture",
         "final_status": "blocked" if blocked else "success",

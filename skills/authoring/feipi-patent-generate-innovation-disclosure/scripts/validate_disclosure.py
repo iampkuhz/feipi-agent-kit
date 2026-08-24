@@ -157,6 +157,7 @@ class ValidationContext:
     def __init__(self, package_dir: Path | None = None) -> None:
         self.package_dir = package_dir
         self.diagnostics: list[Diagnostic] = []
+        self.diagram_package_verifier_runs = 0
 
     def add(self, rule_id: str, severity: str, message: str, location: str = "") -> None:
         self.diagnostics.append(Diagnostic(rule_id, severity, message, location))
@@ -194,6 +195,10 @@ class ValidationContext:
                 "deterministic": deterministic,
                 "semantic_review": semantic,
                 "visual_review": visual,
+            },
+            "operation_counts": {
+                "disclosure_validation_runs": 1 if mode == "package" else 0,
+                "diagram_package_verifier_runs": self.diagram_package_verifier_runs,
             },
             "diagnostics": [asdict(item) for item in self.diagnostics],
             "limitations": [
@@ -1739,6 +1744,7 @@ def _validate_with_generic_verifier(ctx: ValidationContext, package_path: Path, 
         if detail:
             ctx.error("PKG-010", f"无法加载通用图包复核器{detail}", location)
         return
+    ctx.diagram_package_verifier_runs += 1
     try:
         errors = _verify_generic_package_dir(package_path)
     except Exception as exc:  # pragma: no cover - 防止依赖异常中断主校验

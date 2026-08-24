@@ -18,6 +18,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Write validation.json")
     parser.add_argument("--output", required=True)
     parser.add_argument("--skill-name", default="feipi-plantuml-generate-diagram")
+    parser.add_argument("--render-contract-version", default="2")
     parser.add_argument("--diagram-type", default="fallback")
     parser.add_argument("--profile", default="fallback")
     parser.add_argument("--diagram-path", default="")
@@ -34,6 +35,11 @@ def main() -> int:
     parser.add_argument("--total-duration-ms", type=float, default=0.0)
     parser.add_argument("--render-duration-ms", type=float, default=0.0)
     parser.add_argument("--static-validation-duration-ms", type=float, default=0.0)
+    parser.add_argument("--render-http-requests", type=int, default=0)
+    parser.add_argument("--render-rounds", type=int, default=0)
+    parser.add_argument("--package-validation-runs", type=int, default=1)
+    parser.add_argument("--package-verifier-runs", type=int, default=0)
+    parser.add_argument("--cache-hits", type=int, default=0)
     args = parser.parse_args()
 
     profile_config = resolve_profile(args.profile)
@@ -76,8 +82,21 @@ def main() -> int:
                     if candidate.is_file():
                         parent_brief_path = str(candidate)
 
+    timings = {
+        "total_ms": round(max(0.0, args.total_duration_ms), 3),
+        "render_ms": round(max(0.0, args.render_duration_ms), 3),
+        "static_validation_ms": round(max(0.0, args.static_validation_duration_ms), 3),
+    }
+    counters = {
+        "render_http_requests": max(0, args.render_http_requests),
+        "render_rounds": max(0, args.render_rounds),
+        "package_validation_runs": max(0, args.package_validation_runs),
+        "package_verifier_runs": max(0, args.package_verifier_runs),
+        "cache_hits": max(0, args.cache_hits),
+    }
     result = ValidationResult(
         skill_name=args.skill_name,
+        render_contract_version=args.render_contract_version,
         diagram_id=diagram_id,
         diagram_type=args.diagram_type,
         profile=args.profile,
@@ -93,11 +112,10 @@ def main() -> int:
         final_status=args.final_status,
         blocked_reason=args.blocked_reason,
         metrics=compute_puml_metrics(args.profile, diagram_text),
-        timings={
-            "total_ms": round(max(0.0, args.total_duration_ms), 3),
-            "render_ms": round(max(0.0, args.render_duration_ms), 3),
-            "static_validation_ms": round(max(0.0, args.static_validation_duration_ms), 3),
-        },
+        timings=timings,
+        last_run_timings={**timings, "cache_hit": False},
+        counters=counters,
+        last_run_counters=dict(counters),
         parent_brief_path=parent_brief_path,
         parent_component_ref=parent_component_ref,
     )

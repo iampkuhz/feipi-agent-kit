@@ -60,7 +60,7 @@ description: PlantUML 通用作图入口；在用户要求生成架构图、时�
 
 - `diagram.puml` - PlantUML 源码
 - `diagram.svg` - 渲染后的 SVG（仅 render_result=ok 时存在）
-- `validation.json` - v1.1 验证结果合同；包含相对 artifact 路径、原始/规范化 hash、静态 metrics、`render_contract_version` 与 `timings.total_ms/render_ms/static_validation_ms`
+- `validation.json` - v1.1 验证结果合同；包含相对 artifact 路径、原始/规范化 hash、静态 metrics、`render_contract_version`，以及当前/最近完整运行的 timing 与调用计数
 - 可选：`brief.normalized.yaml`
 
 ## 验收标准
@@ -71,8 +71,8 @@ description: PlantUML 通用作图入口；在用户要求生成架构图、时�
 4. 渲染可用时必须产出 `diagram.svg`。
 5. 若 `render_result` 不为 `ok`、renderer 身份缺失或当前 SVG 不存在，`final_status` 必须为 `blocked`；不可复用旧 SVG。
 6. `scripts/validate_package.sh` 已内置 `scripts/verify_package.py`，会双向复核 v1.1 路径、hash、状态与实际 PUML metrics；任何包内文件变化都必须使旧合同失效。
-7. 成功路径只请求一次 SVG endpoint；语法错误从错误 SVG 中识别。单张已变图默认最多修复并重渲染 2 轮，只重跑发生变化的图。
-8. `timings` 使用单调时钟记录当前实际运行；上游应分别消费 render 与静态校验耗时，不得把命中旧图包时保存的历史 timing 当作本次渲染耗时。
+7. 成功路径只请求一次 SVG endpoint；语法错误依据 PlantUML 响应头或错误 SVG 根元数据识别，不扫描用户可见文字。单张已变图默认最多修复并重渲染 2 轮，只重跑发生变化的图。
+8. `timings` / `counters` 保留最近一次完整生成数据，`last_run_timings` / `last_run_counters` 记录本次实际调用；上游应优先消费后者。命中复用时 `render_ms=0`、renderer 请求与轮次均为 0，并单独记录 cache hit，不得把首次生成的历史数据当作本次调用。
 
 重复执行示例：
 

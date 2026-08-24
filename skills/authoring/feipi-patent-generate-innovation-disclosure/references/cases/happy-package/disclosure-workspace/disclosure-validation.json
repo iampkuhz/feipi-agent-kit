@@ -9,6 +9,10 @@
     "semantic_review": "passed",
     "visual_review": "passed"
   },
+  "operation_counts": {
+    "disclosure_validation_runs": 1,
+    "diagram_package_verifier_runs": 2
+  },
   "diagnostics": [],
   "limitations": [
     "本地校验不证明外部资料真实性、专利新颖性或法律可专利性。",

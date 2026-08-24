@@ -35,7 +35,7 @@ BRIEF_FILE=""
 DIAGRAM_FILE=""
 OUT_DIR=""
 REUSE_VALID_PACKAGE=false
-RENDER_CONTRACT_VERSION="1"
+RENDER_CONTRACT_VERSION="2"
 
 # 解析参数
 while [[ $# -gt 0 ]]; do
@@ -103,6 +103,11 @@ PY
 
 VALIDATION_START_NS="$(monotonic_ns)"
 RENDER_DURATION_MS="0"
+RENDER_HTTP_REQUESTS=0
+RENDER_ROUNDS=0
+PACKAGE_VALIDATION_RUNS=1
+PACKAGE_VERIFIER_RUNS=0
+CACHE_HITS=0
 
 # Router 真源：只有注册完成的 profile 才进入 typed 校验，未知图型明确 fallback。
 IFS=$'\t' read -r PROFILE PROFILE_VERSION SCHEMA_FILE COVERAGE_MODE LAYOUT_MODE < <(
@@ -144,11 +149,53 @@ SVG_OUT="$OUT_DIR/diagram.svg"
 VALIDATION_OUT="$OUT_DIR/validation.json"
 BRIEF_OUT=""
 
+update_last_run_observation() {
+  local cache_hit="$1"
+  local render_duration_ms="${2:-$RENDER_DURATION_MS}"
+  local total_duration_ms=""
+  local static_validation_duration_ms=""
+  total_duration_ms="$(duration_ms "$VALIDATION_START_NS")"
+  static_validation_duration_ms="$(python3 - "$total_duration_ms" "$render_duration_ms" <<'PY'
+import sys
+print(round(max(0.0, float(sys.argv[1]) - float(sys.argv[2])), 3))
+PY
+)"
+  python3 - "$VALIDATION_OUT" "$total_duration_ms" "$render_duration_ms" "$static_validation_duration_ms" "$cache_hit" \
+    "$RENDER_HTTP_REQUESTS" "$RENDER_ROUNDS" "$PACKAGE_VALIDATION_RUNS" "$PACKAGE_VERIFIER_RUNS" "$CACHE_HITS" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+data = json.loads(path.read_text(encoding="utf-8"))
+timings = {
+    "total_ms": round(float(sys.argv[2]), 3),
+    "render_ms": round(float(sys.argv[3]), 3),
+    "static_validation_ms": round(float(sys.argv[4]), 3),
+}
+data["last_run_timings"] = {**timings, "cache_hit": sys.argv[5] == "true"}
+last_run_counters = {
+    "render_http_requests": int(sys.argv[6]),
+    "render_rounds": int(sys.argv[7]),
+    "package_validation_runs": int(sys.argv[8]),
+    "package_verifier_runs": int(sys.argv[9]),
+    "cache_hits": int(sys.argv[10]),
+}
+data["last_run_counters"] = last_run_counters
+if sys.argv[5] != "true":
+    data["timings"] = timings
+    data["counters"] = last_run_counters
+temporary = path.with_suffix(path.suffix + ".tmp")
+temporary.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+temporary.replace(path)
+PY
+}
+
 # 显式复用只接受“输入、profile、渲染合同均未变化”的完整成功图包。
 # verify_package.py 会先重算包内路径、hash、metrics 和 SVG 合同；任一项失效即回退全量校验。
 if [[ "$REUSE_VALID_PACKAGE" == "true" && -f "$VALIDATION_OUT" && -f "$SVG_OUT" ]]; then
-  if python3 "$SCRIPT_DIR/verify_package.py" "$OUT_DIR" >/dev/null 2>&1 \
-    && python3 - "$VALIDATION_OUT" "$DIAGRAM_FILE" "$BRIEF_FILE" "$DIAGRAM_TYPE" "$PROFILE" "$PROFILE_VERSION" "$RENDER_CONTRACT_VERSION" "$LIB_DIR" <<'PY'
+  # 先做廉价输入身份检查；输入已变化时不启动完整 package verifier。
+  if python3 - "$VALIDATION_OUT" "$DIAGRAM_FILE" "$BRIEF_FILE" "$DIAGRAM_TYPE" "$PROFILE" "$PROFILE_VERSION" "$RENDER_CONTRACT_VERSION" "$LIB_DIR" <<'PY'
 import hashlib
 import json
 import sys
@@ -194,9 +241,14 @@ elif data.get("brief_sha256"):
     raise SystemExit(1)
 PY
   then
-    echo "cache_hit=true"
-    echo "final_status=success"
-    exit 0
+    PACKAGE_VERIFIER_RUNS=$((PACKAGE_VERIFIER_RUNS + 1))
+    if python3 "$SCRIPT_DIR/verify_package.py" "$OUT_DIR" >/dev/null 2>&1; then
+      CACHE_HITS=1
+      update_last_run_observation "true" "0"
+      echo "cache_hit=true"
+      echo "final_status=success"
+      exit 0
+    fi
   fi
 fi
 
@@ -279,6 +331,7 @@ PY
   python3 "$LIB_DIR/write_validation.py" \
     --output "$VALIDATION_OUT" \
     --skill-name "feipi-plantuml-generate-diagram" \
+    --render-contract-version "$RENDER_CONTRACT_VERSION" \
     --diagram-type "$DIAGRAM_TYPE" \
     --profile "$PROFILE" \
     --diagram-path "$DIAGRAM_OUT" \
@@ -294,7 +347,21 @@ PY
     --package-dir "$OUT_DIR" \
     --total-duration-ms "$total_duration_ms" \
     --render-duration-ms "$RENDER_DURATION_MS" \
-    --static-validation-duration-ms "$static_validation_duration_ms"
+    --static-validation-duration-ms "$static_validation_duration_ms" \
+    --render-http-requests "$RENDER_HTTP_REQUESTS" \
+    --render-rounds "$RENDER_ROUNDS" \
+    --package-validation-runs "$PACKAGE_VALIDATION_RUNS" \
+    --package-verifier-runs "$PACKAGE_VERIFIER_RUNS" \
+    --cache-hits "$CACHE_HITS"
+}
+
+read_render_request_count() {
+  local output="$1"
+  local value=""
+  value="$(printf '%s\n' "$output" | awk -F= '/^render_http_requests=[0-9]+$/ {count=$2} END {if (count != "") print count}')"
+  if [[ "$value" =~ ^[0-9]+$ ]]; then
+    RENDER_HTTP_REQUESTS="$value"
+  fi
 }
 
 # =============================================================================
@@ -396,10 +463,12 @@ fi
 
 RENDER_SCRIPT="$SCRIPT_DIR/check_render.sh"
 if [[ -f "$RENDER_SCRIPT" ]]; then
+  RENDER_ROUNDS=$((RENDER_ROUNDS + 1))
   RENDER_START_NS="$(monotonic_ns)"
   RENDER_OUTPUT="$(bash "$RENDER_SCRIPT" "$DIAGRAM_OUT" --svg-output "$SVG_OUT" 2>&1)" || {
     render_exit=$?
     RENDER_DURATION_MS="$(duration_ms "$RENDER_START_NS")"
+    read_render_request_count "$RENDER_OUTPUT"
     if [[ "$render_exit" -eq 2 ]]; then
       write_json "$BRIEF_CHECK" "$COVERAGE_CHECK" "$LAYOUT_CHECK" "syntax_error" "" "blocked" "render_syntax_error" "$BRIEF_OUT"
       echo "[FAIL] render syntax error" >&2
@@ -418,11 +487,13 @@ if [[ -f "$RENDER_SCRIPT" ]]; then
     fi
   }
   RENDER_DURATION_MS="$(duration_ms "$RENDER_START_NS")"
+  read_render_request_count "$RENDER_OUTPUT"
 
   if echo "$RENDER_OUTPUT" | grep -q "render_result=ok"; then
     RENDER_RESULT="ok"
     RENDER_SERVER="$(echo "$RENDER_OUTPUT" | grep "render_server=" | cut -d'=' -f2 || true)"
-    if [[ -z "$RENDER_SERVER" || ! -f "$SVG_OUT" ]] || ! grep -qi '<svg' "$SVG_OUT"; then
+    if [[ -z "$RENDER_SERVER" || ! -f "$SVG_OUT" ]] \
+      || ! python3 "$LIB_DIR/svg_validation.py" "$SVG_OUT" >/dev/null 2>&1; then
       write_json "$BRIEF_CHECK" "$COVERAGE_CHECK" "$LAYOUT_CHECK" "failed" "$RENDER_SERVER" "blocked" "render_evidence_missing" "$BRIEF_OUT"
       echo "[FAIL] renderer 未提供可绑定的 server 或当前 SVG" >&2
       exit 1
@@ -447,6 +518,7 @@ if ! snapshot_unchanged; then
   echo "[FAIL] 渲染期间 package 副本发生变化" >&2
   exit 1
 fi
+PACKAGE_VERIFIER_RUNS=$((PACKAGE_VERIFIER_RUNS + 1))
 write_json "$BRIEF_CHECK" "$COVERAGE_CHECK" "$LAYOUT_CHECK" "$RENDER_RESULT" "$RENDER_SERVER" "success" "" "$BRIEF_OUT"
 
 if ! python3 "$SCRIPT_DIR/verify_package.py" "$OUT_DIR" >/dev/null 2>&1; then
@@ -454,6 +526,9 @@ if ! python3 "$SCRIPT_DIR/verify_package.py" "$OUT_DIR" >/dev/null 2>&1; then
   echo "[FAIL] package v1.1 自校验失败" >&2
   exit 1
 fi
+
+# 将内置 verifier 的实际耗时与调用次数纳入本次观测；这些字段不参与工件 hash。
+update_last_run_observation "false"
 
 echo ""
 echo "=== Validation Complete ==="

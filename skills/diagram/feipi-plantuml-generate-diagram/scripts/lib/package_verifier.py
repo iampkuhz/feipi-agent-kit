@@ -4,12 +4,14 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 from pathlib import Path, PurePosixPath
 from typing import Any
 
 from .brief_loader import load_yaml
 from .puml_analysis import compute_puml_metrics
+from .svg_validation import is_success_svg
 from .validation_result import compute_normalized_puml_sha256, compute_sha256
 
 
@@ -20,6 +22,82 @@ TOP_FIELDS = {
     "svg": ("svg_path", "svg_sha256"),
     "parent_brief": ("parent_brief_path", "parent_brief_sha256"),
 }
+TIMING_FIELDS = {"total_ms", "render_ms", "static_validation_ms"}
+LAST_RUN_TIMING_FIELDS = {*TIMING_FIELDS, "cache_hit"}
+COUNTER_FIELDS = {
+    "render_http_requests",
+    "render_rounds",
+    "package_validation_runs",
+    "package_verifier_runs",
+    "cache_hits",
+}
+
+
+def _validate_observation_contract(data: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    if data.get("render_contract_version") != "2":
+        errors.append("render_contract_version 必须为 2")
+    timings = data.get("timings")
+    last_timings = data.get("last_run_timings")
+    counters = data.get("counters")
+    last_counters = data.get("last_run_counters")
+    contracts = (
+        ("timings", timings, TIMING_FIELDS),
+        ("last_run_timings", last_timings, LAST_RUN_TIMING_FIELDS),
+        ("counters", counters, COUNTER_FIELDS),
+        ("last_run_counters", last_counters, COUNTER_FIELDS),
+    )
+    for name, value, fields in contracts:
+        if not isinstance(value, dict) or set(value) != fields:
+            errors.append(f"{name} 字段集合无效")
+    if errors:
+        return errors
+
+    assert isinstance(timings, dict) and isinstance(last_timings, dict)
+    assert isinstance(counters, dict) and isinstance(last_counters, dict)
+    for name, values in (("timings", timings), ("last_run_timings", last_timings)):
+        for field in TIMING_FIELDS:
+            value = values[field]
+            if type(value) not in {int, float} or not math.isfinite(float(value)) or value < 0:
+                errors.append(f"{name}.{field} 必须是非负有限数")
+        if not errors and abs(float(values["total_ms"]) - float(values["render_ms"]) - float(values["static_validation_ms"])) > 0.01:
+            errors.append(f"{name}.total_ms 必须等于 render_ms + static_validation_ms")
+    if type(last_timings["cache_hit"]) is not bool:
+        errors.append("last_run_timings.cache_hit 必须是布尔值")
+    for name, values in (("counters", counters), ("last_run_counters", last_counters)):
+        for field in COUNTER_FIELDS:
+            value = values[field]
+            if type(value) is not int or value < 0:
+                errors.append(f"{name}.{field} 必须是非负整数")
+    if errors:
+        return errors
+    if counters["package_validation_runs"] != 1 or counters["cache_hits"] != 0:
+        errors.append("counters 必须记录一次完整生成且 cache_hits=0")
+    cache_hit = last_timings["cache_hit"]
+    if last_counters["package_validation_runs"] != 1:
+        errors.append("last_run_counters.package_validation_runs 必须为 1")
+    if cache_hit:
+        if last_timings["render_ms"] != 0:
+            errors.append("cache hit 的 last_run_timings.render_ms 必须为 0")
+        if last_counters["render_http_requests"] != 0 or last_counters["render_rounds"] != 0:
+            errors.append("cache hit 不得记录 renderer 请求或轮次")
+        if last_counters["cache_hits"] != 1 or last_counters["package_verifier_runs"] < 1:
+            errors.append("cache hit 必须记录一次命中和至少一次 verifier")
+    else:
+        if last_counters["cache_hits"] != 0:
+            errors.append("非 cache hit 的 last_run_counters.cache_hits 必须为 0")
+    if data.get("final_status") == "success":
+        if counters["render_http_requests"] < 1 or counters["render_rounds"] < 1:
+            errors.append("success 的完整生成必须记录 renderer 请求与轮次")
+        if counters["package_verifier_runs"] < 1:
+            errors.append("success 的完整生成必须记录 package verifier")
+        if not cache_hit and (
+            last_counters["render_http_requests"] < 1
+            or last_counters["render_rounds"] < 1
+            or last_counters["package_verifier_runs"] < 1
+        ):
+            errors.append("success 的本次完整运行缺少 renderer 或 verifier 计数")
+    return errors
 
 
 def _safe_relative(value: Any) -> PurePosixPath | None:
@@ -58,6 +136,7 @@ def verify_package_dir(package_dir: Path) -> list[str]:
 
     if data.get("schema_version") != "1.1":
         errors.append("schema_version 必须为 1.1")
+    errors.extend(_validate_observation_contract(data))
     for field in ("diagram_id", "profile", "profile_version"):
         if not isinstance(data.get(field), str) or not data.get(field):
             errors.append(f"{field} 不能为空")
@@ -231,13 +310,8 @@ def verify_package_dir(package_dir: Path) -> list[str]:
         if "svg" not in resolved:
             errors.append("final_status=success 时必须包含当前 SVG artifact")
         else:
-            try:
-                svg_bytes = resolved["svg"].read_bytes()
-            except OSError as exc:
-                errors.append(f"svg artifact 无法读取：{exc}")
-            else:
-                if b"<svg" not in svg_bytes.lower():
-                    errors.append("final_status=success 时 svg artifact 必须包含 SVG 根元素")
+            if not is_success_svg(resolved["svg"]):
+                errors.append("final_status=success 时 svg artifact 必须是合法且非错误的 SVG 根文档")
         if data.get("blocked_reason"):
             errors.append("final_status=success 时 blocked_reason 必须为空")
         if typed:

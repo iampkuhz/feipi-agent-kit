@@ -336,8 +336,21 @@ assert data["diagram_path"] == "diagram.puml"
 assert data["brief_sha256"] == data["artifacts"]["brief"]["sha256"]
 assert data["puml_sha256"] == data["artifacts"]["diagram"]["sha256"]
 assert data["metrics"] == {"node_count": 3, "edge_count": 2, "max_degree": 2}
+assert data["render_contract_version"] == "2"
 assert set(data["timings"]) == {"total_ms", "render_ms", "static_validation_ms"}
 assert all(isinstance(value, (int, float)) and value >= 0 for value in data["timings"].values())
+counter_fields = {
+    "render_http_requests", "render_rounds", "package_validation_runs",
+    "package_verifier_runs", "cache_hits",
+}
+assert set(data["counters"]) == counter_fields
+assert all(type(value) is int and value >= 0 for value in data["counters"].values())
+if data["final_status"] == "success":
+    assert data["last_run_timings"]["cache_hit"] is False
+    assert data["last_run_timings"]["total_ms"] >= data["timings"]["total_ms"]
+    assert data["last_run_counters"] == data["counters"]
+    assert data["counters"]["package_validation_runs"] == 1
+    assert data["counters"]["package_verifier_runs"] >= 1
 PY
 then
   pass "v1.1 字段、相对路径、metrics 与 timing 合同"
@@ -378,7 +391,26 @@ if bash "$SCRIPT_DIR/validate_package.sh" \
   --out-dir "$CACHE_OUT" \
   --reuse-valid-package >"$CACHE_LOG" 2>&1 \
   && rg -q '^cache_hit=true$' "$CACHE_LOG"; then
-  pass "未变图包命中显式复用"
+  if python3 - "$CACHE_OUT/validation.json" <<'PY'
+import json
+import sys
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+assert data["last_run_timings"]["cache_hit"] is True
+assert data["last_run_timings"]["render_ms"] == 0
+assert data["last_run_timings"]["total_ms"] >= 0
+assert data["last_run_counters"] == {
+    "render_http_requests": 0,
+    "render_rounds": 0,
+    "package_validation_runs": 1,
+    "package_verifier_runs": 1,
+    "cache_hits": 1,
+}
+PY
+  then
+    pass "未变图包命中显式复用并记录零渲染"
+  else
+    fail "未变图包 timing 未标记 cache hit"
+  fi
 else
   fail "未变图包未命中显式复用"
 fi

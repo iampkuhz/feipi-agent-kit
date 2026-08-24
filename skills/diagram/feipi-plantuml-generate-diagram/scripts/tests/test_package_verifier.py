@@ -53,7 +53,7 @@ def build_package(base: Path) -> dict:
     svg_path.write_text('<svg xmlns="http://www.w3.org/2000/svg"><text>fixture</text></svg>\n', encoding="utf-8")
     validation = {
         "schema_version": "1.1",
-        "render_contract_version": "1",
+        "render_contract_version": "2",
         "skill_name": "feipi-plantuml-generate-diagram",
         "diagram_id": "D9",
         "diagram_type": "component",
@@ -80,6 +80,18 @@ def build_package(base: Path) -> dict:
             "svg": {"path": "diagram.svg", "sha256": compute_sha256(str(svg_path))},
         },
         "metrics": compute_puml_metrics("component", PUML),
+        "timings": {"total_ms": 3.0, "render_ms": 1.0, "static_validation_ms": 2.0},
+        "last_run_timings": {
+            "total_ms": 3.0, "render_ms": 1.0, "static_validation_ms": 2.0, "cache_hit": False,
+        },
+        "counters": {
+            "render_http_requests": 1, "render_rounds": 1,
+            "package_validation_runs": 1, "package_verifier_runs": 1, "cache_hits": 0,
+        },
+        "last_run_counters": {
+            "render_http_requests": 1, "render_rounds": 1,
+            "package_validation_runs": 1, "package_verifier_runs": 1, "cache_hits": 0,
+        },
         "final_status": "success",
         "blocked_reason": "",
     }
@@ -99,6 +111,66 @@ class PackageVerifierTests(unittest.TestCase):
             base = Path(tmp)
             build_package(base)
             self.assertEqual([], verify_package_dir(base))
+
+    def test_observation_contract_rejects_missing_or_inconsistent_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            build_package(base)
+            self.mutate(base, lambda data: data.pop("counters"))
+            self.assertTrue(any("counters 字段集合" in item for item in verify_package_dir(base)))
+            build_package(base)
+            self.mutate(base, lambda data: data["last_run_timings"].__setitem__("total_ms", 99))
+            self.assertTrue(any("render_ms + static_validation_ms" in item for item in verify_package_dir(base)))
+
+    def test_observation_contract_rejects_old_render_contract_and_bad_cache_counts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            build_package(base)
+            self.mutate(base, lambda data: data.__setitem__("render_contract_version", "1"))
+            self.assertTrue(any("render_contract_version" in item for item in verify_package_dir(base)))
+            build_package(base)
+            def break_cache(data):
+                data["last_run_timings"] = {
+                    "total_ms": 2.0, "render_ms": 1.0,
+                    "static_validation_ms": 1.0, "cache_hit": True,
+                }
+                data["last_run_counters"]["cache_hits"] = 1
+            self.mutate(base, break_cache)
+            self.assertTrue(any("cache hit" in item for item in verify_package_dir(base)))
+
+    def test_success_rejects_svg_text_without_svg_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            build_package(base)
+            svg_path = base / "diagram.svg"
+            svg_path.write_text("<html>&lt;svg&gt;</html>\n", encoding="utf-8")
+            self.mutate(
+                base,
+                lambda data: (
+                    data.__setitem__("svg_sha256", compute_sha256(str(svg_path))),
+                    data["artifacts"]["svg"].__setitem__("sha256", compute_sha256(str(svg_path))),
+                ),
+            )
+            self.assertTrue(any("合法且非错误的 SVG 根文档" in item for item in verify_package_dir(base)))
+
+    def test_success_rejects_plantuml_error_svg_even_with_matching_hash(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            build_package(base)
+            svg_path = base / "diagram.svg"
+            svg_path.write_text(
+                '<svg xmlns="http://www.w3.org/2000/svg" data-diagram-type="ERROR"><text>error</text></svg>\n',
+                encoding="utf-8",
+            )
+            digest = compute_sha256(str(svg_path))
+            self.mutate(
+                base,
+                lambda data: (
+                    data.__setitem__("svg_sha256", digest),
+                    data["artifacts"]["svg"].__setitem__("sha256", digest),
+                ),
+            )
+            self.assertTrue(any("非错误" in item for item in verify_package_dir(base)))
 
     def test_non_object_validation_and_artifact_do_not_crash(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -203,7 +275,7 @@ class PackageVerifierTests(unittest.TestCase):
                 data["svg_sha256"] = digest
                 data["artifacts"]["svg"]["sha256"] = digest
             self.mutate(base, refresh_hash)
-            self.assertTrue(any("SVG 根元素" in item for item in verify_package_dir(base)))
+            self.assertTrue(any("合法且非错误的 SVG 根文档" in item for item in verify_package_dir(base)))
 
 
 if __name__ == "__main__":

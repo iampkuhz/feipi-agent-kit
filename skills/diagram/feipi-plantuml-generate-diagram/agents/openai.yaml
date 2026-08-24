@@ -1,4 +1,4 @@
-version: 3
+version: 4
 interface:
   display_name: "PlantUML 通用作图生成与校验"
   short_description: "PlantUML 多类型作图、校验与 diagram package 输出。"

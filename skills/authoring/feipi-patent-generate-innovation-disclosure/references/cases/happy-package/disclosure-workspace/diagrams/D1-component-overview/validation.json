@@ -1,5 +1,6 @@
 {
   "schema_version": "1.1",
+  "render_contract_version": "2",
   "skill_name": "feipi-plantuml-generate-diagram",
   "diagram_id": "D1",
   "diagram_type": "component",
@@ -35,6 +36,31 @@
     "node_count": 5,
     "edge_count": 5,
     "max_degree": 3
+  },
+  "timings": {
+    "total_ms": 3.0,
+    "render_ms": 1.0,
+    "static_validation_ms": 2.0
+  },
+  "last_run_timings": {
+    "total_ms": 3.0,
+    "render_ms": 1.0,
+    "static_validation_ms": 2.0,
+    "cache_hit": false
+  },
+  "counters": {
+    "render_http_requests": 1,
+    "render_rounds": 1,
+    "package_validation_runs": 1,
+    "package_verifier_runs": 1,
+    "cache_hits": 0
+  },
+  "last_run_counters": {
+    "render_http_requests": 1,
+    "render_rounds": 1,
+    "package_validation_runs": 1,
+    "package_verifier_runs": 1,
+    "cache_hits": 0
   },
   "final_status": "success",
   "blocked_reason": ""

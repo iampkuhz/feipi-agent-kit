@@ -187,6 +187,7 @@
 - [x] **状态：已完成**
 - 你指出的问题：同一张图会先请求文本渲染再请求 SVG，图包自校验后完整交底入口又逐图启动 verifier，未变图也可能被再次渲染。
 - 已做优化：renderer 成功路径收敛为单次 SVG 请求；未变图包可在当前路径、hash、metrics、profile 与渲染合同均有效时显式复用；专利完整校验在当前进程调用通用 verifier，避免逐图启动 Python 子进程；生成阶段每图只做一次图包校验。
+- 后续校准：复用命中单独写入 `last_run_timings` / `last_run_counters`，本次渲染耗时、HTTP 请求和渲染轮次均归零；渲染错误改用 PlantUML 响应头或 SVG 根元数据识别，避免用户图中文字触发误判，并用真实 XML 根元素校验替代 `<svg` 子串扫描。
 
 ### 22. 缺少分级 subagent 与真实 Session 耗时证据
 
@@ -194,6 +195,7 @@
 - 你指出的问题：子任务没有按难度分配模型和思考深度，也没有记录阶段、资源读取、检索、制图、渲染、验证、subagent 数量、执行次数与等待时间，后续无法基于真实 Session 判断瓶颈。
 - 已做优化：增加 Luna/medium 竞品检索、Terra/medium 制图和 Sol/high 终审三级编排，禁止递归派生和全员最高模型；新增 `session_timing.py`，以 JSONL span 记录四阶段及七类活动，并输出包含 subagent 数量、执行与等待统计的 summary。PlantUML 图包额外写入真实 render/static validation timing。
 - 观测边界：活动允许并行，不能把各活动耗时相加当作 Session 墙钟总时长；阶段 2 包含等待用户确认，必须与模型或脚本执行耗时分开解释。
+- 后续校准：增加 active session 防覆盖与 `--resume`、四阶段/五类活动完整性门禁、阶段多次执行聚合、宿主 runtime id、请求/实际模型区分，以及 renderer HTTP 请求、渲染轮次、package validation、verifier、cache hit 的实际计数。宿主未暴露模型内部延迟或实际模型时明确记录 `unknown`，不把请求配置或阶段墙钟冒充真实模型计算。
 
 ## 尚未完成的验收项
 

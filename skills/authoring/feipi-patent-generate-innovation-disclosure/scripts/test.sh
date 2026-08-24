@@ -111,6 +111,19 @@ check_output_layout_contract() {
     && ! test -e "$ROOT_DIR/packages/happy-package/disclosure-validation.json"
 }
 
+check_final_validation_operation_contract() {
+  python3 - "$ROOT_DIR/packages/happy-package/$WORKSPACE_DIR_NAME/disclosure-validation.json" <<'PY'
+import json
+import sys
+
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+assert data["operation_counts"] == {
+    "disclosure_validation_runs": 1,
+    "diagram_package_verifier_runs": 2,
+}
+PY
+}
+
 check_competitor_research_contract() {
   rg -q '无论用户是否提供竞品材料，都使用公开资料检索' "$SKILL_DIR/SKILL.md" \
     && rg -Fq '"status": {"enum": ["evidence_found", "searched_no_usable_evidence"]}' "$SKILL_DIR/assets/disclosure-manifest.schema.json" \
@@ -129,6 +142,7 @@ check_subagent_contract() {
     && rg -q 'fork_turns: none' "$SKILL_DIR/SKILL.md" \
     && rg -q '每张图的.*validate_package\.sh.*只调用一次' "$SKILL_DIR/SKILL.md" \
     && rg -q '只调用一次完整交底包入口' "$SKILL_DIR/SKILL.md" \
+    && rg -q 'task_contract_not_os_sandbox' "$SKILL_DIR/references/subagent-orchestration.json" \
     && ! rg -q '^subagents:' "$SKILL_DIR/agents/openai.yaml"
 }
 
@@ -138,6 +152,8 @@ check_timing_contract() {
     && rg -q 'resource_read.*retrieval.*diagram_generation' "$SKILL_DIR/SKILL.md" \
     && rg -q 'render_ms.*static_validation_ms' "$SKILL_DIR/SKILL.md" \
     && rg -q 'subagent_execution.*subagent_wait' "$SKILL_DIR/SKILL.md" \
+    && rg -q 'run --result-json.*disclosure-validation\.json' "$SKILL_DIR/SKILL.md" \
+    && rg -q 'summarize --require-complete --close-session' "$SKILL_DIR/SKILL.md" \
     && rg -q 'session-timing-summary\.json' "$SKILL_DIR/SKILL.md"
 }
 
@@ -169,6 +185,7 @@ fi
 run_package_case "happy-package" "happy" 0 ""
 run_command "happy-audience-contract" 0 "" check_happy_audience_contract
 run_command "output-layout-contract" 0 "" check_output_layout_contract
+run_command "final-validation-operation-contract" 0 "" check_final_validation_operation_contract
 run_package_case "legacy-flat-layout" "legacy_flat_layout" 0 "PKG-013"
 run_package_case "ambiguous-layout" "ambiguous_layout" 1 "PKG-012"
 run_package_case "workspace-duplicate-public" "workspace_duplicate_public" 1 "PKG-012"

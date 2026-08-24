@@ -1,5 +1,9 @@
 # 变更记录
 
+## 2026-08-25
+- feipi-patent-generate-innovation-disclosure v6：补强跨轮次恢复、完整性门禁与真实调用计数
+- feipi-plantuml-generate-diagram v4：校准复用耗时、renderer 调用计数与 SVG 错误识别
+
 ## 2026-08-24
 - feipi-patent-generate-innovation-disclosure v5：分级编排与全链路耗时观测
 - feipi-plantuml-generate-diagram v3：单次渲染与未变图包复用

@@ -8,11 +8,13 @@ import json
 from dataclasses import dataclass, asdict, field
 from pathlib import Path
 
+from .svg_validation import is_success_svg
+
 
 @dataclass
 class ValidationResult:
     schema_version: str = "1.1"
-    render_contract_version: str = "1"
+    render_contract_version: str = "2"
     skill_name: str = "feipi-plantuml-generate-diagram"
     diagram_id: str = ""
     diagram_type: str = "fallback"
@@ -39,6 +41,32 @@ class ValidationResult:
     )
     timings: dict[str, float] = field(
         default_factory=lambda: {"total_ms": 0.0, "render_ms": 0.0, "static_validation_ms": 0.0}
+    )
+    last_run_timings: dict[str, float | bool] = field(
+        default_factory=lambda: {
+            "total_ms": 0.0,
+            "render_ms": 0.0,
+            "static_validation_ms": 0.0,
+            "cache_hit": False,
+        }
+    )
+    counters: dict[str, int] = field(
+        default_factory=lambda: {
+            "render_http_requests": 0,
+            "render_rounds": 0,
+            "package_validation_runs": 1,
+            "package_verifier_runs": 0,
+            "cache_hits": 0,
+        }
+    )
+    last_run_counters: dict[str, int] = field(
+        default_factory=lambda: {
+            "render_http_requests": 0,
+            "render_rounds": 0,
+            "package_validation_runs": 1,
+            "package_verifier_runs": 0,
+            "cache_hits": 0,
+        }
     )
     final_status: str = "pending"
     blocked_reason: str = ""
@@ -159,7 +187,7 @@ def write_validation_json(
             invalid_success.append("render_server_missing")
         if "svg" not in result.artifacts:
             invalid_success.append("svg_missing")
-        elif not source_svg or b"<svg" not in Path(source_svg).read_bytes().lower():
+        elif not source_svg or not is_success_svg(source_svg):
             invalid_success.append("svg_invalid")
         if result.profile != "fallback":
             for field_name in ("brief_check", "coverage_check", "layout_check"):
