@@ -45,6 +45,7 @@ REQUIRED_FILES=(
   "assets/disclosure-manifest.template.json"
   "assets/disclosure-manifest.schema.json"
   "references/content-quality-gates.md"
+  "references/stage-delivery-contract.md"
   "references/subagent-orchestration.json"
   "references/session-timing.md"
   "references/cases/happy-case-full.md"
@@ -56,6 +57,8 @@ REQUIRED_FILES=(
   "scripts/validate_disclosure_package.sh"
   "scripts/validate_disclosure.py"
   "scripts/session_timing.py"
+  "scripts/stage_handoff.py"
+  "scripts/tests/test_stage_handoff.py"
   "scripts/tests/test_session_timing.py"
   "scripts/tests/generate_package.py"
   "scripts/test.sh"
@@ -107,8 +110,9 @@ assert data.get("max_active_subagents") == 1, "同时只能启用一个 subagent
 assert data.get("max_total_subagents") == 3, "累计 subagent 必须为 3"
 assert data.get("allow_recursive_spawn") is False, "禁止 subagent 递归派生"
 assert data.get("permission_enforcement") == "task_contract_not_os_sandbox", "必须声明 permission 的执行边界"
+assert data.get("handoff_contract") == "references/stage-delivery-contract.md", "阶段交付合同路径不正确"
 assert set(data.get("task_packet_required_fields", [])) == {
-    "input_paths_or_summary", "frozen_contract", "allowed_writes",
+    "task_file", "input_reference", "allowed_writes",
     "forbidden_actions", "return_format", "timing_log",
 }, "subagent 精简任务包字段不完整"
 roles = data.get("roles")
@@ -151,6 +155,36 @@ for name, expected in expected_roles.items():
         item.get("fork_turns"), item.get("permission"), item.get("writes"),
     )
     assert actual == expected, f"{name} 分级或权限映射不正确：{actual}"
+expected_deliveries = {
+    "patent_prior_art_researcher": (
+        "disclosure-workspace/working/stages/agents/prior-art-task.md",
+        "research.tsv rows",
+        "disclosure-workspace/working/stages/phase-1/research.tsv",
+        "main_agent",
+    ),
+    "patent_diagram_engineer": (
+        "disclosure-workspace/working/stages/agents/diagram-task.md",
+        "build-map.tsv rows",
+        "disclosure-workspace/working/stages/phase-3/build-map.tsv",
+        "main_agent",
+    ),
+    "patent_final_reviewer": (
+        "disclosure-workspace/working/stages/agents/final-review-task.md",
+        "review.tsv rows",
+        "disclosure-workspace/working/stages/phase-4/review.tsv",
+        "main_agent",
+    ),
+}
+for name, expected in expected_deliveries.items():
+    item = role_map[name]
+    output = item.get("output_contract", {})
+    actual = (
+        item.get("task_file"), output.get("format"), output.get("cache_path"), output.get("writer"),
+    )
+    assert actual == expected, f"{name} 的输入/输出文件链不正确：{actual}"
+    assert len(item.get("input_contract", [])) == 3, f"{name} 必须声明三个紧凑输入"
+    assert len(item.get("judgment_contract", [])) == 3, f"{name} 必须声明三个判断范围"
+    assert output.get("message") in {"status_and_row_count_only", "status_and_paths_only"}, f"{name} 返回消息不够紧凑"
 diagram = next(item for item in roles if item.get("name") == "patent_diagram_engineer")
 assert diagram.get("writes") == ["disclosure-workspace/diagrams/"], "diagram engineer 写入边界不正确"
 assert data.get("fallback", {}).get("forbid_silent_upgrade_to_highest") is True, "必须禁止静默升级最高模型"
@@ -159,6 +193,10 @@ assert telemetry.get("coordinator") == "main_agent", "timing log 必须由 main 
 assert telemetry.get("log_path") == "disclosure-workspace/working/session-timing.jsonl", "timing log 路径不正确"
 assert all(telemetry.get(field) is True for field in ("record_spawn", "record_execution", "record_wait")), "subagent timing 字段不完整"
 PY
+
+rg -q '^## 2\. 四阶段交付矩阵$' "$TARGET_DIR/references/stage-delivery-contract.md"
+rg -q '^## 4\. subagent 三段式交付$' "$TARGET_DIR/references/stage-delivery-contract.md"
+rg -q 'handoff 不超过 24 KiB' "$TARGET_DIR/SKILL.md"
 
 bash "$TARGET_DIR/scripts/check_disclosure_format.sh" \
   "$TARGET_DIR/references/cases/happy-case-full.md" >/dev/null

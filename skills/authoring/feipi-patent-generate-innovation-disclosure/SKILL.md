@@ -26,8 +26,8 @@ description: 用于把零散业务与技术事实整理为带来源台账、Plan
 
 ## 快速执行与资源加载
 
-- 启动时只读取本文件；运行环境支持 subagent 时，再读取 `references/subagent-orchestration.json` 并按其中的 model、`reasoning_effort`、`fork_turns` 和读写边界显式派发。`agents/openai.yaml` 不承载 subagent 角色配置。
-- 阶段 1 不读取正式模板或 JSON Schema。先把用户材料压缩为一次性的事实台账和缺口清单；同一材料不重复摘要，缺失项合并为一轮定向追问。
+- 启动时只读取本文件和 `references/stage-delivery-contract.md`；运行环境支持 subagent 时，再读取 `references/subagent-orchestration.json` 并按其中的 model、`reasoning_effort`、`fork_turns` 和读写边界显式派发。`agents/openai.yaml` 不承载 subagent 角色配置。
+- 阶段 1 不读取正式模板或 JSON Schema。先把用户材料压缩为一次性的材料索引、证据卡和缺口清单；同一 hash 的材料不重复读取或摘要，缺失项合并为一轮定向追问。
 - 用户确认写作思路后，阶段 3 才读取 `assets/proposal_template.md`、`assets/internal_trace_appendix_template.md` 和 `assets/disclosure-manifest.template.json`。`assets/disclosure-manifest.schema.json` 只由校验脚本消费，模型不得逐行分析。
 - 阶段 4 只在人工复核时读取 `references/content-quality-gates.md` 的相关规则；确定性格式、路径、hash 和字段检查交给脚本，主 agent 不重复逐项推演。
 
@@ -39,7 +39,7 @@ subagent 最多累计 3 个、同时最多 1 个；子 agent 禁止继续派生�
 
 派发时使用 `fork_turns: none`，只传精简任务包，不复制完整对话；指定模型不可用时省略 model override 并保留原 effort，不得把所有角色静默升级为最高模型。运行环境不支持 subagent 时由主 agent 执行同一职责，不降低确认和验证门禁。
 
-每个任务包必须包含输入路径或摘要、当前冻结合同、允许写入路径、禁止动作、返回格式和 timing log。`permission`/`writes` 是主 agent 必须写入任务包并复核的协作合同，不代表宿主额外创建了 OS sandbox。
+每个任务包必须落入 `disclosure-workspace/working/stages/agents/`，并按“输入 / 需要判断 / 返回”三段写明输入引用（阶段 1 为材料索引，其余阶段为上游 handoff）、允许写入路径、禁止动作、紧凑 TSV 返回格式和 timing log。派发消息只传任务文件路径，不复制完整对话或任务内容。`permission`/`writes` 是主 agent 必须写入任务包并复核的协作合同，不代表宿主额外创建了 OS sandbox。
 
 ## 耗时观测（必做）
 
@@ -62,9 +62,14 @@ subagent 最多累计 3 个、同时最多 1 个；子 agent 禁止继续派生�
     ├── disclosure-internal.md
     ├── disclosure-manifest.json
     ├── disclosure-validation.json
-    ├── working/                     # 检索记录、写作思路、临时草稿与 session timing
+    ├── working/                     # 阶段缓存、临时草稿与 session timing
     │   ├── session-timing.jsonl
-    │   └── session-timing-summary.json
+    │   ├── session-timing-summary.json
+    │   └── stages/
+    │       ├── stage-state.tsv
+    │       ├── shared/              # 材料索引与唯一证据卡
+    │       ├── agents/              # 三段式 subagent 任务文件
+    │       └── phase-{1,2,3,4}/     # 阶段缓存与紧凑 handoff
     └── diagrams/
         └── <D编号>-<用途>/
             ├── brief.normalized.yaml
@@ -81,6 +86,21 @@ subagent 最多累计 3 个、同时最多 1 个；子 agent 禁止继续派生�
 
 对外版本中的拟扩展内容仍使用 `> **拟扩展保护**` 高亮，但不显示 `IE` 编号；`IE` 映射只保留在 manifest 和内部追溯附录中。
 
+## 阶段交付与上下文边界（必做）
+
+四阶段必须遵循 `references/stage-delivery-contract.md`。首次执行先初始化 `working/stages/`；每阶段开始用 `status` 取得唯一有效输入，结束时用 `seal` 封存。跨轮次恢复只读取最后一个有效 handoff，不重放旧对话或长推理：
+
+```bash
+python3 scripts/stage_handoff.py init --working <disclosure-workspace/working>
+python3 scripts/stage_handoff.py status --working <disclosure-workspace/working>
+python3 scripts/stage_handoff.py seal --working <disclosure-workspace/working> --stage <phase_name>
+```
+
+- 阶段 1 是既有原始材料的唯一读取者：用 `material-index.tsv` 保存来源、hash 和有效锚点，用 `evidence-cards.md` 只缓存会进入主张、I/T、检索词或边界判断的事实。后续阶段不得为“补上下文”重读同一材料。
+- 阶段间重复记录使用 TSV，只出现一次表头；handoff 不超过 24 KiB，只传稳定 ID、相对路径、hash、已确认决策和未决项，禁止嵌套大 JSON、完整正文、网页副本、日志或思维链。
+- 用户后续增加或修改原始事实时，更新材料索引并从阶段 1 重新封存；上游 hash 变化会使下游状态失效。旧缓存可以保留，但在重新封存前不得使用。
+- 只有封存成功的上游 handoff 才能启动下一阶段或 subagent。并行仅允许阶段 3 的主 agent 写正文与一个 diagram worker 写 `diagrams/`；双方写入不相交，汇合前不得封存阶段 3、计算最终 manifest hash 或启动终审。
+
 只使用工作区内相对路径；禁止绝对路径和 `..`。每个 Markdown PlantUML 块前写稳定标识：
 
 ```markdown
@@ -96,6 +116,8 @@ subagent 最多累计 3 个、同时最多 1 个；子 agent 禁止继续派生�
 ## 分阶段执行流程
 
 ### 阶段 1：素材确认与写作建模
+
+本阶段读取用户消息、用户文件、明确范围内的代码和实际打开的公开检索页，不接受前序 handoff。开始即建立 `working/stages/shared/material-index.tsv`，每份原始材料只读取一次；判断输入门槛、SF/IE/EM 边界、技术泛化、问题/机制/约束、候选 I/T 和检索充分性，并缓存 `evidence-cards.md`、`agents/prior-art-task.md`、`phase-1/model.md`、`phase-1/research.tsv`。阶段结束将核心主张、候选 I/T、实现/扩展边界、证据结论、缺口和候选图职责压缩到 `phase-1/handoff.md`，封存为 `phase_1_material_modeling`；不得把原文或长检索日志传给阶段 2。
 
 1. **建立事实台账**
    - 将输入分为“来源事实 / 发明扩展 / 外部资料”。
@@ -130,18 +152,23 @@ subagent 最多累计 3 个、同时最多 1 个；子 agent 禁止继续派生�
 
 ### 阶段 2：提交写作思路并等待确认
 
+本阶段只读取 `phase-1/handoff.md`、其中明确点名的 `phase-1/model.md` 条目，以及用户本轮新增的确认、否决或补充；不得重读既有原始材料。需要判断用户是否明确确认、冻结哪些 I/T/D/E/S、调整是否改变来源事实，并把可恢复的确认稿缓存到 `phase-2/decision.md`。
+
 - 向用户提交精简的“写作思路”，至少包含：核心发明主张、章节论证顺序、候选 `I/T` 映射、每项创新的“已实现基础 / 带 `IE` 编号的拟扩展保护 / 与现有做法的差异 / 产生什么价值”、竞品检索范围与结论、图示规划、证据缺口与拟处理方式。
-- 写作思路只给确认所需的摘要和映射，不提前扩写完整章节、最终 manifest 或图包；默认不落盘。
+- 写作思路只给确认所需的摘要和映射，不提前扩写完整章节、最终 manifest 或图包；必须同步落入 `phase-2/decision.md`，避免跨轮次依赖对话上下文。
 - 阶段 2 使用内部确认格式 `> **拟扩展保护（IEx）**`，不能只用普通列表或含混措辞标记扩展；最终对外版保留高亮块但移除 `IE` 编号。
 - 阶段 2 属于内部确认材料，可以显示 `SF/IE/EM` 追溯编号；必须明确这些编号不会进入最终对外版本。
 - 明确标注当前处于“思路待确认”状态，并暂停最终版本撰写。
 - 只有收到用户明确的确认、同意或等价表述后，才进入阶段 3；不得把沉默、未回复或仅补充材料视为确认。
-- 用户提出调整时，更新写作思路并再次等待确认；如需将写作思路或预览稿落盘，只能写入 `disclosure-workspace/working/`。确认前不得生成最终版 `disclosure.md`、完整 manifest 或最终图包，也不得把预览稿称为最终版。
+- 用户提出调整时，更新 `decision.md` 并再次等待确认；新增或改变来源事实时退回阶段 1，不能在阶段 2 直接补写事实缓存。确认前不得生成最终版 `disclosure.md`、完整 manifest 或最终图包，也不得把预览稿称为最终版。
+- 确认后将冻结的 I/T/D/E/S、实现/扩展边界、图示职责、所需模板和未决阻塞项写入 `phase-2/handoff.md`，封存为 `phase_2_idea_confirmation`。阶段 3 只消费该 handoff，不接收阶段 1 原始材料。
 
 ### 阶段 3：撰写最终版本
 
+本阶段只读取已封存的 `phase-2/handoff.md` 和按需加载的三份正式模板；正常情况下不读取原始材料。需要判断文档结构、图型与数量触发、编号一致性以及正文/内部稿/manifest/图包的同源关系。缓存 `agents/diagram-task.md` 和 `phase-3/build-map.tsv`；后者只记录工件 ID、相对路径、hash、owner 与状态。
+
 5. **规划并生成图示**
-   - 用户确认后先冻结 `I/T/D/E/S` 与图示职责，再把全部图交给一个 `patent_diagram_engineer`；主 agent 可同时撰写正文，双方不得改写对方负责的文件。
+   - 用户确认后从阶段 2 handoff 读取冻结的 `I/T/D/E/S` 与图示职责，写入三段式 `agents/diagram-task.md`，再把全部图交给一个 `patent_diagram_engineer`；主 agent 可同时撰写正文，双方不得改写对方负责的文件。
    - 统一调用 `$feipi-plantuml-generate-diagram`：先一次性完成全部 brief，再对各图生成 diagram package。每张图的 `validate_package.sh` 已内置 verifier，只调用一次；不得再手工重复调用 `verify_package.py`。
    - 必须且只能有 1 张 `component_overview` 和 1 张 `main_flow`。
    - 主流程由分支/状态驱动时使用 `activity`；由多方调用/回执驱动时使用 `sequence` 且设置 `numbering_scheme: process_s`。
@@ -163,7 +190,11 @@ subagent 最多累计 3 个、同时最多 1 个；子 agent 禁止继续派生�
    - 主流程顶层保持连续 5–10 步；箭头标签只保留编号或一个动作短语，参数和异常处理写在图下。
    - 竞品部分必须展示检索范围、检索日期和结论；存在可靠证据时再列出 1–3 项。没有可用证据时写清已经查阅了什么以及为什么不能形成具名对比，不得留空或出现“待检索”。
 
+正文与图包汇合后才计算最终 hash 并完成 `build-map.tsv`；将工件路径/hash、owner、状态和待复核项写入 `phase-3/handoff.md`，封存为 `phase_3_final_drafting`。handoff 不复制正文、manifest、PUML 或 SVG 内容。
+
 ### 阶段 4：复核、验证与交付
+
+本阶段只读取 `phase-3/handoff.md`、`build-map.tsv` 指向的最终工件及本轮相关质量门禁，不读取原始材料或重新打开竞品网页。开始前写入三段式 `agents/final-review-task.md`；需要判断实现/扩展边界、因果删除、泛化、对外泄漏、SVG 视觉质量和确定性校验状态，并把绑定工件 hash 的紧凑结论缓存到 `phase-4/review.tsv`。
 
 7. **完成语义与视觉复核**
    - 所有正文和图包冻结后只派发一次 `patent_final_reviewer`，合并完成语义与视觉复核；不要为同一工件分别启动多个高模型 reviewer。
@@ -179,6 +210,7 @@ subagent 最多累计 3 个、同时最多 1 个；子 agent 禁止继续派生�
    - 修复 `blocked` 规则后只重跑受影响入口；`review_required` 必须完成相应人工复核后再交付为 `success`，不得进行无修改的固定次数轮询。
    - 保留验证报告中的警告和验证边界；检索无可用证据时保留具体研究结论，不得为了消除空结果而改写成伪证据。
    - 生成 timing summary；若存在未结束 span，只能说明观测不完整并修复记录，不能宣称已具备完整耗时证据。
+   - 将最终工件路径、状态、警告、验证边界和 timing summary 路径写入 `phase-4/handoff.md`，封存为 `phase_4_review_delivery`；交付前运行 `stage_handoff.py validate --require-complete`。
 
 ## 校验入口
 
@@ -208,6 +240,7 @@ bash scripts/validate_disclosure_package.sh <disclosure-dir>
 ## 资源导航
 
 - 内容质量规则：`references/content-quality-gates.md`
+- 阶段交付与上下文压缩：`references/stage-delivery-contract.md`
 - subagent 分级编排：`references/subagent-orchestration.json`
 - session 耗时观测：`references/session-timing.md`
 - 正式文档模板：`assets/proposal_template.md`

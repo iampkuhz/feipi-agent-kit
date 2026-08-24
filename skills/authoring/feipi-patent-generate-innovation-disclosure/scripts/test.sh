@@ -146,6 +146,22 @@ check_subagent_contract() {
     && ! rg -q '^subagents:' "$SKILL_DIR/agents/openai.yaml"
 }
 
+check_stage_delivery_contract() {
+  rg -q '^## 阶段交付与上下文边界（必做）$' "$SKILL_DIR/SKILL.md" \
+    && rg -q '阶段 1 是既有原始材料的唯一读取者' "$SKILL_DIR/SKILL.md" \
+    && rg -q 'phase-1/handoff\.md.*phase-1/model\.md' "$SKILL_DIR/SKILL.md" \
+    && rg -q 'phase-2/handoff\.md.*三份正式模板' "$SKILL_DIR/SKILL.md" \
+    && rg -q 'phase-3/handoff\.md.*build-map\.tsv' "$SKILL_DIR/SKILL.md" \
+    && rg -q '阶段间重复记录使用 TSV' "$SKILL_DIR/SKILL.md" \
+    && rg -q '只有封存成功的上游 handoff 才能启动下一阶段或 subagent' "$SKILL_DIR/SKILL.md" \
+    && rg -q '^## 2\. 四阶段交付矩阵$' "$SKILL_DIR/references/stage-delivery-contract.md" \
+    && rg -q '^## 4\. subagent 三段式交付$' "$SKILL_DIR/references/stage-delivery-contract.md" \
+    && rg -q '上游 hash 变化时从 `stage-state.tsv` 删除下游有效状态' "$SKILL_DIR/references/stage-delivery-contract.md" \
+    && rg -q '"format": "research.tsv rows"' "$SKILL_DIR/references/subagent-orchestration.json" \
+    && rg -q '"format": "build-map.tsv rows"' "$SKILL_DIR/references/subagent-orchestration.json" \
+    && rg -q '"format": "review.tsv rows"' "$SKILL_DIR/references/subagent-orchestration.json"
+}
+
 check_timing_contract() {
   rg -q '^## 耗时观测（必做）$' "$SKILL_DIR/SKILL.md" \
     && rg -q '四个阶段分别记录 start/end' "$SKILL_DIR/SKILL.md" \
@@ -161,6 +177,8 @@ run_command "validate-self" 0 "" bash "$VALIDATE_SKILL" "$SKILL_DIR"
 run_command "confirmation-gate-contract" 0 "" check_confirmation_contract
 run_command "competitor-research-contract" 0 "" check_competitor_research_contract
 run_command "subagent-orchestration-contract" 0 "" check_subagent_contract
+run_command "stage-delivery-contract" 0 "" check_stage_delivery_contract
+run_command "stage-handoff-e2e" 0 "" python3 "$SKILL_DIR/scripts/tests/test_stage_handoff.py"
 run_command "session-timing-contract" 0 "" check_timing_contract
 run_command "session-timing-e2e" 0 "" python3 "$SKILL_DIR/scripts/tests/test_session_timing.py"
 
