@@ -14,7 +14,6 @@ import html
 import ipaddress
 import json
 import re
-import subprocess
 import sys
 import unicodedata
 from dataclasses import dataclass, asdict
@@ -29,13 +28,20 @@ DISCLOSURE_WORKSPACE_DIR = "disclosure-workspace"
 VALIDATION_SCHEMA_VERSION = "1.0"
 EXIT_BY_STATUS = {"success": 0, "blocked": 1, "review_required": 2}
 MANIFEST_SCHEMA_PATH = Path(__file__).resolve().parents[1] / "assets" / "disclosure-manifest.schema.json"
-GENERIC_PACKAGE_VERIFIER = (
+GENERIC_PACKAGE_SCRIPTS = (
     Path(__file__).resolve().parents[3]
     / "diagram"
     / "feipi-plantuml-generate-diagram"
     / "scripts"
-    / "verify_package.py"
 )
+GENERIC_PACKAGE_VERIFIER = GENERIC_PACKAGE_SCRIPTS / "verify_package.py"
+_GENERIC_VERIFY_IMPORT_ERROR = ""
+try:
+    sys.path.insert(0, str(GENERIC_PACKAGE_SCRIPTS))
+    from lib.package_verifier import verify_package_dir as _verify_generic_package_dir
+except Exception as exc:  # pragma: no cover - 仅依赖缺失时进入
+    _verify_generic_package_dir = None
+    _GENERIC_VERIFY_IMPORT_ERROR = str(exc)
 
 REQUIRED_DISCLOSURE_H3 = (
     "申请说明",
@@ -1727,25 +1733,19 @@ def _validate_artifact_entry(
 
 
 def _validate_with_generic_verifier(ctx: ValidationContext, package_path: Path, location: str) -> None:
-    if not GENERIC_PACKAGE_VERIFIER.is_file():
+    if not GENERIC_PACKAGE_VERIFIER.is_file() or _verify_generic_package_dir is None:
+        detail = f"：{_GENERIC_VERIFY_IMPORT_ERROR}" if _GENERIC_VERIFY_IMPORT_ERROR else ""
         ctx.error("PKG-010", f"缺少直接依赖图包复核器：{GENERIC_PACKAGE_VERIFIER}", location)
+        if detail:
+            ctx.error("PKG-010", f"无法加载通用图包复核器{detail}", location)
         return
     try:
-        completed = subprocess.run(
-            [sys.executable, str(GENERIC_PACKAGE_VERIFIER), str(package_path)],
-            cwd=package_path,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=30,
-            check=False,
-        )
-    except (OSError, subprocess.SubprocessError) as exc:
+        errors = _verify_generic_package_dir(package_path)
+    except Exception as exc:  # pragma: no cover - 防止依赖异常中断主校验
         ctx.error("PKG-010", f"无法执行通用图包复核器：{exc}", location)
         return
-    if completed.returncode != 0:
-        detail = (completed.stderr or completed.stdout or "无诊断").strip().replace("\n", " | ")[:800]
+    if errors:
+        detail = " | ".join(str(item).replace("\n", " ") for item in errors)[:800]
         ctx.error("PKG-010", f"通用图包 v1.1 复核失败：{detail}", location)
 
 

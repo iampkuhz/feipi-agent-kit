@@ -303,6 +303,12 @@ else
   fail "v1.1 package 安全与双向合同单元测试"
 fi
 
+if python3 "$TEST_DIR/test_check_render.py" >/dev/null 2>&1; then
+  pass "renderer 单 SVG 请求回归"
+else
+  fail "renderer 单 SVG 请求回归"
+fi
+
 # 未注册图型只能进入 fallback，不得跳过 typed schema 后伪装成 typed profile。
 UNKNOWN_OUT="/tmp/plantuml-unknown-fallback-test"
 run_validate "$UNKNOWN_OUT" --diagram-type class --diagram "$FALLBACK_DIAGRAM"
@@ -330,11 +336,13 @@ assert data["diagram_path"] == "diagram.puml"
 assert data["brief_sha256"] == data["artifacts"]["brief"]["sha256"]
 assert data["puml_sha256"] == data["artifacts"]["diagram"]["sha256"]
 assert data["metrics"] == {"node_count": 3, "edge_count": 2, "max_degree": 2}
+assert set(data["timings"]) == {"total_ms", "render_ms", "static_validation_ms"}
+assert all(isinstance(value, (int, float)) and value >= 0 for value in data["timings"].values())
 PY
 then
-  pass "v1.1 字段、相对路径与 metrics 合同"
+  pass "v1.1 字段、相对路径、metrics 与 timing 合同"
 else
-  fail "v1.1 字段、相对路径与 metrics 合同"
+  fail "v1.1 字段、相对路径、metrics 与 timing 合同"
 fi
 HASH_STATUS="$(python3 -c "import json; print(json.load(open('$HASH_OUT/validation.json'))['final_status'])")"
 if [[ "$HASH_STATUS" == "success" ]]; then
@@ -351,6 +359,28 @@ if [[ "$HASH_STATUS" == "success" ]]; then
   fi
 else
   check_json_field "$HASH_OUT/validation.json" blocked_reason "render_server_unavailable" "离线渲染如实阻塞"
+fi
+
+# 完全未变且通过当前合同的图包可显式复用，且不得再次访问 renderer。
+CACHE_OUT="$(mktemp -d /tmp/plantuml-cache-hit.XXXXXX)"
+python3 - "$CACHE_OUT" "$TEST_DIR" <<'PY'
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[2])
+from test_package_verifier import build_package
+build_package(Path(sys.argv[1]))
+PY
+CACHE_LOG="$CACHE_OUT/cache.log"
+if bash "$SCRIPT_DIR/validate_package.sh" \
+  --diagram-type component \
+  --brief "$CACHE_OUT/brief.normalized.yaml" \
+  --diagram "$CACHE_OUT/diagram.puml" \
+  --out-dir "$CACHE_OUT" \
+  --reuse-valid-package >"$CACHE_LOG" 2>&1 \
+  && rg -q '^cache_hit=true$' "$CACHE_LOG"; then
+  pass "未变图包命中显式复用"
+else
+  fail "未变图包未命中显式复用"
 fi
 
 # renderer 缺失时不得复用旧 SVG 或写出 success。

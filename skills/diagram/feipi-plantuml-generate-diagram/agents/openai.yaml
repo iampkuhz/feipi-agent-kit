@@ -1,5 +1,5 @@
-version: 2
+version: 3
 interface:
   display_name: "PlantUML 通用作图生成与校验"
   short_description: "PlantUML 多类型作图、校验与 diagram package 输出。"
-  default_prompt: "使用 $feipi-plantuml-generate-diagram 生成并校验 PlantUML diagram package。"
+  default_prompt: "使用 $feipi-plantuml-generate-diagram 生成并一次性校验 PlantUML diagram package；重复处理未变图包时启用受 hash 约束的复用。"

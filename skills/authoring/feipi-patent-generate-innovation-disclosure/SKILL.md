@@ -24,13 +24,30 @@ description: 用于把零散业务与技术事实整理为带来源台账、Plan
 
 缺少任一项时定向追问并暂停成稿。不得用推测出的“发明扩展”冒充来源事实或已实现内容。
 
-开始工作时读取：
+## 快速执行与资源加载
 
-- `references/content-quality-gates.md`：十类内容规则、正反例和验证边界。
-- `assets/proposal_template.md`：正式文档结构。
-- `assets/internal_trace_appendix_template.md`：内部追溯附录结构。
-- `assets/disclosure-manifest.template.json`：manifest 字段模板。
-- `assets/disclosure-manifest.schema.json`：manifest 结构合同。
+- 启动时只读取本文件；运行环境支持 subagent 时，再读取 `references/subagent-orchestration.json` 并按其中的 model、`reasoning_effort`、`fork_turns` 和读写边界显式派发。`agents/openai.yaml` 不承载 subagent 角色配置。
+- 阶段 1 不读取正式模板或 JSON Schema。先把用户材料压缩为一次性的事实台账和缺口清单；同一材料不重复摘要，缺失项合并为一轮定向追问。
+- 用户确认写作思路后，阶段 3 才读取 `assets/proposal_template.md`、`assets/internal_trace_appendix_template.md` 和 `assets/disclosure-manifest.template.json`。`assets/disclosure-manifest.schema.json` 只由校验脚本消费，模型不得逐行分析。
+- 阶段 4 只在人工复核时读取 `references/content-quality-gates.md` 的相关规则；确定性格式、路径、hash 和字段检查交给脚本，主 agent 不重复逐项推演。
+
+subagent 最多累计 3 个、同时最多 1 个；子 agent 禁止继续派生。主 agent 保留素材门槛、用户确认、正文合并和最终交付责任：
+
+- `patent_prior_art_researcher`：`gpt-5.6-luna` + `medium`，一次处理两条检索线。
+- `patent_diagram_engineer`：`gpt-5.6-terra` + `medium`，确认后只写 `disclosure-workspace/diagrams/`。
+- `patent_final_reviewer`：`gpt-5.6-sol` + `high`，最终只读复核一次。
+
+派发时使用 `fork_turns: none`，只传精简任务包，不复制完整对话；指定模型不可用时省略 model override 并保留原 effort，不得把所有角色静默升级为最高模型。运行环境不支持 subagent 时由主 agent 执行同一职责，不降低确认和验证门禁。
+
+## 耗时观测（必做）
+
+真实执行开始时读取 `references/session-timing.md`，立即在 `disclosure-workspace/working/session-timing.jsonl` 初始化新 session。主 agent 是 timing log 的唯一写入协调者，并按以下口径记录：
+
+- 四个阶段分别记录 start/end；阶段 2 包含等待用户明确确认的墙钟时间。
+- 每次资源读取记录 `resource_read`；竞品研究记录 `retrieval`；制图 worker 记录 `diagram_generation`。
+- PlantUML 图包完成后使用 `ingest-diagram` 导入真实 `render_ms` 与 `static_validation_ms`；完整交底校验必须通过 `session_timing.py run` 包装。
+- subagent 派发成功后记录 role、agent id、model、effort；从派发完成到结果返回记录 `subagent_execution`，只有主 agent 实际阻塞时才记录 `subagent_wait`。
+- 交付前生成 `session-timing-summary.json` 并确认 `incomplete_spans` 为空。活动可能并行，禁止把各活动耗时简单相加当作 session 总耗时。
 
 ## 输出目录合同
 
@@ -43,7 +60,9 @@ description: 用于把零散业务与技术事实整理为带来源台账、Plan
     ├── disclosure-internal.md
     ├── disclosure-manifest.json
     ├── disclosure-validation.json
-    ├── working/                     # 可选：检索记录、写作思路和临时草稿
+    ├── working/                     # 检索记录、写作思路、临时草稿与 session timing
+    │   ├── session-timing.jsonl
+    │   └── session-timing-summary.json
     └── diagrams/
         └── <D编号>-<用途>/
             ├── brief.normalized.yaml
@@ -82,12 +101,13 @@ description: 用于把零散业务与技术事实整理为带来源台账、Plan
    - 将类名、函数、字段、表名和内部产品名泛化为技术表达；必要缩写加入白名单。
    - 单独确认哪些对象、触发条件、处理步骤、约束和输出状态已经实现，哪些只是希望纳入保护范围的扩展；无法确认时定向追问。
    - 已实现基础应接近真实技术路径，但只保留可说明机制的对象、动作、边界和状态，不照搬类名、函数、字段、表结构或产品内部标识。
+   - 只保留会进入核心主张、`I/T` 映射或检索词的事实；不做无边界代码库扫描或材料复述。
 
 2. **主动完成行业竞品检索**
-   - 无论用户是否提供竞品材料，都使用公开资料检索行业竞品和相似方案；不能把“用户未提供”当作跳过理由。
+   - 无论用户是否提供竞品材料，都使用公开资料检索行业竞品和相似方案；不能把“用户未提供”当作跳过理由。优先交给 `patent_prior_art_researcher`，主 agent 同时继续事实建模。
    - 至少执行两组互不相同的检索：一组围绕泛化后的技术对象与使用场景，一组围绕核心机制与现有问题。每组通过 `basis_terms` 绑定同时存在于输入完整性和关键词中的技术词，并通过 `context_terms` 绑定另一技术分类或已确认使用场景；两类词都必须以纯文本原样进入检索式，检索式还要包含产品、官方、专利、论文、标准或相似方案等研究限定词。不得用内部产品名、类名、字段名、HTML entity、零宽字符或其他未授权标识伪造检索关联。
-   - 优先查阅官方产品页、官方技术文档、公开专利、标准或论文等一手资料。每组检索记录焦点、检索式、检索日期、实际查阅页面和结果摘要；执行时必须人工检查整条检索式及结果是否与主题相关，本地脚本不会判断剩余自由文本的语义相关性。
-   - 找到可靠材料时保留 1–3 项证据；证据的定位地址和日期必须能回溯到检索记录。未找到可用材料时记录 `searched_no_usable_evidence`，对外使用固定无具名断言结论，详细发现只留在内部检索记录中。
+   - 两组检索在一次 subagent 任务内并行执行。每组最多打开 3 个候选页面；优先查阅官方产品页、官方技术文档、公开专利、标准或论文等一手资料。每组记录焦点、检索式、检索日期、实际查阅页面和结果摘要；执行时必须人工检查整条检索式及结果是否与主题相关，本地脚本不会判断剩余自由文本的语义相关性。
+   - 找到足以说明行业基线的可靠材料后立即停止扩散，总计只保留 1–3 项最佳证据；证据的定位地址和日期必须能回溯到检索记录。两组检索均无可用材料时记录 `searched_no_usable_evidence`，对外使用固定无具名断言结论，详细发现只留在内部检索记录中。
    - 检索工具不可用、页面无法访问或两类检索记录不完整时，暂停最终成稿并报告阻塞；不得用“待检索”占位后继续交付。
 
 3. **确定边界与主张**
@@ -109,6 +129,7 @@ description: 用于把零散业务与技术事实整理为带来源台账、Plan
 ### 阶段 2：提交写作思路并等待确认
 
 - 向用户提交精简的“写作思路”，至少包含：核心发明主张、章节论证顺序、候选 `I/T` 映射、每项创新的“已实现基础 / 带 `IE` 编号的拟扩展保护 / 与现有做法的差异 / 产生什么价值”、竞品检索范围与结论、图示规划、证据缺口与拟处理方式。
+- 写作思路只给确认所需的摘要和映射，不提前扩写完整章节、最终 manifest 或图包；默认不落盘。
 - 阶段 2 使用内部确认格式 `> **拟扩展保护（IEx）**`，不能只用普通列表或含混措辞标记扩展；最终对外版保留高亮块但移除 `IE` 编号。
 - 阶段 2 属于内部确认材料，可以显示 `SF/IE/EM` 追溯编号；必须明确这些编号不会进入最终对外版本。
 - 明确标注当前处于“思路待确认”状态，并暂停最终版本撰写。
@@ -118,13 +139,15 @@ description: 用于把零散业务与技术事实整理为带来源台账、Plan
 ### 阶段 3：撰写最终版本
 
 5. **规划并生成图示**
-   - 统一调用 `$feipi-plantuml-generate-diagram`，先生成 brief，再验证图包，最后嵌入文档。
+   - 用户确认后先冻结 `I/T/D/E/S` 与图示职责，再把全部图交给一个 `patent_diagram_engineer`；主 agent 可同时撰写正文，双方不得改写对方负责的文件。
+   - 统一调用 `$feipi-plantuml-generate-diagram`：先一次性完成全部 brief，再对各图生成 diagram package。每张图的 `validate_package.sh` 已内置 verifier，只调用一次；不得再手工重复调用 `verify_package.py`。
    - 必须且只能有 1 张 `component_overview` 和 1 张 `main_flow`。
    - 主流程由分支/状态驱动时使用 `activity`；由多方调用/回执驱动时使用 `sequence` 且设置 `numbering_scheme: process_s`。
    - 出现跨网、跨链、在线/离线、HSM、人工摆渡或人工交接时，增加 `deployment_boundary`。
    - `module_detail` 每张只展开一个父组件；`core_mechanism` 仅在有独立目的时生成，不为凑图添加。
    - 图示只呈现已实现技术路径，拟扩展保护统一在正文高亮块和内部附录中表达，不进入 PlantUML 或 SVG；视觉复核记录必须明确写出“仅呈现已实现路径”。
    - 图示使用 `D1...Dn`；结构关系使用 `E1...En`；流程使用 `S1...Sn`、`S5.1...`。专利文档不得出现 `M/R` 编号。
+   - 默认只生成两张必需图；只有命中明确触发条件才增加图。已变图最多修复并重渲染 2 轮，只重跑失败的图；再次处理完全未变图包时使用 `--reuse-valid-package`，命中 hash 合同后不得访问 renderer。
 
 6. **按模板写作**
    - 标题、使用场景、核心发明主张、关键词及 `I/T` 字段从 manifest 原样渲染，补充解释写在原字段之后。
@@ -141,6 +164,7 @@ description: 用于把零散业务与技术事实整理为带来源台账、Plan
 ### 阶段 4：复核、验证与交付
 
 7. **完成语义与视觉复核**
+   - 所有正文和图包冻结后只派发一次 `patent_final_reviewer`，合并完成语义与视觉复核；不要为同一工件分别启动多个高模型 reviewer。
    - 执行泛化替换测试：替换领域名词后仍适用于任意系统的内容判为失败。
    - 逐项执行因果删除测试：删除核心机制后技术效果仍成立的映射判为失败。
    - 复核 SVG 是否零交叉、零文字遮挡；复核结果绑定当前 `svg_sha256`，图变化后重新复核。
@@ -148,9 +172,11 @@ description: 用于把零散业务与技术事实整理为带来源台账、Plan
    - 复核对外版不含内部台账编号、来源定位和机器枚举；复核内部版的公开正文与对外版同源，所有追溯信息只出现在内部附录。
 
 8. **验证并交付**
-   - 先校验各 diagram package，再校验完整交底包；完整入口会再次调用通用图包 v1.1 verifier 重算路径、状态、hash 与实际 metrics。
-   - 修复 `blocked` 规则后重跑；`review_required` 必须完成相应人工复核后再交付为 `success`。
+   - 图包在生成阶段已经完成一次校验；阶段 4 不再逐图重跑 renderer。视觉复核完成后只调用一次完整交底包入口，入口会在当前进程复用通用图包 v1.1 verifier 重算路径、状态、hash 与实际 metrics。
+   - 只修改正文、manifest 或复核记录时，不重新渲染未变图。只有 brief/PUML/SVG 内容变化才重跑对应图包并使旧视觉复核失效。
+   - 修复 `blocked` 规则后只重跑受影响入口；`review_required` 必须完成相应人工复核后再交付为 `success`，不得进行无修改的固定次数轮询。
    - 保留验证报告中的警告和验证边界；检索无可用证据时保留具体研究结论，不得为了消除空结果而改写成伪证据。
+   - 生成 timing summary；若存在未结束 span，只能说明观测不完整并修复记录，不能宣称已具备完整耗时证据。
 
 ## 校验入口
 
@@ -180,6 +206,8 @@ bash scripts/validate_disclosure_package.sh <disclosure-dir>
 ## 资源导航
 
 - 内容质量规则：`references/content-quality-gates.md`
+- subagent 分级编排：`references/subagent-orchestration.json`
+- session 耗时观测：`references/session-timing.md`
 - 正式文档模板：`assets/proposal_template.md`
 - 内部追溯附录模板：`assets/internal_trace_appendix_template.md`
 - manifest 模板与 schema：`assets/disclosure-manifest.template.json`、`assets/disclosure-manifest.schema.json`

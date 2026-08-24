@@ -45,6 +45,8 @@ REQUIRED_FILES=(
   "assets/disclosure-manifest.template.json"
   "assets/disclosure-manifest.schema.json"
   "references/content-quality-gates.md"
+  "references/subagent-orchestration.json"
+  "references/session-timing.md"
   "references/cases/happy-case-full.md"
   "references/cases/happy-package/disclosure.md"
   "references/cases/happy-package/disclosure-workspace/disclosure-internal.md"
@@ -53,6 +55,8 @@ REQUIRED_FILES=(
   "scripts/check_disclosure_format.sh"
   "scripts/validate_disclosure_package.sh"
   "scripts/validate_disclosure.py"
+  "scripts/session_timing.py"
+  "scripts/tests/test_session_timing.py"
   "scripts/tests/generate_package.py"
   "scripts/test.sh"
 )
@@ -68,8 +72,8 @@ if [[ "$FRONTMATTER_NAME" != "feipi-patent-generate-innovation-disclosure" ]]; t
   echo "SKILL.md name 与目录名不一致：$FRONTMATTER_NAME" >&2
   exit 1
 fi
-if ! rg -q '^version:[[:space:]]*4[[:space:]]*$' "$TARGET_DIR/agents/openai.yaml"; then
-  echo "agents/openai.yaml version 必须为 4" >&2
+if ! rg -q '^version:[[:space:]]*5[[:space:]]*$' "$TARGET_DIR/agents/openai.yaml"; then
+  echo "agents/openai.yaml version 必须为 5" >&2
   exit 1
 fi
 
@@ -91,6 +95,42 @@ done < <(rg --files "$TARGET_DIR/scripts" -g '*.py' | LC_ALL=C sort)
 python3 -c 'import json,sys; json.load(open(sys.argv[1], encoding="utf-8")); json.load(open(sys.argv[2], encoding="utf-8"))' \
   "$TARGET_DIR/assets/disclosure-manifest.template.json" \
   "$TARGET_DIR/assets/disclosure-manifest.schema.json"
+
+python3 - "$TARGET_DIR/references/subagent-orchestration.json" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+data = json.load(open(path, encoding="utf-8"))
+assert data.get("schema_version") == "1.0", "subagent schema_version 必须为 1.0"
+assert data.get("max_active_subagents") == 1, "同时只能启用一个 subagent"
+assert data.get("max_total_subagents") == 3, "累计 subagent 必须为 3"
+assert data.get("allow_recursive_spawn") is False, "禁止 subagent 递归派生"
+roles = data.get("roles")
+assert isinstance(roles, list) and len(roles) == 3, "必须配置三个分级角色"
+names = [item.get("name") for item in roles]
+assert len(names) == len(set(names)), "subagent role 不得重复"
+required = {
+    "patent_prior_art_researcher",
+    "patent_diagram_engineer",
+    "patent_final_reviewer",
+}
+assert set(names) == required, "subagent role 集合不完整"
+models = {item.get("model") for item in roles}
+assert models == {"gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"}, "model 分级不符合合同"
+efforts = [item.get("reasoning_effort") for item in roles]
+assert all(value in {"low", "medium", "high"} for value in efforts), "reasoning_effort 只允许 low/medium/high"
+assert efforts.count("high") == 1, "只有最终 reviewer 使用 high"
+assert all(item.get("fork_turns") == "none" for item in roles), "subagent 必须使用精简上下文"
+assert all(item.get("permission") in {"read_only", "workspace_write"} for item in roles), "permission 非法"
+diagram = next(item for item in roles if item.get("name") == "patent_diagram_engineer")
+assert diagram.get("writes") == ["disclosure-workspace/diagrams/"], "diagram engineer 写入边界不正确"
+assert data.get("fallback", {}).get("forbid_silent_upgrade_to_highest") is True, "必须禁止静默升级最高模型"
+telemetry = data.get("telemetry", {})
+assert telemetry.get("coordinator") == "main_agent", "timing log 必须由 main agent 协调"
+assert telemetry.get("log_path") == "disclosure-workspace/working/session-timing.jsonl", "timing log 路径不正确"
+assert all(telemetry.get(field) is True for field in ("record_spawn", "record_execution", "record_wait")), "subagent timing 字段不完整"
+PY
 
 bash "$TARGET_DIR/scripts/check_disclosure_format.sh" \
   "$TARGET_DIR/references/cases/happy-case-full.md" >/dev/null

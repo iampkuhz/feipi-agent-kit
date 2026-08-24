@@ -31,6 +31,9 @@ def main() -> int:
     parser.add_argument("--blocked-reason", default="")
     parser.add_argument("--brief-path", default="")
     parser.add_argument("--package-dir", default="")
+    parser.add_argument("--total-duration-ms", type=float, default=0.0)
+    parser.add_argument("--render-duration-ms", type=float, default=0.0)
+    parser.add_argument("--static-validation-duration-ms", type=float, default=0.0)
     args = parser.parse_args()
 
     profile_config = resolve_profile(args.profile)
@@ -90,6 +93,11 @@ def main() -> int:
         final_status=args.final_status,
         blocked_reason=args.blocked_reason,
         metrics=compute_puml_metrics(args.profile, diagram_text),
+        timings={
+            "total_ms": round(max(0.0, args.total_duration_ms), 3),
+            "render_ms": round(max(0.0, args.render_duration_ms), 3),
+            "static_validation_ms": round(max(0.0, args.static_validation_duration_ms), 3),
+        },
         parent_brief_path=parent_brief_path,
         parent_component_ref=parent_component_ref,
     )

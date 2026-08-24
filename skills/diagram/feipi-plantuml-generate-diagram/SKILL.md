@@ -46,7 +46,9 @@ description: PlantUML 通用作图入口；在用户要求生成架构图、时�
 
 3. **Fallback Mode**：不强制 typed brief，生成最小可渲染 `.puml` 并完成基础校验。详见 `references/fallback-mode.md`。
 
-4. **Verify**：产出 diagram package；只有 `validation.json` 中 `final_status=success` 且 `render_result=ok` 时，skill 才算完成。
+4. **Verify**：每份图包只通过 `scripts/validate_package.sh` 完成一次静态检查、渲染和内置 verifier；不要再手工重复调用 `verify_package.py`。只有 `validation.json` 中 `final_status=success` 且 `render_result=ok` 时，skill 才算完成。
+
+5. **Reuse**：同一输出目录再次验证且 diagram、brief、父 brief、profile 与渲染合同均未变化时，显式增加 `--reuse-valid-package`。脚本会先重算现有图包的路径、hash、metrics 与 SVG 合同；命中后不再访问 renderer，任一项变化则自动回退完整校验。
 
 ## 输入与输出
 
@@ -58,7 +60,7 @@ description: PlantUML 通用作图入口；在用户要求生成架构图、时�
 
 - `diagram.puml` - PlantUML 源码
 - `diagram.svg` - 渲染后的 SVG（仅 render_result=ok 时存在）
-- `validation.json` - v1.1 验证结果合同；包含相对 artifact 路径、原始/规范化 hash 与静态 metrics
+- `validation.json` - v1.1 验证结果合同；包含相对 artifact 路径、原始/规范化 hash、静态 metrics、`render_contract_version` 与 `timings.total_ms/render_ms/static_validation_ms`
 - 可选：`brief.normalized.yaml`
 
 ## 验收标准
@@ -68,7 +70,15 @@ description: PlantUML 通用作图入口；在用户要求生成架构图、时�
 3. typed profile 模式下必须执行对应的 brief 校验和覆盖校验。
 4. 渲染可用时必须产出 `diagram.svg`。
 5. 若 `render_result` 不为 `ok`、renderer 身份缺失或当前 SVG 不存在，`final_status` 必须为 `blocked`；不可复用旧 SVG。
-6. 使用 `scripts/verify_package.py` 双向复核 v1.1 路径、hash、状态与实际 PUML metrics；任何包内文件变化都必须使旧合同失效。
+6. `scripts/validate_package.sh` 已内置 `scripts/verify_package.py`，会双向复核 v1.1 路径、hash、状态与实际 PUML metrics；任何包内文件变化都必须使旧合同失效。
+7. 成功路径只请求一次 SVG endpoint；语法错误从错误 SVG 中识别。单张已变图默认最多修复并重渲染 2 轮，只重跑发生变化的图。
+8. `timings` 使用单调时钟记录当前实际运行；上游应分别消费 render 与静态校验耗时，不得把命中旧图包时保存的历史 timing 当作本次渲染耗时。
+
+重复执行示例：
+
+```bash
+bash scripts/validate_package.sh --diagram-type component --brief brief.yaml --diagram diagram.puml --out-dir package --reuse-valid-package
+```
 
 ## 资源说明
 

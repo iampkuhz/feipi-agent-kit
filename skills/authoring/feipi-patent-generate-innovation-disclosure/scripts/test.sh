@@ -122,9 +122,31 @@ check_competitor_research_contract() {
       "$SKILL_DIR/references/cases/happy-package/$WORKSPACE_DIR_NAME/disclosure-manifest.json"
 }
 
+check_subagent_contract() {
+  rg -q 'patent_prior_art_researcher.*gpt-5\.6-luna.*medium' "$SKILL_DIR/SKILL.md" \
+    && rg -q 'patent_diagram_engineer.*gpt-5\.6-terra.*medium' "$SKILL_DIR/SKILL.md" \
+    && rg -q 'patent_final_reviewer.*gpt-5\.6-sol.*high' "$SKILL_DIR/SKILL.md" \
+    && rg -q 'fork_turns: none' "$SKILL_DIR/SKILL.md" \
+    && rg -q '每张图的.*validate_package\.sh.*只调用一次' "$SKILL_DIR/SKILL.md" \
+    && rg -q '只调用一次完整交底包入口' "$SKILL_DIR/SKILL.md" \
+    && ! rg -q '^subagents:' "$SKILL_DIR/agents/openai.yaml"
+}
+
+check_timing_contract() {
+  rg -q '^## 耗时观测（必做）$' "$SKILL_DIR/SKILL.md" \
+    && rg -q '四个阶段分别记录 start/end' "$SKILL_DIR/SKILL.md" \
+    && rg -q 'resource_read.*retrieval.*diagram_generation' "$SKILL_DIR/SKILL.md" \
+    && rg -q 'render_ms.*static_validation_ms' "$SKILL_DIR/SKILL.md" \
+    && rg -q 'subagent_execution.*subagent_wait' "$SKILL_DIR/SKILL.md" \
+    && rg -q 'session-timing-summary\.json' "$SKILL_DIR/SKILL.md"
+}
+
 run_command "validate-self" 0 "" bash "$VALIDATE_SKILL" "$SKILL_DIR"
 run_command "confirmation-gate-contract" 0 "" check_confirmation_contract
 run_command "competitor-research-contract" 0 "" check_competitor_research_contract
+run_command "subagent-orchestration-contract" 0 "" check_subagent_contract
+run_command "session-timing-contract" 0 "" check_timing_contract
+run_command "session-timing-e2e" 0 "" python3 "$SKILL_DIR/scripts/tests/test_session_timing.py"
 
 DRAFT_INDEX=0
 while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do

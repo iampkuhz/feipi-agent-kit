@@ -12,6 +12,7 @@ from pathlib import Path
 @dataclass
 class ValidationResult:
     schema_version: str = "1.1"
+    render_contract_version: str = "1"
     skill_name: str = "feipi-plantuml-generate-diagram"
     diagram_id: str = ""
     diagram_type: str = "fallback"
@@ -35,6 +36,9 @@ class ValidationResult:
     artifacts: dict[str, dict[str, str]] = field(default_factory=dict)
     metrics: dict[str, int] = field(
         default_factory=lambda: {"node_count": 0, "edge_count": 0, "max_degree": 0}
+    )
+    timings: dict[str, float] = field(
+        default_factory=lambda: {"total_ms": 0.0, "render_ms": 0.0, "static_validation_ms": 0.0}
     )
     final_status: str = "pending"
     blocked_reason: str = ""

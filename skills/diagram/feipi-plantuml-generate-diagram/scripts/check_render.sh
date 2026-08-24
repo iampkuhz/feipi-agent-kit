@@ -186,48 +186,33 @@ ENCODED="$(encode_plantuml_file "$INPUT_FILE")"
 LAST_ERROR=""
 
 for candidate in "${CANDIDATES[@]}"; do
-  TXT_BODY="$(mktemp)"
-  TXT_CODE="$(mktemp)"
-  TXT_ERR="$(mktemp)"
-  if ! curl -sS --max-time "$TIMEOUT" -o "$TXT_BODY" -w '%{http_code}' "$candidate/txt/$ENCODED" >"$TXT_CODE" 2>"$TXT_ERR"; then
-    LAST_ERROR="$(cat "$TXT_ERR")"
-    rm -f "$TXT_BODY" "$TXT_CODE" "$TXT_ERR"
+  REQUEST_SVG="$(mktemp -t plantuml-render-response.XXXXXX.svg)"
+  SVG_CODE="$(mktemp)"
+  SVG_ERR="$(mktemp)"
+  if ! curl -sS --connect-timeout 2 --max-time "$TIMEOUT" -o "$REQUEST_SVG" -w '%{http_code}' "$candidate/svg/$ENCODED" >"$SVG_CODE" 2>"$SVG_ERR"; then
+    LAST_ERROR="$(cat "$SVG_ERR")"
+    rm -f "$REQUEST_SVG" "$SVG_CODE" "$SVG_ERR"
     continue
   fi
 
-  STATUS="$(cat "$TXT_CODE")"
-  BODY="$(cat "$TXT_BODY")"
-  rm -f "$TXT_CODE" "$TXT_ERR" "$TXT_BODY"
-
-  if [[ "$STATUS" == "200" ]] && printf '%s\n' "$BODY" | grep -Eqi 'syntax error|\[from string'; then
+  STATUS="$(cat "$SVG_CODE")"
+  rm -f "$SVG_CODE" "$SVG_ERR"
+  if grep -Eqi 'syntax error|\[from string' "$REQUEST_SVG"; then
     echo "render_result=syntax_error"
-    printf '%s\n' "$BODY"
+    cat "$REQUEST_SVG"
+    rm -f "$REQUEST_SVG"
     exit 2
   fi
-
-  if [[ "$STATUS" != "200" ]]; then
-    LAST_ERROR="txt 接口不可用，HTTP $STATUS"
+  if [[ "$STATUS" != "200" ]] || ! grep -qi '<svg' "$REQUEST_SVG"; then
+    LAST_ERROR="svg 接口不可用，HTTP $STATUS"
+    rm -f "$REQUEST_SVG"
     continue
   fi
 
   if [[ -z "$SVG_OUTPUT" ]]; then
     SVG_OUTPUT="$(mktemp -t plantuml-render-XXXXXX.svg)"
   fi
-
-  SVG_CODE="$(mktemp)"
-  SVG_ERR="$(mktemp)"
-  if ! curl -sS --max-time "$TIMEOUT" -o "$SVG_OUTPUT" -w '%{http_code}' "$candidate/svg/$ENCODED" >"$SVG_CODE" 2>"$SVG_ERR"; then
-    LAST_ERROR="$(cat "$SVG_ERR")"
-    rm -f "$SVG_CODE" "$SVG_ERR"
-    continue
-  fi
-
-  STATUS="$(cat "$SVG_CODE")"
-  rm -f "$SVG_CODE" "$SVG_ERR"
-  if [[ "$STATUS" != "200" ]] || ! grep -qi '<svg' "$SVG_OUTPUT"; then
-    LAST_ERROR="svg 接口不可用，HTTP $STATUS"
-    continue
-  fi
+  mv -f "$REQUEST_SVG" "$SVG_OUTPUT"
 
   echo "render_result=ok"
   echo "render_server=$candidate"

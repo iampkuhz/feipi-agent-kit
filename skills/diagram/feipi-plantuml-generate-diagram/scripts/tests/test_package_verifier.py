@@ -53,6 +53,7 @@ def build_package(base: Path) -> dict:
     svg_path.write_text('<svg xmlns="http://www.w3.org/2000/svg"><text>fixture</text></svg>\n', encoding="utf-8")
     validation = {
         "schema_version": "1.1",
+        "render_contract_version": "1",
         "skill_name": "feipi-plantuml-generate-diagram",
         "diagram_id": "D9",
         "diagram_type": "component",

@@ -1,0 +1,53 @@
+{
+  "schema_version": "1.0",
+  "max_active_subagents": 1,
+  "max_total_subagents": 3,
+  "allow_recursive_spawn": false,
+  "context_policy": "distilled_task_packet_only",
+  "telemetry": {
+    "coordinator": "main_agent",
+    "log_path": "disclosure-workspace/working/session-timing.jsonl",
+    "record_spawn": true,
+    "record_execution": true,
+    "record_wait": true
+  },
+  "fallback": {
+    "when_subagents_unavailable": "main_agent_executes_same_lane",
+    "when_model_unavailable": "omit_model_override_keep_reasoning_effort",
+    "forbid_silent_upgrade_to_highest": true
+  },
+  "roles": [
+    {
+      "name": "patent_prior_art_researcher",
+      "stage": "material_modeling",
+      "model": "gpt-5.6-luna",
+      "reasoning_effort": "medium",
+      "fork_turns": "none",
+      "permission": "read_only",
+      "writes": [],
+      "task": "使用一个 worker 并行执行两条限定检索线，返回来源、日期、证据属性和精简结论，不展开无关行业研究。"
+    },
+    {
+      "name": "patent_diagram_engineer",
+      "stage": "final_drafting",
+      "model": "gpt-5.6-terra",
+      "reasoning_effort": "medium",
+      "fork_turns": "none",
+      "permission": "workspace_write",
+      "writes": [
+        "disclosure-workspace/diagrams/"
+      ],
+      "task": "根据已确认且冻结的 I/T/D/E/S 合同生成全部必要图包；每图只验证一次，只修改分配的 diagrams 目录。"
+    },
+    {
+      "name": "patent_final_reviewer",
+      "stage": "final_review",
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "high",
+      "fork_turns": "none",
+      "permission": "read_only",
+      "writes": [],
+      "task": "一次性完成实现与扩展边界、因果删除、对外泄漏和最终 SVG 视觉复核，只返回结构化结论。"
+    }
+  ]
+}

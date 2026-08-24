@@ -11,6 +11,8 @@ set -euo pipefail
 #
 #   Typed profile 模式:
 #     bash scripts/validate_package.sh --diagram-type <type> --brief <brief.yaml> --diagram <diagram.puml> --out-dir <dir>
+#   复用完全未变且已通过当前合同校验的图包:
+#     bash scripts/validate_package.sh ... --reuse-valid-package
 #
 # 产出物 (在 <out-dir> 中):
 #   - diagram.puml           (输入的 diagram 原样复制)
@@ -32,6 +34,8 @@ DIAGRAM_TYPE="fallback"
 BRIEF_FILE=""
 DIAGRAM_FILE=""
 OUT_DIR=""
+REUSE_VALID_PACKAGE=false
+RENDER_CONTRACT_VERSION="1"
 
 # 解析参数
 while [[ $# -gt 0 ]]; do
@@ -52,6 +56,10 @@ while [[ $# -gt 0 ]]; do
       OUT_DIR="$2"
       shift 2
       ;;
+    --reuse-valid-package)
+      REUSE_VALID_PACKAGE=true
+      shift
+      ;;
     -h|--help)
       cat <<'USAGE'
 用法:
@@ -59,6 +67,8 @@ while [[ $# -gt 0 ]]; do
     bash scripts/validate_package.sh --diagram <diagram.puml> --out-dir <dir>
   Typed profile 模式:
     bash scripts/validate_package.sh --diagram-type <type> --brief <brief.yaml> --diagram <diagram.puml> --out-dir <dir>
+  复用未变图包:
+    在上述命令末尾增加 --reuse-valid-package
 USAGE
       exit 0
       ;;
@@ -79,6 +89,20 @@ if [[ ! -f "$DIAGRAM_FILE" ]]; then
   echo "diagram 文件不存在：$DIAGRAM_FILE" >&2
   exit 1
 fi
+
+monotonic_ns() {
+  python3 -c 'import time; print(time.monotonic_ns())'
+}
+
+duration_ms() {
+  python3 - "$1" "${2:-$(monotonic_ns)}" <<'PY'
+import sys
+print(round(max(0, int(sys.argv[2]) - int(sys.argv[1])) / 1_000_000, 3))
+PY
+}
+
+VALIDATION_START_NS="$(monotonic_ns)"
+RENDER_DURATION_MS="0"
 
 # Router 真源：只有注册完成的 profile 才进入 typed 校验，未知图型明确 fallback。
 IFS=$'\t' read -r PROFILE PROFILE_VERSION SCHEMA_FILE COVERAGE_MODE LAYOUT_MODE < <(
@@ -119,6 +143,62 @@ DIAGRAM_OUT="$OUT_DIR/diagram.puml"
 SVG_OUT="$OUT_DIR/diagram.svg"
 VALIDATION_OUT="$OUT_DIR/validation.json"
 BRIEF_OUT=""
+
+# 显式复用只接受“输入、profile、渲染合同均未变化”的完整成功图包。
+# verify_package.py 会先重算包内路径、hash、metrics 和 SVG 合同；任一项失效即回退全量校验。
+if [[ "$REUSE_VALID_PACKAGE" == "true" && -f "$VALIDATION_OUT" && -f "$SVG_OUT" ]]; then
+  if python3 "$SCRIPT_DIR/verify_package.py" "$OUT_DIR" >/dev/null 2>&1 \
+    && python3 - "$VALIDATION_OUT" "$DIAGRAM_FILE" "$BRIEF_FILE" "$DIAGRAM_TYPE" "$PROFILE" "$PROFILE_VERSION" "$RENDER_CONTRACT_VERSION" "$LIB_DIR" <<'PY'
+import hashlib
+import json
+import sys
+from pathlib import Path, PurePosixPath
+
+validation_path, diagram_path, brief_path, diagram_type, profile, profile_version, render_contract_version, lib_dir = sys.argv[1:]
+sys.path.insert(0, lib_dir)
+from brief_loader import load_yaml
+
+
+def sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+data = json.loads(Path(validation_path).read_text(encoding="utf-8"))
+if data.get("final_status") != "success" or data.get("render_result") != "ok":
+    raise SystemExit(1)
+if data.get("diagram_type") != diagram_type or data.get("profile") != profile:
+    raise SystemExit(1)
+if str(data.get("profile_version")) != profile_version:
+    raise SystemExit(1)
+if str(data.get("render_contract_version")) != render_contract_version:
+    raise SystemExit(1)
+if sha256(Path(diagram_path)) != data.get("puml_sha256"):
+    raise SystemExit(1)
+
+if profile != "fallback":
+    source_brief = Path(brief_path)
+    if not source_brief.is_file() or sha256(source_brief) != data.get("brief_sha256"):
+        raise SystemExit(1)
+    brief = load_yaml(source_brief)
+    ref = brief.get("parent_component_ref", {}) if isinstance(brief, dict) else {}
+    relative = ref.get("overview_brief_path") if isinstance(ref, dict) else None
+    if isinstance(relative, str) and relative:
+        rel = PurePosixPath(relative)
+        if rel.is_absolute() or "\\" in relative or any(part in {"", ".", ".."} for part in rel.parts):
+            raise SystemExit(1)
+        parent = (source_brief.resolve().parent / Path(*rel.parts)).resolve()
+        parent.relative_to(source_brief.resolve().parent)
+        if not parent.is_file() or sha256(parent) != data.get("parent_brief_sha256"):
+            raise SystemExit(1)
+elif data.get("brief_sha256"):
+    raise SystemExit(1)
+PY
+  then
+    echo "cache_hit=true"
+    echo "final_status=success"
+    exit 0
+  fi
+fi
 
 # 旧 SVG/合同不得被下一轮失败或缺 renderer 的运行误收录。仅清理本包的固定产物。
 rm -f "$SVG_OUT" "$VALIDATION_OUT"
@@ -188,6 +268,14 @@ snapshot_unchanged() {
 # =============================================================================
 write_json() {
   local brief_path="${8:-}"
+  local total_duration_ms=""
+  local static_validation_duration_ms=""
+  total_duration_ms="$(duration_ms "$VALIDATION_START_NS")"
+  static_validation_duration_ms="$(python3 - "$total_duration_ms" "$RENDER_DURATION_MS" <<'PY'
+import sys
+print(round(max(0.0, float(sys.argv[1]) - float(sys.argv[2])), 3))
+PY
+)"
   python3 "$LIB_DIR/write_validation.py" \
     --output "$VALIDATION_OUT" \
     --skill-name "feipi-plantuml-generate-diagram" \
@@ -203,7 +291,10 @@ write_json() {
     --render-server "${5:-}" \
     --final-status "$6" \
     --blocked-reason "${7:-}" \
-    --package-dir "$OUT_DIR"
+    --package-dir "$OUT_DIR" \
+    --total-duration-ms "$total_duration_ms" \
+    --render-duration-ms "$RENDER_DURATION_MS" \
+    --static-validation-duration-ms "$static_validation_duration_ms"
 }
 
 # =============================================================================
@@ -305,8 +396,10 @@ fi
 
 RENDER_SCRIPT="$SCRIPT_DIR/check_render.sh"
 if [[ -f "$RENDER_SCRIPT" ]]; then
+  RENDER_START_NS="$(monotonic_ns)"
   RENDER_OUTPUT="$(bash "$RENDER_SCRIPT" "$DIAGRAM_OUT" --svg-output "$SVG_OUT" 2>&1)" || {
     render_exit=$?
+    RENDER_DURATION_MS="$(duration_ms "$RENDER_START_NS")"
     if [[ "$render_exit" -eq 2 ]]; then
       write_json "$BRIEF_CHECK" "$COVERAGE_CHECK" "$LAYOUT_CHECK" "syntax_error" "" "blocked" "render_syntax_error" "$BRIEF_OUT"
       echo "[FAIL] render syntax error" >&2
@@ -324,6 +417,7 @@ if [[ -f "$RENDER_SCRIPT" ]]; then
       exit 1
     fi
   }
+  RENDER_DURATION_MS="$(duration_ms "$RENDER_START_NS")"
 
   if echo "$RENDER_OUTPUT" | grep -q "render_result=ok"; then
     RENDER_RESULT="ok"
