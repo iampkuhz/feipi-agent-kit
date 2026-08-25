@@ -88,8 +88,9 @@ run_package_case() {
 
 check_confirmation_contract() {
   rg -q '^### 阶段 2：提交写作思路并等待确认$' "$SKILL_DIR/SKILL.md" \
-    && rg -q '只有收到用户明确的确认.*才进入阶段 3' "$SKILL_DIR/SKILL.md" \
-    && rg -q '先提交写作思路供我确认，确认后再并行生成' "$SKILL_DIR/agents/openai.yaml"
+    && rg -q '明确确认后才能封存' "$SKILL_DIR/SKILL.md" \
+    && rg -q '明确确认' "$SKILL_DIR/references/stages/phase-2-idea-confirmation.md" \
+    && rg -q '先提交写作思路供我确认，确认后只从已封存结果' "$SKILL_DIR/agents/openai.yaml"
 }
 
 check_happy_audience_contract() {
@@ -125,7 +126,8 @@ PY
 }
 
 check_competitor_research_contract() {
-  rg -q '无论用户是否提供竞品材料，都使用公开资料检索' "$SKILL_DIR/SKILL.md" \
+  rg -q '仍须主动检索竞品' "$SKILL_DIR/SKILL.md" \
+    && rg -q 'searched_no_usable_evidence' "$SKILL_DIR/references/stages/phase-1-material-modeling.md" \
     && rg -Fq '"status": {"enum": ["evidence_found", "searched_no_usable_evidence"]}' "$SKILL_DIR/assets/disclosure-manifest.schema.json" \
     && rg -q '"search_records"' "$SKILL_DIR/assets/disclosure-manifest.schema.json" \
     && rg -q '整理技术事实并检索竞品' "$SKILL_DIR/agents/openai.yaml" \
@@ -140,15 +142,18 @@ check_orchestration_contract() {
   python3 - \
     "$SKILL_DIR/agents/subagents/index.json" \
     "$SKILL_DIR/agents/subagents/runtime.json" \
+    "$SKILL_DIR/agents/subagents/loading-policy.json" \
     "$SKILL_DIR/agents/subagents/checkpoint-task-catalog.json" <<'PY' || return 1
 import json
 import sys
 
 index = json.load(open(sys.argv[1], encoding="utf-8"))
 runtime = json.load(open(sys.argv[2], encoding="utf-8"))
-catalog = json.load(open(sys.argv[3], encoding="utf-8"))
+loading = json.load(open(sys.argv[3], encoding="utf-8"))
+catalog = json.load(open(sys.argv[4], encoding="utf-8"))
 
 assert len(index["roles"]) == 6
+assert index["loading_policy"] == "loading-policy.json"
 assert tuple(index["stages"]) == (
     "phase_1_material_modeling",
     "phase_2_idea_confirmation",
@@ -160,6 +165,13 @@ assert runtime["event_reporting"]["critical_events"] == [
 ]
 assert runtime["wait_policy"]["mode"] == "event_driven_join"
 assert runtime["wait_policy"]["busy_wait"] is False
+assert loading["bootstrap"]["audience"] == "main_agent"
+assert loading["bootstrap"]["paths"] == [
+    "SKILL.md",
+    "agents/subagents/index.json",
+    "agents/subagents/runtime.json",
+    "agents/subagents/loading-policy.json",
+]
 templates = {
     task["template_id"]
     for tasks in catalog["stages"].values()
@@ -168,22 +180,24 @@ templates = {
 }
 assert templates == {"phase-3-diagram", "phase-4-visual-review"}
 PY
-  rg -q 'agents/subagents/index\.json' "$SKILL_DIR/SKILL.md" \
-    && rg -q '固定项和按图展开模板以 `agents/subagents/checkpoint-task-catalog\.json` 为机器真源' "$SKILL_DIR/SKILL.md" \
-    && rg -q '^## 5\. 关键事件与非轮询汇合$' "$SKILL_DIR/references/stage-delivery-contract.md" \
-    && rg -q '阶段内 subagent 还必须满足当前阶段图中的 `depends_on`' "$SKILL_DIR/SKILL.md" \
-    && rg -q '六个 subagent role 模板及其动态实例' "$SKILL_DIR/references/stage-delivery-contract.md"
+  rg -q 'agents/subagents/loading-policy\.json' "$SKILL_DIR/SKILL.md" \
+    && rg -q '运行时禁止整体读取' "$SKILL_DIR/references/stage-delivery-contract.md" \
+    && rg -q '运行时不得整体读取' "$SKILL_DIR/references/content-quality-gates.md" \
+    && rg -q 'Skill 运行时不得读取' "$SKILL_DIR/handbook/progressive-loading.md"
 }
 
 check_timing_contract() {
-  rg -q '^## 耗时观测（必做）$' "$SKILL_DIR/SKILL.md" \
-    && rg -q '四个阶段分别记录 start/end' "$SKILL_DIR/SKILL.md" \
-    && rg -q 'resource_read.*retrieval.*diagram_generation' "$SKILL_DIR/SKILL.md" \
-    && rg -q 'render_ms.*static_validation_ms' "$SKILL_DIR/SKILL.md" \
-    && rg -q 'subagent_execution.*subagent_wait' "$SKILL_DIR/SKILL.md" \
-    && rg -q 'run --result-json.*disclosure-validation\.json' "$SKILL_DIR/SKILL.md" \
-    && rg -q 'summarize --require-complete --close-session' "$SKILL_DIR/SKILL.md" \
-    && rg -q 'session-timing-summary\.json' "$SKILL_DIR/SKILL.md"
+  rg -q 'session timing 说明仅初始化/恢复时按需读取一次' "$SKILL_DIR/SKILL.md" \
+    && rg -q 'resource_read' "$SKILL_DIR/references/session-timing.md" \
+    && rg -q 'retrieval' "$SKILL_DIR/references/session-timing.md" \
+    && rg -q 'diagram_generation' "$SKILL_DIR/references/session-timing.md" \
+    && rg -q 'render_ms' "$SKILL_DIR/references/session-timing.md" \
+    && rg -q 'static_validation_ms' "$SKILL_DIR/references/session-timing.md" \
+    && rg -q 'subagent_execution' "$SKILL_DIR/references/session-timing.md" \
+    && rg -q 'subagent_wait' "$SKILL_DIR/references/session-timing.md" \
+    && rg -q -- '--result-json .*disclosure-validation\.json' "$SKILL_DIR/references/session-timing.md" \
+    && rg -q -- '--require-complete --close-session' "$SKILL_DIR/references/session-timing.md" \
+    && rg -q 'session-timing-summary\.json' "$SKILL_DIR/references/session-timing.md"
 }
 
 run_command "validate-self" 0 "" bash "$VALIDATE_SKILL" "$SKILL_DIR"

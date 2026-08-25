@@ -257,6 +257,24 @@
 - 复核收口：双线研究必须先汇总为 canonical `research.tsv`，创新价值分析再消费该汇总；正文与 manifest 都从冻结的 `content-core.json` 派生。编排门禁从 DAG 推导真实并发，并校验阶段链、中心计划屏障、fan-out 来源、join 语义、checkpoint 唯一绑定和逐图集合完整性，避免只靠声明字段形成“假绿”。
 - 边界：并行不等于多个 agent 同时决定规则真源；用户确认、核心主张收敛、全局编号、正文同源、join、最终校验和回退阶段仍由主 agent 负责。`resume` 只校验单个结果；输入、冻结计划或重做结果发生语义/hash 变化时，由主 agent 显式回退阶段，第一版仍不做自动依赖分析。
 
+## 2026-08-26｜第十二轮：渐进式上下文加载
+
+### 27. 大入口和全阶段合同被多个阶段、多个 subagent 共同读取
+
+- [x] **状态：已完成**
+- 你提出的要求：分析 skill 的文件管理是否符合渐进式加载；明确每个阶段、每个 agent 在什么时机读取什么文件，避免所有角色共同读取一个大文档，或不同阶段反复加载不相关内容造成上下文污染。
+- 发现的问题：旧 `SKILL.md` 有 34.6 KB，并在启动时强制再读 26.3 KB 的 `stage-delivery-contract.md`；两份文件都展开四阶段和六类 subagent。阶段 4 还可能整体读取 19.2 KB 的 `content-quality-gates.md`。因此任何阶段启动至少先承载约 60.9 KB 的重复规则，语义与视觉 reviewer 也没有可执行的专用加载边界。
+- 入口调整：`SKILL.md` 缩为目标、门槛、全局硬约束和四阶段路由；完整触发时不再预装所有阶段细则。旧阶段总合同缩为维护索引，不参与运行；内容质量总表保留稳定规则编号和维护用途，但不直接注入 agent。
+- 阶段拆分：新增四份主 agent 阶段说明。阶段开始只读取当前 stage JSON 和当前说明；阶段 3 的对外稿、manifest、内部附录模板分别在对应节点延迟加载，制图 worker 不读取正文模板；阶段 4 的确定性规则交给脚本，不再让 reviewer 共读总门禁。
+- 角色拆分：主体、双线研究和创新价值 subagent 只读各自任务包及点名输入；制图、语义、视觉各有独立小合同。role JSON 仅由主 agent 在派发当前节点前读取，subagent 不读取专利 `SKILL.md`、阶段说明、stage/role JSON、其他角色合同或完整对话。
+- 任务包与权限收口：任务包升级为 v2，动态输入逐项使用相对路径和 SHA-256；阶段 1 与逐图任务使用预生成聚焦 slice，禁止 worker 直读完整 evidence cards/content core/diagram plan，派发或 fallback 前必须通过 `stage_handoff.py validate-task`。制图 worker 只写单图包，其他角色只读；所有结果 row 统一由主 agent 落盘。
+- 文件分级：Schema、checkpoint catalog、校验器和测试源码归为 script-only；handbook、历史、案例、阶段总索引和内容质量总表归为 maintainer-only。session timing 只在初始化或恢复时由主 agent 按需读取一次。
+- 可执行门禁：新增机器可读 loading policy，并与阶段 DAG、role 索引和任务包白名单交叉校验；阻塞阶段说明复用、跨阶段模板、语义/视觉合同互串、维护/脚本文件进入模型上下文、越界路径、宽泛目录引用和文档再次膨胀。
+- 后续修正：补齐主体边界、双线研究、创新价值三份聚焦小合同，并由 role JSON 与任务包白名单双重绑定；双线研究共用合同但保持 object/mechanism 的任务类型、实例和 slice 隔离。
+- 对抗修正：Phase 1 与逐图 slice 统一为携带 task identity 和 `source_set_sha256` 的 JSON envelope；任务包判断/返回只引用注册 `contract_id`，研究 URL 仅留在 slice payload。`validate-task` 原子生成绑定任务、TaskSpec 和动态输入集合的 dispatch receipt，seal 复验当前 receipt 并纳入 cache digest。语义九行绑定四输入规范化集合 hash；三类 D 结果行及 visual row 统一绑定主 agent 复算的当前 `diagram.svg` SHA-256，不使用虚构 package hash。
+- 权限边界：`permission` / `result_owner` 是可校验行为合同，不等于宿主文件系统 sandbox 或真实写入 provenance；宿主无法施加只读/独占目录时仍按合同执行，只能通过真实 Session trace 核验，不能声称本地脚本证明真实写入者。
+- 验证边界：本地门禁能证明“声明的加载图”和任务包白名单自洽，不能单独证明宿主运行时绝无越权读取；真实遵守情况仍需后续脱敏 Session 轨迹验证。
+
 ## 尚未完成的验收项
 
 - [ ] **真实 Session 回归**：目前只有合成交底包和独立合成请求回归；在获得脱敏真实 Session 前，不得宣称真实使用场景已经覆盖。

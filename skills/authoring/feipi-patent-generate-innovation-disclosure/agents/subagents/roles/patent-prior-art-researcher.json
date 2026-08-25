@@ -7,6 +7,10 @@
   "fork_turns": "none",
   "permission": "read_only",
   "max_instances": 2,
+  "instruction_refs": [
+    "references/roles/prior-art-research.md"
+  ],
+  "skill_dependencies": [],
   "allowed_write_templates": [],
   "capabilities": [
     "object_prior_art_research",

@@ -1,6 +1,7 @@
 {
   "schema_version": "1.0",
   "stage": "phase_4_review_delivery",
+  "instruction_ref": "references/stages/phase-4-review-delivery.md",
   "requires_upstream": ["phase-3-handoff"],
   "nodes": [
     {

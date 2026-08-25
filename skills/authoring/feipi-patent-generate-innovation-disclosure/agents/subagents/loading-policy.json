@@ -1,0 +1,87 @@
+{
+  "schema_version": "1.0",
+  "mode": "progressive_jit",
+  "bootstrap": {
+    "audience": "main_agent",
+    "paths": [
+      "SKILL.md",
+      "agents/subagents/index.json",
+      "agents/subagents/runtime.json",
+      "agents/subagents/loading-policy.json"
+    ]
+  },
+  "on_demand": {
+    "session_timing": {
+      "path": "references/session-timing.md",
+      "audience": "main_agent",
+      "load_at": "session_init_or_resume",
+      "cardinality": "once_per_task"
+    }
+  },
+  "just_in_time": {
+    "stage_config": {
+      "selector": "index.stages[current_stage]",
+      "audience": "main_agent",
+      "load_at": "stage_start"
+    },
+    "stage_instruction": {
+      "selector": "stage.instruction_ref",
+      "audience": "main_agent",
+      "load_at": "stage_start"
+    },
+    "node_resources": {
+      "selector": "node.resource_refs",
+      "audience": "main_agent",
+      "load_at": "node_start"
+    },
+    "role_config": {
+      "selector": "index.roles[node.role_ref]",
+      "audience": "main_agent",
+      "load_at": "before_role_execution"
+    },
+    "task_packet_template": {
+      "path": "agents/subagents/task-packet.template.md",
+      "audience": "main_agent",
+      "load_at": "before_role_execution"
+    },
+    "subagent_context": {
+      "audience": "subagent",
+      "load_at": "task_start",
+      "selectors": [
+        "generated_task_packet",
+        "task_packet.dynamic_inputs",
+        "role.instruction_refs",
+        "role.skill_dependencies"
+      ]
+    },
+    "fallback_context": {
+      "audience": "main_agent",
+      "load_at": "fallback_task_start",
+      "selectors": [
+        "generated_task_packet",
+        "task_packet.dynamic_inputs",
+        "role.instruction_refs",
+        "role.skill_dependencies"
+      ]
+    }
+  },
+  "script_only": [
+    "agents/subagents/checkpoint-task-catalog.json",
+    "assets/disclosure-manifest.schema.json",
+    "scripts/"
+  ],
+  "maintainer_only": [
+    "MAINTAINER_HISTORY.md",
+    "handbook/",
+    "references/cases/",
+    "references/content-quality-gates.md",
+    "references/stage-delivery-contract.md",
+    "references/test_cases.txt"
+  ],
+  "limits": {
+    "skill_entry_max_bytes": 12288,
+    "stage_instruction_max_bytes": 8192,
+    "role_instruction_max_bytes": 4096,
+    "loading_policy_max_bytes": 8192
+  }
+}

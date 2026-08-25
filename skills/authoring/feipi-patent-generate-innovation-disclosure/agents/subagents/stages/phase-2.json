@@ -1,6 +1,7 @@
 {
   "schema_version": "1.0",
   "stage": "phase_2_idea_confirmation",
+  "instruction_ref": "references/stages/phase-2-idea-confirmation.md",
   "requires_upstream": ["phase-1-handoff"],
   "nodes": [
     {

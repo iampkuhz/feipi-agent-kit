@@ -7,6 +7,8 @@
   "fork_turns": "none",
   "permission": "workspace_write",
   "max_instances": 2,
+  "instruction_refs": ["references/roles/diagram-engineer.md"],
+  "skill_dependencies": ["feipi-plantuml-generate-diagram"],
   "allowed_write_templates": [
     "disclosure-workspace/diagrams/{diagram_id}-{purpose}/"
   ],

@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+import re
 import stat
 import sys
 from collections import Counter
@@ -65,21 +67,113 @@ EXPECTED_NODE_ROLES = {
     ("phase_4_review_delivery", "semantic-review"): "patent_semantic_reviewer",
     ("phase_4_review_delivery", "visual-review"): "patent_visual_reviewer",
 }
+EXPECTED_STAGE_INSTRUCTIONS = {
+    "phase_1_material_modeling": "references/stages/phase-1-material-modeling.md",
+    "phase_2_idea_confirmation": "references/stages/phase-2-idea-confirmation.md",
+    "phase_3_final_drafting": "references/stages/phase-3-final-drafting.md",
+    "phase_4_review_delivery": "references/stages/phase-4-review-delivery.md",
+}
+EXPECTED_ROLE_INSTRUCTIONS = {
+    "patent_subject_boundary_analyst": ["references/roles/subject-boundary.md"],
+    "patent_prior_art_researcher": ["references/roles/prior-art-research.md"],
+    "patent_innovation_value_analyst": ["references/roles/innovation-value.md"],
+    "patent_diagram_engineer": ["references/roles/diagram-engineer.md"],
+    "patent_semantic_reviewer": ["references/reviews/semantic-review.md"],
+    "patent_visual_reviewer": ["references/reviews/visual-review.md"],
+}
+EXPECTED_ROLE_SKILL_DEPENDENCIES = {
+    "patent_subject_boundary_analyst": [],
+    "patent_prior_art_researcher": [],
+    "patent_innovation_value_analyst": [],
+    "patent_diagram_engineer": ["feipi-plantuml-generate-diagram"],
+    "patent_semantic_reviewer": [],
+    "patent_visual_reviewer": [],
+}
+EXPECTED_ROLE_PERMISSIONS = {
+    role_name: "workspace_write" if role_name == "patent_diagram_engineer" else "read_only"
+    for role_name in EXPECTED_ROLE_INSTRUCTIONS
+}
+EXPECTED_ROLE_WRITE_TEMPLATES = {
+    role_name: ["disclosure-workspace/diagrams/{diagram_id}-{purpose}/"]
+    if role_name == "patent_diagram_engineer" else []
+    for role_name in EXPECTED_ROLE_INSTRUCTIONS
+}
+EXPECTED_NODE_RESOURCES = {
+    ("phase_3_final_drafting", "public-draft"): ["assets/proposal_template.md"],
+    ("phase_3_final_drafting", "manifest"): ["assets/disclosure-manifest.template.json"],
+    ("phase_3_final_drafting", "internal-draft"): ["assets/internal_trace_appendix_template.md"],
+}
+EXPECTED_BOOTSTRAP_PATHS = [
+    "SKILL.md",
+    "agents/subagents/index.json",
+    "agents/subagents/runtime.json",
+    "agents/subagents/loading-policy.json",
+]
+EXPECTED_SCRIPT_ONLY = [
+    "agents/subagents/checkpoint-task-catalog.json",
+    "assets/disclosure-manifest.schema.json",
+    "scripts/",
+]
+EXPECTED_MAINTAINER_ONLY = [
+    "MAINTAINER_HISTORY.md",
+    "handbook/",
+    "references/cases/",
+    "references/content-quality-gates.md",
+    "references/stage-delivery-contract.md",
+    "references/test_cases.txt",
+]
+EXPECTED_LOADING_LIMITS = {
+    "skill_entry_max_bytes": 12 * 1024,
+    "stage_instruction_max_bytes": 8 * 1024,
+    "role_instruction_max_bytes": 4 * 1024,
+    "loading_policy_max_bytes": 8 * 1024,
+}
 EXPECTED_CRITICAL_EVENTS = ["MILESTONE", "DECISION", "BLOCKED", "COMPLETE"]
 EXPECTED_SILENT_EVENTS = [
     "STARTED", "RUNNING", "HEARTBEAT", "STATUS", "TOOL_CALL", "FILE_READ",
     "FILE_WRITE", "CACHE_HIT", "WAIT_TIMEOUT", "RETRYING", "UNCHANGED",
 ]
 REQUIRED_TEMPLATE_FIELDS = {
+    "{{task_type}}",
     "{{role_name}}",
     "{{checkpoint_binding}}",
+    "{{result_path}}",
+    "{{result_owner}}",
+    "{{minimum_check}}",
     "{{timing_log}}",
     "{{key_event_contract}}",
-    "{{input_references}}",
+    "{{dynamic_inputs}}",
+    "{{allowed_skill_resources}}",
+    "{{dependency_skills}}",
     "{{allowed_writes}}",
     "{{forbidden_actions}}",
-    "{{judgment_contract}}",
-    "{{return_contract}}",
+    "{{judgment_contract_id}}",
+    "{{return_contract_id}}",
+}
+REQUIRED_TEMPLATE_METADATA_LINES = {
+    "- contract_version: `2`",
+    "- task_type: `{{task_type}}`",
+    "- role: `{{role_name}}`",
+    "- checkpoint: `{{checkpoint_binding}}`",
+    "- result: `{{result_path}}`",
+    "- result_owner: `{{result_owner}}`",
+    "- minimum_check: `{{minimum_check}}`",
+    "- timing: `{{timing_log}}`",
+    "- 关键事件: `{{key_event_contract}}`",
+    "- 允许写入: `{{allowed_writes}}`",
+    "- 本 Skill 资源: `{{allowed_skill_resources}}`",
+    "- 依赖 Skill: `{{dependency_skills}}`",
+    "- 禁止动作: `{{forbidden_actions}}`",
+}
+REQUIRED_TEMPLATE_GUARDRAILS = {
+    "- 只读取上述动态输入；禁止读取完整阶段缓存、原始材料、未列出的会话文件或其他任务的输入切片。",
+    "- 除“本 Skill 资源”所列文件外，禁止读取本 Skill 其他资源。",
+    "- 除“依赖 Skill”所列 Skill 外，禁止加载其他 Skill。",
+}
+FORBIDDEN_TEMPLATE_REVERSALS = {
+    "可以读取完整阶段缓存",
+    "可以读取本 Skill 其他资源",
+    "可以加载其他 Skill",
 }
 ROLE_FIELDS = {
     "schema_version",
@@ -90,6 +184,8 @@ ROLE_FIELDS = {
     "fork_turns",
     "permission",
     "max_instances",
+    "instruction_refs",
+    "skill_dependencies",
     "allowed_write_templates",
     "capabilities",
     "forbidden_actions",
@@ -101,10 +197,19 @@ ALLOWED_PERMISSIONS = {"read_only", "workspace_write"}
 class ValidationError(ValueError):
     """配置合同不成立。"""
 
+    def __init__(self, message: str, rule_id: str = "ORCH-001") -> None:
+        super().__init__(message)
+        self.rule_id = rule_id
+
 
 def require(condition: bool, message: str) -> None:
     if not condition:
         raise ValidationError(message)
+
+
+def load_require(condition: bool, rule_id: str, message: str) -> None:
+    if not condition:
+        raise ValidationError(message, rule_id)
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -126,6 +231,75 @@ def safe_config_path(base: Path, relative: Any, field: str) -> Path:
     pure = PurePosixPath(relative)
     require(not pure.is_absolute() and ".." not in pure.parts and "\\" not in relative, f"{field} 路径越界")
     return base.joinpath(*pure.parts)
+
+
+def safe_skill_resource(skill_dir: Path, relative: Any, field: str) -> tuple[str, Path]:
+    """解析声明式资源路径，并拒绝越界、缺失、软链接与类型伪装。"""
+    load_require(isinstance(relative, str) and relative.strip(), "LOAD-002", f"{field} 必须是非空相对路径")
+    pure = PurePosixPath(relative)
+    load_require(
+        not pure.is_absolute() and ".." not in pure.parts and "\\" not in relative,
+        "LOAD-002",
+        f"{field} 路径越界",
+    )
+    expects_directory = relative.endswith("/")
+    normalized = pure.as_posix() + ("/" if expects_directory else "")
+    parts = pure.parts
+    path = skill_dir.joinpath(*parts)
+
+    current = skill_dir
+    try:
+        for part in parts:
+            current = current / part
+            mode = current.lstat().st_mode
+            load_require(not stat.S_ISLNK(mode), "LOAD-002", f"{field} 禁止软链接：{relative}")
+    except FileNotFoundError as exc:
+        raise ValidationError(f"{field} 缺少资源：{relative}", "LOAD-002") from exc
+    if expects_directory:
+        load_require(path.is_dir(), "LOAD-002", f"{field} 必须指向目录：{relative}")
+    else:
+        load_require(path.is_file(), "LOAD-002", f"{field} 必须指向普通文件：{relative}")
+    return normalized, path
+
+
+def path_in_classified_set(path: str, classified: list[str]) -> bool:
+    for candidate in classified:
+        if candidate.endswith("/"):
+            if path.startswith(candidate):
+                return True
+        elif path == candidate:
+            return True
+    return False
+
+
+def require_file_size(path: Path, limit: int, field: str) -> None:
+    try:
+        size = path.stat().st_size
+    except OSError as exc:
+        raise ValidationError(f"{field} 无法读取大小：{path}", "LOAD-002") from exc
+    load_require(0 < size <= limit, "LOAD-007", f"{field} 必须非空且不超过 {limit} 字节：{path}")
+
+
+def resource_identity(path: Path, field: str) -> tuple[tuple[int, int], str]:
+    """返回物理文件身份与原始内容 hash，用于阻止换路径复用同一 guide。"""
+    try:
+        info = path.stat()
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError as exc:
+        raise ValidationError(f"{field} 无法计算文件身份：{path}", "LOAD-002") from exc
+    return (info.st_dev, info.st_ino), digest
+
+
+def loading_string_list(value: Any, field: str, *, allow_empty: bool = False) -> list[str]:
+    load_require(isinstance(value, list), "LOAD-001", f"{field} 必须是数组")
+    load_require(allow_empty or bool(value), "LOAD-001", f"{field} 不得为空")
+    load_require(
+        all(isinstance(item, str) and item.strip() for item in value),
+        "LOAD-001",
+        f"{field} 只能包含非空字符串",
+    )
+    load_require(len(value) == len(set(value)), "LOAD-001", f"{field} 不得包含重复项")
+    return value
 
 
 def safe_runtime_path(relative: Any, field: str, *, trailing_slash: bool | None = None) -> str:
@@ -192,12 +366,19 @@ def validate_role(name: str, role: dict[str, Any], max_active: int) -> None:
     require(isinstance(role.get("model"), str) and role["model"].strip(), f"role model 为空：{name}")
     require(role.get("reasoning_effort") in ALLOWED_REASONING_EFFORTS, f"role reasoning_effort 非法：{name}")
     require(role.get("permission") in ALLOWED_PERMISSIONS, f"role permission 非法：{name}")
+    require(
+        role.get("permission") == EXPECTED_ROLE_PERMISSIONS[name],
+        f"role permission 与职责不一致：{name}",
+    )
     require(role.get("fork_turns") == "none", f"role 必须使用 fork_turns none：{name}")
     max_instances = role.get("max_instances")
     require(
         isinstance(max_instances, int) and not isinstance(max_instances, bool) and 1 <= max_instances <= max_active,
         f"role max_instances 必须在 1..{max_active}：{name}",
     )
+
+    string_list(role.get("instruction_refs"), f"role instruction_refs：{name}", allow_empty=True)
+    string_list(role.get("skill_dependencies"), f"role skill_dependencies：{name}", allow_empty=True)
 
     writes = string_list(role.get("allowed_write_templates"), f"role allowed_write_templates：{name}", allow_empty=True)
     for path in writes:
@@ -206,6 +387,10 @@ def validate_role(name: str, role: dict[str, Any], max_active: int) -> None:
         require(writes == [], f"只读 role 不得声明写路径：{name}")
     else:
         require(bool(writes), f"workspace_write role 必须声明写路径：{name}")
+    require(
+        writes == EXPECTED_ROLE_WRITE_TEMPLATES[name],
+        f"role allowed_write_templates 与职责不一致：{name}",
+    )
 
     capabilities = set(string_list(role.get("capabilities"), f"role capabilities：{name}"))
     required = ROLE_CAPABILITY_CONTRACTS[name]
@@ -255,12 +440,36 @@ def validate_task_packet_template(path: Path, max_bytes: int) -> None:
         size = path.stat().st_size
         content = path.read_text(encoding="utf-8")
     except (FileNotFoundError, OSError, UnicodeError) as exc:
-        raise ValidationError(f"任务包模板不可读：{path}") from exc
-    require(size > 0 and size <= max_bytes, "任务包模板必须非空且不超过 12 KiB")
+        raise ValidationError(f"任务包模板不可读：{path}", "LOAD-008") from exc
+    load_require(size > 0 and size <= max_bytes, "LOAD-008", "任务包模板必须非空且不超过 12 KiB")
     headings = [line for line in content.splitlines() if line.startswith("## ")]
-    require(headings == ["## 输入", "## 需要判断", "## 返回"], "任务包模板必须且只能包含输入/需要判断/返回三节")
+    load_require(
+        headings == ["## 输入", "## 需要判断", "## 返回"],
+        "LOAD-008",
+        "任务包模板必须且只能包含输入/需要判断/返回三节",
+    )
     missing = sorted(field for field in REQUIRED_TEMPLATE_FIELDS if field not in content)
-    require(not missing, f"任务包模板缺少占位字段：{','.join(missing)}")
+    load_require(not missing, "LOAD-008", f"任务包模板缺少占位字段：{','.join(missing)}")
+    actual_fields = set(re.findall(r"\{\{[a-z0-9_]+\}\}", content))
+    load_require(
+        actual_fields == REQUIRED_TEMPLATE_FIELDS,
+        "LOAD-008",
+        "任务包模板占位字段集合必须固定且不得保留宽泛输入占位符",
+    )
+    repeated_fields = sorted(field for field in REQUIRED_TEMPLATE_FIELDS if content.count(field) != 1)
+    load_require(not repeated_fields, "LOAD-008", "任务包模板每个占位字段必须且只能出现一次")
+    missing_metadata = sorted(line for line in REQUIRED_TEMPLATE_METADATA_LINES if line not in content)
+    load_require(not missing_metadata, "LOAD-008", "任务包模板缺少固定元数据合同")
+    reversed_guardrails = sorted(phrase for phrase in FORBIDDEN_TEMPLATE_REVERSALS if phrase in content)
+    load_require(not reversed_guardrails, "LOAD-008", "任务包模板出现语义反转的加载许可")
+    missing_guardrails = sorted(line for line in REQUIRED_TEMPLATE_GUARDRAILS if line not in content)
+    load_require(not missing_guardrails, "LOAD-008", "任务包模板缺少固定渐进加载禁令")
+    load_require(
+        "### 动态输入" in content
+        and "{{dynamic_inputs}}" in content,
+        "LOAD-008",
+        "任务包模板缺少动态输入专节",
+    )
 
 
 def validate_possible_concurrency(
@@ -536,14 +745,294 @@ def validate_stage_contracts(stages: dict[str, dict[str, Any]]) -> None:
     )
 
 
+def validate_loading_contract(
+    skill_dir: Path,
+    index: dict[str, Any],
+    policy: dict[str, Any],
+    roles: dict[str, dict[str, Any]],
+    stages: dict[str, dict[str, Any]],
+) -> None:
+    """验证按阶段、节点和角色即时加载，避免共享大文档进入所有上下文。"""
+    load_require(
+        set(policy) == {
+            "schema_version",
+            "mode",
+            "bootstrap",
+            "on_demand",
+            "just_in_time",
+            "script_only",
+            "maintainer_only",
+            "limits",
+        },
+        "LOAD-001",
+        "loading policy 顶层字段不完整",
+    )
+    load_require(policy.get("schema_version") == "1.0", "LOAD-001", "loading policy schema_version 必须为 1.0")
+    load_require(policy.get("mode") == "progressive_jit", "LOAD-001", "loading policy 必须使用 progressive_jit")
+
+    bootstrap = policy.get("bootstrap")
+    load_require(isinstance(bootstrap, dict), "LOAD-001", "loading policy 缺少 bootstrap")
+    load_require(set(bootstrap) == {"audience", "paths"}, "LOAD-001", "bootstrap 字段不正确")
+    load_require(bootstrap.get("audience") == "main_agent", "LOAD-001", "bootstrap 只能面向 main_agent")
+    bootstrap_paths = loading_string_list(bootstrap.get("paths"), "bootstrap.paths")
+    for path in bootstrap_paths:
+        safe_skill_resource(skill_dir, path, "bootstrap.paths")
+    load_require(bootstrap_paths == EXPECTED_BOOTSTRAP_PATHS, "LOAD-001", "bootstrap 必须保持最小固定集合")
+
+    on_demand = policy.get("on_demand")
+    load_require(isinstance(on_demand, dict) and set(on_demand) == {"session_timing"}, "LOAD-001", "on_demand 只能声明 session_timing")
+    timing = on_demand["session_timing"]
+    load_require(
+        timing == {
+            "path": "references/session-timing.md",
+            "audience": "main_agent",
+            "load_at": "session_init_or_resume",
+            "cardinality": "once_per_task",
+        },
+        "LOAD-001",
+        "session timing 必须由 main_agent 在任务初始化或恢复时只加载一次",
+    )
+    timing_path, _ = safe_skill_resource(skill_dir, timing["path"], "on_demand.session_timing.path")
+
+    just_in_time = policy.get("just_in_time")
+    load_require(isinstance(just_in_time, dict), "LOAD-001", "loading policy 缺少 just_in_time")
+    expected_jit = {
+        "stage_config": {
+            "selector": "index.stages[current_stage]",
+            "audience": "main_agent",
+            "load_at": "stage_start",
+        },
+        "stage_instruction": {
+            "selector": "stage.instruction_ref",
+            "audience": "main_agent",
+            "load_at": "stage_start",
+        },
+        "node_resources": {
+            "selector": "node.resource_refs",
+            "audience": "main_agent",
+            "load_at": "node_start",
+        },
+        "role_config": {
+            "selector": "index.roles[node.role_ref]",
+            "audience": "main_agent",
+            "load_at": "before_role_execution",
+        },
+        "task_packet_template": {
+            "path": "agents/subagents/task-packet.template.md",
+            "audience": "main_agent",
+            "load_at": "before_role_execution",
+        },
+        "subagent_context": {
+            "audience": "subagent",
+            "load_at": "task_start",
+            "selectors": [
+                "generated_task_packet",
+                "task_packet.dynamic_inputs",
+                "role.instruction_refs",
+                "role.skill_dependencies",
+            ],
+        },
+        "fallback_context": {
+            "audience": "main_agent",
+            "load_at": "fallback_task_start",
+            "selectors": [
+                "generated_task_packet",
+                "task_packet.dynamic_inputs",
+                "role.instruction_refs",
+                "role.skill_dependencies",
+            ],
+        },
+    }
+    load_require(just_in_time == expected_jit, "LOAD-001", "just_in_time 必须保持阶段/角色即时加载合同")
+    task_template_path, _ = safe_skill_resource(
+        skill_dir,
+        just_in_time["task_packet_template"]["path"],
+        "just_in_time.task_packet_template.path",
+    )
+
+    script_only = loading_string_list(policy.get("script_only"), "script_only")
+    maintainer_only = loading_string_list(policy.get("maintainer_only"), "maintainer_only")
+    for path in script_only:
+        safe_skill_resource(skill_dir, path, "script_only")
+    for path in maintainer_only:
+        safe_skill_resource(skill_dir, path, "maintainer_only")
+    load_require(script_only == EXPECTED_SCRIPT_ONLY, "LOAD-001", "script_only 分类不得被削弱或扩张")
+    load_require(maintainer_only == EXPECTED_MAINTAINER_ONLY, "LOAD-001", "maintainer_only 分类不得被削弱或扩张")
+    load_require(
+        not any(path_in_classified_set(path, maintainer_only) for path in script_only),
+        "LOAD-006",
+        "script_only 与 maintainer_only 不得重叠",
+    )
+
+    limits = policy.get("limits")
+    load_require(limits == EXPECTED_LOADING_LIMITS, "LOAD-001", "渐进加载体积上限不得被放宽")
+    _, skill_entry = safe_skill_resource(skill_dir, "SKILL.md", "skill entry")
+    _, policy_path = safe_skill_resource(skill_dir, "agents/subagents/loading-policy.json", "loading policy")
+    require_file_size(skill_entry, limits["skill_entry_max_bytes"], "SKILL.md")
+    require_file_size(policy_path, limits["loading_policy_max_bytes"], "loading-policy.json")
+
+    model_paths: set[str] = set(bootstrap_paths)
+    model_paths.update({timing_path, task_template_path})
+    for relative in index["stages"].values():
+        stage_config_path = f"agents/subagents/{relative}"
+        safe_skill_resource(skill_dir, stage_config_path, "stage config")
+        model_paths.add(stage_config_path)
+    for relative in index["roles"].values():
+        role_config_path = f"agents/subagents/{relative}"
+        safe_skill_resource(skill_dir, role_config_path, "role config")
+        model_paths.add(role_config_path)
+
+    stage_instruction_paths: list[str] = []
+    stage_instruction_resources: list[tuple[str, Path]] = []
+    node_resources: dict[tuple[str, str], list[str]] = {}
+    used_roles: set[str] = set()
+    for stage_name, stage in stages.items():
+        instruction_ref, instruction_path = safe_skill_resource(
+            skill_dir,
+            stage.get("instruction_ref"),
+            f"stage instruction_ref:{stage_name}",
+        )
+        stage_instruction_paths.append(instruction_ref)
+        stage_instruction_resources.append((instruction_ref, instruction_path))
+        model_paths.add(instruction_ref)
+        require_file_size(
+            instruction_path,
+            limits["stage_instruction_max_bytes"],
+            f"stage instruction_ref:{stage_name}",
+        )
+
+        for node in stage["nodes"]:
+            if node.get("executor") == "subagent":
+                used_roles.add(node["role_ref"])
+            refs = node.get("resource_refs", [])
+            load_require(isinstance(refs, list), "LOAD-004", f"resource_refs 必须是数组：{stage_name}:{node['id']}")
+            load_require(
+                all(isinstance(item, str) and item.strip() for item in refs) and len(refs) == len(set(refs)),
+                "LOAD-004",
+                f"resource_refs 必须是无重复相对路径：{stage_name}:{node['id']}",
+            )
+            normalized_refs: list[str] = []
+            for ref in refs:
+                normalized, _ = safe_skill_resource(skill_dir, ref, f"node resource:{stage_name}:{node['id']}")
+                normalized_refs.append(normalized)
+                model_paths.add(normalized)
+            node_resources[(stage_name, node["id"])] = normalized_refs
+
+    load_require(
+        len(stage_instruction_paths) == len(set(stage_instruction_paths)),
+        "LOAD-003",
+        "每个阶段必须使用独立 instruction_ref",
+    )
+    load_require(
+        {name: stages[name].get("instruction_ref") for name in EXPECTED_STAGES} == EXPECTED_STAGE_INSTRUCTIONS,
+        "LOAD-003",
+        "阶段 instruction_ref 与阶段职责不一致",
+    )
+    stage_inode_owner: dict[tuple[int, int], str] = {}
+    stage_hash_owner: dict[str, str] = {}
+    for instruction_ref, instruction_path in stage_instruction_resources:
+        inode, digest = resource_identity(instruction_path, f"stage instruction_ref:{instruction_ref}")
+        load_require(
+            inode not in stage_inode_owner,
+            "LOAD-003",
+            f"阶段 guide 不得通过 hardlink 复用：{stage_inode_owner.get(inode)}:{instruction_ref}",
+        )
+        load_require(
+            digest not in stage_hash_owner,
+            "LOAD-003",
+            f"阶段 guide 不得复制相同内容：{stage_hash_owner.get(digest)}:{instruction_ref}",
+        )
+        stage_inode_owner[inode] = instruction_ref
+        stage_hash_owner[digest] = instruction_ref
+    load_require(used_roles == set(roles), "LOAD-003", "DAG 使用的角色集合必须与 role 索引一致")
+
+    role_instruction_owner: dict[str, str] = {}
+    role_inode_owner: dict[tuple[int, int], str] = {}
+    role_hash_owner: dict[str, str] = {}
+    for role_name, role in roles.items():
+        instruction_refs = role["instruction_refs"]
+        for ref in instruction_refs:
+            normalized, instruction_path = safe_skill_resource(skill_dir, ref, f"role instruction_ref:{role_name}")
+            load_require(normalized not in role_instruction_owner, "LOAD-005", f"角色专页不得交叉复用：{normalized}")
+            role_instruction_owner[normalized] = role_name
+            model_paths.add(normalized)
+            inode, digest = resource_identity(instruction_path, f"role instruction_ref:{role_name}")
+            load_require(
+                inode not in role_inode_owner,
+                "LOAD-005",
+                f"角色专页不得通过 hardlink 复用：{role_inode_owner.get(inode)}:{normalized}",
+            )
+            load_require(
+                digest not in role_hash_owner,
+                "LOAD-005",
+                f"角色专页不得复制相同内容：{role_hash_owner.get(digest)}:{normalized}",
+            )
+            load_require(
+                inode not in stage_inode_owner,
+                "LOAD-005",
+                f"阶段 guide 与角色专页不得通过 hardlink 复用：{stage_inode_owner.get(inode)}:{normalized}",
+            )
+            load_require(
+                digest not in stage_hash_owner,
+                "LOAD-005",
+                f"阶段 guide 与角色专页不得复制相同内容：{stage_hash_owner.get(digest)}:{normalized}",
+            )
+            role_inode_owner[inode] = normalized
+            role_hash_owner[digest] = normalized
+            require_file_size(
+                instruction_path,
+                limits["role_instruction_max_bytes"],
+                f"role instruction_ref:{role_name}",
+            )
+    for role_name, role in roles.items():
+        load_require(
+            role["instruction_refs"] == EXPECTED_ROLE_INSTRUCTIONS[role_name],
+            "LOAD-005",
+            f"role instruction_refs 与职责不一致：{role_name}",
+        )
+        load_require(
+            role["skill_dependencies"] == EXPECTED_ROLE_SKILL_DEPENDENCIES[role_name],
+            "LOAD-005",
+            f"role skill_dependencies 与职责不一致：{role_name}",
+        )
+
+    load_require(
+        not set(stage_instruction_paths) & set(role_instruction_owner),
+        "LOAD-005",
+        "阶段 guide 与角色专页不得复用同一文件",
+    )
+
+    forbidden_classes = script_only + maintainer_only
+    contaminated = sorted(path for path in model_paths if path_in_classified_set(path, forbidden_classes))
+    load_require(not contaminated, "LOAD-006", f"模型加载集合包含非运行时资源：{','.join(contaminated)}")
+
+    for key, actual_refs in node_resources.items():
+        expected_refs = EXPECTED_NODE_RESOURCES.get(key)
+        if expected_refs is None:
+            load_require(not actual_refs and "resource_refs" not in next(
+                node for node in stages[key[0]]["nodes"] if node["id"] == key[1]
+            ), "LOAD-004", f"非条件节点不得声明 resource_refs：{key[0]}:{key[1]}")
+        else:
+            load_require(actual_refs == expected_refs, "LOAD-004", f"条件模板绑定不正确：{key[0]}:{key[1]}")
+
+
 def validate(skill_dir: Path) -> None:
     config_dir = skill_dir / "agents/subagents"
     index = load_json(config_dir / "index.json")
     require(index.get("schema_version") == "1.0", "index schema_version 必须为 1.0")
-    require(set(index) == {"schema_version", "runtime", "task_packet_template", "roles", "stages"}, "index 顶层字段不完整")
+    require(
+        set(index) == {"schema_version", "loading_policy", "runtime", "task_packet_template", "roles", "stages"},
+        "index 顶层字段不完整",
+    )
+    load_require(index.get("loading_policy") == "loading-policy.json", "LOAD-001", "index 必须注册 loading-policy.json")
 
+    loading_policy_path = safe_config_path(config_dir, index.get("loading_policy"), "index.loading_policy")
     runtime_path = safe_config_path(config_dir, index.get("runtime"), "index.runtime")
     template_path = safe_config_path(config_dir, index.get("task_packet_template"), "index.task_packet_template")
+    try:
+        loading_policy = load_json(loading_policy_path)
+    except ValidationError as exc:
+        raise ValidationError(str(exc), "LOAD-001") from exc
     runtime = load_json(runtime_path)
     max_active, max_total, max_task_bytes = validate_runtime(runtime)
     validate_task_packet_template(template_path, max_task_bytes)
@@ -608,6 +1097,7 @@ def validate(skill_dir: Path) -> None:
         )
     require(total_spawn_budget <= max_total, f"累计 subagent 预算超过 max_total_subagents：{total_spawn_budget}")
     validate_stage_contracts(stages)
+    validate_loading_contract(skill_dir, index, loading_policy, roles, stages)
 
 
 def main() -> int:
@@ -615,7 +1105,7 @@ def main() -> int:
     try:
         validate(skill_dir)
     except ValidationError as exc:
-        print(f"ORCH-001 {exc}", file=sys.stderr)
+        print(f"{exc.rule_id} {exc}", file=sys.stderr)
         return 1
     print("orchestration=valid")
     return 0

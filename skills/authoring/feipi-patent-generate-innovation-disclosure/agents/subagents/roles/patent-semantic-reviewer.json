@@ -7,6 +7,8 @@
   "fork_turns": "none",
   "permission": "read_only",
   "max_instances": 1,
+  "instruction_refs": ["references/reviews/semantic-review.md"],
+  "skill_dependencies": [],
   "allowed_write_templates": [],
   "capabilities": [
     "implementation_extension_review",

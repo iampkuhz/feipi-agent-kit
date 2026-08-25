@@ -1,5 +1,6 @@
 {
   "schema_version": "1.0",
+  "loading_policy": "loading-policy.json",
   "runtime": "runtime.json",
   "task_packet_template": "task-packet.template.md",
   "roles": {

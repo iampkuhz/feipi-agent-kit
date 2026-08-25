@@ -1,6 +1,7 @@
 {
   "schema_version": "1.0",
   "stage": "phase_1_material_modeling",
+  "instruction_ref": "references/stages/phase-1-material-modeling.md",
   "requires_upstream": [],
   "nodes": [
     {

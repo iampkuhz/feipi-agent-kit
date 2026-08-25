@@ -1,6 +1,7 @@
 {
   "schema_version": "1.0",
   "stage": "phase_3_final_drafting",
+  "instruction_ref": "references/stages/phase-3-final-drafting.md",
   "requires_upstream": ["phase-2-handoff"],
   "nodes": [
     {
@@ -22,7 +23,8 @@
       "executor": "main_agent",
       "depends_on": ["content-core", "diagram-plan"],
       "parallel_group": "phase-3-build",
-      "checkpoint_ref": "phase-3-public-draft"
+      "checkpoint_ref": "phase-3-public-draft",
+      "resource_refs": ["assets/proposal_template.md"]
     },
     {
       "id": "diagram-worker",
@@ -56,13 +58,15 @@
       "id": "manifest",
       "executor": "main_agent",
       "depends_on": ["public-draft", "diagram-join"],
-      "checkpoint_ref": "phase-3-manifest"
+      "checkpoint_ref": "phase-3-manifest",
+      "resource_refs": ["assets/disclosure-manifest.template.json"]
     },
     {
       "id": "internal-draft",
       "executor": "main_agent",
       "depends_on": ["public-draft", "diagram-join", "manifest"],
-      "checkpoint_ref": "phase-3-internal-draft"
+      "checkpoint_ref": "phase-3-internal-draft",
+      "resource_refs": ["assets/internal_trace_appendix_template.md"]
     },
     {
       "id": "build-map",

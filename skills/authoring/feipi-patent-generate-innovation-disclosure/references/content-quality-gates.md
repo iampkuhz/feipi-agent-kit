@@ -1,6 +1,8 @@
-# 专利创新交底内容质量门禁
+# 专利创新交底内容质量门禁（维护总表）
 
-本文件是交底内容规则真源。脚本负责可确定判断；人工复核负责业务边界、因果语义和 SVG 可读性。不要把“存在复核记录”表述为脚本已理解内容。
+> 维护者与确定性规则总表；运行时不得整体读取或由主 agent / subagent 直接整体加载。主 agent 运行相应 validator，语义与视觉 reviewer 分别只加载 `references/reviews/semantic-review.md`、`references/reviews/visual-review.md`。需要修改规则时在此核对全局编号，再同步 schema、validator、聚焦 guide 与测试。
+
+脚本负责可确定判断；人工复核负责业务边界、因果语义和 SVG 可读性。不要把“存在复核记录”表述为脚本已理解内容，也不要为了让 reviewer 理解局部职责而把本总表塞入任务包。
 
 ## 目录
 

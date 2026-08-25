@@ -7,6 +7,8 @@
   "fork_turns": "none",
   "permission": "read_only",
   "max_instances": 2,
+  "instruction_refs": ["references/reviews/visual-review.md"],
+  "skill_dependencies": [],
   "allowed_write_templates": [],
   "capabilities": [
     "single_svg_visual_review",

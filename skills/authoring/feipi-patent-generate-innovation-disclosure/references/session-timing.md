@@ -4,6 +4,8 @@
 
 为每次真实专利交底执行保留可聚合的 JSONL 时间线，区分阶段墙钟、资源读取、外部检索、PlantUML renderer、确定性校验和 subagent 等待。观测文件只属于内部工作区，不进入对外 `disclosure.md`。
 
+本页只由主 agent 在当前任务进入执行上下文时读取一次（`audience=main_agent`、`load_at=session_init_or_resume`、`cardinality=once_per_task`）：新任务在初始化入口读取，已有任务在恢复入口读取，两种入口择一；本任务一旦完成该加载，后续阶段或再次恢复均不得重复读取。subagent 不读取本页。
+
 ## 落位
 
 ```text

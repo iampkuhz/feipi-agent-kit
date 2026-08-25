@@ -7,6 +7,10 @@
   "fork_turns": "none",
   "permission": "read_only",
   "max_instances": 1,
+  "instruction_refs": [
+    "references/roles/subject-boundary.md"
+  ],
+  "skill_dependencies": [],
   "allowed_write_templates": [],
   "capabilities": [
     "technical_subject",

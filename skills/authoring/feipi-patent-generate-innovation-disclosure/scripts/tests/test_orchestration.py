@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import tempfile
@@ -20,7 +21,7 @@ class OrchestrationTests(unittest.TestCase):
     def fixture(self) -> tuple[tempfile.TemporaryDirectory[str], Path]:
         temporary = tempfile.TemporaryDirectory(prefix="patent-orchestration-")
         root = Path(temporary.name)
-        shutil.copytree(SKILL_DIR / CONFIG_RELATIVE, root / CONFIG_RELATIVE)
+        shutil.copytree(SKILL_DIR, root, dirs_exist_ok=True)
         return temporary, root
 
     def run_validator(
@@ -28,6 +29,7 @@ class OrchestrationTests(unittest.TestCase):
         root: Path,
         expected: int,
         error_contains: str | None = None,
+        rule_id: str = "ORCH-001",
     ) -> subprocess.CompletedProcess[str]:
         result = subprocess.run(
             ["python3", str(VALIDATOR), str(root)],
@@ -37,7 +39,7 @@ class OrchestrationTests(unittest.TestCase):
         )
         self.assertEqual(expected, result.returncode, result.stdout + result.stderr)
         if expected:
-            self.assertIn("ORCH-001", result.stderr)
+            self.assertIn(rule_id, result.stderr)
             if error_contains:
                 self.assertIn(error_contains, result.stderr)
         return result
@@ -53,7 +55,29 @@ class OrchestrationTests(unittest.TestCase):
         self.run_validator(SKILL_DIR, 0)
         config = SKILL_DIR / CONFIG_RELATIVE
 
+        index = json.loads((config / "index.json").read_text(encoding="utf-8"))
+        self.assertEqual("loading-policy.json", index["loading_policy"])
+        policy = json.loads((config / "loading-policy.json").read_text(encoding="utf-8"))
+        self.assertEqual(
+            {
+                "path": "references/session-timing.md",
+                "audience": "main_agent",
+                "load_at": "session_init_or_resume",
+                "cardinality": "once_per_task",
+            },
+            policy["on_demand"]["session_timing"],
+        )
+        for context_name in ("subagent_context", "fallback_context"):
+            self.assertIn(
+                "task_packet.dynamic_inputs",
+                policy["just_in_time"][context_name]["selectors"],
+            )
+
         phase_1 = json.loads((config / "stages/phase-1.json").read_text(encoding="utf-8"))
+        self.assertEqual(
+            "references/stages/phase-1-material-modeling.md",
+            phase_1["instruction_ref"],
+        )
         nodes_1 = {node["id"]: node for node in phase_1["nodes"]}
         self.assertEqual(
             ["research-object", "research-mechanism"],
@@ -66,6 +90,15 @@ class OrchestrationTests(unittest.TestCase):
 
         phase_3 = json.loads((config / "stages/phase-3.json").read_text(encoding="utf-8"))
         nodes_3 = {node["id"]: node for node in phase_3["nodes"]}
+        self.assertEqual(["assets/proposal_template.md"], nodes_3["public-draft"]["resource_refs"])
+        self.assertEqual(
+            ["assets/disclosure-manifest.template.json"],
+            nodes_3["manifest"]["resource_refs"],
+        )
+        self.assertEqual(
+            ["assets/internal_trace_appendix_template.md"],
+            nodes_3["internal-draft"]["resource_refs"],
+        )
         self.assertEqual(
             {"content-core", "diagram-plan"},
             set(nodes_3["diagram-worker"]["depends_on"]),
@@ -76,6 +109,199 @@ class OrchestrationTests(unittest.TestCase):
         nodes_4 = {node["id"]: node for node in phase_4["nodes"]}
         self.assertEqual("build_map_diagrams", nodes_4["visual-review"]["fan_out"]["source"])
         self.assertEqual("all_instances", nodes_4["review-join"]["join"])
+
+        expected_role_guides = {
+            "patent-subject-boundary-analyst.json": ["references/roles/subject-boundary.md"],
+            "patent-prior-art-researcher.json": ["references/roles/prior-art-research.md"],
+            "patent-innovation-value-analyst.json": ["references/roles/innovation-value.md"],
+        }
+        for role_file, instruction_refs in expected_role_guides.items():
+            role = json.loads((config / f"roles/{role_file}").read_text(encoding="utf-8"))
+            self.assertEqual(instruction_refs, role["instruction_refs"])
+
+        diagram_role = json.loads(
+            (config / "roles/patent-diagram-engineer.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(["references/roles/diagram-engineer.md"], diagram_role["instruction_refs"])
+        self.assertEqual(["feipi-plantuml-generate-diagram"], diagram_role["skill_dependencies"])
+
+    def test_loading_policy_keeps_bootstrap_small_and_jit(self) -> None:
+        mutations = (
+            (
+                lambda data: data["bootstrap"]["paths"].append("references/content-quality-gates.md"),
+                "bootstrap 必须保持最小固定集合",
+            ),
+            (
+                lambda data: data["just_in_time"]["role_config"].update(load_at="stage_start"),
+                "just_in_time 必须保持阶段/角色即时加载合同",
+            ),
+            (
+                lambda data: data["just_in_time"]["subagent_context"].update(audience="main_agent"),
+                "just_in_time 必须保持阶段/角色即时加载合同",
+            ),
+            (
+                lambda data: data["just_in_time"]["subagent_context"]["selectors"].remove(
+                    "task_packet.dynamic_inputs"
+                ),
+                "just_in_time 必须保持阶段/角色即时加载合同",
+            ),
+            (
+                lambda data: data["just_in_time"]["fallback_context"]["selectors"].remove(
+                    "task_packet.dynamic_inputs"
+                ),
+                "just_in_time 必须保持阶段/角色即时加载合同",
+            ),
+            (
+                lambda data: data["on_demand"]["session_timing"].update(audience="subagent"),
+                "session timing 必须由 main_agent",
+            ),
+            (
+                lambda data: data["on_demand"]["session_timing"].update(trigger="timing_enabled"),
+                "session timing 必须由 main_agent",
+            ),
+            (
+                lambda data: data["limits"].update(stage_instruction_max_bytes=65536),
+                "体积上限不得被放宽",
+            ),
+        )
+        for change, expected_error in mutations:
+            with self.subTest(expected_error=expected_error):
+                temporary, root = self.fixture()
+                try:
+                    self.mutate_json(root, "loading-policy.json", change)
+                    self.run_validator(root, 1, expected_error, "LOAD-001")
+                finally:
+                    temporary.cleanup()
+
+    def test_stage_instruction_refs_are_unique_safe_and_present(self) -> None:
+        temporary, root = self.fixture()
+        try:
+            self.mutate_json(
+                root,
+                "stages/phase-2.json",
+                lambda data: data.update(instruction_ref="references/stages/phase-1-material-modeling.md"),
+            )
+            self.run_validator(root, 1, "每个阶段必须使用独立", "LOAD-003")
+        finally:
+            temporary.cleanup()
+
+        temporary, root = self.fixture()
+        try:
+            self.mutate_json(
+                root,
+                "stages/phase-2.json",
+                lambda data: data.update(instruction_ref="../outside.md"),
+            )
+            self.run_validator(root, 1, "路径越界", "LOAD-002")
+        finally:
+            temporary.cleanup()
+
+        for mode in ("missing", "symlink"):
+            with self.subTest(mode=mode):
+                temporary, root = self.fixture()
+                try:
+                    path = root / "references/stages/phase-2-idea-confirmation.md"
+                    path.unlink()
+                    if mode == "symlink":
+                        path.symlink_to("phase-1-material-modeling.md")
+                    expected_error = "缺少资源" if mode == "missing" else "禁止软链接"
+                    self.run_validator(root, 1, expected_error, "LOAD-002")
+                finally:
+                    temporary.cleanup()
+
+    def test_stage_and_role_guides_reject_hardlinks_and_copied_content(self) -> None:
+        cases = (
+            (
+                "stage",
+                "references/stages/phase-1-material-modeling.md",
+                "references/stages/phase-2-idea-confirmation.md",
+                "LOAD-003",
+            ),
+            (
+                "role",
+                "references/reviews/semantic-review.md",
+                "references/reviews/visual-review.md",
+                "LOAD-005",
+            ),
+        )
+        for family, source_relative, target_relative, rule_id in cases:
+            for reuse_mode in ("hardlink", "copied-content"):
+                with self.subTest(family=family, reuse_mode=reuse_mode):
+                    temporary, root = self.fixture()
+                    try:
+                        source = root / source_relative
+                        target = root / target_relative
+                        if reuse_mode == "hardlink":
+                            target.unlink()
+                            os.link(source, target)
+                            expected_error = "hardlink"
+                        else:
+                            target.write_bytes(source.read_bytes())
+                            expected_error = "复制相同内容"
+                        self.run_validator(root, 1, expected_error, rule_id)
+                    finally:
+                        temporary.cleanup()
+
+    def test_node_resources_are_bound_only_at_their_node(self) -> None:
+        temporary, root = self.fixture()
+        try:
+            def change_template(data):
+                node = next(item for item in data["nodes"] if item["id"] == "manifest")
+                node["resource_refs"] = ["assets/proposal_template.md"]
+
+            self.mutate_json(root, "stages/phase-3.json", change_template)
+            self.run_validator(root, 1, "条件模板绑定不正确", "LOAD-004")
+        finally:
+            temporary.cleanup()
+
+        temporary, root = self.fixture()
+        try:
+            def load_maintainer_doc(data):
+                node = next(item for item in data["nodes"] if item["id"] == "content-core")
+                node["resource_refs"] = ["references/content-quality-gates.md"]
+
+            self.mutate_json(root, "stages/phase-3.json", load_maintainer_doc)
+            self.run_validator(root, 1, "包含非运行时资源", "LOAD-006")
+        finally:
+            temporary.cleanup()
+
+    def test_role_instructions_and_dependencies_do_not_cross(self) -> None:
+        temporary, root = self.fixture()
+        try:
+            self.mutate_json(
+                root,
+                "roles/patent-semantic-reviewer.json",
+                lambda data: data.update(instruction_refs=["references/reviews/visual-review.md"]),
+            )
+            self.run_validator(root, 1, "角色专页不得交叉复用", "LOAD-005")
+        finally:
+            temporary.cleanup()
+
+        temporary, root = self.fixture()
+        try:
+            self.mutate_json(
+                root,
+                "roles/patent-diagram-engineer.json",
+                lambda data: data.update(skill_dependencies=[]),
+            )
+            self.run_validator(root, 1, "skill_dependencies 与职责不一致", "LOAD-005")
+        finally:
+            temporary.cleanup()
+
+    def test_entry_and_guides_have_hard_size_limits(self) -> None:
+        for relative, expected_label in (
+            ("SKILL.md", "SKILL.md"),
+            ("references/stages/phase-1-material-modeling.md", "stage instruction_ref"),
+            ("references/roles/diagram-engineer.md", "role instruction_ref"),
+        ):
+            with self.subTest(relative=relative):
+                temporary, root = self.fixture()
+                try:
+                    path = root / relative
+                    path.write_text("x" * 13000, encoding="utf-8")
+                    self.run_validator(root, 1, expected_label, "LOAD-007")
+                finally:
+                    temporary.cleanup()
 
     def test_configuration_does_not_copy_checkpoint_result_paths(self) -> None:
         config = SKILL_DIR / CONFIG_RELATIVE
@@ -111,6 +337,29 @@ class OrchestrationTests(unittest.TestCase):
                     self.run_validator(nested_root, 1, expected_error)
                 finally:
                     nested_temporary.cleanup()
+
+    def test_role_permissions_cannot_be_escalated_or_downgraded(self) -> None:
+        cases = (
+            (
+                "roles/patent-semantic-reviewer.json",
+                lambda data: data.update(
+                    permission="workspace_write",
+                    allowed_write_templates=["disclosure-workspace/reviews/semantic/"],
+                ),
+            ),
+            (
+                "roles/patent-diagram-engineer.json",
+                lambda data: data.update(permission="read_only", allowed_write_templates=[]),
+            ),
+        )
+        for relative, mutation in cases:
+            with self.subTest(relative=relative):
+                temporary, root = self.fixture()
+                try:
+                    self.mutate_json(root, relative, mutation)
+                    self.run_validator(root, 1, "role permission 与职责不一致")
+                finally:
+                    temporary.cleanup()
 
     def test_stage_role_capability_responsibility_is_enforced(self) -> None:
         temporary, root = self.fixture()
@@ -392,7 +641,44 @@ class OrchestrationTests(unittest.TestCase):
         path = root / CONFIG_RELATIVE / "task-packet.template.md"
         content = path.read_text(encoding="utf-8").replace("## 返回", "### 返回")
         path.write_text(content, encoding="utf-8")
-        self.run_validator(root, 1, "只能包含输入/需要判断/返回三节")
+        self.run_validator(root, 1, "只能包含输入/需要判断/返回三节", "LOAD-008")
+
+    def test_task_packet_progressive_loading_contract_cannot_be_weakened(self) -> None:
+        mutations = (
+            ("{{dynamic_inputs}}", "", "缺少占位字段"),
+            ("{{result_owner}}", "", "缺少占位字段"),
+            (
+                "{{dynamic_inputs}}",
+                "{{dynamic_inputs}}\n{{input_references}}",
+                "占位字段集合必须固定",
+            ),
+            (
+                "禁止读取完整阶段缓存",
+                "可以读取完整阶段缓存",
+                "语义反转",
+            ),
+            (
+                "禁止读取本 Skill 其他资源",
+                "可以读取本 Skill 其他资源",
+                "语义反转",
+            ),
+            (
+                "禁止加载其他 Skill",
+                "可以加载其他 Skill",
+                "语义反转",
+            ),
+        )
+        for original, replacement, expected_error in mutations:
+            with self.subTest(original=original):
+                temporary, root = self.fixture()
+                try:
+                    path = root / CONFIG_RELATIVE / "task-packet.template.md"
+                    content = path.read_text(encoding="utf-8")
+                    self.assertIn(original, content)
+                    path.write_text(content.replace(original, replacement, 1), encoding="utf-8")
+                    self.run_validator(root, 1, expected_error, "LOAD-008")
+                finally:
+                    temporary.cleanup()
 
     def test_nonisolated_diagram_write_path_is_rejected(self) -> None:
         temporary, root = self.fixture()
@@ -407,7 +693,7 @@ class OrchestrationTests(unittest.TestCase):
 
         self.mutate_json(root, "roles/patent-diagram-engineer.json", change_role)
         self.mutate_json(root, "stages/phase-3.json", change_stage)
-        self.run_validator(root, 1, "动态图写路径必须按 diagram_id 隔离")
+        self.run_validator(root, 1, "role allowed_write_templates 与职责不一致")
 
     def test_unknown_role_and_checkpoint_references_are_rejected(self) -> None:
         mutations = (
