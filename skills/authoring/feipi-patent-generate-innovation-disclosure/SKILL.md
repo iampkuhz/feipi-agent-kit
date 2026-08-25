@@ -39,7 +39,22 @@ subagent 最多累计 3 个、同时最多 1 个；子 agent 禁止继续派生�
 
 派发时使用 `fork_turns: none`，只传精简任务包，不复制完整对话；指定模型不可用时省略 model override 并保留原 effort，不得把所有角色静默升级为最高模型。运行环境不支持 subagent 时由主 agent 执行同一职责，不降低确认和验证门禁。
 
-每个任务包必须落入 `disclosure-workspace/working/stages/agents/`，并按“输入 / 需要判断 / 返回”三段写明输入引用（阶段 1 为材料索引，其余阶段为上游 handoff）、允许写入路径、禁止动作、紧凑 TSV 返回格式和 timing log。派发消息只传任务文件路径，不复制完整对话或任务内容。`permission`/`writes` 是主 agent 必须写入任务包并复核的协作合同，不代表宿主额外创建了 OS sandbox。
+每个任务包必须落入 `disclosure-workspace/working/stages/agents/`，并按“输入 / 需要判断 / 返回”三段写明输入引用（阶段 1 为材料索引，其余阶段为上游 handoff）、允许写入路径、禁止动作、紧凑 TSV 返回格式、关键事件合同和 timing log。派发消息只传任务文件路径，不复制完整对话或任务内容。`permission`/`writes` 是主 agent 必须写入任务包并复核的协作合同，不代表宿主额外创建了 OS sandbox。
+
+## 关键事件上报与等待纪律（必做）
+
+关键事件只有四类，详细语义以 `references/stage-delivery-contract.md` 为真源：
+
+- `MILESTONE`：已形成可供下游消费的阶段 handoff 或关键工件，不表示“开始处理”。
+- `DECISION`：需要用户或主 agent 作出会改变主张、保护边界、证据范围、图示职责或交付状态的选择。
+- `BLOCKED`：缺少必要输入、权限、工具能力，或必做门禁失败，当前职责无法继续。
+- `COMPLETE`：当前 subagent 职责或主任务已经闭环；最终答复本身即为主任务的 `COMPLETE`，不再额外发送完成消息。
+
+主 agent 只向用户上报会改变用户下一步或交付有效性的关键事件；subagent 只向主 agent 上报。主 agent 对同一 scope 和结果去重、聚合后用一句话说明“结果 + 下一步”，不得原样转发 TSV、正文、日志或推理。subagent 的最终响应可直接承载 `COMPLETE` 或终态 `BLOCKED`，不得先发同内容事件再重复一遍最终消息。
+
+`STARTED`、`RUNNING`、`HEARTBEAT`、普通状态、工具调用、文件读写、缓存命中、无变化等待和预算内重试都不是关键事件，必须静默。不得为了显得有进展而发送“仍在处理”或百分比估计。宿主强制的首次操作说明不登记为 `STARTED` 事件，只简短发送一次；若宿主另有长任务更新要求，只能汇总已经完成且可验证的结果，不得虚构里程碑或发送空心跳。
+
+主 agent 派发后先继续不依赖 subagent 的本地工作；只有到依赖汇合点且确实无其他工作时，才使用宿主提供的长时、事件驱动等待。禁止用短间隔 `wait`、`list`、`status`、`read` 或 `sleep` 循环查询 subagent。宿主因非终态超时结束长等待且 worker 仍在运行时，可以继续同类长等待，但中间不得查询状态、发送心跳或缩短等待周期；非终态超时本身不是关键事件，也不等同于失败。阶段 2 等用户确认时结束当前轮次，不轮询用户或 subagent。
 
 ## 耗时观测（必做）
 
@@ -48,7 +63,7 @@ subagent 最多累计 3 个、同时最多 1 个；子 agent 禁止继续派生�
 - 四个阶段分别记录 start/end；阶段 2 包含等待用户明确确认的墙钟时间。
 - 每批资源读取记录 `resource_read`；竞品研究记录 `retrieval`；制图 worker 记录 `diagram_generation`，避免为每个小文件反复启动观测进程。
 - PlantUML 图包完成后使用 `ingest-diagram` 导入本次真实 `render_ms`、`static_validation_ms`、HTTP 请求数、渲染轮次、图包校验数、verifier 数和 cache hit 数；缺字段时必须报错，不能按 0 猜测。完整交底校验必须通过 `session_timing.py run --result-json disclosure-workspace/disclosure-validation.json` 包装，同时导入阶段 4 内部的逐图 verifier 次数。
-- subagent 派发成功后记录 role、agent id、请求/实际 model 与 effort；宿主不暴露实际值时记 `unknown`，不得把请求值伪装成实际值。从派发完成到结果返回记录 `subagent_execution`，只有主 agent 实际阻塞时才记录 `subagent_wait`。
+- subagent 派发成功后记录 role、agent id、请求/实际 model 与 effort；宿主不暴露实际值时记 `unknown`，不得把请求值伪装成实际值。从派发完成到结果返回记录 `subagent_execution`；`subagent_wait` 只记录依赖屏障处的完整逻辑事件驱动阻塞，不记录状态查询、轮询或主 agent 同时工作的时间。
 - 交付前使用 `summarize --require-complete --close-session` 生成 `session-timing-summary.json`；四阶段、五类必记活动或任一 span 缺失时均不得宣称观测完整。活动可能并行，禁止把各活动耗时简单相加当作 session 总耗时。
 
 ## 输出目录合同

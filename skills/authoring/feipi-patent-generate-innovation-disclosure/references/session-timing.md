@@ -31,7 +31,7 @@ disclosure-workspace/working/
 - `render`：PlantUML `/svg` 请求耗时，从图包 `validation.json.last_run_timings.render_ms` 导入。
 - `validation`：确定性校验耗时；图包静态部分从 `last_run_timings.static_validation_ms` 导入，并同步导入 renderer HTTP 请求、渲染轮次、package validation、verifier 和 cache hit 次数；完整交底入口使用 `run` 包装。
 - `subagent_execution`：从派发成功到 worker 结果完成。
-- `subagent_wait`：主 agent 实际阻塞等待 worker 的时间；主 agent 同时继续工作时不计入等待。
+- `subagent_wait`：主 agent 在依赖汇合点通过宿主事件机制真实阻塞等待 worker 的时间；主 agent 同时继续工作时不计入等待，状态查询、短间隔轮询和心跳不得记成等待。
 
 不得在 label、agent id 或事件字段中记录用户原文、检索结果正文、密钥或其他敏感内容。路径使用相对工作区的稳定短名。
 
@@ -67,7 +67,7 @@ python3 scripts/session_timing.py end --log <timing-log> \
   --stage phase_2_idea_confirmation --activity phase --status success
 ```
 
-subagent 派发成功后先记录数量与配置，再分别记录执行和真实等待 span：
+subagent 派发成功后先记录数量与配置，再分别记录执行和真实等待 span。等待 span 包住依赖汇合点的完整逻辑等待；宿主非终态超时后的长时事件等待续接仍属于同一逻辑等待，禁止为了产生观测数据而查询或短周期轮询：
 
 ```bash
 python3 scripts/session_timing.py record-subagent --log <timing-log> \

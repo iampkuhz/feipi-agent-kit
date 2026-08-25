@@ -1,19 +1,103 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "max_active_subagents": 1,
   "max_total_subagents": 3,
   "allow_recursive_spawn": false,
   "context_policy": "distilled_task_packet_only",
   "permission_enforcement": "task_contract_not_os_sandbox",
   "handoff_contract": "references/stage-delivery-contract.md",
+  "main_agent_reporting_profile": "main_to_user",
   "task_packet_required_fields": [
     "task_file",
     "input_reference",
     "allowed_writes",
     "forbidden_actions",
     "return_format",
-    "timing_log"
+    "timing_log",
+    "key_event_contract"
   ],
+  "event_reporting": {
+    "critical_events": [
+      "MILESTONE",
+      "DECISION",
+      "BLOCKED",
+      "COMPLETE"
+    ],
+    "silent_events": [
+      "STARTED",
+      "RUNNING",
+      "HEARTBEAT",
+      "STATUS",
+      "TOOL_CALL",
+      "FILE_READ",
+      "FILE_WRITE",
+      "CACHE_HIT",
+      "WAIT_TIMEOUT",
+      "RETRYING",
+      "UNCHANGED"
+    ],
+    "unknown_event_policy": "reject_not_forward",
+    "profiles": {
+      "main_to_user": {
+        "audience": "user",
+        "emit_on": [
+          "MILESTONE",
+          "DECISION",
+          "BLOCKED",
+          "COMPLETE"
+        ]
+      },
+      "subagent_to_main": {
+        "audience": "main_agent",
+        "emit_on": [
+          "MILESTONE",
+          "DECISION",
+          "BLOCKED",
+          "COMPLETE"
+        ]
+      }
+    },
+    "envelope": {
+      "format": "[<EVENT>] <scope>｜<outcome>｜<next_or_artifact>",
+      "max_lines": 1,
+      "max_chars": 240,
+      "overflow_policy": "shorten_outcome"
+    },
+    "lifecycle": {
+      "max_milestones_per_scope": 1,
+      "final_events": [
+        "BLOCKED",
+        "COMPLETE"
+      ],
+      "final_response_is_event": true,
+      "duplicate_final_notification": false
+    },
+    "classification": {
+      "complete_over_milestone": true,
+      "decision_when_receiver_choice_can_unblock": true,
+      "blocked_when_no_receiver_choice_can_unblock": true
+    },
+    "deduplicate": {
+      "enabled": true,
+      "key_fields": [
+        "profile",
+        "event",
+        "scope",
+        "outcome"
+      ]
+    },
+    "wait_policy": {
+      "mode": "event_driven_join",
+      "main_agent_work_while_subagent_runs": true,
+      "dependency_barrier_wait": "long_event_wait_with_nonterminal_timeout_continuation",
+      "busy_wait": false,
+      "periodic_poll": false,
+      "heartbeat": false,
+      "status_probe_between_waits": false,
+      "short_wait_loop": false,
+      "nonterminal_timeout_policy": "continue_long_event_wait_without_status_probe"
+    }
+  },
   "telemetry": {
     "coordinator": "main_agent",
     "log_path": "disclosure-workspace/working/session-timing.jsonl",
@@ -34,6 +118,7 @@
       "reasoning_effort": "medium",
       "fork_turns": "none",
       "permission": "read_only",
+      "reporting_profile": "subagent_to_main",
       "writes": [],
       "task_file": "disclosure-workspace/working/stages/agents/prior-art-task.md",
       "input_contract": [
@@ -49,7 +134,7 @@
       "output_contract": {
         "format": "research.tsv rows",
         "cache_path": "disclosure-workspace/working/stages/phase-1/research.tsv",
-        "message": "status_and_row_count_only",
+        "message": "final_event_and_row_count_only",
         "writer": "main_agent"
       },
       "task": "使用一个 worker 并行执行两条限定检索线，返回来源、日期、证据属性和精简结论，不展开无关行业研究。"
@@ -61,6 +146,7 @@
       "reasoning_effort": "medium",
       "fork_turns": "none",
       "permission": "workspace_write",
+      "reporting_profile": "subagent_to_main",
       "writes": [
         "disclosure-workspace/diagrams/"
       ],
@@ -78,7 +164,7 @@
       "output_contract": {
         "format": "build-map.tsv rows",
         "cache_path": "disclosure-workspace/working/stages/phase-3/build-map.tsv",
-        "message": "status_and_paths_only",
+        "message": "final_event_and_paths_only",
         "writer": "main_agent"
       },
       "task": "根据已确认且冻结的 I/T/D/E/S 合同生成全部必要图包；每图只验证一次，只修改分配的 diagrams 目录。"
@@ -90,6 +176,7 @@
       "reasoning_effort": "high",
       "fork_turns": "none",
       "permission": "read_only",
+      "reporting_profile": "subagent_to_main",
       "writes": [],
       "task_file": "disclosure-workspace/working/stages/agents/final-review-task.md",
       "input_contract": [
@@ -105,7 +192,7 @@
       "output_contract": {
         "format": "review.tsv rows",
         "cache_path": "disclosure-workspace/working/stages/phase-4/review.tsv",
-        "message": "status_and_row_count_only",
+        "message": "final_event_and_row_count_only",
         "writer": "main_agent"
       },
       "task": "一次性完成实现与扩展边界、因果删除、对外泄漏和最终 SVG 视觉复核，只返回结构化结论。"

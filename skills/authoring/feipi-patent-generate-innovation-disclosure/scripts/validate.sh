@@ -105,7 +105,7 @@ import sys
 
 path = sys.argv[1]
 data = json.load(open(path, encoding="utf-8"))
-assert data.get("schema_version") == "1.0", "subagent schema_version 必须为 1.0"
+assert data.get("schema_version") == "1.1", "subagent schema_version 必须为 1.1"
 assert data.get("max_active_subagents") == 1, "同时只能启用一个 subagent"
 assert data.get("max_total_subagents") == 3, "累计 subagent 必须为 3"
 assert data.get("allow_recursive_spawn") is False, "禁止 subagent 递归派生"
@@ -113,8 +113,53 @@ assert data.get("permission_enforcement") == "task_contract_not_os_sandbox", "�
 assert data.get("handoff_contract") == "references/stage-delivery-contract.md", "阶段交付合同路径不正确"
 assert set(data.get("task_packet_required_fields", [])) == {
     "task_file", "input_reference", "allowed_writes",
-    "forbidden_actions", "return_format", "timing_log",
+    "forbidden_actions", "return_format", "timing_log", "key_event_contract",
 }, "subagent 精简任务包字段不完整"
+reporting = data.get("event_reporting", {})
+critical_events = ["MILESTONE", "DECISION", "BLOCKED", "COMPLETE"]
+silent_events = [
+    "STARTED", "RUNNING", "HEARTBEAT", "STATUS", "TOOL_CALL",
+    "FILE_READ", "FILE_WRITE", "CACHE_HIT", "WAIT_TIMEOUT", "RETRYING", "UNCHANGED",
+]
+assert reporting.get("critical_events") == critical_events, "关键事件必须恰好为 MILESTONE/DECISION/BLOCKED/COMPLETE"
+assert reporting.get("silent_events") == silent_events, "非关键事件静默集合不完整"
+assert reporting.get("unknown_event_policy") == "reject_not_forward", "未知事件不得转发给用户"
+assert set(critical_events).isdisjoint(silent_events), "关键事件与静默事件不得重叠"
+profiles = reporting.get("profiles", {})
+assert set(profiles) == {"main_to_user", "subagent_to_main"}, "关键事件上报 profile 不完整"
+assert profiles.get("main_to_user", {}).get("audience") == "user", "主 agent 上报对象必须为用户"
+assert profiles.get("subagent_to_main", {}).get("audience") == "main_agent", "subagent 上报对象必须为主 agent"
+assert all(profile.get("emit_on") == critical_events for profile in profiles.values()), "主子 agent 只能上报关键事件"
+assert data.get("main_agent_reporting_profile") == "main_to_user", "主 agent 必须绑定 main_to_user"
+envelope = reporting.get("envelope", {})
+assert envelope.get("format") == "[<EVENT>] <scope>｜<outcome>｜<next_or_artifact>", "关键事件 envelope 格式不正确"
+assert envelope.get("max_lines") == 1, "关键事件 envelope 必须限制为一行"
+assert envelope.get("max_chars") == 240, "关键事件 envelope 必须限制为 240 字符"
+assert envelope.get("overflow_policy") == "shorten_outcome", "关键事件超长时必须压缩结果"
+lifecycle = reporting.get("lifecycle", {})
+assert lifecycle == {
+    "max_milestones_per_scope": 1,
+    "final_events": ["BLOCKED", "COMPLETE"],
+    "final_response_is_event": True,
+    "duplicate_final_notification": False,
+}, "关键事件生命周期约束不完整"
+assert reporting.get("classification") == {
+    "complete_over_milestone": True,
+    "decision_when_receiver_choice_can_unblock": True,
+    "blocked_when_no_receiver_choice_can_unblock": True,
+}, "关键事件重叠分类规则不完整"
+deduplicate = reporting.get("deduplicate", {})
+assert deduplicate.get("enabled") is True, "关键事件必须去重"
+assert deduplicate.get("key_fields") == [
+    "profile", "event", "scope", "outcome",
+], "关键事件去重键不正确"
+wait_policy = reporting.get("wait_policy", {})
+assert wait_policy.get("mode") == "event_driven_join", "subagent 等待必须为事件驱动"
+assert wait_policy.get("main_agent_work_while_subagent_runs") is True, "主 agent 必须先执行独立工作"
+assert wait_policy.get("dependency_barrier_wait") == "long_event_wait_with_nonterminal_timeout_continuation", "依赖屏障必须使用可续接的长时事件等待"
+assert all(wait_policy.get(field) is False for field in ("busy_wait", "periodic_poll", "heartbeat")), "禁止 busy wait、轮询和心跳"
+assert all(wait_policy.get(field) is False for field in ("status_probe_between_waits", "short_wait_loop")), "长等待续接之间禁止状态查询和短周期等待"
+assert wait_policy.get("nonterminal_timeout_policy") == "continue_long_event_wait_without_status_probe", "宿主非终态超时后只能无查询续接长等待"
 roles = data.get("roles")
 assert isinstance(roles, list) and len(roles) == 3, "必须配置三个分级角色"
 names = [item.get("name") for item in roles]
@@ -135,6 +180,7 @@ assert all(value in {"low", "medium", "high"} for value in efforts), "reasoning_
 assert efforts.count("high") == 1, "只有最终 reviewer 使用 high"
 assert all(item.get("fork_turns") == "none" for item in roles), "subagent 必须使用精简上下文"
 assert all(item.get("permission") in {"read_only", "workspace_write"} for item in roles), "permission 非法"
+assert all(item.get("reporting_profile") == "subagent_to_main" for item in roles), "每个 subagent 必须引用 subagent_to_main"
 role_map = {item["name"]: item for item in roles}
 expected_roles = {
     "patent_prior_art_researcher": (
@@ -184,7 +230,7 @@ for name, expected in expected_deliveries.items():
     assert actual == expected, f"{name} 的输入/输出文件链不正确：{actual}"
     assert len(item.get("input_contract", [])) == 3, f"{name} 必须声明三个紧凑输入"
     assert len(item.get("judgment_contract", [])) == 3, f"{name} 必须声明三个判断范围"
-    assert output.get("message") in {"status_and_row_count_only", "status_and_paths_only"}, f"{name} 返回消息不够紧凑"
+    assert output.get("message") in {"final_event_and_row_count_only", "final_event_and_paths_only"}, f"{name} 返回消息不够紧凑"
 diagram = next(item for item in roles if item.get("name") == "patent_diagram_engineer")
 assert diagram.get("writes") == ["disclosure-workspace/diagrams/"], "diagram engineer 写入边界不正确"
 assert data.get("fallback", {}).get("forbid_silent_upgrade_to_highest") is True, "必须禁止静默升级最高模型"
@@ -196,6 +242,12 @@ PY
 
 rg -q '^## 2\. 四阶段交付矩阵$' "$TARGET_DIR/references/stage-delivery-contract.md"
 rg -q '^## 4\. subagent 三段式交付$' "$TARGET_DIR/references/stage-delivery-contract.md"
+rg -q '^## 5\. 关键事件与非轮询汇合$' "$TARGET_DIR/references/stage-delivery-contract.md"
+rg -q '^### 5\.2 必须上报的触发点$' "$TARGET_DIR/references/stage-delivery-contract.md"
+rg -q '^## 关键事件上报与等待纪律（必做）$' "$TARGET_DIR/SKILL.md"
+rg -q '长时、事件驱动等待' "$TARGET_DIR/SKILL.md"
+rg -q '禁止用短间隔.*循环查询 subagent' "$TARGET_DIR/SKILL.md"
+rg -q '非终态超时.*继续同类长等待.*不得查询状态' "$TARGET_DIR/SKILL.md"
 rg -q 'handoff 不超过 24 KiB' "$TARGET_DIR/SKILL.md"
 
 bash "$TARGET_DIR/scripts/check_disclosure_format.sh" \

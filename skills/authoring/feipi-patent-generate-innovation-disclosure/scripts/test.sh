@@ -146,6 +146,86 @@ check_subagent_contract() {
     && ! rg -q '^subagents:' "$SKILL_DIR/agents/openai.yaml"
 }
 
+check_key_event_reporting_contract() {
+  python3 - "$SKILL_DIR/references/subagent-orchestration.json" <<'PY' || return 1
+import json
+import sys
+
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+reporting = data["event_reporting"]
+critical = ["MILESTONE", "DECISION", "BLOCKED", "COMPLETE"]
+silent = [
+    "STARTED", "RUNNING", "HEARTBEAT", "STATUS", "TOOL_CALL",
+    "FILE_READ", "FILE_WRITE", "CACHE_HIT", "WAIT_TIMEOUT", "RETRYING", "UNCHANGED",
+]
+event_stream = [
+    "STARTED", "RUNNING", "TOOL_CALL", "MILESTONE", "STATUS",
+    "DECISION", "FILE_READ", "BLOCKED", "RETRYING", "UNCHANGED",
+    "COMPLETE", "HEARTBEAT", "FILE_WRITE", "CACHE_HIT", "WAIT_TIMEOUT",
+]
+assert reporting["critical_events"] == critical
+assert reporting["silent_events"] == silent
+assert reporting["unknown_event_policy"] == "reject_not_forward"
+for profile_name in ("main_to_user", "subagent_to_main"):
+    profile = reporting["profiles"][profile_name]
+    assert profile["emit_on"] == critical
+    assert [event for event in event_stream if event in profile["emit_on"]] == critical
+    assert not any(event in profile["emit_on"] for event in silent)
+envelope = reporting["envelope"]
+assert envelope["max_lines"] == 1
+assert envelope["max_chars"] == 240
+assert "\n" not in envelope["format"]
+assert len(envelope["format"]) <= envelope["max_chars"]
+assert envelope["format"] == "[<EVENT>] <scope>｜<outcome>｜<next_or_artifact>"
+assert envelope["overflow_policy"] == "shorten_outcome"
+assert reporting["lifecycle"] == {
+    "max_milestones_per_scope": 1,
+    "final_events": ["BLOCKED", "COMPLETE"],
+    "final_response_is_event": True,
+    "duplicate_final_notification": False,
+}
+assert reporting["classification"] == {
+    "complete_over_milestone": True,
+    "decision_when_receiver_choice_can_unblock": True,
+    "blocked_when_no_receiver_choice_can_unblock": True,
+}
+assert reporting["deduplicate"]["enabled"] is True
+assert reporting["deduplicate"]["key_fields"] == ["profile", "event", "scope", "outcome"]
+assert data["main_agent_reporting_profile"] == "main_to_user"
+wait = reporting["wait_policy"]
+assert wait == {
+    "mode": "event_driven_join",
+    "main_agent_work_while_subagent_runs": True,
+    "dependency_barrier_wait": "long_event_wait_with_nonterminal_timeout_continuation",
+    "busy_wait": False,
+    "periodic_poll": False,
+    "heartbeat": False,
+    "status_probe_between_waits": False,
+    "short_wait_loop": False,
+    "nonterminal_timeout_policy": "continue_long_event_wait_without_status_probe",
+}
+assert all(role["reporting_profile"] == "subagent_to_main" for role in data["roles"])
+assert [role["output_contract"]["message"] for role in data["roles"]] == [
+    "final_event_and_row_count_only",
+    "final_event_and_paths_only",
+    "final_event_and_row_count_only",
+]
+assert "key_event_contract" in data["task_packet_required_fields"]
+PY
+  rg -q '^## 关键事件上报与等待纪律（必做）$' "$SKILL_DIR/SKILL.md" \
+    && rg -q '主 agent 只向用户上报.*subagent 只向主 agent 上报' "$SKILL_DIR/SKILL.md" \
+    && rg -q '长时、事件驱动等待' "$SKILL_DIR/SKILL.md" \
+    && rg -q '禁止用短间隔.*循环查询 subagent' "$SKILL_DIR/SKILL.md" \
+    && rg -q '^## 5\. 关键事件与非轮询汇合$' "$SKILL_DIR/references/stage-delivery-contract.md" \
+    && rg -q '^### 5\.2 必须上报的触发点$' "$SKILL_DIR/references/stage-delivery-contract.md" \
+    && rg -q '阶段 2.*`DECISION`.*阶段 3.*`MILESTONE`.*阶段 4' "$SKILL_DIR/references/stage-delivery-contract.md" \
+    && rg -q '主 agent 收到 subagent `COMPLETE` 后.*不能机械转发' "$SKILL_DIR/references/stage-delivery-contract.md" \
+    && rg -q '职责已经全部闭环.*`COMPLETE`.*明确选择即可解除.*`DECISION`.*没有.*解除路径.*`BLOCKED`' "$SKILL_DIR/references/stage-delivery-contract.md" \
+    && rg -q '非终态超时.*继续同类长等待.*不得查询状态' "$SKILL_DIR/SKILL.md" \
+    && rg -q '最终响应本身就是该事件' "$SKILL_DIR/references/stage-delivery-contract.md" \
+    && rg -q '复用未变图包.*仅上报关键事件且不轮询 subagent.*已实现基础与拟扩展保护边界' "$SKILL_DIR/agents/openai.yaml"
+}
+
 check_stage_delivery_contract() {
   rg -q '^## 阶段交付与上下文边界（必做）$' "$SKILL_DIR/SKILL.md" \
     && rg -q '阶段 1 是既有原始材料的唯一读取者' "$SKILL_DIR/SKILL.md" \
@@ -177,6 +257,7 @@ run_command "validate-self" 0 "" bash "$VALIDATE_SKILL" "$SKILL_DIR"
 run_command "confirmation-gate-contract" 0 "" check_confirmation_contract
 run_command "competitor-research-contract" 0 "" check_competitor_research_contract
 run_command "subagent-orchestration-contract" 0 "" check_subagent_contract
+run_command "key-event-reporting-contract" 0 "" check_key_event_reporting_contract
 run_command "stage-delivery-contract" 0 "" check_stage_delivery_contract
 run_command "stage-handoff-e2e" 0 "" python3 "$SKILL_DIR/scripts/tests/test_stage_handoff.py"
 run_command "session-timing-contract" 0 "" check_timing_contract

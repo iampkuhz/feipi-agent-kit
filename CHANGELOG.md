@@ -1,7 +1,7 @@
 # 变更记录
 
 ## 2026-08-25
-- feipi-patent-generate-innovation-disclosure v6：分阶段交付、观测与图包复用
+- feipi-patent-generate-innovation-disclosure v6：分阶段交付、关键上报、观测与图包复用
 - feipi-plantuml-generate-diagram v4：校准复用耗时、renderer 调用计数与 SVG 错误识别
 
 ## 2026-08-24
