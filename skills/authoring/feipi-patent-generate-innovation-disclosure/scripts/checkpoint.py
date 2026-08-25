@@ -23,7 +23,7 @@ from typing import Iterable, Sequence
 
 
 CHECKPOINT_RELATIVE = PurePosixPath("disclosure-workspace/working/CHECKPOINT.md")
-CATALOG_PATH = Path(__file__).resolve().parents[1] / "references/checkpoint-task-catalog.json"
+CATALOG_PATH = Path(__file__).resolve().parents[1] / "agents/subagents/checkpoint-task-catalog.json"
 STATE_MARKER_PREFIX = "<!-- checkpoint-state-v1: "
 STATE_MARKER_SUFFIX = " -->"
 STATE_VERSION = 1
@@ -78,6 +78,20 @@ class CatalogTask:
     allowed_owners: tuple[str, ...]
     result: str
     minimum_check: str
+
+
+@dataclass(frozen=True)
+class CatalogTemplate:
+    template_id: str
+    task_id_regex: str
+    result_regex: str
+    allowed_owners: tuple[str, ...]
+    minimum_check: str
+    min_instances: int
+    max_instances: int
+
+
+CatalogNode = CatalogTask | CatalogTemplate
 
 
 @dataclass(frozen=True)
@@ -276,12 +290,32 @@ def tasks_from_args(raw_tasks: Sequence[Sequence[str]]) -> tuple[Task, ...]:
     return tuple(tasks)
 
 
+def catalog_owners(raw: object, node_id: str) -> tuple[str, ...]:
+    if not isinstance(raw, list) or not raw:
+        raise CheckpointError(f"catalog {node_id} allowed_owners 不得为空")
+    owners = tuple(normalize_owner(owner, node_id) for owner in raw)
+    if len(set(owners)) != len(owners):
+        raise CheckpointError(f"catalog {node_id} allowed_owners 重复")
+    return owners
+
+
+def catalog_regex(raw: object, label: str) -> str:
+    pattern = clean_text(raw, label, maximum=2048)
+    try:
+        compiled = re.compile(pattern)
+    except re.error as exc:
+        raise CheckpointError(f"{label} 不是有效正则") from exc
+    if "instance" not in compiled.groupindex:
+        raise CheckpointError(f"{label} 必须包含命名组 instance")
+    return pattern
+
+
 @lru_cache(maxsize=1)
-def load_task_catalog() -> dict[str, tuple[CatalogTask, ...]]:
+def load_task_catalog() -> dict[str, tuple[CatalogNode, ...]]:
     try:
         mode = CATALOG_PATH.lstat().st_mode
     except FileNotFoundError as exc:
-        raise CheckpointError("缺少 references/checkpoint-task-catalog.json") from exc
+        raise CheckpointError("缺少 agents/subagents/checkpoint-task-catalog.json") from exc
     if stat.S_ISLNK(mode) or not stat.S_ISREG(mode):
         raise CheckpointError("checkpoint task catalog 必须是实际普通文件")
     try:
@@ -290,61 +324,189 @@ def load_task_catalog() -> dict[str, tuple[CatalogTask, ...]]:
         raise CheckpointError("checkpoint task catalog 无法解析") from exc
     if not isinstance(raw, dict) or set(raw) != {"schema_version", "stages"}:
         raise CheckpointError("checkpoint task catalog 顶层字段不符合合同")
-    if raw.get("schema_version") != "1.0":
-        raise CheckpointError("checkpoint task catalog 版本必须为 1.0")
+    if raw.get("schema_version") != "2.0":
+        raise CheckpointError("checkpoint task catalog 版本必须为 2.0")
     raw_stages = raw.get("stages")
     if not isinstance(raw_stages, dict) or set(raw_stages) != set(STAGES):
         raise CheckpointError("checkpoint task catalog 阶段集合不完整")
 
-    catalog: dict[str, tuple[CatalogTask, ...]] = {}
+    catalog: dict[str, tuple[CatalogNode, ...]] = {}
     global_ids: set[str] = set()
+    global_template_ids: set[str] = set()
     for stage in STAGES:
-        raw_tasks = raw_stages.get(stage)
-        if not isinstance(raw_tasks, list) or not raw_tasks:
-            raise CheckpointError(f"checkpoint task catalog 阶段任务为空：{stage}")
-        stage_tasks: list[CatalogTask] = []
+        raw_nodes = raw_stages.get(stage)
+        if not isinstance(raw_nodes, list) or not raw_nodes:
+            raise CheckpointError(f"checkpoint task catalog 阶段节点为空：{stage}")
+        stage_nodes: list[CatalogNode] = []
         stage_results: set[str] = set()
-        for index, item in enumerate(raw_tasks, start=1):
-            if not isinstance(item, dict) or set(item) != {
-                "task_id", "title", "allowed_owners", "result", "minimum_check",
-            }:
-                raise CheckpointError(f"checkpoint task catalog 任务字段不完整：{stage}:{index}")
-            task_id = clean_text(item.get("task_id"), f"catalog {stage} task_id", maximum=128)
-            title = clean_text(item.get("title"), f"catalog {task_id} title", maximum=512)
-            owners = item.get("allowed_owners")
-            if not isinstance(owners, list) or not owners:
-                raise CheckpointError(f"catalog {task_id} allowed_owners 不得为空")
-            normalized_owners = tuple(normalize_owner(owner, task_id) for owner in owners)
-            if len(set(normalized_owners)) != len(normalized_owners):
-                raise CheckpointError(f"catalog {task_id} allowed_owners 重复")
-            result = normalize_result(item.get("result"))
-            minimum_check = parse_minimum_check(item.get("minimum_check"))
-            if task_id in global_ids:
-                raise CheckpointError(f"checkpoint task catalog ID 重复：{task_id}")
-            if result in stage_results:
-                raise CheckpointError(f"checkpoint task catalog 结果重复：{stage}:{result}")
-            global_ids.add(task_id)
-            stage_results.add(result)
-            stage_tasks.append(CatalogTask(task_id, title, normalized_owners, result, minimum_check))
-        catalog[stage] = tuple(stage_tasks)
+        for index, item in enumerate(raw_nodes, start=1):
+            if not isinstance(item, dict):
+                raise CheckpointError(f"checkpoint task catalog 节点必须是对象：{stage}:{index}")
+            node_type = item.get("type")
+            if node_type == "fixed":
+                if set(item) != {
+                    "type", "task_id", "title", "allowed_owners", "result", "minimum_check",
+                }:
+                    raise CheckpointError(f"checkpoint task catalog fixed 字段不完整：{stage}:{index}")
+                task_id = clean_text(item.get("task_id"), f"catalog {stage} task_id", maximum=128)
+                title = clean_text(item.get("title"), f"catalog {task_id} title", maximum=512)
+                owners = catalog_owners(item.get("allowed_owners"), task_id)
+                result = normalize_result(item.get("result"))
+                minimum_check = parse_minimum_check(item.get("minimum_check"))
+                if task_id in global_ids:
+                    raise CheckpointError(f"checkpoint task catalog ID 重复：{task_id}")
+                if result in stage_results:
+                    raise CheckpointError(f"checkpoint task catalog 结果重复：{stage}:{result}")
+                global_ids.add(task_id)
+                stage_results.add(result)
+                stage_nodes.append(CatalogTask(task_id, title, owners, result, minimum_check))
+                continue
+            if node_type == "template":
+                if set(item) != {
+                    "type", "template_id", "task_id_regex", "result_regex", "allowed_owners",
+                    "minimum_check", "min_instances", "max_instances",
+                }:
+                    raise CheckpointError(f"checkpoint task catalog template 字段不完整：{stage}:{index}")
+                template_id = clean_text(
+                    item.get("template_id"), f"catalog {stage} template_id", maximum=128,
+                )
+                if not OWNER_PATTERN.fullmatch(template_id):
+                    raise CheckpointError(f"catalog template_id 必须是小写稳定标识：{template_id}")
+                if template_id in global_template_ids:
+                    raise CheckpointError(f"checkpoint task catalog template_id 重复：{template_id}")
+                owners = catalog_owners(item.get("allowed_owners"), template_id)
+                task_id_regex = catalog_regex(
+                    item.get("task_id_regex"), f"catalog {template_id} task_id_regex",
+                )
+                result_regex = catalog_regex(
+                    item.get("result_regex"), f"catalog {template_id} result_regex",
+                )
+                minimum_check = parse_minimum_check(item.get("minimum_check"))
+                minimum = item.get("min_instances")
+                maximum = item.get("max_instances")
+                if (
+                    type(minimum) is not int
+                    or type(maximum) is not int
+                    or minimum < 1
+                    or maximum < minimum
+                ):
+                    raise CheckpointError(f"catalog {template_id} 实例数范围非法")
+                global_template_ids.add(template_id)
+                stage_nodes.append(
+                    CatalogTemplate(
+                        template_id, task_id_regex, result_regex, owners,
+                        minimum_check, minimum, maximum,
+                    )
+                )
+                continue
+            raise CheckpointError(f"checkpoint task catalog 节点 type 非法：{stage}:{index}")
+        catalog[stage] = tuple(stage_nodes)
     return catalog
 
 
+def validate_fixed_catalog_task(stage: str, order: int, task: Task, expected: CatalogTask) -> None:
+    if task.task_id != expected.task_id:
+        raise CheckpointError(
+            f"阶段固定任务必须按 catalog 顺序且只能追加：{stage}:{order}:{expected.task_id}"
+        )
+    if task.title != expected.title:
+        raise CheckpointError(f"阶段固定任务标题不匹配：{task.task_id}")
+    if task.owner not in expected.allowed_owners:
+        raise CheckpointError(f"阶段固定任务 owner 不允许：{task.task_id}:{task.owner}")
+    if task.result != expected.result:
+        raise CheckpointError(f"阶段固定任务结果路径不匹配：{task.task_id}")
+    if task.minimum_check != expected.minimum_check:
+        raise CheckpointError(f"阶段固定任务最低检查不匹配：{task.task_id}")
+
+
+def validate_template_task(template: CatalogTemplate, task: Task, instance_number: int) -> None:
+    task_match = re.fullmatch(template.task_id_regex, task.task_id)
+    if task_match is None:
+        raise CheckpointError(f"模板任务 ID 不匹配：{template.template_id}:{task.task_id}")
+    result_match = re.fullmatch(template.result_regex, task.result)
+    if result_match is None:
+        raise CheckpointError(f"模板任务结果路径不匹配：{template.template_id}:{task.task_id}")
+    task_instance = task_match.group("instance")
+    result_instance = result_match.group("instance")
+    if task_instance != result_instance:
+        raise CheckpointError(f"模板任务 task_id/result instance 不一致：{task.task_id}")
+    expected_instance = f"D{instance_number}"
+    if task_instance != expected_instance:
+        raise CheckpointError(
+            f"模板任务 instance 必须从 D1 连续编号：{template.template_id}:"
+            f"expected={expected_instance}:actual={task_instance}"
+        )
+    if task.owner not in template.allowed_owners:
+        raise CheckpointError(f"模板任务 owner 不允许：{task.task_id}:{task.owner}")
+    if task.minimum_check != template.minimum_check:
+        raise CheckpointError(f"模板任务最低检查不匹配：{task.task_id}")
+
+
 def validate_stage_task_catalog(stage: str, tasks: Sequence[Task]) -> None:
-    required = load_task_catalog()[stage]
-    if len(tasks) < len(required):
+    catalog = load_task_catalog()
+    nodes = catalog[stage]
+    position = 0
+    templates = tuple(node for node in nodes if isinstance(node, CatalogTemplate))
+    if not templates and len(tasks) < len(nodes):
         raise CheckpointError(f"阶段固定任务不完整：{stage}")
-    for order, (task, expected) in enumerate(zip(tasks, required), start=1):
-        if task.task_id != expected.task_id:
+    for node in nodes:
+        if isinstance(node, CatalogTask):
+            if position >= len(tasks):
+                raise CheckpointError(f"阶段固定任务不完整：{stage}:{node.task_id}")
+            validate_fixed_catalog_task(stage, position + 1, tasks[position], node)
+            position += 1
+            continue
+
+        count = 0
+        while position < len(tasks):
+            task = tasks[position]
+            if re.fullmatch(node.task_id_regex, task.task_id) is None:
+                break
+            if count >= node.max_instances:
+                raise CheckpointError(f"模板任务实例超过上限：{node.template_id}:{node.max_instances}")
+            validate_template_task(node, task, count + 1)
+            count += 1
+            position += 1
+        if count < node.min_instances:
             raise CheckpointError(
-                f"阶段固定任务必须按 catalog 顺序且只能追加：{stage}:{order}:{expected.task_id}"
+                f"模板任务实例不足：{node.template_id}:{count}/{node.min_instances}"
             )
-        if task.owner not in expected.allowed_owners:
-            raise CheckpointError(f"阶段固定任务 owner 不允许：{task.task_id}:{task.owner}")
-        if task.result != expected.result:
-            raise CheckpointError(f"阶段固定任务结果路径不匹配：{task.task_id}")
-        if task.minimum_check != expected.minimum_check:
-            raise CheckpointError(f"阶段固定任务最低检查不匹配：{task.task_id}")
+
+    for task in tasks[position:]:
+        for template in templates:
+            if (
+                re.fullmatch(template.task_id_regex, task.task_id) is not None
+                or re.fullmatch(template.result_regex, task.result) is not None
+            ):
+                raise CheckpointError(
+                    f"模板任务只能在 catalog 固定位置连续出现：{template.template_id}:{task.task_id}"
+                )
+        for catalog_stage, catalog_nodes in catalog.items():
+            if catalog_stage == stage:
+                continue
+            for node in catalog_nodes:
+                if isinstance(node, CatalogTask):
+                    if task.task_id == node.task_id:
+                        raise CheckpointError(
+                            "追加任务不得复用其他阶段固定任务 ID："
+                            f"{stage}->{catalog_stage}:{task.task_id}"
+                        )
+                    if task.result == node.result:
+                        raise CheckpointError(
+                            "追加任务不得复用其他阶段固定任务结果："
+                            f"{stage}->{catalog_stage}:{task.result}"
+                        )
+                    continue
+                if re.fullmatch(node.task_id_regex, task.task_id) is not None:
+                    raise CheckpointError(
+                        "追加任务不得匹配其他阶段模板任务 ID："
+                        f"{stage}->{catalog_stage}:{node.template_id}:{task.task_id}"
+                    )
+                if re.fullmatch(node.result_regex, task.result) is not None:
+                    raise CheckpointError(
+                        "追加任务不得匹配其他阶段模板任务结果："
+                        f"{stage}->{catalog_stage}:{node.template_id}:{task.result}"
+                    )
 
 
 def state_from_dict(raw: object) -> State:

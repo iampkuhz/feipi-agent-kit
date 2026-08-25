@@ -13,12 +13,13 @@ from pathlib import Path
 
 
 SCRIPT = Path(__file__).resolve().parent.parent / "checkpoint.py"
-CATALOG = SCRIPT.parents[1] / "references/checkpoint-task-catalog.json"
+CATALOG = SCRIPT.parents[1] / "agents/subagents/checkpoint-task-catalog.json"
 CATALOG_DATA = json.loads(CATALOG.read_text(encoding="utf-8"))["stages"]
 CHECKPOINT = Path("disclosure-workspace/working/CHECKPOINT.md")
 PHASE_1 = "phase_1_material_modeling"
 PHASE_2 = "phase_2_idea_confirmation"
 PHASE_3 = "phase_3_final_drafting"
+PHASE_4 = "phase_4_review_delivery"
 
 
 class CheckpointTests(unittest.TestCase):
@@ -58,32 +59,76 @@ class CheckpointTests(unittest.TestCase):
         return started
 
     @staticmethod
-    def catalog_task_arguments(stage: str) -> list[str]:
-        arguments: list[str] = []
-        for task in CATALOG_DATA[stage]:
-            arguments.extend(
-                (
-                    "--task",
-                    task["task_id"],
-                    task["title"],
-                    task["allowed_owners"][0],
-                    task["result"],
-                    task["minimum_check"],
-                )
+    def dynamic_task(template_id: str, instance_number: int) -> tuple[str, str, str, str, str]:
+        instance = f"D{instance_number}"
+        if template_id == "phase-3-diagram":
+            return (
+                f"phase-3-diagram-{instance}", f"生成并校验图包 {instance}",
+                "patent_diagram_engineer",
+                f"disclosure-workspace/working/stages/phase-3/diagrams/{instance}-result.tsv",
+                "tsv",
             )
+        if template_id == "phase-4-visual-review":
+            return (
+                f"phase-4-visual-review-{instance}", f"复核图示 {instance}",
+                "patent_visual_reviewer",
+                f"disclosure-workspace/working/stages/phase-4/visual/{instance}-review.tsv",
+                "tsv",
+            )
+        raise AssertionError(f"unknown template fixture: {template_id}")
+
+    @classmethod
+    def catalog_tasks(
+        cls,
+        stage: str,
+        template_counts: dict[str, int] | None = None,
+    ) -> list[tuple[str, str, str, str, str]]:
+        counts = template_counts or {}
+        tasks: list[tuple[str, str, str, str, str]] = []
+        for node in CATALOG_DATA[stage]:
+            if node["type"] == "fixed":
+                tasks.append(
+                    (
+                        node["task_id"], node["title"], node["allowed_owners"][0],
+                        node["result"], node["minimum_check"],
+                    )
+                )
+                continue
+            count = counts.get(node["template_id"], node["min_instances"])
+            tasks.extend(cls.dynamic_task(node["template_id"], index) for index in range(1, count + 1))
+        return tasks
+
+    @staticmethod
+    def task_arguments(tasks: list[tuple[str, str, str, str, str]]) -> list[str]:
+        arguments: list[str] = []
+        for task in tasks:
+            arguments.extend(("--task", *task))
         return arguments
 
+    @classmethod
+    def catalog_task_arguments(
+        cls,
+        stage: str,
+        template_counts: dict[str, int] | None = None,
+    ) -> list[str]:
+        return cls.task_arguments(cls.catalog_tasks(stage, template_counts))
+
     def complete_catalog_tasks(self, root: Path, stage: str) -> None:
-        for task in CATALOG_DATA[stage]:
-            check = task["minimum_check"]
+        for task_id, _, _, result, check in self.catalog_tasks(stage):
             if check == "json":
                 data = b"{}\n"
             elif check == "tsv":
                 data = b"id\tstatus\nfixture\tready\n"
             else:
                 data = b"# fixture\n"
-            self.write(root, task["result"], data)
-            self.run_cli(root, "complete-task", "--task", task["task_id"])
+            self.write(root, result, data)
+            self.run_cli(root, "complete-task", "--task", task_id)
+
+    def advance_before(self, root: Path, target_stage: str) -> None:
+        for index, stage in enumerate((PHASE_1, PHASE_2, PHASE_3, PHASE_4)):
+            if stage == target_stage:
+                return
+            self.start(root, stage=stage, inputs=(f"阶段 {index + 1} 输入",))
 
     @staticmethod
     def write(root: Path, relative: str, data: str | bytes) -> Path:
@@ -160,6 +205,231 @@ class CheckpointTests(unittest.TestCase):
             final_content = checkpoint.read_text(encoding="utf-8")
             for _, _, data in fixtures:
                 self.assertIn(hashlib.sha256(data).hexdigest(), final_content)
+
+    def test_catalog_v2_fixed_sequences_and_template_contracts(self) -> None:
+        raw = json.loads(CATALOG.read_text(encoding="utf-8"))
+        self.assertEqual("2.0", raw["schema_version"])
+        self.assertFalse((SCRIPT.parents[1] / "references/checkpoint-task-catalog.json").exists())
+
+        def node_ids(stage: str) -> list[str]:
+            return [node.get("task_id", node.get("template_id")) for node in CATALOG_DATA[stage]]
+
+        self.assertEqual(
+            [
+                "phase-1-material-index", "phase-1-evidence-cards", "phase-1-analysis-plan",
+                "phase-1-delivery-goals", "phase-1-subject-boundary", "phase-1-research-object",
+                "phase-1-research-mechanism", "phase-1-research-join",
+                "phase-1-innovation-candidates", "phase-1-material-model", "phase-1-handoff",
+            ],
+            node_ids(PHASE_1),
+        )
+        self.assertEqual(["phase-2-decision", "phase-2-handoff"], node_ids(PHASE_2))
+        self.assertEqual(
+            [
+                "phase-3-content-core", "phase-3-diagram-plan", "phase-3-public-draft",
+                "phase-3-diagram", "phase-3-diagram-join", "phase-3-manifest",
+                "phase-3-internal-draft", "phase-3-build-map", "phase-3-handoff",
+            ],
+            node_ids(PHASE_3),
+        )
+        self.assertEqual(
+            [
+                "phase-4-review-plan", "phase-4-semantic-review", "phase-4-visual-review",
+                "phase-4-review-join", "phase-4-validation", "phase-4-timing-summary",
+                "phase-4-handoff",
+            ],
+            node_ids(PHASE_4),
+        )
+        templates = {
+            node["template_id"]: node
+            for stage in (PHASE_3, PHASE_4)
+            for node in CATALOG_DATA[stage]
+            if node["type"] == "template"
+        }
+        self.assertEqual({"phase-3-diagram", "phase-4-visual-review"}, set(templates))
+        for node in templates.values():
+            self.assertEqual(2, node["min_instances"])
+            self.assertEqual(8, node["max_instances"])
+            self.assertEqual("tsv", node["minimum_check"])
+            self.assertIn("(?P<instance>", node["task_id_regex"])
+            self.assertIn("(?P<instance>", node["result_regex"])
+        self.assertEqual(
+            ["patent_diagram_engineer", "main_agent"],
+            templates["phase-3-diagram"]["allowed_owners"],
+        )
+        self.assertEqual(
+            ["patent_visual_reviewer", "main_agent"],
+            templates["phase-4-visual-review"]["allowed_owners"],
+        )
+
+    def test_dynamic_templates_accept_consecutive_instances_and_trailing_tasks(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.advance_before(root, PHASE_3)
+            tasks = self.catalog_tasks(PHASE_3, {"phase-3-diagram": 3})
+            tasks.append(("custom-after-phase-3", "普通追加任务", "main_agent", "outputs/extra.txt", "nonempty"))
+            started = self.run_cli(
+                root,
+                "start-stage", "--stage", PHASE_3, "--input", "阶段二 handoff",
+                *self.task_arguments(tasks),
+            )
+            self.assertIn("checkpoint=started", started.stdout)
+            checkpoint = self.checkpoint(root).read_text(encoding="utf-8")
+            ordered_ids = (
+                "phase-3-public-draft", "phase-3-diagram-D1", "phase-3-diagram-D2",
+                "phase-3-diagram-D3", "phase-3-diagram-join", "phase-3-manifest",
+                "phase-3-internal-draft", "phase-3-build-map", "phase-3-handoff",
+                "custom-after-phase-3",
+            )
+            positions = [checkpoint.index(task_id) for task_id in ordered_ids]
+            self.assertEqual(sorted(positions), positions)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.advance_before(root, PHASE_4)
+            tasks = self.catalog_tasks(PHASE_4, {"phase-4-visual-review": 2})
+            tasks.append(("custom-after-phase-4", "普通追加任务", "main_agent", "outputs/final-extra.txt", "nonempty"))
+            started = self.run_cli(
+                root,
+                "start-stage", "--stage", PHASE_4, "--input", "阶段三 handoff",
+                *self.task_arguments(tasks),
+            )
+            self.assertIn("checkpoint=started", started.stdout)
+            checkpoint = self.checkpoint(root).read_text(encoding="utf-8")
+            ordered_ids = (
+                "phase-4-semantic-review", "phase-4-visual-review-D1",
+                "phase-4-visual-review-D2", "phase-4-review-join", "phase-4-validation",
+                "phase-4-timing-summary", "phase-4-handoff", "custom-after-phase-4",
+            )
+            positions = [checkpoint.index(task_id) for task_id in ordered_ids]
+            self.assertEqual(sorted(positions), positions)
+
+    def test_trailing_custom_tasks_reject_other_stage_catalog_identities(self) -> None:
+        phase_2_fixed = next(
+            node for node in CATALOG_DATA[PHASE_2] if node["type"] == "fixed"
+        )
+        phase_3_template_task = self.dynamic_task("phase-3-diagram", 7)
+        phase_4_template_task = self.dynamic_task("phase-4-visual-review", 7)
+        cases = (
+            (
+                (
+                    phase_2_fixed["task_id"], "伪装其他阶段固定 ID", "main_agent",
+                    "outputs/custom-fixed-id.txt", "nonempty",
+                ),
+                "追加任务不得复用其他阶段固定任务 ID",
+            ),
+            (
+                (
+                    "custom-fixed-result", "伪装其他阶段固定结果", "main_agent",
+                    phase_2_fixed["result"], "markdown",
+                ),
+                "追加任务不得复用其他阶段固定任务结果",
+            ),
+            (
+                (
+                    phase_3_template_task[0], "伪装其他阶段模板 ID", "main_agent",
+                    "outputs/custom-template-id.txt", "nonempty",
+                ),
+                "追加任务不得匹配其他阶段模板任务 ID",
+            ),
+            (
+                (
+                    "custom-template-result", "伪装其他阶段模板结果", "main_agent",
+                    phase_4_template_task[3], "tsv",
+                ),
+                "追加任务不得匹配其他阶段模板任务结果",
+            ),
+        )
+        for task, expected_message in cases:
+            with self.subTest(task_id=task[0]), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                rejected = self.run_raw(
+                    root,
+                    "start-stage", "--stage", PHASE_1, "--input", "阶段一输入",
+                    *self.catalog_task_arguments(PHASE_1), "--task", *task,
+                )
+                self.assertEqual(1, rejected.returncode, rejected.stderr)
+                self.assertIn(expected_message, rejected.stderr)
+                self.assertFalse(self.checkpoint(root).exists())
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            accepted = self.run_raw(
+                root,
+                "start-stage", "--stage", PHASE_1, "--input", "阶段一输入",
+                *self.catalog_task_arguments(PHASE_1),
+                "--task", "custom-phase-1-tail", "真正的阶段尾部任务", "main_agent",
+                "outputs/custom-phase-1-tail.txt", "nonempty",
+            )
+            self.assertEqual(0, accepted.returncode, accepted.stderr)
+            self.assertIn("checkpoint=started", accepted.stdout)
+
+    def test_dynamic_template_rejects_count_order_instance_owner_check_and_position(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.advance_before(root, PHASE_3)
+            valid_tasks = self.catalog_tasks(PHASE_3)
+            self.run_cli(
+                root,
+                "start-stage", "--stage", PHASE_3, "--input", "阶段二 handoff",
+                *self.task_arguments(valid_tasks),
+            )
+            checkpoint = self.checkpoint(root)
+            unchanged = checkpoint.read_bytes()
+
+            def rejected(tasks: list[tuple[str, str, str, str, str]], message: str) -> None:
+                completed = self.run_raw(
+                    root,
+                    "rollback-stage", "--stage", PHASE_3, "--reason", "模板反例",
+                    "--input", "阶段二 handoff", *self.task_arguments(tasks),
+                )
+                self.assertEqual(1, completed.returncode, completed.stderr)
+                self.assertIn(message, completed.stderr)
+                self.assertEqual(unchanged, checkpoint.read_bytes())
+
+            rejected(
+                self.catalog_tasks(PHASE_3, {"phase-3-diagram": 1}),
+                "模板任务实例不足",
+            )
+            rejected(
+                self.catalog_tasks(PHASE_3, {"phase-3-diagram": 9}),
+                "模板任务实例超过上限",
+            )
+
+            starts_at_d2 = self.catalog_tasks(PHASE_3)
+            diagram_index = next(
+                index for index, task in enumerate(starts_at_d2)
+                if task[0] == "phase-3-diagram-D1"
+            )
+            starts_at_d2[diagram_index] = self.dynamic_task("phase-3-diagram", 2)
+            starts_at_d2[diagram_index + 1] = self.dynamic_task("phase-3-diagram", 3)
+            rejected(starts_at_d2, "必须从 D1 连续编号")
+
+            gap = self.catalog_tasks(PHASE_3)
+            gap[diagram_index + 1] = self.dynamic_task("phase-3-diagram", 3)
+            rejected(gap, "必须从 D1 连续编号")
+
+            mismatched_instance = self.catalog_tasks(PHASE_3)
+            first = list(mismatched_instance[diagram_index])
+            first[3] = "disclosure-workspace/working/stages/phase-3/diagrams/D8-result.tsv"
+            mismatched_instance[diagram_index] = tuple(first)
+            rejected(mismatched_instance, "task_id/result instance 不一致")
+
+            wrong_owner = self.catalog_tasks(PHASE_3)
+            first = list(wrong_owner[diagram_index])
+            first[2] = "patent_visual_reviewer"
+            wrong_owner[diagram_index] = tuple(first)
+            rejected(wrong_owner, "模板任务 owner 不允许")
+
+            wrong_check = self.catalog_tasks(PHASE_3)
+            first = list(wrong_check[diagram_index])
+            first[4] = "markdown"
+            wrong_check[diagram_index] = tuple(first)
+            rejected(wrong_check, "模板任务最低检查不匹配")
+
+            misplaced = self.catalog_tasks(PHASE_3)
+            misplaced.append(self.dynamic_task("phase-3-diagram", 3))
+            rejected(misplaced, "模板任务只能在 catalog 固定位置连续出现")
 
     def test_complete_task_allows_parallel_order_and_requires_valid_regular_nonempty_file(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -517,6 +787,18 @@ class CheckpointTests(unittest.TestCase):
             )
             self.assertEqual(1, wrong_definition.returncode)
             self.assertIn("结果路径不匹配", wrong_definition.stderr)
+
+            wrong_title_tasks = self.catalog_tasks(PHASE_1)
+            first_fixed = list(wrong_title_tasks[0])
+            first_fixed[1] = "被篡改的固定标题"
+            wrong_title_tasks[0] = tuple(first_fixed)
+            wrong_title = self.run_raw(
+                root,
+                "start-stage", "--stage", PHASE_1, "--input", "input",
+                *self.task_arguments(wrong_title_tasks),
+            )
+            self.assertEqual(1, wrong_title.returncode)
+            self.assertIn("固定任务标题不匹配", wrong_title.stderr)
 
             missing_owner = self.run_raw(
                 root,

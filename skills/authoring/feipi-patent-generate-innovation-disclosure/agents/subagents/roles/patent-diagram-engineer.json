@@ -1,0 +1,25 @@
+{
+  "schema_version": "1.0",
+  "name": "patent_diagram_engineer",
+  "description": "按主 agent 冻结的单图职责、编号和独占目录生成并验证一个 PlantUML 图包。",
+  "model": "gpt-5.6-terra",
+  "reasoning_effort": "medium",
+  "fork_turns": "none",
+  "permission": "workspace_write",
+  "max_instances": 2,
+  "allowed_write_templates": [
+    "disclosure-workspace/diagrams/{diagram_id}-{purpose}/"
+  ],
+  "capabilities": [
+    "single_diagram_package",
+    "diagram_profile_selection",
+    "layout_and_numbering",
+    "package_validation"
+  ],
+  "forbidden_actions": [
+    "write_outside_assigned_diagram",
+    "change_frozen_numbering",
+    "include_extension_only_path",
+    "write_shared_result_tsv"
+  ]
+}

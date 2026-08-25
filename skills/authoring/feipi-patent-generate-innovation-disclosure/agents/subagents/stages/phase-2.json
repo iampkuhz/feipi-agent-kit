@@ -1,0 +1,25 @@
+{
+  "schema_version": "1.0",
+  "stage": "phase_2_idea_confirmation",
+  "requires_upstream": ["phase-1-handoff"],
+  "nodes": [
+    {
+      "id": "idea-decision",
+      "executor": "main_agent",
+      "depends_on": [],
+      "checkpoint_ref": "phase-2-decision"
+    },
+    {
+      "id": "user-confirmation",
+      "executor": "user",
+      "depends_on": ["idea-decision"],
+      "gate": "explicit_confirmation"
+    },
+    {
+      "id": "phase-2-handoff",
+      "executor": "main_agent",
+      "depends_on": ["user-confirmation"],
+      "checkpoint_ref": "phase-2-handoff"
+    }
+  ]
+}

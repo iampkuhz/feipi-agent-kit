@@ -26,20 +26,21 @@ description: 用于把零散业务与技术事实整理为带来源台账、Plan
 
 ## 快速执行与资源加载
 
-- 启动时只读取本文件和 `references/stage-delivery-contract.md`；运行环境支持 subagent 时，再读取 `references/subagent-orchestration.json` 并按其中的 model、`reasoning_effort`、`fork_turns` 和读写边界显式派发。`agents/openai.yaml` 不承载 subagent 角色配置。
+- 启动时只读取本文件和 `references/stage-delivery-contract.md`；运行环境支持 subagent 时，再读取 `agents/subagents/index.json`，并只加载当前阶段文件及其引用的 role 配置。`agents/openai.yaml` 只承载 UI 元数据，不承载 subagent 编排。
 - 阶段 1 不读取正式模板或 JSON Schema。先把用户材料压缩为一次性的材料索引、证据卡和缺口清单；同一 hash 的材料不重复读取或摘要，缺失项合并为一轮定向追问。
 - 用户确认写作思路后，阶段 3 才读取 `assets/proposal_template.md`、`assets/internal_trace_appendix_template.md` 和 `assets/disclosure-manifest.template.json`。`assets/disclosure-manifest.schema.json` 只由校验脚本消费，模型不得逐行分析。
 - 阶段 4 只在人工复核时读取 `references/content-quality-gates.md` 的相关规则；确定性格式、路径、hash 和字段检查交给脚本，主 agent 不重复逐项推演。
 
-subagent 最多累计 3 个、同时最多 1 个；子 agent 禁止继续派生。主 agent 保留素材门槛、用户确认、正文合并和最终交付责任：
+subagent 同时最多 3 个、整个任务最多创建 9 个，子 agent 禁止继续派生；容量不足时按同一依赖图分批执行，不改变汇合门禁。主 agent 保留素材门槛、交付目标、用户确认、正文合并和最终交付责任：
 
-- `patent_prior_art_researcher`：`gpt-5.6-luna` + `medium`，一次处理两条检索线。
-- `patent_diagram_engineer`：`gpt-5.6-terra` + `medium`，确认后只写 `disclosure-workspace/diagrams/`。
-- `patent_final_reviewer`：`gpt-5.6-sol` + `high`，最终只读复核一次。
+- 阶段 1：`patent_subject_boundary_analyst` 与两个 `patent_prior_art_researcher` 实例并行；三者汇合后再运行 `patent_innovation_value_analyst`。
+- 阶段 2：不派发 subagent，等待并冻结用户确认。
+- 阶段 3：`patent_diagram_engineer` 按图实例化，最多两个 worker 复用处理图队列；主 agent 同时撰写唯一对外稿。
+- 阶段 4：`patent_semantic_reviewer` 与最多两个 `patent_visual_reviewer` 并行，主 agent 汇合后再运行最终校验。
 
 派发时使用 `fork_turns: none`，只传精简任务包，不复制完整对话；指定模型不可用时省略 model override 并保留原 effort，不得把所有角色静默升级为最高模型。运行环境不支持 subagent 时由主 agent 执行同一职责，不降低确认和验证门禁。
 
-每个任务包必须落入 `disclosure-workspace/working/stages/agents/`，并按“输入 / 需要判断 / 返回”三段写明输入引用（阶段 1 为材料索引，其余阶段为上游 handoff）、允许写入路径、禁止动作、紧凑 TSV 返回格式、关键事件合同和 timing log。派发消息只传任务文件路径，不复制完整对话或任务内容。`permission`/`writes` 是主 agent 必须写入任务包并复核的协作合同，不代表宿主额外创建了 OS sandbox。
+每个任务包必须由 `agents/subagents/task-packet.template.md` 生成到 `disclosure-workspace/working/stages/agents/`，并按“输入 / 需要判断 / 返回”三段写明输入引用（阶段 1 为材料索引，其余阶段为上游 handoff）、允许写入路径、禁止动作、紧凑 TSV 返回格式、关键事件合同、checkpoint task 和 timing log。派发消息只传任务文件路径，不复制完整对话或任务内容。`permission`/`writes` 是主 agent 必须写入任务包并复核的协作合同，不代表宿主额外创建了 OS sandbox。
 
 ## 关键事件上报与等待纪律（必做）
 
@@ -84,7 +85,7 @@ subagent 最多累计 3 个、同时最多 1 个；子 agent 禁止继续派生�
     │   └── stages/
     │       ├── stage-state.tsv
     │       ├── shared/              # 材料索引与唯一证据卡
-    │       ├── agents/              # 三段式 subagent 任务文件
+    │       ├── agents/              # 由静态模板生成的逐 lane / 逐图任务包
     │       └── phase-{1,2,3,4}/     # 阶段缓存与紧凑 handoff
     └── diagrams/
         └── <D编号>-<用途>/
@@ -106,7 +107,7 @@ subagent 最多累计 3 个、同时最多 1 个；子 agent 禁止继续派生�
 
 每次真实任务都在 `<disclosure-dir>/disclosure-workspace/working/CHECKPOINT.md` 维护唯一的当前状态。它不是进度日志，只记录当前阶段、本阶段输入、本阶段任务、当前阶段已交付、下一步和阻塞项；不得追加微步骤、工具调用、普通文件读写、预算内重试或重复进度。
 
-- 任务粒度只允许“一个阶段交付物”或“一个 subagent 职责”，每项必须绑定相对 `<disclosure-dir>` 的唯一结果文件和最低检查类型。四阶段固定项以 `references/checkpoint-task-catalog.json` 为机器真源，不能删除、替换或合并，额外任务只能追加；subagent 任务包还必须写明对应的 checkpoint task id、结果路径和最低检查。
+- 任务粒度只允许“一个阶段交付物”或“一个 subagent 职责”，每项必须绑定相对 `<disclosure-dir>` 的唯一结果文件和最低检查类型。固定项和按图展开模板以 `agents/subagents/checkpoint-task-catalog.json` 为机器真源，不能删除、替换或合并，额外任务只能追加；subagent 任务包还必须写明对应的 checkpoint task id、结果路径和最低检查。
 - 只有结果文件存在、非空并通过 `nonempty`、`markdown`、`json` 或 `tsv` 中声明的最低检查，才能完成任务并加入“当前阶段已交付”；完成时同时绑定当前 SHA-256。并行的主/subagent 任务可以按实际完成顺序登记，恢复时仍按任务清单顺序选择第一个无效或未完成项。最低检查只是文件级底线，不能替代 handoff 封存、图包验证、完整交底校验或语义复核。
 - CHECKPOINT 只在阶段开始、任务完成、等待用户和发生阻塞时原子更新。阶段 2 提交写作思路后先记录等待用户再结束当前轮次；等待动作只进入状态与“下一步”，不伪装成阻塞。写入等待/阻塞时将已经失效的旧交付降回 pending；完全相同的重复请求不重写文件。subagent 的普通事件、依赖等待超时和恢复检查本身不更新 CHECKPOINT。
 - 恢复任务时先校验并读取 CHECKPOINT，再运行 `stage_handoff.py status` 核对封存链。已完成且文件仍满足最低检查、SHA-256 未变化的任务直接跳过；结果缺失、为空、格式无效或 hash 改变时，将该任务视为未完成并重新执行，从第一个无效或未完成任务继续。恢复检查只报告，不改写状态。
@@ -128,7 +129,7 @@ python3 scripts/stage_handoff.py rewind --working <disclosure-workspace/working>
 - 阶段 1 是既有原始材料的唯一读取者：用 `material-index.tsv` 保存来源、hash 和有效锚点，用 `evidence-cards.md` 只缓存会进入主张、I/T、检索词或边界判断的事实。后续阶段不得为“补上下文”重读同一材料。
 - 阶段间重复记录使用 TSV，只出现一次表头；handoff 不超过 24 KiB，只传稳定 ID、相对路径、hash、已确认决策和未决项，禁止嵌套大 JSON、完整正文、网页副本、日志或思维链。
 - 用户后续增加或修改原始事实时，更新材料索引并从阶段 1 重新封存；上游 hash 变化会使下游状态失效。旧缓存可以保留，但在重新封存前不得使用。
-- 只有封存成功的上游 handoff 才能启动下一阶段或 subagent。并行仅允许阶段 3 的主 agent 写正文与一个 diagram worker 写 `diagrams/`；双方写入不相交，汇合前不得封存阶段 3、计算最终 manifest hash 或启动终审。
+- 只有封存成功的上游 handoff 才能启动下一阶段；阶段内 subagent 还必须满足当前阶段图中的 `depends_on`。允许的并行组只有阶段 1 的主体/双线检索 fan-out、阶段 3 的正文/逐图生成和阶段 4 的语义/逐图视觉复核；写入路径必须不相交，汇合前不得完成 join、封存阶段或启动下游。
 
 只使用工作区内相对路径；禁止绝对路径和 `..`。每个 Markdown PlantUML 块前写稳定标识：
 
@@ -146,7 +147,9 @@ python3 scripts/stage_handoff.py rewind --working <disclosure-workspace/working>
 
 ### 阶段 1：素材确认与写作建模
 
-本阶段读取用户消息、用户文件、明确范围内的代码和实际打开的公开检索页，不接受前序 handoff。开始即建立 `working/stages/shared/material-index.tsv`，每份原始材料只读取一次；判断输入门槛、SF/IE/EM 边界、技术泛化、问题/机制/约束、候选 I/T 和检索充分性，并缓存 `evidence-cards.md`、`agents/prior-art-task.md`、`phase-1/model.md`、`phase-1/research.tsv`。阶段结束将核心主张、候选 I/T、实现/扩展边界、证据结论、缺口和候选图职责压缩到 `phase-1/handoff.md`，封存为 `phase_1_material_modeling`；不得把原文或长检索日志传给阶段 2。
+本阶段读取用户消息、用户文件、明确范围内的代码和实际打开的公开检索页，不接受前序 handoff。开始即建立 `working/stages/shared/material-index.tsv`，每份原始材料只读取一次；完成 `evidence-cards.md` 与 `phase-1/analysis-plan.json` 后才允许 fan-out：主 agent 整理 `delivery-goals.md`，主体边界 analyst 与两条竞品检索 lane 并行。主 agent 先将两条检索结果去重为 canonical `research.tsv`，再让创新价值 analyst 消费主体边界、交付目标和该研究汇总；最后由主 agent 生成 `model.md` 和 `handoff.md`。不得把原文或长检索日志传给阶段 2。
+
+技术主体、候选创新点和交付目标不能无条件同时自由生成：交付目标可在事实基线后与主体/检索并行；候选创新必须等待主体边界、两条检索和交付目标汇合，只允许形成基于同一事实底座的正式 `I/T` 候选。
 
 1. **建立事实台账**
    - 将输入分为“来源事实 / 发明扩展 / 外部资料”。
@@ -157,13 +160,19 @@ python3 scripts/stage_handoff.py rewind --working <disclosure-workspace/working>
    - 只保留会进入核心主张、`I/T` 映射或检索词的事实；不做无边界代码库扫描或材料复述。
 
 2. **主动完成行业竞品检索**
-   - 无论用户是否提供竞品材料，都使用公开资料检索行业竞品和相似方案；不能把“用户未提供”当作跳过理由。优先交给 `patent_prior_art_researcher`，主 agent 同时继续事实建模。
+   - 无论用户是否提供竞品材料，都使用公开资料检索行业竞品和相似方案；不能把“用户未提供”当作跳过理由。对象/场景与机制/问题分别交给两个 `patent_prior_art_researcher` 实例，主 agent 同时整理交付目标，`patent_subject_boundary_analyst` 同时提炼技术主体与边界。
    - 至少执行两组互不相同的检索：一组围绕泛化后的技术对象与使用场景，一组围绕核心机制与现有问题。每组通过 `basis_terms` 绑定同时存在于输入完整性和关键词中的技术词，并通过 `context_terms` 绑定另一技术分类或已确认使用场景；两类词都必须以纯文本原样进入检索式，检索式还要包含产品、官方、专利、论文、标准或相似方案等研究限定词。不得用内部产品名、类名、字段名、HTML entity、零宽字符或其他未授权标识伪造检索关联。
-   - 两组检索在一次 subagent 任务内并行执行。每组最多打开 3 个候选页面；优先查阅官方产品页、官方技术文档、公开专利、标准或论文等一手资料。每组记录焦点、检索式、检索日期、实际查阅页面和结果摘要；执行时必须人工检查整条检索式及结果是否与主题相关，本地脚本不会判断剩余自由文本的语义相关性。
+   - 两组检索使用独立任务包和独立 `research-object.tsv` / `research-mechanism.tsv`，不得共同追加文件。每组最多打开 3 个候选页面；优先查阅官方产品页、官方技术文档、公开专利、标准或论文等一手资料。每组记录焦点、检索式、检索日期、实际查阅页面和结果摘要；执行时必须人工检查整条检索式及结果是否与主题相关，本地脚本不会判断剩余自由文本的语义相关性。
    - 找到足以说明行业基线的可靠材料后立即停止扩散，总计只保留 1–3 项最佳证据；证据的定位地址和日期必须能回溯到检索记录。两组检索均无可用材料时记录 `searched_no_usable_evidence`，对外使用固定无具名断言结论，详细发现只留在内部检索记录中。
    - 检索工具不可用、页面无法访问或两类检索记录不完整时，暂停最终成稿并报告阻塞；不得用“待检索”占位后继续交付。
 
-3. **确定边界与主张**
+3. **汇合主体、检索与创新价值**
+   - `patent_subject_boundary_analyst` 只从事实卡和分析计划提取技术对象、使用场景、业务域、系统归属、物理边界及实现/扩展边界，结果写入 `subject-boundary.tsv`；它不冻结最终主张。
+   - 主 agent 先校验并去重两条研究 lane，生成唯一 `research.tsv`；任一研究 lane 未完成或汇总无效时，不得派发创新价值任务。
+   - `research.tsv`、主体结果与交付目标全部有效后，才派发 `patent_innovation_value_analyst`；其 `innovation-candidates.tsv` 必须同时给出问题、机制、约束、差异假设、价值因果、候选效果和图示落点。
+   - 主 agent 再把主体、交付目标、canonical 研究和创新候选收敛进 `model.md`；subagent 结果不能直接成为冻结主张。
+
+4. **确定边界与主张**
    - 先确定业务域、系统归属、拥有方、物理边界和部署触发条件，再拆组件。
    - 先写唯一的核心发明主张，再提炼 2–4 个 `I1...In` 创新点。
    - 每个创新点写全对比基线、核心机制、必要约束、实质差异、价值关联、对应 `T` 效果和正文/图示落点。
@@ -171,7 +180,7 @@ python3 scripts/stage_handoff.py rewind --working <disclosure-workspace/working>
    - 已实现内容与拟扩展保护必须分开记录，不能把扩展伪装成已经上线或验证的事实，也不能保留未被任何创新点使用的孤立 `IE`。
    - 对比基线优先使用来源事实中的现有做法；没有外部证据时只写通用技术做法，不得借此虚构具名竞品能力。
 
-4. **建立效果映射**
+5. **建立效果映射**
    - 为每个创新点建立唯一的 `T1...Tn` 技术效果，保持一一映射。
    - 每项写全原问题、采用机制、可观察结果和验证状态。
    - 价值关联必须说明“哪一项差异为什么会产生哪一个可观察结果”，不能只写采用了什么处理方式或笼统宣称有好处。
@@ -194,11 +203,14 @@ python3 scripts/stage_handoff.py rewind --working <disclosure-workspace/working>
 
 ### 阶段 3：撰写最终版本
 
-本阶段只读取已封存的 `phase-2/handoff.md` 和按需加载的三份正式模板；正常情况下不读取原始材料。需要判断文档结构、图型与数量触发、编号一致性以及正文/内部稿/manifest/图包的同源关系。缓存 `agents/diagram-task.md`、不可变的 subagent 结果 `phase-3/diagram-result.tsv` 和最终 `phase-3/build-map.tsv`；两个 TSV 均只记录工件 ID、相对路径、hash、owner 与状态。
+本阶段只读取已封存的 `phase-2/handoff.md` 和按需加载的三份正式模板；正常情况下不读取原始材料。主 agent 先生成共同内容真源 `phase-3/content-core.json` 和中心图示计划 `phase-3/diagram-plan.json`，冻结图职责、D/E/S 编号、父子关系、实现范围与独立输出目录；之后正文 lane 与逐图 worker 才能并行。逐图结果先写入各自 `phase-3/diagrams/Dn-result.tsv`，汇合后再生成唯一 `diagram-result.tsv` 与 `build-map.tsv`。
 
-5. **规划并生成图示**
-   - 用户确认后从阶段 2 handoff 读取冻结的 `I/T/D/E/S` 与图示职责，写入三段式 `agents/diagram-task.md`，再把全部图交给一个 `patent_diagram_engineer`；主 agent 可同时撰写正文，双方不得改写对方负责的文件。worker 返回后由主 agent 一次性写入 `diagram-result.tsv` 并完成对应 checkpoint task，后续不得追加正文工件使其 hash 失效。
-   - 统一调用 `$feipi-plantuml-generate-diagram`：先一次性完成全部 brief，再对各图生成 diagram package。每张图的 `validate_package.sh` 已内置 verifier，只调用一次；不得再手工重复调用 `verify_package.py`。
+6. **规划并并行生成图示**
+   - 中心计划必须先确定每张图的 `diagram_id`、唯一目的、图型、实现范围、编号分配、父组件、输出目录和依赖；不同 worker 不得独立重判全局编号或图示职责。
+   - `diagram-plan.json.diagrams[]` 每项必须包含 `diagram_id`、小写连字符 `purpose` 和精确 `output_dir=disclosure-workspace/diagrams/<Dn>-<purpose>`；逐图结果、聚合结果和 build map 的 path 必须与该目录完全一致。
+   - 每张图生成独立任务包和动态 checkpoint task `phase-3-diagram-Dn`。同一 `patent_diagram_engineer` role 最多保留两个 worker，按事件完成顺序复用处理后续图；禁止轮询空闲 worker。
+   - 主 agent 同时从 `content-core.json` 撰写对外稿。各 worker 只能写自己的 `diagrams/<D编号>-<用途>/`，不能共同追加 TSV；主 agent 校验逐图结果后才汇总 `diagram-result.tsv`。
+   - 每个 worker 统一调用 `$feipi-plantuml-generate-diagram` 生成自己负责的一张 diagram package。每张图的 `validate_package.sh` 已内置 verifier，只调用一次；不得再手工重复调用 `verify_package.py`。
    - 必须且只能有 1 张 `component_overview` 和 1 张 `main_flow`。
    - 主流程由分支/状态驱动时使用 `activity`；由多方调用/回执驱动时使用 `sequence` 且设置 `numbering_scheme: process_s`。
    - 出现跨网、跨链、在线/离线、HSM、人工摆渡或人工交接时，增加 `deployment_boundary`。
@@ -207,8 +219,8 @@ python3 scripts/stage_handoff.py rewind --working <disclosure-workspace/working>
    - 图示使用 `D1...Dn`；结构关系使用 `E1...En`；流程使用 `S1...Sn`、`S5.1...`。专利文档不得出现 `M/R` 编号。
    - 默认只生成两张必需图；只有命中明确触发条件才增加图。已变图最多修复并重渲染 2 轮，只重跑失败的图；再次处理完全未变图包时使用 `--reuse-valid-package`，命中 hash 合同后不得访问 renderer。
 
-6. **按模板写作**
-   - 标题、使用场景、核心发明主张、关键词及 `I/T` 字段从 manifest 原样渲染，补充解释写在原字段之后。
+7. **按模板写作并汇合**
+   - 标题、使用场景、核心发明主张、关键词及 `I/T` 字段从冻结的 `content-core.json` 原样渲染；manifest 从同一字段生成，主 agent 在汇合时比较正文/manifest 公开字段，补充解释写在原字段之后。脚本只验证最终字段一致性，不证明生成历史上的派生关系。
    - 每个创新点按“对比基线 → 处理方式 → 实质差异 → 价值因果 → 对应可观察效果”连续呈现；不得把价值拆到远处后只在创新点中留下处理方式。
    - 先按 `assets/proposal_template.md` 在交底书目录根部生成对外版 `disclosure.md`：每个创新点用“已实现基础”说明经泛化后的具体技术路径，但不显示来源编号；每个可选扩展分别放入醒目的 `> **拟扩展保护**` 引用块，不显示 `IE`；无扩展时不显示空占位块。
    - 再复制完整对外正文生成 `disclosure-workspace/disclosure-internal.md`，仅按 `assets/internal_trace_appendix_template.md` 在文末追加内部追溯附录；不得在两份正文中分别改写同一段内容。
@@ -219,21 +231,24 @@ python3 scripts/stage_handoff.py rewind --working <disclosure-workspace/working>
    - 主流程顶层保持连续 5–10 步；箭头标签只保留编号或一个动作短语，参数和异常处理写在图下。
    - 竞品部分必须展示检索范围、检索日期和结论；存在可靠证据时再列出 1–3 项。没有可用证据时写清已经查阅了什么以及为什么不能形成具名对比，不得留空或出现“待检索”。
 
-正文与图包汇合后才把 `diagram-result.tsv` 与正文工件合并为最终 `build-map.tsv` 并计算 hash；将工件路径/hash、owner、状态和待复核项写入 `phase-3/handoff.md`，封存为 `phase_3_final_drafting`。handoff 不复制正文、manifest、PUML 或 SVG 内容。
+对外稿与所有动态图任务完成后，先汇总 `diagram-result.tsv` 并生成 manifest，再从唯一对外正文和 manifest 生成内部追溯稿，最后生成 `build-map.tsv`；随后才写入 `phase-3/handoff.md` 并封存 `phase_3_final_drafting`。任一图失败只保留该图为 pending，其他有效图和正文不回滚；handoff 不复制正文、manifest、PUML 或 SVG 内容。
 
 ### 阶段 4：复核、验证与交付
 
-本阶段只读取 `phase-3/handoff.md`、`build-map.tsv` 指向的最终工件及本轮相关质量门禁，不读取原始材料或重新打开竞品网页。开始前写入三段式 `agents/final-review-task.md`；需要判断实现/扩展边界、因果删除、泛化、对外泄漏、SVG 视觉质量和确定性校验状态，并把绑定工件 hash 的紧凑结论缓存到 `phase-4/review.tsv`。
+本阶段只读取 `phase-3/handoff.md`、`build-map.tsv` 指向的最终工件及本轮相关质量门禁，不读取原始材料或重新打开竞品网页。主 agent 先生成 `phase-4/review-plan.json`；随后语义 reviewer 与逐图视觉 reviewer 并行，只返回绑定工件 hash 的独立结果，主 agent 汇合为唯一 `phase-4/review.tsv`。
 
-7. **完成语义与视觉复核**
-   - 所有正文和图包冻结后只派发一次 `patent_final_reviewer`，合并完成语义与视觉复核；不要为同一工件分别启动多个高模型 reviewer。
+8. **并行完成语义与视觉复核**
+   - 所有正文和图包冻结后，`patent_semantic_reviewer` 负责实现/扩展边界、泛化、因果、创新—价值及内外泄漏；`patent_visual_reviewer` 按图负责交叉、遮挡、唯一职责和“仅呈现已实现路径”。两类职责互不重叠。
+   - 每张图建立动态 `phase-4-visual-review-Dn`，最多两个视觉 worker 复用处理队列；语义复核只启动一个高推理 reviewer，逐图视觉不静默升级到最高模型。
+   - `review-plan.json` 用独立 `diagrams` 数组列出需要视觉复核的 `D1...Dn`；正文等非图工件可放其他字段，不得混入 `diagrams`。
    - 执行泛化替换测试：替换领域名词后仍适用于任意系统的内容判为失败。
    - 逐项执行因果删除测试：删除核心机制后技术效果仍成立的映射判为失败。
    - 复核 SVG 是否零交叉、零文字遮挡；复核结果绑定当前 `svg_sha256`，图变化后重新复核。
    - 机器脚本只验证复核记录及其绑定关系，不声称自动理解语义或视觉质量。
    - 复核对外版不含内部台账编号、来源定位和机器枚举；复核内部版的公开正文与对外版同源，所有追溯信息只出现在内部附录。
 
-8. **验证并交付**
+9. **汇合、验证并交付**
+   - 内容复核与全部视觉复核都通过 hash 绑定后，主 agent 才生成规范化 `review.tsv`；任一 lane 未完成时不得运行最终完整校验。
    - 图包在生成阶段已经完成一次校验；阶段 4 不再逐图重跑 renderer。视觉复核完成后只调用一次完整交底包入口，入口会在当前进程复用通用图包 v1.1 verifier 重算路径、状态、hash 与实际 metrics。
    - 只修改正文、manifest 或复核记录时，不重新渲染未变图。只有 brief/PUML/SVG 内容变化才重跑对应图包并使旧视觉复核失效。
    - 修复 `blocked` 规则后只重跑受影响入口；`review_required` 必须完成相应人工复核后再交付为 `success`，不得进行无修改的固定次数轮询。
@@ -271,12 +286,14 @@ bash scripts/validate_disclosure_package.sh <disclosure-dir>
 
 - 内容质量规则：`references/content-quality-gates.md`
 - 阶段交付与上下文压缩：`references/stage-delivery-contract.md`
-- 阶段检查点固定任务：`references/checkpoint-task-catalog.json`
+- 阶段检查点与动态图任务模板：`agents/subagents/checkpoint-task-catalog.json`
 - 任务检查点工具：`scripts/checkpoint.py`
-- subagent 分级编排：`references/subagent-orchestration.json`
+- subagent 配置入口：`agents/subagents/index.json`
+- subagent 配置校验：`scripts/validate_orchestration.py`
 - session 耗时观测：`references/session-timing.md`
 - 正式文档模板：`assets/proposal_template.md`
 - 内部追溯附录模板：`assets/internal_trace_appendix_template.md`
 - manifest 模板与 schema：`assets/disclosure-manifest.template.json`、`assets/disclosure-manifest.schema.json`
 - 草稿兼容样例：`references/cases/happy-case-full.md`
 - 完整合成交付包：`references/cases/happy-package/`
+- 维护者流程与并行说明：`handbook/workflow-and-parallelism.md`（仅供人工理解，运行时不得读取）

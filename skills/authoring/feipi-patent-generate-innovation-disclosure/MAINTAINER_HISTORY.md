@@ -237,9 +237,25 @@
 - 更新时机：只在阶段开始、任务完成、等待用户和发生阻塞时原子更新。等待超时、缓存命中、普通重试、subagent 中间事件和工具过程全部静默，避免把检查点重新变成高频日志。
 - 与现有机制的关系：CHECKPOINT 负责阶段内任务恢复，`stage_handoff.py` 继续负责四阶段 handoff 的封存和 hash 链。恢复时先检查 CHECKPOINT，再核对最后一个有效 handoff；两者都不能绕过对方的失效结论。
 - 回退边界：用户修改输入或冻结计划时，由主 agent 判断回退到阶段 1、2、3 或 4；先重置 CHECKPOINT，再用显式 `stage_handoff.py rewind --stage` 删除该阶段及下游的封存状态但保留缓存，随后重建所选阶段任务。第一版明确不做自动依赖分析；回退范围会改变交付内容且无法判断时，必须请求用户选择。
-- subagent 绑定：研究、制图和终审分别绑定 `research.tsv`、不可变的 `diagram-result.tsv` 和 `review.tsv`；主 agent 收到终态事件后仍须先把结构化结果写入约定文件并通过门禁，才能完成对应 checkpoint task。阶段 3 在正文汇合后另行生成最终 `build-map.tsv`，避免追加主工件导致已完成的制图结果 hash 失效。
+- subagent 绑定：最初按研究、制图和终审三个聚合职责绑定结果；第 26 项进一步拆成主体、双线研究、创新价值、逐图制图、语义复核和逐图视觉复核，并为逐图任务增加动态 checkpoint。主 agent 收到终态事件后仍须先把结构化结果写入约定文件并通过门禁，才能完成对应 task。
 - 运行时完整性：`start-stage`、`rollback-stage` 和检查点读取都会校验 catalog；固定任务缺失、乱序、结果路径/最低检查不一致或 owner 越权都会失败。并行任务可以乱序完成，但恢复始终按 catalog 顺序选择第一项 pending 或失效任务；等待用户或阻塞状态不会被普通 pending 自动解除。
 - 验证边界：本地工具能证明检查点结构、结果文件最低格式和 SHA-256 绑定是否自洽，不能判断交底内容是否正确，也不能替代完整交付包校验、SVG 视觉复核、专利语义审查或真实 Session 恢复演练。
+
+## 2026-08-26｜第十一轮：阶段内有界并行
+
+### 26. 并行范围过窄，现有 subagent 职责和配置无法按任务拆分
+
+- [x] **状态：已完成**
+- 你提出的要求：分析四个阶段中哪些内容可以并行，并落实为具体 subagent；特别判断技术主体、候选创新点、交付目标和不同 PlantUML 图之间的依赖。现有 subagent 也要同步调整，且 skill 目录要能独立维护角色与阶段配置，并提供人工可读 handbook。
+- 主要问题：旧配置限制同时只能运行一个 subagent；两条竞品检索被塞进同一 worker，全部图也由一个 worker 串行处理，语义与视觉终审共用一个高模型 reviewer。单一编排 JSON 同时保存运行时、角色、阶段和 checkpoint 规则，Shell 校验又重复硬编码，新增角色时容易漂移。
+- 并行判断：原始材料归一化仍由主 agent 串行完成。事实基线形成后，技术主体边界和两条竞品检索可以并行，主 agent 同时整理交付目标；正式候选创新必须等待这些结果汇合，不能与技术主体完全独立生成。阶段 2 是用户确认屏障，保持串行。
+- 制图调整：主 agent 先冻结中心图示计划，统一分配 D/E/S、图职责、父子关系和独占目录；随后每张图建立独立动态 checkpoint，由最多两个 `patent_diagram_engineer` worker 事件驱动复用处理。正文可同时撰写，单图失败只重做该图。
+- 终审调整：原混合 `patent_final_reviewer` 拆为高推理语义 reviewer 和中等推理逐图视觉 reviewer；两类结果绑定各自工件 hash 并行产生，主 agent 汇合后才运行完整校验。
+- 配置落地：新增 `agents/subagents/`，分别维护入口、runtime、六个 role、四阶段 DAG、checkpoint catalog 和任务包模板；`agents/openai.yaml` 继续只保存 UI 元数据。新增标准库校验器检查跨文件引用、DAG、并发上限、动态 D 模板、权限/写路径、阶段 2 禁止 subagent、事件与非轮询纪律。
+- 检查点升级：catalog 支持固定任务与按图动态模板；`phase-3-diagram-Dn` 和 `phase-4-visual-review-Dn` 分别绑定独立 TSV 与 SHA-256，恢复时可以跳过未变化的单图结果，不再用一个聚合任务掩盖局部缺失。
+- 人工说明：新增 `handbook/workflow-and-parallelism.md`，用阶段屏障、fan-out、join、角色合同和局部恢复解释真实流程；该文件只供维护者阅读，skill 运行时明确不得加载。
+- 复核收口：双线研究必须先汇总为 canonical `research.tsv`，创新价值分析再消费该汇总；正文与 manifest 都从冻结的 `content-core.json` 派生。编排门禁从 DAG 推导真实并发，并校验阶段链、中心计划屏障、fan-out 来源、join 语义、checkpoint 唯一绑定和逐图集合完整性，避免只靠声明字段形成“假绿”。
+- 边界：并行不等于多个 agent 同时决定规则真源；用户确认、核心主张收敛、全局编号、正文同源、join、最终校验和回退阶段仍由主 agent 负责。`resume` 只校验单个结果；输入、冻结计划或重做结果发生语义/hash 变化时，由主 agent 显式回退阶段，第一版仍不做自动依赖分析。
 
 ## 尚未完成的验收项
 

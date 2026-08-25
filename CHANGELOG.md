@@ -1,6 +1,7 @@
 # 变更记录
 
 ## 2026-08-26
+- feipi-patent-generate-innovation-disclosure v8：固化阶段内并行 DAG 与逐图 subagent 配置
 - feipi-patent-generate-innovation-disclosure v7：固化阶段检查点与断点恢复
 
 ## 2026-08-25

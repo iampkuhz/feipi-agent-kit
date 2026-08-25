@@ -1,0 +1,57 @@
+{
+  "schema_version": "1.0",
+  "limits": {
+    "max_active_subagents": 3,
+    "max_total_subagents": 9,
+    "allow_recursive_spawn": false,
+    "default_fork_turns": "none",
+    "task_packet_max_bytes": 12288
+  },
+  "checkpoint": {
+    "path": "disclosure-workspace/working/CHECKPOINT.md",
+    "catalog": "agents/subagents/checkpoint-task-catalog.json",
+    "coordinator": "main_agent"
+  },
+  "event_reporting": {
+    "critical_events": [
+      "MILESTONE",
+      "DECISION",
+      "BLOCKED",
+      "COMPLETE"
+    ],
+    "silent_events": [
+      "STARTED",
+      "RUNNING",
+      "HEARTBEAT",
+      "STATUS",
+      "TOOL_CALL",
+      "FILE_READ",
+      "FILE_WRITE",
+      "CACHE_HIT",
+      "WAIT_TIMEOUT",
+      "RETRYING",
+      "UNCHANGED"
+    ],
+    "subagent_audience": "main_agent",
+    "main_agent_audience": "user",
+    "envelope": "[<EVENT>] <scope>｜<outcome>｜<next_or_artifact>",
+    "max_lines": 1,
+    "max_chars": 240,
+    "deduplicate": true
+  },
+  "wait_policy": {
+    "mode": "event_driven_join",
+    "main_agent_work_while_subagents_run": true,
+    "busy_wait": false,
+    "periodic_poll": false,
+    "heartbeat": false,
+    "status_probe_between_waits": false,
+    "short_wait_loop": false,
+    "nonterminal_timeout_policy": "continue_long_event_wait_without_status_probe"
+  },
+  "fallback": {
+    "subagents_unavailable": "main_agent_executes_same_node",
+    "model_unavailable": "omit_model_override_keep_reasoning_effort",
+    "forbid_silent_upgrade_to_highest": true
+  }
+}

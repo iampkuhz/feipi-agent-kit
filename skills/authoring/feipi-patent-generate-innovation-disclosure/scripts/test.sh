@@ -89,7 +89,7 @@ run_package_case() {
 check_confirmation_contract() {
   rg -q '^### 阶段 2：提交写作思路并等待确认$' "$SKILL_DIR/SKILL.md" \
     && rg -q '只有收到用户明确的确认.*才进入阶段 3' "$SKILL_DIR/SKILL.md" \
-    && rg -q '先整理技术事实.*提交写作思路供我确认；收到确认后再生成' "$SKILL_DIR/agents/openai.yaml"
+    && rg -q '先提交写作思路供我确认，确认后再并行生成' "$SKILL_DIR/agents/openai.yaml"
 }
 
 check_happy_audience_contract() {
@@ -128,182 +128,51 @@ check_competitor_research_contract() {
   rg -q '无论用户是否提供竞品材料，都使用公开资料检索' "$SKILL_DIR/SKILL.md" \
     && rg -Fq '"status": {"enum": ["evidence_found", "searched_no_usable_evidence"]}' "$SKILL_DIR/assets/disclosure-manifest.schema.json" \
     && rg -q '"search_records"' "$SKILL_DIR/assets/disclosure-manifest.schema.json" \
-    && rg -q '主动检索行业竞品' "$SKILL_DIR/agents/openai.yaml" \
+    && rg -q '整理技术事实并检索竞品' "$SKILL_DIR/agents/openai.yaml" \
     && ! rg -q '^或：待检索' "$SKILL_DIR/assets/proposal_template.md" \
     && ! rg -q '"status": "pending_retrieval"' \
       "$SKILL_DIR/assets/disclosure-manifest.template.json" \
       "$SKILL_DIR/references/cases/happy-package/$WORKSPACE_DIR_NAME/disclosure-manifest.json"
 }
 
-check_subagent_contract() {
-  rg -q 'patent_prior_art_researcher.*gpt-5\.6-luna.*medium' "$SKILL_DIR/SKILL.md" \
-    && rg -q 'patent_diagram_engineer.*gpt-5\.6-terra.*medium' "$SKILL_DIR/SKILL.md" \
-    && rg -q 'patent_final_reviewer.*gpt-5\.6-sol.*high' "$SKILL_DIR/SKILL.md" \
-    && rg -q 'fork_turns: none' "$SKILL_DIR/SKILL.md" \
-    && rg -q '每张图的.*validate_package\.sh.*只调用一次' "$SKILL_DIR/SKILL.md" \
-    && rg -q '只调用一次完整交底包入口' "$SKILL_DIR/SKILL.md" \
-    && rg -q 'task_contract_not_os_sandbox' "$SKILL_DIR/references/subagent-orchestration.json" \
-    && ! rg -q '^subagents:' "$SKILL_DIR/agents/openai.yaml"
-}
-
-check_key_event_reporting_contract() {
-  python3 - "$SKILL_DIR/references/subagent-orchestration.json" <<'PY' || return 1
+check_orchestration_contract() {
+  python3 "$SCRIPT_DIR/validate_orchestration.py" "$SKILL_DIR" || return 1
+  python3 - \
+    "$SKILL_DIR/agents/subagents/index.json" \
+    "$SKILL_DIR/agents/subagents/runtime.json" \
+    "$SKILL_DIR/agents/subagents/checkpoint-task-catalog.json" <<'PY' || return 1
 import json
 import sys
 
-data = json.load(open(sys.argv[1], encoding="utf-8"))
-reporting = data["event_reporting"]
-critical = ["MILESTONE", "DECISION", "BLOCKED", "COMPLETE"]
-silent = [
-    "STARTED", "RUNNING", "HEARTBEAT", "STATUS", "TOOL_CALL",
-    "FILE_READ", "FILE_WRITE", "CACHE_HIT", "WAIT_TIMEOUT", "RETRYING", "UNCHANGED",
-]
-event_stream = [
-    "STARTED", "RUNNING", "TOOL_CALL", "MILESTONE", "STATUS",
-    "DECISION", "FILE_READ", "BLOCKED", "RETRYING", "UNCHANGED",
-    "COMPLETE", "HEARTBEAT", "FILE_WRITE", "CACHE_HIT", "WAIT_TIMEOUT",
-]
-assert reporting["critical_events"] == critical
-assert reporting["silent_events"] == silent
-assert reporting["unknown_event_policy"] == "reject_not_forward"
-for profile_name in ("main_to_user", "subagent_to_main"):
-    profile = reporting["profiles"][profile_name]
-    assert profile["emit_on"] == critical
-    assert [event for event in event_stream if event in profile["emit_on"]] == critical
-    assert not any(event in profile["emit_on"] for event in silent)
-envelope = reporting["envelope"]
-assert envelope["max_lines"] == 1
-assert envelope["max_chars"] == 240
-assert "\n" not in envelope["format"]
-assert len(envelope["format"]) <= envelope["max_chars"]
-assert envelope["format"] == "[<EVENT>] <scope>｜<outcome>｜<next_or_artifact>"
-assert envelope["overflow_policy"] == "shorten_outcome"
-assert reporting["lifecycle"] == {
-    "max_milestones_per_scope": 1,
-    "final_events": ["BLOCKED", "COMPLETE"],
-    "final_response_is_event": True,
-    "duplicate_final_notification": False,
-}
-assert reporting["classification"] == {
-    "complete_over_milestone": True,
-    "decision_when_receiver_choice_can_unblock": True,
-    "blocked_when_no_receiver_choice_can_unblock": True,
-}
-assert reporting["deduplicate"]["enabled"] is True
-assert reporting["deduplicate"]["key_fields"] == ["profile", "event", "scope", "outcome"]
-assert data["main_agent_reporting_profile"] == "main_to_user"
-wait = reporting["wait_policy"]
-assert wait == {
-    "mode": "event_driven_join",
-    "main_agent_work_while_subagent_runs": True,
-    "dependency_barrier_wait": "long_event_wait_with_nonterminal_timeout_continuation",
-    "busy_wait": False,
-    "periodic_poll": False,
-    "heartbeat": False,
-    "status_probe_between_waits": False,
-    "short_wait_loop": False,
-    "nonterminal_timeout_policy": "continue_long_event_wait_without_status_probe",
-}
-assert all(role["reporting_profile"] == "subagent_to_main" for role in data["roles"])
-assert [role["output_contract"]["message"] for role in data["roles"]] == [
-    "final_event_and_row_count_only",
-    "final_event_and_paths_only",
-    "final_event_and_row_count_only",
-]
-assert "key_event_contract" in data["task_packet_required_fields"]
-PY
-  rg -q '^## 关键事件上报与等待纪律（必做）$' "$SKILL_DIR/SKILL.md" \
-    && rg -q '主 agent 只向用户上报.*subagent 只向主 agent 上报' "$SKILL_DIR/SKILL.md" \
-    && rg -q '长时、事件驱动等待' "$SKILL_DIR/SKILL.md" \
-    && rg -q '禁止用短间隔.*循环查询 subagent' "$SKILL_DIR/SKILL.md" \
-    && rg -q '^## 5\. 关键事件与非轮询汇合$' "$SKILL_DIR/references/stage-delivery-contract.md" \
-    && rg -q '^### 5\.2 必须上报的触发点$' "$SKILL_DIR/references/stage-delivery-contract.md" \
-    && rg -q '阶段 2.*`DECISION`.*阶段 3.*`MILESTONE`.*阶段 4' "$SKILL_DIR/references/stage-delivery-contract.md" \
-    && rg -q '主 agent 收到 subagent `COMPLETE` 后.*不能机械转发' "$SKILL_DIR/references/stage-delivery-contract.md" \
-    && rg -q '职责已经全部闭环.*`COMPLETE`.*明确选择即可解除.*`DECISION`.*没有.*解除路径.*`BLOCKED`' "$SKILL_DIR/references/stage-delivery-contract.md" \
-    && rg -q '非终态超时.*继续同类长等待.*不得查询状态' "$SKILL_DIR/SKILL.md" \
-    && rg -q '最终响应本身就是该事件' "$SKILL_DIR/references/stage-delivery-contract.md" \
-    && rg -q '复用未变图包.*仅上报关键事件且不轮询 subagent.*已实现基础与拟扩展保护边界' "$SKILL_DIR/agents/openai.yaml"
-}
-
-check_stage_delivery_contract() {
-  rg -q '^## 阶段交付与上下文边界（必做）$' "$SKILL_DIR/SKILL.md" \
-    && rg -q '阶段 1 是既有原始材料的唯一读取者' "$SKILL_DIR/SKILL.md" \
-    && rg -q 'phase-1/handoff\.md.*phase-1/model\.md' "$SKILL_DIR/SKILL.md" \
-    && rg -q 'phase-2/handoff\.md.*三份正式模板' "$SKILL_DIR/SKILL.md" \
-    && rg -q 'phase-3/handoff\.md.*build-map\.tsv' "$SKILL_DIR/SKILL.md" \
-    && rg -q '阶段间重复记录使用 TSV' "$SKILL_DIR/SKILL.md" \
-    && rg -q '只有封存成功的上游 handoff 才能启动下一阶段或 subagent' "$SKILL_DIR/SKILL.md" \
-    && rg -q '^## 2\. 四阶段交付矩阵$' "$SKILL_DIR/references/stage-delivery-contract.md" \
-    && rg -q '^## 4\. subagent 三段式交付$' "$SKILL_DIR/references/stage-delivery-contract.md" \
-    && rg -q '上游 hash 变化时从 `stage-state.tsv` 删除下游有效状态' "$SKILL_DIR/references/stage-delivery-contract.md" \
-    && rg -q '"format": "research.tsv rows"' "$SKILL_DIR/references/subagent-orchestration.json" \
-    && rg -q '"format": "diagram-result.tsv rows"' "$SKILL_DIR/references/subagent-orchestration.json" \
-    && rg -q '"format": "review.tsv rows"' "$SKILL_DIR/references/subagent-orchestration.json"
-}
-
-check_checkpoint_contract() {
-  python3 - "$SKILL_DIR/references/subagent-orchestration.json" "$SKILL_DIR/references/stage-delivery-contract.md" "$SKILL_DIR/references/checkpoint-task-catalog.json" <<'PY' || return 1
-import json
-import sys
-
-data = json.load(open(sys.argv[1], encoding="utf-8"))
-contract = open(sys.argv[2], encoding="utf-8").read()
+index = json.load(open(sys.argv[1], encoding="utf-8"))
+runtime = json.load(open(sys.argv[2], encoding="utf-8"))
 catalog = json.load(open(sys.argv[3], encoding="utf-8"))
-assert data["schema_version"] == "1.2"
-checkpoint = data["checkpoint"]
-assert checkpoint["path"] == "disclosure-workspace/working/CHECKPOINT.md"
-assert checkpoint["task_catalog"] == "references/checkpoint-task-catalog.json"
-assert checkpoint["coordinator"] == "main_agent"
-assert checkpoint["state_model"] == "current_state_not_event_log"
-assert checkpoint["task_granularity"] == "stage_deliverable_or_single_subagent_assignment"
-assert checkpoint["update_on"] == ["stage_start", "task_complete", "waiting_user", "blocked"]
-assert checkpoint["completion_gate"]["minimum_checks"] == ["nonempty", "markdown", "json", "tsv"]
-assert checkpoint["completion_gate"]["bind_sha256"] is True
-assert checkpoint["resume"] == {
-    "read_before_stage_status": True,
-    "skip_completed_only_when_result_valid": True,
-    "first_invalid_or_incomplete_task": True,
-    "read_only": True,
+
+assert len(index["roles"]) == 6
+assert tuple(index["stages"]) == (
+    "phase_1_material_modeling",
+    "phase_2_idea_confirmation",
+    "phase_3_final_drafting",
+    "phase_4_review_delivery",
+)
+assert runtime["event_reporting"]["critical_events"] == [
+    "MILESTONE", "DECISION", "BLOCKED", "COMPLETE",
+]
+assert runtime["wait_policy"]["mode"] == "event_driven_join"
+assert runtime["wait_policy"]["busy_wait"] is False
+templates = {
+    task["template_id"]
+    for tasks in catalog["stages"].values()
+    for task in tasks
+    if task["type"] == "template"
 }
-assert checkpoint["rollback"]["decision_owner"] == "main_agent"
-assert checkpoint["rollback"]["reason_required"] is True
-assert checkpoint["rollback"]["automatic_dependency_analysis"] is False
-expected = {
-    "patent_prior_art_researcher": ("phase-1-prior-art-research", "patent_prior_art_researcher", "research.tsv", "tsv"),
-    "patent_diagram_engineer": ("phase-3-diagram-packages", "patent_diagram_engineer", "diagram-result.tsv", "tsv"),
-    "patent_final_reviewer": ("phase-4-final-review", "patent_final_reviewer", "review.tsv", "tsv"),
-}
-for role in data["roles"]:
-    task = role["checkpoint_task"]
-    task_id, owner, suffix, minimum_check = expected[role["name"]]
-    assert task["task_id"] == task_id
-    assert task["owner"] == owner
-    assert task["result_path"].endswith(suffix)
-    assert task["minimum_check"] == minimum_check
-assert "checkpoint_task" in data["task_packet_required_fields"]
-required = {
-    "phase-1-material-index", "phase-1-evidence-cards", "phase-1-prior-art-task",
-    "phase-1-material-model", "phase-1-prior-art-research", "phase-1-handoff",
-    "phase-2-decision", "phase-2-handoff",
-    "phase-3-diagram-task", "phase-3-public-draft", "phase-3-internal-draft",
-    "phase-3-manifest", "phase-3-diagram-packages", "phase-3-build-map", "phase-3-handoff",
-    "phase-4-review-task", "phase-4-final-review", "phase-4-validation",
-    "phase-4-timing-summary", "phase-4-handoff",
-}
-assert all(f"`{task_id}`" in contract for task_id in required)
-catalog_tasks = [task for stage_tasks in catalog["stages"].values() for task in stage_tasks]
-assert {task["task_id"] for task in catalog_tasks} == required
-assert len(catalog_tasks) == len(required)
+assert templates == {"phase-3-diagram", "phase-4-visual-review"}
 PY
-  rg -q '^## 任务检查点与恢复（必做）$' "$SKILL_DIR/SKILL.md" \
-    && rg -q '阶段开始、任务完成、等待用户和发生阻塞时' "$SKILL_DIR/SKILL.md" \
-    && rg -q '从第一个无效或未完成任务继续' "$SKILL_DIR/SKILL.md" \
-    && rg -q '第一版不做自动依赖分析' "$SKILL_DIR/SKILL.md" \
-    && rg -q 'stage_handoff\.py rewind' "$SKILL_DIR/SKILL.md" \
-    && rg -q '^## 7\. 任务检查点与恢复$' "$SKILL_DIR/references/stage-delivery-contract.md" \
-    && rg -q 'CHECKPOINT.md.*只表示当前状态' "$SKILL_DIR/references/stage-delivery-contract.md" \
-    && rg -q '读取材料、调用工具、生成中间片段、重试' "$SKILL_DIR/references/stage-delivery-contract.md"
+  rg -q 'agents/subagents/index\.json' "$SKILL_DIR/SKILL.md" \
+    && rg -q '固定项和按图展开模板以 `agents/subagents/checkpoint-task-catalog\.json` 为机器真源' "$SKILL_DIR/SKILL.md" \
+    && rg -q '^## 5\. 关键事件与非轮询汇合$' "$SKILL_DIR/references/stage-delivery-contract.md" \
+    && rg -q '阶段内 subagent 还必须满足当前阶段图中的 `depends_on`' "$SKILL_DIR/SKILL.md" \
+    && rg -q '六个 subagent role 模板及其动态实例' "$SKILL_DIR/references/stage-delivery-contract.md"
 }
 
 check_timing_contract() {
@@ -320,11 +189,9 @@ check_timing_contract() {
 run_command "validate-self" 0 "" bash "$VALIDATE_SKILL" "$SKILL_DIR"
 run_command "confirmation-gate-contract" 0 "" check_confirmation_contract
 run_command "competitor-research-contract" 0 "" check_competitor_research_contract
-run_command "subagent-orchestration-contract" 0 "" check_subagent_contract
-run_command "key-event-reporting-contract" 0 "" check_key_event_reporting_contract
-run_command "stage-delivery-contract" 0 "" check_stage_delivery_contract
+run_command "orchestration-contract" 0 "" check_orchestration_contract
+run_command "orchestration-e2e" 0 "" python3 "$SCRIPT_DIR/tests/test_orchestration.py"
 run_command "stage-handoff-e2e" 0 "" python3 "$SKILL_DIR/scripts/tests/test_stage_handoff.py"
-run_command "checkpoint-contract" 0 "" check_checkpoint_contract
 run_command "checkpoint-e2e" 0 "" python3 "$SKILL_DIR/scripts/tests/test_checkpoint.py"
 run_command "session-timing-contract" 0 "" check_timing_contract
 run_command "session-timing-e2e" 0 "" python3 "$SKILL_DIR/scripts/tests/test_session_timing.py"

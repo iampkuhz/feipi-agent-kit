@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0",
+  "name": "patent_prior_art_researcher",
+  "description": "分别围绕技术对象或核心机制检索行业基线，并返回带来源属性的紧凑证据行。",
+  "model": "gpt-5.6-luna",
+  "reasoning_effort": "medium",
+  "fork_turns": "none",
+  "permission": "read_only",
+  "max_instances": 2,
+  "allowed_write_templates": [],
+  "capabilities": [
+    "object_prior_art_research",
+    "mechanism_prior_art_research",
+    "source_relevance",
+    "research_stop_condition"
+  ],
+  "forbidden_actions": [
+    "read_unlisted_raw_materials",
+    "assert_unsourced_competitor_capability",
+    "expand_beyond_query_limits"
+  ]
+}

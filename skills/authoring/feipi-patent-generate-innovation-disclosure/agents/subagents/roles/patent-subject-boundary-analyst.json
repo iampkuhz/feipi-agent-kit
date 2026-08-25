@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0",
+  "name": "patent_subject_boundary_analyst",
+  "description": "从事实基线中提炼技术主体、系统边界以及已实现与拟扩展保护边界。",
+  "model": "gpt-5.6-terra",
+  "reasoning_effort": "medium",
+  "fork_turns": "none",
+  "permission": "read_only",
+  "max_instances": 1,
+  "allowed_write_templates": [],
+  "capabilities": [
+    "technical_subject",
+    "system_ownership",
+    "physical_boundary",
+    "implementation_extension_boundary"
+  ],
+  "forbidden_actions": [
+    "read_raw_materials",
+    "invent_implementation_fact",
+    "write_final_disclosure"
+  ]
+}

@@ -1,0 +1,80 @@
+{
+  "schema_version": "1.0",
+  "stage": "phase_3_final_drafting",
+  "requires_upstream": ["phase-2-handoff"],
+  "nodes": [
+    {
+      "id": "content-core",
+      "executor": "main_agent",
+      "depends_on": [],
+      "parallel_group": "phase-3-plan",
+      "checkpoint_ref": "phase-3-content-core"
+    },
+    {
+      "id": "diagram-plan",
+      "executor": "main_agent",
+      "depends_on": [],
+      "parallel_group": "phase-3-plan",
+      "checkpoint_ref": "phase-3-diagram-plan"
+    },
+    {
+      "id": "public-draft",
+      "executor": "main_agent",
+      "depends_on": ["content-core", "diagram-plan"],
+      "parallel_group": "phase-3-build",
+      "checkpoint_ref": "phase-3-public-draft"
+    },
+    {
+      "id": "diagram-worker",
+      "executor": "subagent",
+      "role_ref": "patent_diagram_engineer",
+      "depends_on": ["content-core", "diagram-plan"],
+      "parallel_group": "phase-3-build",
+      "checkpoint_template_ref": "phase-3-diagram",
+      "task_packet": {
+        "template_ref": "default",
+        "path": "disclosure-workspace/working/stages/agents/diagram-{diagram_id}-task.md"
+      },
+      "fan_out": {
+        "source": "frozen_diagram_plan",
+        "item_key": "diagram_id",
+        "max_parallel": 2,
+        "overflow_policy": "reuse_pool_sequentially"
+      },
+      "allowed_writes": [
+        "disclosure-workspace/diagrams/{diagram_id}-{purpose}/"
+      ]
+    },
+    {
+      "id": "diagram-join",
+      "executor": "main_agent",
+      "depends_on": ["diagram-worker"],
+      "checkpoint_ref": "phase-3-diagram-join",
+      "join": "all_instances"
+    },
+    {
+      "id": "manifest",
+      "executor": "main_agent",
+      "depends_on": ["public-draft", "diagram-join"],
+      "checkpoint_ref": "phase-3-manifest"
+    },
+    {
+      "id": "internal-draft",
+      "executor": "main_agent",
+      "depends_on": ["public-draft", "diagram-join", "manifest"],
+      "checkpoint_ref": "phase-3-internal-draft"
+    },
+    {
+      "id": "build-map",
+      "executor": "main_agent",
+      "depends_on": ["internal-draft", "manifest", "diagram-join"],
+      "checkpoint_ref": "phase-3-build-map"
+    },
+    {
+      "id": "phase-3-handoff",
+      "executor": "main_agent",
+      "depends_on": ["build-map"],
+      "checkpoint_ref": "phase-3-handoff"
+    }
+  ]
+}

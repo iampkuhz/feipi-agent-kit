@@ -1,0 +1,70 @@
+{
+  "schema_version": "1.0",
+  "stage": "phase_4_review_delivery",
+  "requires_upstream": ["phase-3-handoff"],
+  "nodes": [
+    {
+      "id": "review-plan",
+      "executor": "main_agent",
+      "depends_on": [],
+      "checkpoint_ref": "phase-4-review-plan"
+    },
+    {
+      "id": "semantic-review",
+      "executor": "subagent",
+      "role_ref": "patent_semantic_reviewer",
+      "depends_on": ["review-plan"],
+      "parallel_group": "phase-4-review",
+      "checkpoint_ref": "phase-4-semantic-review",
+      "task_packet": {
+        "template_ref": "default",
+        "path": "disclosure-workspace/working/stages/agents/semantic-review-task.md"
+      },
+      "allowed_writes": []
+    },
+    {
+      "id": "visual-review",
+      "executor": "subagent",
+      "role_ref": "patent_visual_reviewer",
+      "depends_on": ["review-plan"],
+      "parallel_group": "phase-4-review",
+      "checkpoint_template_ref": "phase-4-visual-review",
+      "task_packet": {
+        "template_ref": "default",
+        "path": "disclosure-workspace/working/stages/agents/visual-review-{diagram_id}-task.md"
+      },
+      "fan_out": {
+        "source": "build_map_diagrams",
+        "item_key": "diagram_id",
+        "max_parallel": 2,
+        "overflow_policy": "reuse_pool_sequentially"
+      },
+      "allowed_writes": []
+    },
+    {
+      "id": "review-join",
+      "executor": "main_agent",
+      "depends_on": ["semantic-review", "visual-review"],
+      "checkpoint_ref": "phase-4-review-join",
+      "join": "all_instances"
+    },
+    {
+      "id": "validation",
+      "executor": "main_agent",
+      "depends_on": ["review-join"],
+      "checkpoint_ref": "phase-4-validation"
+    },
+    {
+      "id": "timing-summary",
+      "executor": "main_agent",
+      "depends_on": ["validation"],
+      "checkpoint_ref": "phase-4-timing-summary"
+    },
+    {
+      "id": "phase-4-handoff",
+      "executor": "main_agent",
+      "depends_on": ["timing-summary"],
+      "checkpoint_ref": "phase-4-handoff"
+    }
+  ]
+}

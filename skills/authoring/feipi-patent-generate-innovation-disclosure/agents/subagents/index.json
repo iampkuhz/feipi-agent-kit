@@ -1,0 +1,19 @@
+{
+  "schema_version": "1.0",
+  "runtime": "runtime.json",
+  "task_packet_template": "task-packet.template.md",
+  "roles": {
+    "patent_subject_boundary_analyst": "roles/patent-subject-boundary-analyst.json",
+    "patent_prior_art_researcher": "roles/patent-prior-art-researcher.json",
+    "patent_innovation_value_analyst": "roles/patent-innovation-value-analyst.json",
+    "patent_diagram_engineer": "roles/patent-diagram-engineer.json",
+    "patent_semantic_reviewer": "roles/patent-semantic-reviewer.json",
+    "patent_visual_reviewer": "roles/patent-visual-reviewer.json"
+  },
+  "stages": {
+    "phase_1_material_modeling": "stages/phase-1.json",
+    "phase_2_idea_confirmation": "stages/phase-2.json",
+    "phase_3_final_drafting": "stages/phase-3.json",
+    "phase_4_review_delivery": "stages/phase-4.json"
+  }
+}

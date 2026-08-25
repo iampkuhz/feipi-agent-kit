@@ -1,0 +1,116 @@
+{
+  "schema_version": "1.0",
+  "stage": "phase_1_material_modeling",
+  "requires_upstream": [],
+  "nodes": [
+    {
+      "id": "material-index",
+      "executor": "main_agent",
+      "depends_on": [],
+      "checkpoint_ref": "phase-1-material-index"
+    },
+    {
+      "id": "evidence-cards",
+      "executor": "main_agent",
+      "depends_on": ["material-index"],
+      "checkpoint_ref": "phase-1-evidence-cards"
+    },
+    {
+      "id": "analysis-plan",
+      "executor": "main_agent",
+      "depends_on": ["evidence-cards"],
+      "checkpoint_ref": "phase-1-analysis-plan"
+    },
+    {
+      "id": "delivery-goals",
+      "executor": "main_agent",
+      "depends_on": ["analysis-plan"],
+      "parallel_group": "phase-1-baseline",
+      "checkpoint_ref": "phase-1-delivery-goals"
+    },
+    {
+      "id": "subject-boundary",
+      "executor": "subagent",
+      "role_ref": "patent_subject_boundary_analyst",
+      "depends_on": ["analysis-plan"],
+      "parallel_group": "phase-1-baseline",
+      "checkpoint_ref": "phase-1-subject-boundary",
+      "task_packet": {
+        "template_ref": "default",
+        "path": "disclosure-workspace/working/stages/agents/subject-boundary-task.md"
+      },
+      "allowed_writes": []
+    },
+    {
+      "id": "research-object",
+      "executor": "subagent",
+      "role_ref": "patent_prior_art_researcher",
+      "role_instance": "object",
+      "depends_on": ["analysis-plan"],
+      "parallel_group": "phase-1-baseline",
+      "checkpoint_ref": "phase-1-research-object",
+      "task_packet": {
+        "template_ref": "default",
+        "path": "disclosure-workspace/working/stages/agents/prior-art-object-task.md"
+      },
+      "allowed_writes": []
+    },
+    {
+      "id": "research-mechanism",
+      "executor": "subagent",
+      "role_ref": "patent_prior_art_researcher",
+      "role_instance": "mechanism",
+      "depends_on": ["analysis-plan"],
+      "parallel_group": "phase-1-baseline",
+      "checkpoint_ref": "phase-1-research-mechanism",
+      "task_packet": {
+        "template_ref": "default",
+        "path": "disclosure-workspace/working/stages/agents/prior-art-mechanism-task.md"
+      },
+      "allowed_writes": []
+    },
+    {
+      "id": "research-join",
+      "executor": "main_agent",
+      "depends_on": [
+        "research-object",
+        "research-mechanism"
+      ],
+      "checkpoint_ref": "phase-1-research-join",
+      "join": "all_dependencies"
+    },
+    {
+      "id": "innovation-value",
+      "executor": "subagent",
+      "role_ref": "patent_innovation_value_analyst",
+      "depends_on": [
+        "delivery-goals",
+        "subject-boundary",
+        "research-join"
+      ],
+      "checkpoint_ref": "phase-1-innovation-candidates",
+      "task_packet": {
+        "template_ref": "default",
+        "path": "disclosure-workspace/working/stages/agents/innovation-value-task.md"
+      },
+      "allowed_writes": []
+    },
+    {
+      "id": "material-model",
+      "executor": "main_agent",
+      "depends_on": [
+        "delivery-goals",
+        "subject-boundary",
+        "innovation-value",
+        "research-join"
+      ],
+      "checkpoint_ref": "phase-1-material-model"
+    },
+    {
+      "id": "phase-1-handoff",
+      "executor": "main_agent",
+      "depends_on": ["material-model"],
+      "checkpoint_ref": "phase-1-handoff"
+    }
+  ]
+}

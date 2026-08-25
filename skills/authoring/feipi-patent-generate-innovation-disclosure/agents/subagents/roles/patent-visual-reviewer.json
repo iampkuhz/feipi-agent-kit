@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0",
+  "name": "patent_visual_reviewer",
+  "description": "按当前 SVG hash 对单图执行交叉、遮挡、图示职责和已实现路径边界复核。",
+  "model": "gpt-5.6-terra",
+  "reasoning_effort": "medium",
+  "fork_turns": "none",
+  "permission": "read_only",
+  "max_instances": 2,
+  "allowed_write_templates": [],
+  "capabilities": [
+    "single_svg_visual_review",
+    "crossing_and_overlap_review",
+    "diagram_purpose_review",
+    "hash_bound_review"
+  ],
+  "forbidden_actions": [
+    "edit_diagram_package",
+    "reuse_stale_visual_review",
+    "review_unbound_svg"
+  ]
+}

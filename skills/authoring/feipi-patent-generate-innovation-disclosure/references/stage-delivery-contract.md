@@ -1,6 +1,6 @@
 # 阶段交付与上下文压缩合同
 
-本合同约束四个大阶段及三个 subagent 的输入、判断、缓存和输出。目标是让每个阶段只读取完成本阶段所需的最小信息，并能在跨轮次恢复时从文件继续，而不是依赖完整对话或重复打开原始材料。
+本合同约束四个大阶段、六个 subagent role 模板及其动态实例的输入、判断、缓存和输出。目标是让每个阶段只读取完成本阶段所需的最小信息，并能在跨轮次恢复时从文件继续，而不是依赖完整对话或重复打开原始材料。
 
 ## 1. 固定目录与紧凑格式
 
@@ -13,10 +13,20 @@ stages/
 │   ├── material-index.tsv
 │   └── evidence-cards.md
 ├── agents/
-│   ├── prior-art-task.md
-│   ├── diagram-task.md
-│   └── final-review-task.md
+│   ├── subject-boundary-task.md
+│   ├── prior-art-object-task.md
+│   ├── prior-art-mechanism-task.md
+│   ├── innovation-value-task.md
+│   ├── diagram-Dn-task.md
+│   ├── semantic-review-task.md
+│   └── visual-review-Dn-task.md
 ├── phase-1/
+│   ├── analysis-plan.json
+│   ├── delivery-goals.md
+│   ├── subject-boundary.tsv
+│   ├── research-object.tsv
+│   ├── research-mechanism.tsv
+│   ├── innovation-candidates.tsv
 │   ├── model.md
 │   ├── research.tsv
 │   └── handoff.md
@@ -24,10 +34,16 @@ stages/
 │   ├── decision.md
 │   └── handoff.md
 ├── phase-3/
+│   ├── content-core.json
+│   ├── diagram-plan.json
+│   ├── diagrams/Dn-result.tsv
 │   ├── diagram-result.tsv
 │   ├── build-map.tsv
 │   └── handoff.md
 └── phase-4/
+    ├── review-plan.json
+    ├── semantic-review.tsv
+    ├── visual/Dn-review.tsv
     ├── review.tsv
     └── handoff.md
 ```
@@ -43,10 +59,17 @@ stages/
 ```text
 material-index.tsv: source_id\tsource_type\tpath_or_locator\tsha256\trelevant_anchors
 research.tsv:       lane\tquery_id\tsource_id\tevidence_status\tlocator\tconclusion
+subject-boundary.tsv: subject_id\ttechnical_object\tuse_scenario\tbusiness_domain\tsystem_owner\tphysical_boundary\timplemented_scope\textension_scope\tcore_mechanism
+innovation-candidates.tsv: candidate_id\tsource_fact_ids\textension_ids\tproblem\tmechanism\tconstraint\tbaseline\tdifference_hypothesis\tvalue_chain\teffect\tvalidation_status\tdiagram_landing
 build-map.tsv:      artifact_id\tpath\tsha256\towner\tstatus
 diagram-result.tsv: artifact_id\tpath\tsha256\towner\tstatus
 review.tsv:         artifact_id\treview_type\tstatus\tbound_sha256\tconclusion
 ```
+
+阶段计划 JSON 的最小合同：
+
+- `diagram-plan.json.diagrams[]`：每项包含 `diagram_id`、小写连字符 `purpose`、`output_dir`；目录必须精确等于 `disclosure-workspace/diagrams/<Dn>-<purpose>`。
+- `review-plan.json.diagrams`：只包含连续的 `D1...Dn`；正文、manifest 等非图工件使用其他字段，不能混入逐图数组。
 
 每个 `handoff.md` 的前四行固定为：
 
@@ -63,41 +86,61 @@ status: <ready|confirmed|built|reviewed>
 
 | 阶段 | 允许读取的原始材料 | 接受的结构化输入 | 本阶段判断 | 必须缓存的内部文件 | 传给下一阶段 |
 |---|---|---|---|---|---|
-| 阶段 1 素材确认与建模 | 用户消息、用户文件、明确范围内的代码、实际打开的公开检索页 | 无；首次执行先建材料索引 | 输入门槛、SF/IE/EM 边界、技术泛化、问题/机制/约束、候选 I/T、两线检索是否充分 | `material-index.tsv`、`evidence-cards.md`、`agents/prior-art-task.md`、`phase-1/model.md`、`phase-1/research.tsv`、`phase-1/handoff.md` | 核心主张、候选 I/T、实现/扩展边界、证据结论、缺口、候选图职责；只给 ID 和缓存定位 |
+| 阶段 1 素材确认与建模 | 用户消息、用户文件、明确范围内的代码、实际打开的公开检索页 | 无；首次执行先建材料索引 | 输入门槛、SF/IE/EM 边界、技术主体、交付目标、问题/机制/约束、候选 I/T、两线检索是否充分 | 材料索引、事实卡、分析计划、主体边界、双线检索、创新价值、规范化模型与 handoff | 核心主张、候选 I/T、实现/扩展边界、证据结论、缺口、候选图职责；只给 ID 和缓存定位 |
 | 阶段 2 思路确认 | 仅用户本轮新增的确认、否决或补充；不得重读既有原始材料 | `phase-1/handoff.md` 及其中点名的 `model.md` 条目 | 是否得到明确确认；冻结哪些 I/T/D/E/S；用户调整是否导致阶段 1 事实或检索失效 | `phase-2/decision.md`、`phase-2/handoff.md` | 已确认且冻结的 I/T/D/E/S、实现/扩展边界、图示职责、所需模板、未决阻塞项 |
-| 阶段 3 最终撰写 | 正常情况下不读原始材料；只有用户新增材料使阶段 1 失效时才回退 | `phase-2/handoff.md`；按需加载三份正式模板 | 文档结构、图型与数量触发、编号一致性、正文/内部稿/manifest/图包的同源关系 | 最终工件、`agents/diagram-task.md`、`phase-3/diagram-result.tsv`、`phase-3/build-map.tsv`、`phase-3/handoff.md` | 最终工件的相对路径、hash、owner、状态和待复核项；不得复制完整正文或图源码 |
-| 阶段 4 复核与交付 | 正常情况下不读原始材料，也不重读网页 | `phase-3/handoff.md` 及 `build-map.tsv` 指向的最终工件；按需加载相关质量门禁 | 实现/扩展边界、因果删除、泛化、对外泄漏、SVG 视觉质量、确定性校验状态 | `agents/final-review-task.md`、`phase-4/review.tsv`、`disclosure-validation.json`、`phase-4/handoff.md` | 给用户的工件路径、最终状态、警告、验证边界和 timing summary 路径 |
+| 阶段 3 最终撰写 | 正常情况下不读原始材料；只有用户新增材料使阶段 1 失效时才回退 | `phase-2/handoff.md`；按需加载三份正式模板 | 共同内容真源、中心图计划、编号一致性、正文/内部稿/manifest/图包同源关系 | `content-core.json`、`diagram-plan.json`、逐图结果、聚合结果、最终工件、build map 与 handoff | 最终工件的相对路径、hash、owner、状态和待复核项；不得复制完整正文或图源码 |
+| 阶段 4 复核与交付 | 正常情况下不读原始材料，也不重读网页 | `phase-3/handoff.md` 及 `build-map.tsv` 指向的最终工件；按需加载相关质量门禁 | 语义复核、逐图视觉复核、hash 绑定与确定性校验状态 | `review-plan.json`、语义/逐图视觉结果、聚合 `review.tsv`、validation 与 handoff | 给用户的工件路径、最终状态、警告、验证边界和 timing summary 路径 |
 
 ## 3. 阶段执行规则
 
 1. 每阶段开始先运行 `status`，只读取它给出的 `next_input`；阶段结束写完缓存后再 `seal`。跨轮次恢复不重放旧推理，只从最后一个有效 handoff 继续。
-2. 阶段 1 对每份原始材料只读取一次，并用 `source_id + sha256 + relevant_anchors` 建索引。`evidence-cards.md` 只摘录会进入主张、I/T、检索词或边界判断的证据；不保存思维链和材料复述。
+2. 阶段 1 对每份原始材料只读取一次，并用 `source_id + sha256 + relevant_anchors` 建索引。`evidence-cards.md` 只摘录会进入主张、I/T、检索词或边界判断的证据；事实卡与分析计划完成前不得派发 subagent。完成后主体边界与两条研究 lane 并行，交付目标由主 agent 同时整理；创新价值必须等待这些结果汇合。
 3. 阶段 2 的写作思路必须落入 `decision.md`，不能只留在对话。用户补充新事实时先更新材料索引并回退阶段 1；只有对既有候选的确认或取舍可以直接封存阶段 2。
-4. 阶段 3 只依据已冻结 handoff 工作。正文与制图可以并行，但主 agent 与 diagram worker 写入路径必须不相交；两者汇合前不得生成最终 manifest hash，也不得启动阶段 4。
-5. 阶段 4 只复核 `build-map.tsv` 绑定的 hash。任一工件变化后，相应复核和阶段 4 handoff 自动失效，禁止沿用旧结论。
+4. 阶段 3 只依据已冻结 handoff 工作。主 agent 先冻结 `content-core.json` 与 `diagram-plan.json`；正文与逐图生成可以并行，各图写入独立目录和结果文件。所有图汇合前不得生成最终 manifest hash，也不得启动阶段 4。
+5. 阶段 4 只复核 `build-map.tsv` 绑定的 hash。语义与逐图视觉复核并行，主 agent 汇合后才执行完整校验；任一工件变化后，主 agent 必须显式回退到受影响阶段，使相应复核和阶段 4 handoff 失效，禁止沿用旧结论。第一版不做自动依赖分析。
 6. 长分析只在当前阶段内发生，缓存只保留结论、证据定位和未决项。禁止把完整对话、长检索日志或上一阶段的推理过程传入下一阶段或 subagent。
 
 ## 4. subagent 三段式交付
 
 每个 subagent 的任务文件都只包含 `输入`、`需要判断`、`返回` 三节，并写明 role、输入引用（阶段 1 使用材料索引，其余阶段使用上游 handoff）、允许写入和 timing log；`返回` 中必须声明统一关键事件合同。派发使用 `fork_turns: none`，消息中只给任务文件路径，不复制任务文件内容。
 
+角色的模型、effort、权限和实例上限以 `agents/subagents/roles/` 为机器真源；本节只说明业务交接。
+
+### `patent_subject_boundary_analyst`
+
+- 输入：`agents/subject-boundary-task.md`；只引用事实卡和 `analysis-plan.json`，不读取原始材料。
+- 需要判断：技术对象、场景、业务/系统/物理边界及已实现与拟扩展范围。
+- 返回：`subject-boundary.tsv` 数据行和一行终态事件；只提供候选边界，不冻结最终主张。
+
 ### `patent_prior_art_researcher`
 
-- 输入：`agents/prior-art-task.md`；其中只含两条检索线的 basis/context terms、查询上限、允许来源类型和阶段 1 缓存 ID，不含完整原始材料。
-- 需要判断：候选页面相关性、证据属性、是否足以说明行业基线、何时停止扩散。
-- 返回：符合 `research.tsv` 表头的数据行和一行终态事件；不返回长页面摘录、搜索日志或重复字段。主 agent 是 `research.tsv` 的唯一写入者。
+- 输入：对象/场景或机制/问题的独立任务包；每个实例只处理一条检索线，不含完整原始材料。
+- 需要判断：候选页面相关性、证据属性、是否足以说明该线行业基线、何时停止扩散。
+- 返回：各自 `research-object.tsv` 或 `research-mechanism.tsv` 数据行和一行终态事件；不得共同追加文件，主 agent 汇合为唯一 `research.tsv`。
+
+### `patent_innovation_value_analyst`
+
+- 输入：`agents/innovation-value-task.md`；只引用主体边界、交付目标、canonical `research.tsv` 和事实卡的稳定 ID/hash。
+- 需要判断：问题—机制—约束、差异假设、价值因果、候选效果和图示落点。
+- 返回：`innovation-candidates.tsv` 数据行和一行终态事件；正式核心主张与 I/T 仍由主 agent 收敛。
 
 ### `patent_diagram_engineer`
 
-- 输入：`agents/diagram-task.md`；只引用已封存的阶段 2 handoff、每张图的职责和允许写入的 `diagrams/` 目录。
-- 需要判断：图型、触发条件、布局、编号和“仅呈现已实现路径”是否成立。
-- 返回：符合 `diagram-result.tsv` 表头的图包数据行和一行终态事件；图文件直接写入各自目录，不在消息中回传 PUML/SVG。主 agent 将结果一次性写入此不可变缓存，正文汇合后再合并生成最终 `build-map.tsv`；不得把后续主工件追加到已经完成并绑定 hash 的 subagent 结果文件。
+- 输入：单张 `agents/diagram-Dn-task.md`；只引用冻结的 `diagram-plan.json` 对应条目及该图独占目录。
+- 需要判断：单图 brief、布局、编号落地和“仅呈现已实现路径”是否成立；不得重判其他图职责或全局编号。
+- 返回：单张 `phase-3/diagrams/Dn-result.tsv` 和一行终态事件；图文件直接写入自己的目录，不在消息中回传 PUML/SVG。主 agent 汇合为不可变 `diagram-result.tsv`。
 
-### `patent_final_reviewer`
+### `patent_semantic_reviewer`
 
-- 输入：`agents/final-review-task.md`；只引用阶段 3 handoff、`build-map.tsv` 中的路径/hash 和本轮相关质量门禁。
-- 需要判断：实现/扩展边界、因果删除、泛化、对外泄漏和最终 SVG 视觉质量。
-- 返回：符合 `review.tsv` 表头的数据行和一行终态事件；不回传正文副本或逐步推理。主 agent 是 review 缓存和 manifest 复核记录的唯一写入者。
+- 输入：`agents/semantic-review-task.md`；只引用阶段 3 handoff、正文/manifest hash 和相关质量门禁。
+- 需要判断：实现/扩展边界、泛化、因果删除、创新—价值、内外泄漏和图文 ID 一致性，不判断 SVG 布局。
+- 返回：`semantic-review.tsv` 数据行和一行终态事件，不回传正文副本或逐步推理。
+
+### `patent_visual_reviewer`
+
+- 输入：单张 `agents/visual-review-Dn-task.md`；只引用该图 SVG、validation、brief、冻结职责和 hash。
+- 需要判断：交叉、遮挡、唯一职责和“仅呈现已实现路径”，不重复语义审查。
+- 返回：单张 `phase-4/visual/Dn-review.tsv` 和一行终态事件；主 agent 汇合为唯一 `review.tsv`。
 
 ## 5. 关键事件与非轮询汇合
 
@@ -138,7 +181,8 @@ status: <ready|confirmed|built|reviewed>
 ## 6. 稳定性与失效边界
 
 - 只有已封存的上游 handoff 才能启动下一阶段或 subagent。主 agent 在派发前校验输入 hash，汇合后再次校验输出路径与 hash。
-- 并行只允许“阶段 3 主 agent 写正文 + 单个 diagram worker 写 diagrams”这一组不相交写入；竞品的两条检索线在同一 worker 内处理，终审只启一个 reviewer。
+- 并行组固定为：阶段 1 的主体边界 + 两条独立研究 lane（主 agent 同时整理交付目标）、阶段 3 的主正文 + 逐图生成、阶段 4 的语义 + 逐图视觉复核。阶段 2 禁止 subagent；未列出的任务保持串行。
+- 全局同时最多 3 个 subagent；diagram 与 visual role 各使用最多两个长期 worker，收到终态事件后再派下一图，不轮询空闲状态。单图写入路径与单图结果必须独占。
 - 宿主明确返回 subagent 失败或超时终态，或返回格式不合同时，不把半成品写入共享 TSV，也不启动下游；由主 agent 最多重派一次或接管同一职责。普通事件等待到期不得触发立即重派。
 - 使用 `scripts/stage_handoff.py` 管理封存链：
 
@@ -150,7 +194,7 @@ python3 scripts/stage_handoff.py rewind --working <disclosure-workspace/working>
 python3 scripts/stage_handoff.py validate --working <disclosure-workspace/working> --require-complete
 ```
 
-`seal` 只承认固定缓存文件和 handoff 头；上游 hash 变化时从 `stage-state.tsv` 删除下游有效状态，但不删除缓存文件。`rewind` 只接受主 agent 已经明确选择的阶段，验证并保留其上游封存前缀，再删除所选阶段及下游封存行；它不删除缓存，也不推断回退阶段。`validate` 负责发现篡改、断链、越界、缺文件和超大 handoff，不判断专利内容质量。
+`seal` 只承认合同登记的固定缓存、按冻结图计划展开的逐图任务/结果、聚合 TSV、hash 绑定和 handoff 头；阶段 3/4 的 D 集合、逐图目录、成功状态及语义/视觉汇合不完整时不得封存。上游 hash 变化时从 `stage-state.tsv` 删除下游有效状态，但不删除缓存文件。`rewind` 只接受主 agent 已经明确选择的阶段，验证并保留其上游封存前缀，再删除所选阶段及下游封存行；它不删除缓存，也不推断回退阶段。`validate` 负责发现篡改、断链、越界、缺文件和超大 handoff，不判断专利内容质量。
 
 ## 7. 任务检查点与恢复
 
@@ -213,36 +257,25 @@ CHECKPOINT 只允许在以下四类时机更新：
 
 ### 7.5 阶段与 subagent 绑定
 
-`references/checkpoint-task-catalog.json` 是固定 task id、结果路径、最低检查和允许 owner 的机器真源；本节是供执行 agent 阅读的同源清单。`checkpoint.py` 在阶段开始、回退及读取既有状态时强制校验 catalog：固定项必须完整并保持顺序，额外的本次交底阶段级结果只能追加，不能删除、替换或合并固定项。标题可以在不改变任务职责的前提下精简。
+`agents/subagents/checkpoint-task-catalog.json` 是固定 task、动态图模板、结果路径、最低检查和允许 owner 的机器真源；本节只说明职责分组，不复制全部字段。`checkpoint.py` 在阶段开始、回退及读取既有状态时强制校验 catalog：固定项必须完整，动态图任务必须在模板位置按 `D1...Dn` 连续展开，额外阶段级结果只能在固定序列之后追加。
 
-每阶段开始时至少登记以下固定任务：
+阶段任务按以下职责分组，具体结果路径和最低检查直接从 catalog 读取：
 
 - 阶段 1：
-  - `phase-1-material-index` → `disclosure-workspace/working/stages/shared/material-index.tsv`（`main_agent` / `tsv`）
-  - `phase-1-evidence-cards` → `disclosure-workspace/working/stages/shared/evidence-cards.md`（`main_agent` / `markdown`）
-  - `phase-1-prior-art-task` → `disclosure-workspace/working/stages/agents/prior-art-task.md`（`main_agent` / `markdown`）
-  - `phase-1-material-model` → `disclosure-workspace/working/stages/phase-1/model.md`（`main_agent` / `markdown`）
-  - `phase-1-prior-art-research` → `disclosure-workspace/working/stages/phase-1/research.tsv`（`patent_prior_art_researcher`，fallback 时为 `main_agent` / `tsv`）
-  - `phase-1-handoff` → `disclosure-workspace/working/stages/phase-1/handoff.md`（`main_agent` / `markdown`）
-- 阶段 2：
-  - `phase-2-decision` → `disclosure-workspace/working/stages/phase-2/decision.md`（`main_agent` / `markdown`）
-  - `phase-2-handoff` → `disclosure-workspace/working/stages/phase-2/handoff.md`（`main_agent` / `markdown`）；提交思路等待用户时保持 pending，明确确认后才完成。
+  - 主 agent 基线：`phase-1-material-index`、`phase-1-evidence-cards`、`phase-1-analysis-plan`。
+  - 首轮 fan-out：`phase-1-delivery-goals`、`phase-1-subject-boundary`、`phase-1-research-object`、`phase-1-research-mechanism`。
+  - 后续汇合与分析：`phase-1-research-join`、`phase-1-innovation-candidates`、`phase-1-material-model`、`phase-1-handoff`。
+- 阶段 2：`phase-2-decision`、`phase-2-handoff`；提交思路等待用户时 handoff 保持 pending，明确确认后才完成。
 - 阶段 3：
-  - `phase-3-diagram-task` → `disclosure-workspace/working/stages/agents/diagram-task.md`（`main_agent` / `markdown`）
-  - `phase-3-public-draft` → `disclosure.md`（`main_agent` / `markdown`）
-  - `phase-3-internal-draft` → `disclosure-workspace/disclosure-internal.md`（`main_agent` / `markdown`）
-  - `phase-3-manifest` → `disclosure-workspace/disclosure-manifest.json`（`main_agent` / `json`）
-  - `phase-3-diagram-packages` → `disclosure-workspace/working/stages/phase-3/diagram-result.tsv`（`patent_diagram_engineer`，fallback 时为 `main_agent` / `tsv`）
-  - `phase-3-build-map` → `disclosure-workspace/working/stages/phase-3/build-map.tsv`（`main_agent` / `tsv`）
-  - `phase-3-handoff` → `disclosure-workspace/working/stages/phase-3/handoff.md`（`main_agent` / `markdown`）
+  - 中心计划：`phase-3-content-core`、`phase-3-diagram-plan`。
+  - 并行构建：`phase-3-public-draft` 与按计划展开的 `phase-3-diagram-D1...Dn`。
+  - 汇合交付：`phase-3-diagram-join`、`phase-3-manifest`、`phase-3-internal-draft`、`phase-3-build-map`、`phase-3-handoff`。
 - 阶段 4：
-  - `phase-4-review-task` → `disclosure-workspace/working/stages/agents/final-review-task.md`（`main_agent` / `markdown`）
-  - `phase-4-final-review` → `disclosure-workspace/working/stages/phase-4/review.tsv`（`patent_final_reviewer`，fallback 时为 `main_agent` / `tsv`）
-  - `phase-4-validation` → `disclosure-workspace/disclosure-validation.json`（`main_agent` / `json`）
-  - `phase-4-timing-summary` → `disclosure-workspace/working/session-timing-summary.json`（`main_agent` / `json`）
-  - `phase-4-handoff` → `disclosure-workspace/working/stages/phase-4/handoff.md`（`main_agent` / `markdown`）
+  - 中心计划：`phase-4-review-plan`。
+  - 并行复核：`phase-4-semantic-review` 与按图展开的 `phase-4-visual-review-D1...Dn`。
+  - 汇合交付：`phase-4-review-join`、`phase-4-validation`、`phase-4-timing-summary`、`phase-4-handoff`。
 
-阶段 3 的制图结果文件在 worker 完成后一次写定；主 agent 随后将图包行和正文工件合并为单独的 `build-map.tsv`。不能用一个“已写完”任务掩盖缺失工件，也不能在任务完成并绑定 hash 后继续追加内容。
+逐图生成和逐图视觉结果在完成后分别绑定 hash；主 agent 只能在全部计划实例有效后完成 join。不能用一个聚合“已写完”掩盖缺失的 D 任务，也不能在任务完成并绑定 hash 后继续追加内容。
 
 - subagent 返回终态事件后，由主 agent 先把结构化结果写入合同指定的缓存文件并执行最低检查，再完成相应 checkpoint task；仅有聊天消息或事件行不能标记完成。
 
