@@ -46,6 +46,7 @@ REQUIRED_FILES=(
   "assets/disclosure-manifest.schema.json"
   "references/content-quality-gates.md"
   "references/stage-delivery-contract.md"
+  "references/checkpoint-task-catalog.json"
   "references/subagent-orchestration.json"
   "references/session-timing.md"
   "references/cases/happy-case-full.md"
@@ -58,6 +59,8 @@ REQUIRED_FILES=(
   "scripts/validate_disclosure.py"
   "scripts/session_timing.py"
   "scripts/stage_handoff.py"
+  "scripts/checkpoint.py"
+  "scripts/tests/test_checkpoint.py"
   "scripts/tests/test_stage_handoff.py"
   "scripts/tests/test_session_timing.py"
   "scripts/tests/generate_package.py"
@@ -75,8 +78,8 @@ if [[ "$FRONTMATTER_NAME" != "feipi-patent-generate-innovation-disclosure" ]]; t
   echo "SKILL.md name 与目录名不一致：$FRONTMATTER_NAME" >&2
   exit 1
 fi
-if ! rg -q '^version:[[:space:]]*6[[:space:]]*$' "$TARGET_DIR/agents/openai.yaml"; then
-  echo "agents/openai.yaml version 必须为 6" >&2
+if ! rg -q '^version:[[:space:]]*7[[:space:]]*$' "$TARGET_DIR/agents/openai.yaml"; then
+  echo "agents/openai.yaml version 必须为 7" >&2
   exit 1
 fi
 
@@ -99,13 +102,17 @@ python3 -c 'import json,sys; json.load(open(sys.argv[1], encoding="utf-8")); jso
   "$TARGET_DIR/assets/disclosure-manifest.template.json" \
   "$TARGET_DIR/assets/disclosure-manifest.schema.json"
 
-python3 - "$TARGET_DIR/references/subagent-orchestration.json" <<'PY'
+python3 -m json.tool "$TARGET_DIR/references/checkpoint-task-catalog.json" >/dev/null
+
+python3 - "$TARGET_DIR/references/subagent-orchestration.json" "$TARGET_DIR/references/stage-delivery-contract.md" "$TARGET_DIR/references/checkpoint-task-catalog.json" <<'PY'
 import json
 import sys
 
 path = sys.argv[1]
 data = json.load(open(path, encoding="utf-8"))
-assert data.get("schema_version") == "1.1", "subagent schema_version 必须为 1.1"
+checkpoint_contract = open(sys.argv[2], encoding="utf-8").read()
+task_catalog = json.load(open(sys.argv[3], encoding="utf-8"))
+assert data.get("schema_version") == "1.2", "subagent schema_version 必须为 1.2"
 assert data.get("max_active_subagents") == 1, "同时只能启用一个 subagent"
 assert data.get("max_total_subagents") == 3, "累计 subagent 必须为 3"
 assert data.get("allow_recursive_spawn") is False, "禁止 subagent 递归派生"
@@ -114,7 +121,61 @@ assert data.get("handoff_contract") == "references/stage-delivery-contract.md", 
 assert set(data.get("task_packet_required_fields", [])) == {
     "task_file", "input_reference", "allowed_writes",
     "forbidden_actions", "return_format", "timing_log", "key_event_contract",
+    "checkpoint_task",
 }, "subagent 精简任务包字段不完整"
+checkpoint = data.get("checkpoint", {})
+assert checkpoint.get("path") == "disclosure-workspace/working/CHECKPOINT.md", "checkpoint 路径不正确"
+assert checkpoint.get("task_catalog") == "references/checkpoint-task-catalog.json", "checkpoint task catalog 路径不正确"
+assert checkpoint.get("coordinator") == "main_agent", "CHECKPOINT 只能由主 agent 协调"
+assert checkpoint.get("state_model") == "current_state_not_event_log", "CHECKPOINT 必须是当前状态而非事件日志"
+assert checkpoint.get("task_granularity") == "stage_deliverable_or_single_subagent_assignment", "checkpoint 任务粒度不正确"
+assert checkpoint.get("update_on") == [
+    "stage_start", "task_complete", "waiting_user", "blocked",
+], "CHECKPOINT 更新触发点不正确"
+assert checkpoint.get("silent_on") == [
+    "micro_step", "tool_call", "file_read", "file_write", "cache_hit",
+    "retry", "resume_check", "unchanged_wait",
+], "CHECKPOINT 静默事件不完整"
+assert checkpoint.get("completion_gate") == {
+    "result_file_required": True,
+    "nonempty": True,
+    "minimum_check_required": True,
+    "bind_sha256": True,
+    "minimum_checks": ["nonempty", "markdown", "json", "tsv"],
+}, "CHECKPOINT 完成门禁不完整"
+assert checkpoint.get("resume") == {
+    "read_before_stage_status": True,
+    "skip_completed_only_when_result_valid": True,
+    "first_invalid_or_incomplete_task": True,
+    "read_only": True,
+}, "CHECKPOINT 恢复合同不完整"
+assert checkpoint.get("rollback") == {
+    "decision_owner": "main_agent",
+    "reason_required": True,
+    "automatic_dependency_analysis": False,
+}, "CHECKPOINT 第一版必须由主 agent 手工回退"
+required_checkpoint_tasks = {
+    "phase-1-material-index", "phase-1-evidence-cards", "phase-1-prior-art-task",
+    "phase-1-material-model", "phase-1-prior-art-research", "phase-1-handoff",
+    "phase-2-decision", "phase-2-handoff",
+    "phase-3-diagram-task", "phase-3-public-draft", "phase-3-internal-draft",
+    "phase-3-manifest", "phase-3-diagram-packages", "phase-3-build-map", "phase-3-handoff",
+    "phase-4-review-task", "phase-4-final-review", "phase-4-validation",
+    "phase-4-timing-summary", "phase-4-handoff",
+}
+assert all(f"`{task_id}`" in checkpoint_contract for task_id in required_checkpoint_tasks), "四阶段固定 checkpoint task 不完整"
+assert task_catalog.get("schema_version") == "1.0", "checkpoint task catalog 版本必须为 1.0"
+catalog_stages = task_catalog.get("stages", {})
+assert set(catalog_stages) == {
+    "phase_1_material_modeling", "phase_2_idea_confirmation",
+    "phase_3_final_drafting", "phase_4_review_delivery",
+}, "checkpoint task catalog 阶段集合不完整"
+catalog_tasks = [task for stage_tasks in catalog_stages.values() for task in stage_tasks]
+assert {task.get("task_id") for task in catalog_tasks} == required_checkpoint_tasks, "checkpoint task catalog 固定项不完整"
+assert len(catalog_tasks) == len(required_checkpoint_tasks), "checkpoint task catalog task id 重复"
+assert all(set(task) == {"task_id", "title", "allowed_owners", "result", "minimum_check"} for task in catalog_tasks), "checkpoint task catalog 字段不完整"
+assert all(task.get("minimum_check") in {"nonempty", "markdown", "json", "tsv"} for task in catalog_tasks), "checkpoint task catalog 最低检查非法"
+assert all(task.get("allowed_owners") for task in catalog_tasks), "checkpoint task catalog owner 为空"
 reporting = data.get("event_reporting", {})
 critical_events = ["MILESTONE", "DECISION", "BLOCKED", "COMPLETE"]
 silent_events = [
@@ -210,8 +271,8 @@ expected_deliveries = {
     ),
     "patent_diagram_engineer": (
         "disclosure-workspace/working/stages/agents/diagram-task.md",
-        "build-map.tsv rows",
-        "disclosure-workspace/working/stages/phase-3/build-map.tsv",
+        "diagram-result.tsv rows",
+        "disclosure-workspace/working/stages/phase-3/diagram-result.tsv",
         "main_agent",
     ),
     "patent_final_reviewer": (
@@ -219,6 +280,26 @@ expected_deliveries = {
         "review.tsv rows",
         "disclosure-workspace/working/stages/phase-4/review.tsv",
         "main_agent",
+    ),
+}
+expected_checkpoint_tasks = {
+    "patent_prior_art_researcher": (
+        "phase-1-prior-art-research",
+        "patent_prior_art_researcher",
+        "disclosure-workspace/working/stages/phase-1/research.tsv",
+        "tsv",
+    ),
+    "patent_diagram_engineer": (
+        "phase-3-diagram-packages",
+        "patent_diagram_engineer",
+        "disclosure-workspace/working/stages/phase-3/diagram-result.tsv",
+        "tsv",
+    ),
+    "patent_final_reviewer": (
+        "phase-4-final-review",
+        "patent_final_reviewer",
+        "disclosure-workspace/working/stages/phase-4/review.tsv",
+        "tsv",
     ),
 }
 for name, expected in expected_deliveries.items():
@@ -231,6 +312,12 @@ for name, expected in expected_deliveries.items():
     assert len(item.get("input_contract", [])) == 3, f"{name} 必须声明三个紧凑输入"
     assert len(item.get("judgment_contract", [])) == 3, f"{name} 必须声明三个判断范围"
     assert output.get("message") in {"final_event_and_row_count_only", "final_event_and_paths_only"}, f"{name} 返回消息不够紧凑"
+    checkpoint_task = item.get("checkpoint_task", {})
+    actual_checkpoint = (
+        checkpoint_task.get("task_id"), checkpoint_task.get("owner"),
+        checkpoint_task.get("result_path"), checkpoint_task.get("minimum_check"),
+    )
+    assert actual_checkpoint == expected_checkpoint_tasks[name], f"{name} checkpoint 绑定不正确：{actual_checkpoint}"
 diagram = next(item for item in roles if item.get("name") == "patent_diagram_engineer")
 assert diagram.get("writes") == ["disclosure-workspace/diagrams/"], "diagram engineer 写入边界不正确"
 assert data.get("fallback", {}).get("forbid_silent_upgrade_to_highest") is True, "必须禁止静默升级最高模型"
@@ -245,6 +332,12 @@ rg -q '^## 4\. subagent 三段式交付$' "$TARGET_DIR/references/stage-delivery
 rg -q '^## 5\. 关键事件与非轮询汇合$' "$TARGET_DIR/references/stage-delivery-contract.md"
 rg -q '^### 5\.2 必须上报的触发点$' "$TARGET_DIR/references/stage-delivery-contract.md"
 rg -q '^## 关键事件上报与等待纪律（必做）$' "$TARGET_DIR/SKILL.md"
+rg -q '^## 任务检查点与恢复（必做）$' "$TARGET_DIR/SKILL.md"
+rg -q '^## 7\. 任务检查点与恢复$' "$TARGET_DIR/references/stage-delivery-contract.md"
+rg -q '只在阶段开始、任务完成、等待用户和发生阻塞时' "$TARGET_DIR/SKILL.md"
+rg -q '从第一个无效或未完成任务继续' "$TARGET_DIR/SKILL.md"
+rg -q '第一版不做自动依赖分析' "$TARGET_DIR/SKILL.md"
+rg -q 'stage_handoff\.py rewind' "$TARGET_DIR/SKILL.md"
 rg -q '长时、事件驱动等待' "$TARGET_DIR/SKILL.md"
 rg -q '禁止用短间隔.*循环查询 subagent' "$TARGET_DIR/SKILL.md"
 rg -q '非终态超时.*继续同类长等待.*不得查询状态' "$TARGET_DIR/SKILL.md"

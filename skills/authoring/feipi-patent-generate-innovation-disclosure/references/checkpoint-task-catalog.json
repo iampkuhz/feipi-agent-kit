@@ -1,0 +1,153 @@
+{
+  "schema_version": "1.0",
+  "stages": {
+    "phase_1_material_modeling": [
+      {
+        "task_id": "phase-1-material-index",
+        "title": "建立材料索引",
+        "allowed_owners": ["main_agent"],
+        "result": "disclosure-workspace/working/stages/shared/material-index.tsv",
+        "minimum_check": "tsv"
+      },
+      {
+        "task_id": "phase-1-evidence-cards",
+        "title": "整理证据卡",
+        "allowed_owners": ["main_agent"],
+        "result": "disclosure-workspace/working/stages/shared/evidence-cards.md",
+        "minimum_check": "markdown"
+      },
+      {
+        "task_id": "phase-1-prior-art-task",
+        "title": "准备竞品检索任务",
+        "allowed_owners": ["main_agent"],
+        "result": "disclosure-workspace/working/stages/agents/prior-art-task.md",
+        "minimum_check": "markdown"
+      },
+      {
+        "task_id": "phase-1-material-model",
+        "title": "形成材料模型",
+        "allowed_owners": ["main_agent"],
+        "result": "disclosure-workspace/working/stages/phase-1/model.md",
+        "minimum_check": "markdown"
+      },
+      {
+        "task_id": "phase-1-prior-art-research",
+        "title": "完成竞品检索",
+        "allowed_owners": ["patent_prior_art_researcher", "main_agent"],
+        "result": "disclosure-workspace/working/stages/phase-1/research.tsv",
+        "minimum_check": "tsv"
+      },
+      {
+        "task_id": "phase-1-handoff",
+        "title": "封存阶段一交接",
+        "allowed_owners": ["main_agent"],
+        "result": "disclosure-workspace/working/stages/phase-1/handoff.md",
+        "minimum_check": "markdown"
+      }
+    ],
+    "phase_2_idea_confirmation": [
+      {
+        "task_id": "phase-2-decision",
+        "title": "记录写作思路与用户决定",
+        "allowed_owners": ["main_agent"],
+        "result": "disclosure-workspace/working/stages/phase-2/decision.md",
+        "minimum_check": "markdown"
+      },
+      {
+        "task_id": "phase-2-handoff",
+        "title": "封存阶段二交接",
+        "allowed_owners": ["main_agent"],
+        "result": "disclosure-workspace/working/stages/phase-2/handoff.md",
+        "minimum_check": "markdown"
+      }
+    ],
+    "phase_3_final_drafting": [
+      {
+        "task_id": "phase-3-diagram-task",
+        "title": "准备制图任务",
+        "allowed_owners": ["main_agent"],
+        "result": "disclosure-workspace/working/stages/agents/diagram-task.md",
+        "minimum_check": "markdown"
+      },
+      {
+        "task_id": "phase-3-public-draft",
+        "title": "生成对外稿",
+        "allowed_owners": ["main_agent"],
+        "result": "disclosure.md",
+        "minimum_check": "markdown"
+      },
+      {
+        "task_id": "phase-3-internal-draft",
+        "title": "生成内部追溯稿",
+        "allowed_owners": ["main_agent"],
+        "result": "disclosure-workspace/disclosure-internal.md",
+        "minimum_check": "markdown"
+      },
+      {
+        "task_id": "phase-3-manifest",
+        "title": "生成内容清单",
+        "allowed_owners": ["main_agent"],
+        "result": "disclosure-workspace/disclosure-manifest.json",
+        "minimum_check": "json"
+      },
+      {
+        "task_id": "phase-3-diagram-packages",
+        "title": "生成并校验图包",
+        "allowed_owners": ["patent_diagram_engineer", "main_agent"],
+        "result": "disclosure-workspace/working/stages/phase-3/diagram-result.tsv",
+        "minimum_check": "tsv"
+      },
+      {
+        "task_id": "phase-3-build-map",
+        "title": "汇总最终工件映射",
+        "allowed_owners": ["main_agent"],
+        "result": "disclosure-workspace/working/stages/phase-3/build-map.tsv",
+        "minimum_check": "tsv"
+      },
+      {
+        "task_id": "phase-3-handoff",
+        "title": "封存阶段三交接",
+        "allowed_owners": ["main_agent"],
+        "result": "disclosure-workspace/working/stages/phase-3/handoff.md",
+        "minimum_check": "markdown"
+      }
+    ],
+    "phase_4_review_delivery": [
+      {
+        "task_id": "phase-4-review-task",
+        "title": "准备终审任务",
+        "allowed_owners": ["main_agent"],
+        "result": "disclosure-workspace/working/stages/agents/final-review-task.md",
+        "minimum_check": "markdown"
+      },
+      {
+        "task_id": "phase-4-final-review",
+        "title": "完成语义与视觉终审",
+        "allowed_owners": ["patent_final_reviewer", "main_agent"],
+        "result": "disclosure-workspace/working/stages/phase-4/review.tsv",
+        "minimum_check": "tsv"
+      },
+      {
+        "task_id": "phase-4-validation",
+        "title": "生成完整校验报告",
+        "allowed_owners": ["main_agent"],
+        "result": "disclosure-workspace/disclosure-validation.json",
+        "minimum_check": "json"
+      },
+      {
+        "task_id": "phase-4-timing-summary",
+        "title": "生成耗时汇总",
+        "allowed_owners": ["main_agent"],
+        "result": "disclosure-workspace/working/session-timing-summary.json",
+        "minimum_check": "json"
+      },
+      {
+        "task_id": "phase-4-handoff",
+        "title": "封存阶段四交接",
+        "allowed_owners": ["main_agent"],
+        "result": "disclosure-workspace/working/stages/phase-4/handoff.md",
+        "minimum_check": "markdown"
+      }
+    ]
+  }
+}

@@ -24,6 +24,7 @@ stages/
 │   ├── decision.md
 │   └── handoff.md
 ├── phase-3/
+│   ├── diagram-result.tsv
 │   ├── build-map.tsv
 │   └── handoff.md
 └── phase-4/
@@ -43,6 +44,7 @@ stages/
 material-index.tsv: source_id\tsource_type\tpath_or_locator\tsha256\trelevant_anchors
 research.tsv:       lane\tquery_id\tsource_id\tevidence_status\tlocator\tconclusion
 build-map.tsv:      artifact_id\tpath\tsha256\towner\tstatus
+diagram-result.tsv: artifact_id\tpath\tsha256\towner\tstatus
 review.tsv:         artifact_id\treview_type\tstatus\tbound_sha256\tconclusion
 ```
 
@@ -63,7 +65,7 @@ status: <ready|confirmed|built|reviewed>
 |---|---|---|---|---|---|
 | 阶段 1 素材确认与建模 | 用户消息、用户文件、明确范围内的代码、实际打开的公开检索页 | 无；首次执行先建材料索引 | 输入门槛、SF/IE/EM 边界、技术泛化、问题/机制/约束、候选 I/T、两线检索是否充分 | `material-index.tsv`、`evidence-cards.md`、`agents/prior-art-task.md`、`phase-1/model.md`、`phase-1/research.tsv`、`phase-1/handoff.md` | 核心主张、候选 I/T、实现/扩展边界、证据结论、缺口、候选图职责；只给 ID 和缓存定位 |
 | 阶段 2 思路确认 | 仅用户本轮新增的确认、否决或补充；不得重读既有原始材料 | `phase-1/handoff.md` 及其中点名的 `model.md` 条目 | 是否得到明确确认；冻结哪些 I/T/D/E/S；用户调整是否导致阶段 1 事实或检索失效 | `phase-2/decision.md`、`phase-2/handoff.md` | 已确认且冻结的 I/T/D/E/S、实现/扩展边界、图示职责、所需模板、未决阻塞项 |
-| 阶段 3 最终撰写 | 正常情况下不读原始材料；只有用户新增材料使阶段 1 失效时才回退 | `phase-2/handoff.md`；按需加载三份正式模板 | 文档结构、图型与数量触发、编号一致性、正文/内部稿/manifest/图包的同源关系 | 最终工件、`agents/diagram-task.md`、`phase-3/build-map.tsv`、`phase-3/handoff.md` | 最终工件的相对路径、hash、owner、状态和待复核项；不得复制完整正文或图源码 |
+| 阶段 3 最终撰写 | 正常情况下不读原始材料；只有用户新增材料使阶段 1 失效时才回退 | `phase-2/handoff.md`；按需加载三份正式模板 | 文档结构、图型与数量触发、编号一致性、正文/内部稿/manifest/图包的同源关系 | 最终工件、`agents/diagram-task.md`、`phase-3/diagram-result.tsv`、`phase-3/build-map.tsv`、`phase-3/handoff.md` | 最终工件的相对路径、hash、owner、状态和待复核项；不得复制完整正文或图源码 |
 | 阶段 4 复核与交付 | 正常情况下不读原始材料，也不重读网页 | `phase-3/handoff.md` 及 `build-map.tsv` 指向的最终工件；按需加载相关质量门禁 | 实现/扩展边界、因果删除、泛化、对外泄漏、SVG 视觉质量、确定性校验状态 | `agents/final-review-task.md`、`phase-4/review.tsv`、`disclosure-validation.json`、`phase-4/handoff.md` | 给用户的工件路径、最终状态、警告、验证边界和 timing summary 路径 |
 
 ## 3. 阶段执行规则
@@ -89,7 +91,7 @@ status: <ready|confirmed|built|reviewed>
 
 - 输入：`agents/diagram-task.md`；只引用已封存的阶段 2 handoff、每张图的职责和允许写入的 `diagrams/` 目录。
 - 需要判断：图型、触发条件、布局、编号和“仅呈现已实现路径”是否成立。
-- 返回：符合 `build-map.tsv` 表头的图包数据行和一行终态事件；图文件直接写入各自目录，不在消息中回传 PUML/SVG。主 agent 可并行写正文，但在 worker 返回前不得封存阶段 3。
+- 返回：符合 `diagram-result.tsv` 表头的图包数据行和一行终态事件；图文件直接写入各自目录，不在消息中回传 PUML/SVG。主 agent 将结果一次性写入此不可变缓存，正文汇合后再合并生成最终 `build-map.tsv`；不得把后续主工件追加到已经完成并绑定 hash 的 subagent 结果文件。
 
 ### `patent_final_reviewer`
 
@@ -144,7 +146,119 @@ status: <ready|confirmed|built|reviewed>
 python3 scripts/stage_handoff.py init --working <disclosure-workspace/working>
 python3 scripts/stage_handoff.py status --working <disclosure-workspace/working>
 python3 scripts/stage_handoff.py seal --working <disclosure-workspace/working> --stage phase_1_material_modeling
+python3 scripts/stage_handoff.py rewind --working <disclosure-workspace/working> --stage phase_1_material_modeling
 python3 scripts/stage_handoff.py validate --working <disclosure-workspace/working> --require-complete
 ```
 
-`seal` 只承认固定缓存文件和 handoff 头；上游 hash 变化时从 `stage-state.tsv` 删除下游有效状态，但不删除缓存文件。`validate` 负责发现篡改、断链、越界、缺文件和超大 handoff，不判断专利内容质量。
+`seal` 只承认固定缓存文件和 handoff 头；上游 hash 变化时从 `stage-state.tsv` 删除下游有效状态，但不删除缓存文件。`rewind` 只接受主 agent 已经明确选择的阶段，验证并保留其上游封存前缀，再删除所选阶段及下游封存行；它不删除缓存，也不推断回退阶段。`validate` 负责发现篡改、断链、越界、缺文件和超大 handoff，不判断专利内容质量。
+
+## 7. 任务检查点与恢复
+
+### 7.1 文件职责与固定内容
+
+任务运行时必须维护 `<disclosure-dir>/disclosure-workspace/working/CHECKPOINT.md`。该文件只表示当前状态，不保存历史事件；每次允许更新时都原子重写，并固定包含：
+
+1. 当前阶段和阶段状态。
+2. 本阶段输入：只列相对 `<disclosure-dir>` 的文件或稳定输入说明。
+3. 本阶段任务：每项包含稳定 task id、owner、唯一结果文件、最低检查类型和完成状态。
+4. 当前阶段已交付：只列已经通过完成门禁的 task id、结果路径、最低检查类型和绑定 SHA-256。
+5. 下一步：一个可以直接执行的任务或需要接收方完成的动作。
+6. 阻塞项：没有时明确写“无”；等待用户只写入状态与“下一步”，不能放在阻塞项中。
+
+任务粒度只能是“一个阶段交付物”或“一个 subagent 职责”。读取材料、调用工具、生成中间片段、重试和普通校验步骤都不能单独登记为任务，也不能进入“当前阶段已交付”。
+
+CHECKPOINT 由 `scripts/checkpoint.py` 规范渲染并内嵌机器状态，禁止手工编辑。task id 必须稳定且阶段内唯一；owner 使用 `main_agent` 或对应 subagent role 等小写稳定标识。标准调用为：
+
+```bash
+python3 scripts/checkpoint.py start-stage --root <disclosure-dir> \
+  --stage <phase_name> --input "<输入或相对路径>" \
+  --task <task-id> "<标题>" <owner> <result-path> <nonempty|markdown|json|tsv>
+
+python3 scripts/checkpoint.py complete-task --root <disclosure-dir> --task <task-id>
+python3 scripts/checkpoint.py wait-user --root <disclosure-dir> --reason "<等待选择>"
+python3 scripts/checkpoint.py block --root <disclosure-dir> --reason "<阻塞及解除动作>"
+python3 scripts/checkpoint.py resume --root <disclosure-dir>
+python3 scripts/checkpoint.py validate --root <disclosure-dir>
+```
+
+`--input` 和 `--task` 均可重复。全新任务第一次 `start-stage` 只能选择阶段 1；重新进入同一阶段时，输入和任务定义必须与当前 CHECKPOINT 一致；定义变化只能使用带原因的 `rollback-stage`。新阶段只能按固定四阶段顺序开始，不能跳过中间阶段。
+
+### 7.2 完成门禁
+
+- 每项任务只绑定一个相对交底目录的结果文件；禁止绝对路径、`..` 和符号链接越界。
+- 标记完成前必须确认文件存在、非空，并通过任务声明的最低检查：`nonempty` 只检查非空，`markdown` 检查非空 Markdown，`json` 检查可解析 JSON，`tsv` 检查非空且列数一致的 TSV。
+- 完成时记录当前文件 SHA-256。未通过门禁时命令失败且不得修改 CHECKPOINT，也不得把任务加入“当前阶段已交付”。
+- 阶段内允许并行的主 agent / subagent 任务可按真实完成顺序分别登记，不要求 completed 形成有序前缀；`resume` 仍按任务清单顺序返回第一个 pending 或失效任务，并跳过其他仍然有效的已交付任务。
+- 最低检查仅证明结果文件具备可消费的基本格式。阶段 handoff 仍需 `stage_handoff.py seal`，图包仍需自身 validator，正式交底仍需完整交付校验，内容语义仍需人工复核。
+
+### 7.3 更新时机
+
+CHECKPOINT 只允许在以下四类时机更新：
+
+- 阶段开始：写入当前阶段、输入、完整任务清单、下一步，并清空旧阶段交付。
+- 任务完成：结果通过门禁后勾选任务、绑定 hash、加入当前阶段已交付，并指向下一个未完成任务。
+- 等待用户：记录 `waiting_user` 和用户必须作出的具体选择，然后结束当前对话轮次。
+- 发生阻塞：记录 `blocked`、影响和解除动作；普通重试、等待超时或无状态变化不构成阻塞。
+
+写入等待或阻塞前重新检查已交付结果；已经缺失、为空、格式无效或 hash 改变的任务降回 pending 并移出“当前阶段已交付”，不能因旧勾选继续保留。完全相同的阶段开始、回退、等待或阻塞请求视为幂等 no-op，不重写文件时间戳。
+
+禁止为阶段内微步骤、工具调用、文件读写、subagent 普通事件、缓存命中、预算内重试、恢复扫描或重复进度更新 CHECKPOINT。关键事件是否向用户展示仍由第 5 节决定；CHECKPOINT 更新本身不自动产生用户可见消息。
+
+### 7.4 恢复顺序
+
+1. 恢复时先运行 checkpoint `validate` / `resume`，不得先重放对话、重读原始材料或轮询 subagent。
+2. 按任务清单顺序检查 pending 和已完成结果的文件、最低格式及绑定 hash；有效完成项跳过，返回第一个 pending 或失效任务。处于 `waiting_user` / `blocked` 时，如果第一可执行项本来就是 pending，则保持暂停状态；只有排在它之前的已交付项失效时，才优先返回 `redo`。
+3. 再运行 `stage_handoff.py status` 核对最后一个有效封存 handoff。CHECKPOINT 不能让未封存阶段绕过阶段链，阶段链也不能让已损坏的任务结果被跳过。
+4. `resume` 只返回恢复结论和第一个应执行的 task id，不改写 CHECKPOINT；真正完成、等待或阻塞时再按 7.3 更新。
+
+### 7.5 阶段与 subagent 绑定
+
+`references/checkpoint-task-catalog.json` 是固定 task id、结果路径、最低检查和允许 owner 的机器真源；本节是供执行 agent 阅读的同源清单。`checkpoint.py` 在阶段开始、回退及读取既有状态时强制校验 catalog：固定项必须完整并保持顺序，额外的本次交底阶段级结果只能追加，不能删除、替换或合并固定项。标题可以在不改变任务职责的前提下精简。
+
+每阶段开始时至少登记以下固定任务：
+
+- 阶段 1：
+  - `phase-1-material-index` → `disclosure-workspace/working/stages/shared/material-index.tsv`（`main_agent` / `tsv`）
+  - `phase-1-evidence-cards` → `disclosure-workspace/working/stages/shared/evidence-cards.md`（`main_agent` / `markdown`）
+  - `phase-1-prior-art-task` → `disclosure-workspace/working/stages/agents/prior-art-task.md`（`main_agent` / `markdown`）
+  - `phase-1-material-model` → `disclosure-workspace/working/stages/phase-1/model.md`（`main_agent` / `markdown`）
+  - `phase-1-prior-art-research` → `disclosure-workspace/working/stages/phase-1/research.tsv`（`patent_prior_art_researcher`，fallback 时为 `main_agent` / `tsv`）
+  - `phase-1-handoff` → `disclosure-workspace/working/stages/phase-1/handoff.md`（`main_agent` / `markdown`）
+- 阶段 2：
+  - `phase-2-decision` → `disclosure-workspace/working/stages/phase-2/decision.md`（`main_agent` / `markdown`）
+  - `phase-2-handoff` → `disclosure-workspace/working/stages/phase-2/handoff.md`（`main_agent` / `markdown`）；提交思路等待用户时保持 pending，明确确认后才完成。
+- 阶段 3：
+  - `phase-3-diagram-task` → `disclosure-workspace/working/stages/agents/diagram-task.md`（`main_agent` / `markdown`）
+  - `phase-3-public-draft` → `disclosure.md`（`main_agent` / `markdown`）
+  - `phase-3-internal-draft` → `disclosure-workspace/disclosure-internal.md`（`main_agent` / `markdown`）
+  - `phase-3-manifest` → `disclosure-workspace/disclosure-manifest.json`（`main_agent` / `json`）
+  - `phase-3-diagram-packages` → `disclosure-workspace/working/stages/phase-3/diagram-result.tsv`（`patent_diagram_engineer`，fallback 时为 `main_agent` / `tsv`）
+  - `phase-3-build-map` → `disclosure-workspace/working/stages/phase-3/build-map.tsv`（`main_agent` / `tsv`）
+  - `phase-3-handoff` → `disclosure-workspace/working/stages/phase-3/handoff.md`（`main_agent` / `markdown`）
+- 阶段 4：
+  - `phase-4-review-task` → `disclosure-workspace/working/stages/agents/final-review-task.md`（`main_agent` / `markdown`）
+  - `phase-4-final-review` → `disclosure-workspace/working/stages/phase-4/review.tsv`（`patent_final_reviewer`，fallback 时为 `main_agent` / `tsv`）
+  - `phase-4-validation` → `disclosure-workspace/disclosure-validation.json`（`main_agent` / `json`）
+  - `phase-4-timing-summary` → `disclosure-workspace/working/session-timing-summary.json`（`main_agent` / `json`）
+  - `phase-4-handoff` → `disclosure-workspace/working/stages/phase-4/handoff.md`（`main_agent` / `markdown`）
+
+阶段 3 的制图结果文件在 worker 完成后一次写定；主 agent 随后将图包行和正文工件合并为单独的 `build-map.tsv`。不能用一个“已写完”任务掩盖缺失工件，也不能在任务完成并绑定 hash 后继续追加内容。
+
+- subagent 返回终态事件后，由主 agent 先把结构化结果写入合同指定的缓存文件并执行最低检查，再完成相应 checkpoint task；仅有聊天消息或事件行不能标记完成。
+
+### 7.6 手工回退
+
+用户增加或修改原始输入时，通常回退阶段 1；修改未确认写作思路时通常留在阶段 2；修改已冻结 I/T/D/E/S 或图示规划时由主 agent判断回退阶段 2 或 3；只改变复核处置时可回退阶段 4。主 agent 必须记录具体回退阶段和理由，再重建该阶段任务清单。
+
+主 agent 先用 checkpoint `rollback-stage` 重置到选定阶段，再立即对同一阶段执行 `stage_handoff.py rewind`。`rewind` 只校验并保留所选阶段之前的有效前缀，删除所选阶段及下游封存行且保留缓存；两步完成后 `resume` 与 `stage_handoff.py status` 必须指向同一阶段。任一步失败时记录 `BLOCKED`，不得继续使用旧下游 handoff。所选阶段重建完成后必须重新 `seal`。
+
+```bash
+python3 scripts/checkpoint.py rollback-stage --root <disclosure-dir> \
+  --stage <phase_name> --reason "<主 agent 的回退判断>" \
+  --input "<输入或相对路径>" \
+  --task <task-id> "<标题>" <owner> <result-path> <minimum-check>
+python3 scripts/stage_handoff.py rewind \
+  --working <disclosure-workspace/working> --stage <phase_name>
+```
+
+第一版不自动分析任务依赖，也不根据文件变化自行选择回退阶段；“显式选择阶段后按固定四阶段顺序截断下游封存”不属于自动推断。无法确定回退范围且不同选择会改变交付内容时，按 `DECISION` 请求用户确认。

@@ -78,6 +78,7 @@ subagent 最多累计 3 个、同时最多 1 个；子 agent 禁止继续派生�
     ├── disclosure-manifest.json
     ├── disclosure-validation.json
     ├── working/                     # 阶段缓存、临时草稿与 session timing
+    │   ├── CHECKPOINT.md             # 当前任务状态与断点恢复依据
     │   ├── session-timing.jsonl
     │   ├── session-timing-summary.json
     │   └── stages/
@@ -101,14 +102,27 @@ subagent 最多累计 3 个、同时最多 1 个；子 agent 禁止继续派生�
 
 对外版本中的拟扩展内容仍使用 `> **拟扩展保护**` 高亮，但不显示 `IE` 编号；`IE` 映射只保留在 manifest 和内部追溯附录中。
 
+## 任务检查点与恢复（必做）
+
+每次真实任务都在 `<disclosure-dir>/disclosure-workspace/working/CHECKPOINT.md` 维护唯一的当前状态。它不是进度日志，只记录当前阶段、本阶段输入、本阶段任务、当前阶段已交付、下一步和阻塞项；不得追加微步骤、工具调用、普通文件读写、预算内重试或重复进度。
+
+- 任务粒度只允许“一个阶段交付物”或“一个 subagent 职责”，每项必须绑定相对 `<disclosure-dir>` 的唯一结果文件和最低检查类型。四阶段固定项以 `references/checkpoint-task-catalog.json` 为机器真源，不能删除、替换或合并，额外任务只能追加；subagent 任务包还必须写明对应的 checkpoint task id、结果路径和最低检查。
+- 只有结果文件存在、非空并通过 `nonempty`、`markdown`、`json` 或 `tsv` 中声明的最低检查，才能完成任务并加入“当前阶段已交付”；完成时同时绑定当前 SHA-256。并行的主/subagent 任务可以按实际完成顺序登记，恢复时仍按任务清单顺序选择第一个无效或未完成项。最低检查只是文件级底线，不能替代 handoff 封存、图包验证、完整交底校验或语义复核。
+- CHECKPOINT 只在阶段开始、任务完成、等待用户和发生阻塞时原子更新。阶段 2 提交写作思路后先记录等待用户再结束当前轮次；等待动作只进入状态与“下一步”，不伪装成阻塞。写入等待/阻塞时将已经失效的旧交付降回 pending；完全相同的重复请求不重写文件。subagent 的普通事件、依赖等待超时和恢复检查本身不更新 CHECKPOINT。
+- 恢复任务时先校验并读取 CHECKPOINT，再运行 `stage_handoff.py status` 核对封存链。已完成且文件仍满足最低检查、SHA-256 未变化的任务直接跳过；结果缺失、为空、格式无效或 hash 改变时，将该任务视为未完成并重新执行，从第一个无效或未完成任务继续。恢复检查只报告，不改写状态。
+- 用户修改输入或已冻结计划时，由主 agent 判断应回退到阶段 1、2、3 或 4，记录回退理由并显式重建所选阶段的任务；先执行 checkpoint `rollback-stage`，再对同一阶段执行 `stage_handoff.py rewind`，只保留其上游有效封存并使两份状态一致。第一版不做自动依赖分析，也不得静默推断回退范围。
+
+标准入口以 `scripts/checkpoint.py --help` 为准：写操作使用 `start-stage`、`complete-task`、`wait-user`、`block` 和 `rollback-stage`，只读恢复使用 `resume`，完整性检查使用 `validate`。路径必须位于交底目录内，禁止绝对路径、`..` 和符号链接越界。
+
 ## 阶段交付与上下文边界（必做）
 
-四阶段必须遵循 `references/stage-delivery-contract.md`。首次执行先初始化 `working/stages/`；每阶段开始用 `status` 取得唯一有效输入，结束时用 `seal` 封存。跨轮次恢复只读取最后一个有效 handoff，不重放旧对话或长推理：
+四阶段必须遵循 `references/stage-delivery-contract.md`。首次执行先初始化 `working/stages/`，再为当前阶段建立 CHECKPOINT；每阶段开始用 `status` 取得唯一有效输入，结束时用 `seal` 封存。跨轮次恢复先走 CHECKPOINT 恢复规则，再读取最后一个有效 handoff，不重放旧对话或长推理：
 
 ```bash
 python3 scripts/stage_handoff.py init --working <disclosure-workspace/working>
 python3 scripts/stage_handoff.py status --working <disclosure-workspace/working>
 python3 scripts/stage_handoff.py seal --working <disclosure-workspace/working> --stage <phase_name>
+python3 scripts/stage_handoff.py rewind --working <disclosure-workspace/working> --stage <phase_name>
 ```
 
 - 阶段 1 是既有原始材料的唯一读取者：用 `material-index.tsv` 保存来源、hash 和有效锚点，用 `evidence-cards.md` 只缓存会进入主张、I/T、检索词或边界判断的事实。后续阶段不得为“补上下文”重读同一材料。
@@ -180,10 +194,10 @@ python3 scripts/stage_handoff.py seal --working <disclosure-workspace/working> -
 
 ### 阶段 3：撰写最终版本
 
-本阶段只读取已封存的 `phase-2/handoff.md` 和按需加载的三份正式模板；正常情况下不读取原始材料。需要判断文档结构、图型与数量触发、编号一致性以及正文/内部稿/manifest/图包的同源关系。缓存 `agents/diagram-task.md` 和 `phase-3/build-map.tsv`；后者只记录工件 ID、相对路径、hash、owner 与状态。
+本阶段只读取已封存的 `phase-2/handoff.md` 和按需加载的三份正式模板；正常情况下不读取原始材料。需要判断文档结构、图型与数量触发、编号一致性以及正文/内部稿/manifest/图包的同源关系。缓存 `agents/diagram-task.md`、不可变的 subagent 结果 `phase-3/diagram-result.tsv` 和最终 `phase-3/build-map.tsv`；两个 TSV 均只记录工件 ID、相对路径、hash、owner 与状态。
 
 5. **规划并生成图示**
-   - 用户确认后从阶段 2 handoff 读取冻结的 `I/T/D/E/S` 与图示职责，写入三段式 `agents/diagram-task.md`，再把全部图交给一个 `patent_diagram_engineer`；主 agent 可同时撰写正文，双方不得改写对方负责的文件。
+   - 用户确认后从阶段 2 handoff 读取冻结的 `I/T/D/E/S` 与图示职责，写入三段式 `agents/diagram-task.md`，再把全部图交给一个 `patent_diagram_engineer`；主 agent 可同时撰写正文，双方不得改写对方负责的文件。worker 返回后由主 agent 一次性写入 `diagram-result.tsv` 并完成对应 checkpoint task，后续不得追加正文工件使其 hash 失效。
    - 统一调用 `$feipi-plantuml-generate-diagram`：先一次性完成全部 brief，再对各图生成 diagram package。每张图的 `validate_package.sh` 已内置 verifier，只调用一次；不得再手工重复调用 `verify_package.py`。
    - 必须且只能有 1 张 `component_overview` 和 1 张 `main_flow`。
    - 主流程由分支/状态驱动时使用 `activity`；由多方调用/回执驱动时使用 `sequence` 且设置 `numbering_scheme: process_s`。
@@ -205,7 +219,7 @@ python3 scripts/stage_handoff.py seal --working <disclosure-workspace/working> -
    - 主流程顶层保持连续 5–10 步；箭头标签只保留编号或一个动作短语，参数和异常处理写在图下。
    - 竞品部分必须展示检索范围、检索日期和结论；存在可靠证据时再列出 1–3 项。没有可用证据时写清已经查阅了什么以及为什么不能形成具名对比，不得留空或出现“待检索”。
 
-正文与图包汇合后才计算最终 hash 并完成 `build-map.tsv`；将工件路径/hash、owner、状态和待复核项写入 `phase-3/handoff.md`，封存为 `phase_3_final_drafting`。handoff 不复制正文、manifest、PUML 或 SVG 内容。
+正文与图包汇合后才把 `diagram-result.tsv` 与正文工件合并为最终 `build-map.tsv` 并计算 hash；将工件路径/hash、owner、状态和待复核项写入 `phase-3/handoff.md`，封存为 `phase_3_final_drafting`。handoff 不复制正文、manifest、PUML 或 SVG 内容。
 
 ### 阶段 4：复核、验证与交付
 
@@ -249,6 +263,7 @@ bash scripts/validate_disclosure_package.sh <disclosure-dir>
 - 来源悬空：删除断言或补齐来源；竞品资料不足时继续检索，完成两类检索后仍无可用证据则记录具体结论，不要猜测。
 - 竞品检索不可用：说明检索工具或页面访问阻塞并暂停最终成稿；不得生成空章节或“待检索”占位稿。
 - 图包失败：先修 diagram package，不把未通过的 PlantUML 贴入正文。
+- 检查点结果失效：从 `resume` 返回的第一个无效或未完成任务重做，不手工勾选完成，也不删除旧文件来伪造新状态。
 - 语义或视觉复核待完成：输出 `review_required`，不得宣称全部通过。
 - 校验规则与模板冲突：以 schema 和 `references/content-quality-gates.md` 为内容合同，记录冲突并修复同源资源。
 
@@ -256,6 +271,8 @@ bash scripts/validate_disclosure_package.sh <disclosure-dir>
 
 - 内容质量规则：`references/content-quality-gates.md`
 - 阶段交付与上下文压缩：`references/stage-delivery-contract.md`
+- 阶段检查点固定任务：`references/checkpoint-task-catalog.json`
+- 任务检查点工具：`scripts/checkpoint.py`
 - subagent 分级编排：`references/subagent-orchestration.json`
 - session 耗时观测：`references/session-timing.md`
 - 正式文档模板：`assets/proposal_template.md`

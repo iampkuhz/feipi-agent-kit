@@ -119,6 +119,7 @@ python3 scripts/session_timing.py summarize --log <timing-log> \
 
 ## 观测边界
 
+- `CHECKPOINT.md` 是可恢复的当前任务状态，`session-timing.jsonl` 才是追加式观测日志；不得把 checkpoint 更新复制成 timing 微事件，也不得用 timing span 代替任务完成门禁。
 - 宿主未提供模型排队、首 token、token 用量或隐藏 reasoning 时长时，本工具不能推导这些指标；阶段墙钟只代表协调流程经过时间，不等于模型计算时间。
 - 每次 `session_timing.py` 进程启动和 JSONL 写入本身存在少量观测开销，该开销不计入被测 span；因此资源读取按批次记录。
 - 并行活动的 `duration_ms` 会重叠，分析关键路径时使用阶段墙钟、subagent wait 和宿主 runtime session，不对活动总和作墙钟解释。

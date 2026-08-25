@@ -67,6 +67,10 @@ def populate(working: Path) -> None:
     write(stage_root / "phase-2/decision.md", "# Decision\n\nconfirmed\n")
     write(stage_root / "agents/diagram-task.md", "# Task\n\n## 输入\n\n- phase-2\n\n## 需要判断\n\n- layout\n\n## 返回\n\n- TSV rows\n")
     write(
+        stage_root / "phase-3/diagram-result.tsv",
+        "artifact_id\tpath\tsha256\towner\tstatus\nD1\tdiagrams/D1\tdeadbeef\tdiagram_worker\tready\n",
+    )
+    write(
         stage_root / "phase-3/build-map.tsv",
         "artifact_id\tpath\tsha256\towner\tstatus\nD1\tdiagrams/D1\tdeadbeef\tdiagram_worker\tready\n",
     )
@@ -143,6 +147,69 @@ def test_upstream_change_invalidates_downstream() -> None:
         run(working, "validate", "--require-complete", expected=1)
 
 
+def test_rewind_truncates_state_and_allows_current_stage_noop() -> None:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        working = Path(temp_dir) / "disclosure-workspace/working"
+        run(working, "init")
+        populate(working)
+        seal_all(working)
+        cached = working / "stages/phase-3/build-map.tsv"
+        cached_before = cached.read_bytes()
+
+        result = run(working, "rewind", "--stage", STAGES[1][0])
+        assert f"rewound={STAGES[1][0]}" in result.stdout
+        assert (
+            "invalidated="
+            "phase_2_idea_confirmation,phase_3_final_drafting,phase_4_review_delivery"
+        ) in result.stdout
+        assert "valid_stages=1" in result.stdout
+        assert f"next_stage={STAGES[1][0]}" in result.stdout
+        assert cached.read_bytes() == cached_before
+
+        status = run(working, "status")
+        assert f"next_stage={STAGES[1][0]}" in status.stdout
+        assert "next_input=stages/phase-1/handoff.md" in status.stdout
+
+        state_before = (working / "stages/stage-state.tsv").read_bytes()
+        result = run(working, "rewind", "--stage", STAGES[1][0])
+        assert "invalidated=none" in result.stdout
+        assert "valid_stages=1" in result.stdout
+        assert (working / "stages/stage-state.tsv").read_bytes() == state_before
+
+
+def test_rewind_allows_damaged_downstream_and_preserves_cache() -> None:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        working = Path(temp_dir) / "disclosure-workspace/working"
+        run(working, "init")
+        populate(working)
+        seal_all(working)
+        damaged = working / "stages/phase-3/build-map.tsv"
+        damaged.write_text(damaged.read_text(encoding="utf-8") + "damaged\n", encoding="utf-8")
+
+        result = run(working, "rewind", "--stage", STAGES[1][0])
+        assert f"rewound={STAGES[1][0]}" in result.stdout
+        assert "valid_stages=1" in result.stdout
+        assert damaged.read_text(encoding="utf-8").endswith("damaged\n")
+        result = run(working, "validate")
+        assert "valid_stages=1" in result.stdout
+
+
+def test_rewind_rejects_unreachable_future_stage() -> None:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        working = Path(temp_dir) / "disclosure-workspace/working"
+        run(working, "init")
+        populate(working)
+        run(working, "seal", "--stage", STAGES[0][0])
+        state_path = working / "stages/stage-state.tsv"
+        state_before = state_path.read_bytes()
+
+        result = run(working, "rewind", "--stage", STAGES[2][0], expected=1)
+        assert f"回退阶段尚不可达：{STAGES[2][0]}" in result.stderr
+        assert state_path.read_bytes() == state_before
+        status = run(working, "status")
+        assert f"next_stage={STAGES[1][0]}" in status.stdout
+
+
 def test_symlink_escape_is_rejected() -> None:
     with tempfile.TemporaryDirectory() as temp_dir:
         base = Path(temp_dir)
@@ -178,6 +245,9 @@ def main() -> None:
         test_complete_chain_and_status,
         test_tamper_and_header_failure,
         test_upstream_change_invalidates_downstream,
+        test_rewind_truncates_state_and_allows_current_stage_noop,
+        test_rewind_allows_damaged_downstream_and_preserves_cache,
+        test_rewind_rejects_unreachable_future_stage,
         test_symlink_escape_is_rejected,
         test_nested_json_cell_is_rejected,
     )

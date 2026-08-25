@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.1",
+  "schema_version": "1.2",
   "max_active_subagents": 1,
   "max_total_subagents": 3,
   "allow_recursive_spawn": false,
@@ -14,8 +14,55 @@
     "forbidden_actions",
     "return_format",
     "timing_log",
-    "key_event_contract"
+    "key_event_contract",
+    "checkpoint_task"
   ],
+  "checkpoint": {
+    "path": "disclosure-workspace/working/CHECKPOINT.md",
+    "task_catalog": "references/checkpoint-task-catalog.json",
+    "coordinator": "main_agent",
+    "state_model": "current_state_not_event_log",
+    "task_granularity": "stage_deliverable_or_single_subagent_assignment",
+    "update_on": [
+      "stage_start",
+      "task_complete",
+      "waiting_user",
+      "blocked"
+    ],
+    "silent_on": [
+      "micro_step",
+      "tool_call",
+      "file_read",
+      "file_write",
+      "cache_hit",
+      "retry",
+      "resume_check",
+      "unchanged_wait"
+    ],
+    "completion_gate": {
+      "result_file_required": true,
+      "nonempty": true,
+      "minimum_check_required": true,
+      "bind_sha256": true,
+      "minimum_checks": [
+        "nonempty",
+        "markdown",
+        "json",
+        "tsv"
+      ]
+    },
+    "resume": {
+      "read_before_stage_status": true,
+      "skip_completed_only_when_result_valid": true,
+      "first_invalid_or_incomplete_task": true,
+      "read_only": true
+    },
+    "rollback": {
+      "decision_owner": "main_agent",
+      "reason_required": true,
+      "automatic_dependency_analysis": false
+    }
+  },
   "event_reporting": {
     "critical_events": [
       "MILESTONE",
@@ -121,6 +168,12 @@
       "reporting_profile": "subagent_to_main",
       "writes": [],
       "task_file": "disclosure-workspace/working/stages/agents/prior-art-task.md",
+      "checkpoint_task": {
+        "task_id": "phase-1-prior-art-research",
+        "owner": "patent_prior_art_researcher",
+        "result_path": "disclosure-workspace/working/stages/phase-1/research.tsv",
+        "minimum_check": "tsv"
+      },
       "input_contract": [
         "disclosure-workspace/working/stages/agents/prior-art-task.md",
         "basis_terms_and_context_terms",
@@ -151,6 +204,12 @@
         "disclosure-workspace/diagrams/"
       ],
       "task_file": "disclosure-workspace/working/stages/agents/diagram-task.md",
+      "checkpoint_task": {
+        "task_id": "phase-3-diagram-packages",
+        "owner": "patent_diagram_engineer",
+        "result_path": "disclosure-workspace/working/stages/phase-3/diagram-result.tsv",
+        "minimum_check": "tsv"
+      },
       "input_contract": [
         "disclosure-workspace/working/stages/phase-2/handoff.md",
         "diagram_responsibilities",
@@ -162,8 +221,8 @@
         "implemented_path_only"
       ],
       "output_contract": {
-        "format": "build-map.tsv rows",
-        "cache_path": "disclosure-workspace/working/stages/phase-3/build-map.tsv",
+        "format": "diagram-result.tsv rows",
+        "cache_path": "disclosure-workspace/working/stages/phase-3/diagram-result.tsv",
         "message": "final_event_and_paths_only",
         "writer": "main_agent"
       },
@@ -179,6 +238,12 @@
       "reporting_profile": "subagent_to_main",
       "writes": [],
       "task_file": "disclosure-workspace/working/stages/agents/final-review-task.md",
+      "checkpoint_task": {
+        "task_id": "phase-4-final-review",
+        "owner": "patent_final_reviewer",
+        "result_path": "disclosure-workspace/working/stages/phase-4/review.tsv",
+        "minimum_check": "tsv"
+      },
       "input_contract": [
         "disclosure-workspace/working/stages/phase-3/handoff.md",
         "disclosure-workspace/working/stages/phase-3/build-map.tsv",

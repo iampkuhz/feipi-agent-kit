@@ -74,6 +74,7 @@ STAGES = (
         "phase_4_review_delivery",
         (
             "stages/agents/diagram-task.md",
+            "stages/phase-3/diagram-result.tsv",
             "stages/phase-3/build-map.tsv",
             "stages/phase-3/handoff.md",
         ),
@@ -102,6 +103,9 @@ TSV_HEADERS = {
     "stages/phase-3/build-map.tsv": [
         "artifact_id", "path", "sha256", "owner", "status",
     ],
+    "stages/phase-3/diagram-result.tsv": [
+        "artifact_id", "path", "sha256", "owner", "status",
+    ],
     "stages/phase-4/review.tsv": [
         "artifact_id", "review_type", "status", "bound_sha256", "conclusion",
     ],
@@ -125,9 +129,10 @@ def parse_args() -> argparse.Namespace:
         sub.add_argument("--working", required=True, help="disclosure-workspace/working 路径")
         if command == "validate":
             sub.add_argument("--require-complete", action="store_true")
-    seal = subparsers.add_parser("seal")
-    seal.add_argument("--working", required=True, help="disclosure-workspace/working 路径")
-    seal.add_argument("--stage", required=True, choices=tuple(STAGE_BY_NAME))
+    for command in ("seal", "rewind"):
+        sub = subparsers.add_parser(command)
+        sub.add_argument("--working", required=True, help="disclosure-workspace/working 路径")
+        sub.add_argument("--stage", required=True, choices=tuple(STAGE_BY_NAME))
     return parser.parse_args()
 
 
@@ -373,6 +378,27 @@ def seal(root: Path, stage_name: str) -> None:
     print(f"invalidated={','.join(invalidated) if invalidated else 'none'}")
 
 
+def rewind(root: Path, stage_name: str) -> None:
+    rows = load_state(root)
+    stage = STAGE_BY_NAME[stage_name]
+    index = STAGES.index(stage)
+    if len(rows) > len(STAGES):
+        raise ContractError("stage-state.tsv 阶段数超出合同")
+    if index > len(rows):
+        raise ContractError(f"回退阶段尚不可达：{stage.name}")
+
+    retained = rows[:index]
+    validate_rows(root, retained)
+    invalidated = [STAGES[row_index].name for row_index in range(index, len(rows))]
+    if invalidated:
+        save_state(root, retained)
+
+    print(f"rewound={stage.name}")
+    print(f"invalidated={','.join(invalidated) if invalidated else 'none'}")
+    print(f"valid_stages={len(retained)}")
+    print(f"next_stage={stage.name}")
+
+
 def status(root: Path) -> None:
     rows = validate_state(root)
     if not rows:
@@ -399,6 +425,8 @@ def main() -> int:
             init(root)
         elif args.command == "seal":
             seal(root, args.stage)
+        elif args.command == "rewind":
+            rewind(root, args.stage)
         elif args.command == "status":
             status(root)
         elif args.command == "validate":
