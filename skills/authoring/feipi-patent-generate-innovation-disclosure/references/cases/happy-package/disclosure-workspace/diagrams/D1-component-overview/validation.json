@@ -1,6 +1,6 @@
 {
-  "schema_version": "1.1",
-  "render_contract_version": "2",
+  "schema_version": "1.2",
+  "render_contract_version": "3",
   "skill_name": "feipi-plantuml-generate-diagram",
   "diagram_id": "D1",
   "diagram_type": "component",
@@ -63,5 +63,12 @@
     "cache_hits": 0
   },
   "final_status": "success",
-  "blocked_reason": ""
+  "blocked_reason": "",
+  "failure_class": "none",
+  "repairable": false,
+  "issues": [],
+  "attempt_index": 1,
+  "max_render_attempts": 2,
+  "attempts_remaining": 1,
+  "brief_validation_reused": false
 }

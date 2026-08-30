@@ -11,6 +11,8 @@ set -euo pipefail
 #
 #   Typed profile 模式:
 #     bash scripts/validate_package.sh --diagram-type <type> --brief <brief.yaml> --diagram <diagram.puml> --out-dir <dir>
+#   renderer 地址来自批次 preflight 的 renderer_url：
+#     bash scripts/validate_package.sh ... --server-url http://127.0.0.1:8199/plantuml
 #   复用完全未变且已通过当前合同校验的图包:
 #     bash scripts/validate_package.sh ... --reuse-valid-package
 #
@@ -35,7 +37,9 @@ BRIEF_FILE=""
 DIAGRAM_FILE=""
 OUT_DIR=""
 REUSE_VALID_PACKAGE=false
-RENDER_CONTRACT_VERSION="2"
+RENDER_CONTRACT_VERSION="3"
+SERVER_URL="auto"
+MAX_RENDER_ATTEMPTS=2
 
 # 解析参数
 while [[ $# -gt 0 ]]; do
@@ -60,6 +64,10 @@ while [[ $# -gt 0 ]]; do
       REUSE_VALID_PACKAGE=true
       shift
       ;;
+    --server-url)
+      SERVER_URL="$2"
+      shift 2
+      ;;
     -h|--help)
       cat <<'USAGE'
 用法:
@@ -67,6 +75,8 @@ while [[ $# -gt 0 ]]; do
     bash scripts/validate_package.sh --diagram <diagram.puml> --out-dir <dir>
   Typed profile 模式:
     bash scripts/validate_package.sh --diagram-type <type> --brief <brief.yaml> --diagram <diagram.puml> --out-dir <dir>
+  使用批次预检冻结的 renderer:
+    在上述命令末尾增加 --server-url <loopback-url>
   复用未变图包:
     在上述命令末尾增加 --reuse-valid-package
 USAGE
@@ -101,6 +111,14 @@ print(round(max(0, int(sys.argv[2]) - int(sys.argv[1])) / 1_000_000, 3))
 PY
 }
 
+file_sha256() {
+  python3 - "$1" <<'PY'
+import hashlib, sys
+from pathlib import Path
+print(hashlib.sha256(Path(sys.argv[1]).read_bytes()).hexdigest())
+PY
+}
+
 VALIDATION_START_NS="$(monotonic_ns)"
 RENDER_DURATION_MS="0"
 RENDER_HTTP_REQUESTS=0
@@ -108,6 +126,8 @@ RENDER_ROUNDS=0
 PACKAGE_VALIDATION_RUNS=1
 PACKAGE_VERIFIER_RUNS=0
 CACHE_HITS=0
+PREVIOUS_RENDER_ATTEMPTS=0
+BRIEF_VALIDATION_REUSED=false
 
 # Router 真源：只有注册完成的 profile 才进入 typed 校验，未知图型明确 fallback。
 IFS=$'\t' read -r PROFILE PROFILE_VERSION SCHEMA_FILE COVERAGE_MODE LAYOUT_MODE < <(
@@ -252,6 +272,59 @@ PY
   fi
 fi
 
+# 失败合同是下一轮定点修复的唯一入口：相同 brief/profile 下，未修改图、
+# 非可修复失败或已经耗尽两次 renderer 调用时都禁止重复执行。
+if [[ -f "$VALIDATION_OUT" ]]; then
+  CURRENT_DIAGRAM_SHA256="$(file_sha256 "$DIAGRAM_FILE")"
+  CURRENT_BRIEF_SHA256=""
+  [[ -n "$BRIEF_FILE" && -f "$BRIEF_FILE" ]] && CURRENT_BRIEF_SHA256="$(file_sha256 "$BRIEF_FILE")"
+  IFS='|' read -r PREV_STATUS PREV_PROFILE PREV_PROFILE_VERSION PREV_RENDER_CONTRACT \
+    PREV_BRIEF_SHA256 PREV_PUML_SHA256 PREV_ATTEMPT PREV_REPAIRABLE PREV_FAILURE_CLASS < <(
+    python3 - "$VALIDATION_OUT" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+try:
+    data = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+except Exception:
+    data = {}
+values = [
+    data.get("final_status", ""),
+    data.get("profile", ""),
+    str(data.get("profile_version", "")),
+    str(data.get("render_contract_version", "")),
+    data.get("brief_sha256", ""),
+    data.get("puml_sha256", ""),
+    str(data.get("attempt_index", 0)),
+    "true" if data.get("repairable") is True else "false",
+    data.get("failure_class", ""),
+]
+print("|".join(values))
+PY
+  )
+  if [[ "$PREV_STATUS" == "blocked" \
+    && "$PREV_PROFILE" == "$PROFILE" \
+    && "$PREV_PROFILE_VERSION" == "$PROFILE_VERSION" \
+    && "$PREV_RENDER_CONTRACT" == "$RENDER_CONTRACT_VERSION" \
+    && "$PREV_BRIEF_SHA256" == "$CURRENT_BRIEF_SHA256" ]]; then
+    [[ "$PREV_ATTEMPT" =~ ^[0-9]+$ ]] || PREV_ATTEMPT=0
+    if [[ "$PREV_REPAIRABLE" != "true" ]]; then
+      echo "上次失败不可自动修复：$PREV_FAILURE_CLASS；请处理 blocker 或更换输出目录" >&2
+      exit 1
+    fi
+    if [[ "$PREV_PUML_SHA256" == "$CURRENT_DIAGRAM_SHA256" ]]; then
+      echo "失败图未发生变化，禁止重复校验和渲染" >&2
+      exit 1
+    fi
+    if [[ "$PREV_ATTEMPT" -ge "$MAX_RENDER_ATTEMPTS" ]]; then
+      echo "已达到每图最多 $MAX_RENDER_ATTEMPTS 次 renderer 调用，禁止继续" >&2
+      exit 1
+    fi
+    PREVIOUS_RENDER_ATTEMPTS="$PREV_ATTEMPT"
+  fi
+fi
+
 # 旧 SVG/合同不得被下一轮失败或缺 renderer 的运行误收录。仅清理本包的固定产物。
 rm -f "$SVG_OUT" "$VALIDATION_OUT"
 
@@ -288,14 +361,6 @@ PY
   fi
 fi
 
-file_sha256() {
-  python3 - "$1" <<'PY'
-import hashlib, sys
-from pathlib import Path
-print(hashlib.sha256(Path(sys.argv[1]).read_bytes()).hexdigest())
-PY
-}
-
 DIAGRAM_SNAPSHOT_SHA256="$(file_sha256 "$DIAGRAM_OUT")"
 BRIEF_SNAPSHOT_SHA256=""
 PARENT_SNAPSHOT_SHA256=""
@@ -315,11 +380,76 @@ snapshot_unchanged() {
   fi
 }
 
+BRIEF_LOCK_OUT="$OUT_DIR/.brief-lock.json"
+BRIEF_RULESET_SHA256=""
+if [[ "$IS_TYPED" == "true" ]]; then
+  BRIEF_RULESET_SHA256="$(python3 - "$SCHEMA_FILE" "$LIB_DIR/profile_registry.py" \
+    "$LIB_DIR/brief_loader.py" "$LIB_DIR/validate_brief_cli.py" "$LIB_DIR/profile_validators.py" <<'PY'
+import hashlib
+import sys
+from pathlib import Path
+
+digest = hashlib.sha256()
+for value in sys.argv[1:]:
+    path = Path(value)
+    digest.update(path.name.encode("utf-8"))
+    digest.update(b"\0")
+    digest.update(path.read_bytes())
+    digest.update(b"\n")
+print(digest.hexdigest())
+PY
+)"
+fi
+
+brief_lock_matches() {
+  [[ "$IS_TYPED" == "true" && -f "$BRIEF_LOCK_OUT" ]] || return 1
+  python3 - "$BRIEF_LOCK_OUT" "$BRIEF_SNAPSHOT_SHA256" "$PROFILE" "$PROFILE_VERSION" "$BRIEF_RULESET_SHA256" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+try:
+    data = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+except Exception:
+    raise SystemExit(1)
+expected = {
+    "brief_sha256": sys.argv[2],
+    "profile": sys.argv[3],
+    "profile_version": sys.argv[4],
+    "brief_ruleset_sha256": sys.argv[5],
+    "brief_check": "ok",
+}
+raise SystemExit(0 if all(data.get(key) == value for key, value in expected.items()) else 1)
+PY
+}
+
+write_brief_lock() {
+  python3 - "$BRIEF_LOCK_OUT" "$BRIEF_SNAPSHOT_SHA256" "$PROFILE" "$PROFILE_VERSION" "$BRIEF_RULESET_SHA256" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+value = {
+    "brief_sha256": sys.argv[2],
+    "profile": sys.argv[3],
+    "profile_version": sys.argv[4],
+    "brief_ruleset_sha256": sys.argv[5],
+    "brief_check": "ok",
+}
+temporary = path.with_suffix(path.suffix + ".tmp")
+temporary.write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+temporary.replace(path)
+PY
+}
+
 # =============================================================================
 # 用 Python 写 validation.json，避免 shell 拼接 JSON
 # =============================================================================
 write_json() {
   local brief_path="${8:-}"
+  local issue_text="${9:-${7:-}}"
+  local attempt_index=$((PREVIOUS_RENDER_ATTEMPTS + RENDER_ROUNDS))
   local total_duration_ms=""
   local static_validation_duration_ms=""
   total_duration_ms="$(duration_ms "$VALIDATION_START_NS")"
@@ -344,6 +474,10 @@ PY
     --render-server "${5:-}" \
     --final-status "$6" \
     --blocked-reason "${7:-}" \
+    --issue-text "$issue_text" \
+    --attempt-index "$attempt_index" \
+    --max-render-attempts "$MAX_RENDER_ATTEMPTS" \
+    --brief-validation-reused "$BRIEF_VALIDATION_REUSED" \
     --package-dir "$OUT_DIR" \
     --total-duration-ms "$total_duration_ms" \
     --render-duration-ms "$RENDER_DURATION_MS" \
@@ -371,13 +505,13 @@ echo "Step 0: Validating basic structure..."
 
 DIAGRAM_CONTENT="$(cat "$DIAGRAM_OUT")"
 if ! printf '%s\n' "$DIAGRAM_CONTENT" | grep -qE '^[[:space:]]*@startuml[[:space:]]*$'; then
-  write_json "skipped" "skipped" "skipped" "skipped" "" "blocked" "missing_startuml"
+  write_json "skipped" "skipped" "skipped" "skipped" "" "blocked" "missing_startuml" "" "diagram 缺少 @startuml"
   echo "[FAIL] diagram 缺少 @startuml" >&2
   exit 1
 fi
 
 if ! printf '%s\n' "$DIAGRAM_CONTENT" | grep -qE '^[[:space:]]*@enduml[[:space:]]*$'; then
-  write_json "skipped" "skipped" "skipped" "skipped" "" "blocked" "missing_enduml"
+  write_json "skipped" "skipped" "skipped" "skipped" "" "blocked" "missing_enduml" "" "diagram 缺少 @enduml"
   echo "[FAIL] diagram 缺少 @enduml" >&2
   exit 1
 fi
@@ -394,18 +528,23 @@ LAYOUT_CHECK="skipped"
 if [[ "$IS_TYPED" == "true" ]]; then
   echo "Step 1/4: Validating brief..."
 
-  if [[ ! -f "$SCHEMA_FILE" ]]; then
+  if brief_lock_matches; then
+    BRIEF_CHECK="ok"
+    BRIEF_VALIDATION_REUSED=true
+    echo "[OK] frozen brief validation reused"
+  elif [[ ! -f "$SCHEMA_FILE" ]]; then
     write_json "failed" "skipped" "skipped" "skipped" "" "blocked" "profile_registry_incomplete" "$BRIEF_OUT"
     echo "[FAIL] 已注册 profile 缺少 schema：$SCHEMA_FILE" >&2
     exit 1
   else
     BRIEF_OUTPUT="$(python3 "$LIB_DIR/validate_brief_cli.py" "$BRIEF_OUT" --schema "$SCHEMA_FILE" --type "$PROFILE" 2>&1)" || {
-      write_json "failed" "skipped" "skipped" "skipped" "" "blocked" "brief_validation_failed" "$BRIEF_OUT"
+      write_json "failed" "skipped" "skipped" "skipped" "" "blocked" "brief_validation_failed" "$BRIEF_OUT" "$BRIEF_OUTPUT"
       echo "[FAIL] brief validation failed" >&2
       echo "$BRIEF_OUTPUT" >&2
       exit 1
     }
     BRIEF_CHECK="ok"
+    write_brief_lock
     echo "[OK] brief validation passed"
   fi
 
@@ -417,7 +556,7 @@ if [[ "$IS_TYPED" == "true" ]]; then
   COVERAGE_SCRIPT="$SKILL_DIR/scripts/check_coverage.py"
   if [[ -f "$COVERAGE_SCRIPT" ]]; then
     COVERAGE_OUTPUT="$(python3 "$COVERAGE_SCRIPT" --type "$COVERAGE_MODE" --brief "$BRIEF_OUT" --diagram "$DIAGRAM_OUT" 2>&1)" || {
-      write_json "$BRIEF_CHECK" "failed" "skipped" "skipped" "" "blocked" "coverage_validation_failed" "$BRIEF_OUT"
+      write_json "$BRIEF_CHECK" "failed" "skipped" "skipped" "" "blocked" "coverage_validation_failed" "$BRIEF_OUT" "$COVERAGE_OUTPUT"
       echo "[FAIL] coverage check failed" >&2
       echo "$COVERAGE_OUTPUT" >&2
       exit 1
@@ -437,7 +576,7 @@ if [[ "$IS_TYPED" == "true" ]]; then
   LINT_SCRIPT="$SKILL_DIR/scripts/lint_layout.sh"
   if [[ -f "$LINT_SCRIPT" ]]; then
     LAYOUT_OUTPUT="$(bash "$LINT_SCRIPT" --type "$LAYOUT_MODE" "$DIAGRAM_OUT" "$BRIEF_OUT" 2>&1)" || {
-      write_json "$BRIEF_CHECK" "$COVERAGE_CHECK" "failed" "skipped" "" "blocked" "layout_validation_failed" "$BRIEF_OUT"
+      write_json "$BRIEF_CHECK" "$COVERAGE_CHECK" "failed" "skipped" "" "blocked" "layout_validation_failed" "$BRIEF_OUT" "$LAYOUT_OUTPUT"
       echo "[FAIL] layout check failed" >&2
       echo "$LAYOUT_OUTPUT" >&2
       exit 1
@@ -463,24 +602,29 @@ fi
 
 RENDER_SCRIPT="$SCRIPT_DIR/check_render.sh"
 if [[ -f "$RENDER_SCRIPT" ]]; then
+  if [[ $((PREVIOUS_RENDER_ATTEMPTS + 1)) -gt "$MAX_RENDER_ATTEMPTS" ]]; then
+    write_json "$BRIEF_CHECK" "$COVERAGE_CHECK" "$LAYOUT_CHECK" "skipped" "" "blocked" "attempt_limit_exceeded" "$BRIEF_OUT"
+    echo "[FAIL] render attempt limit exceeded" >&2
+    exit 1
+  fi
   RENDER_ROUNDS=$((RENDER_ROUNDS + 1))
   RENDER_START_NS="$(monotonic_ns)"
-  RENDER_OUTPUT="$(bash "$RENDER_SCRIPT" "$DIAGRAM_OUT" --svg-output "$SVG_OUT" 2>&1)" || {
+  RENDER_OUTPUT="$(bash "$RENDER_SCRIPT" "$DIAGRAM_OUT" --svg-output "$SVG_OUT" --server-url "$SERVER_URL" 2>&1)" || {
     render_exit=$?
     RENDER_DURATION_MS="$(duration_ms "$RENDER_START_NS")"
     read_render_request_count "$RENDER_OUTPUT"
     if [[ "$render_exit" -eq 2 ]]; then
-      write_json "$BRIEF_CHECK" "$COVERAGE_CHECK" "$LAYOUT_CHECK" "syntax_error" "" "blocked" "render_syntax_error" "$BRIEF_OUT"
+      write_json "$BRIEF_CHECK" "$COVERAGE_CHECK" "$LAYOUT_CHECK" "syntax_error" "" "blocked" "render_syntax_error" "$BRIEF_OUT" "$RENDER_OUTPUT"
       echo "[FAIL] render syntax error" >&2
       echo "$RENDER_OUTPUT" >&2
       exit 1
     elif [[ "$render_exit" -eq 4 ]]; then
-      write_json "$BRIEF_CHECK" "$COVERAGE_CHECK" "$LAYOUT_CHECK" "skipped" "" "blocked" "render_server_unavailable" "$BRIEF_OUT"
+      write_json "$BRIEF_CHECK" "$COVERAGE_CHECK" "$LAYOUT_CHECK" "skipped" "" "blocked" "render_server_unavailable" "$BRIEF_OUT" "$RENDER_OUTPUT"
       echo "[FAIL] no render server available" >&2
       echo "$RENDER_OUTPUT" >&2
       exit 1
     else
-      write_json "$BRIEF_CHECK" "$COVERAGE_CHECK" "$LAYOUT_CHECK" "failed" "" "blocked" "render_failed" "$BRIEF_OUT"
+      write_json "$BRIEF_CHECK" "$COVERAGE_CHECK" "$LAYOUT_CHECK" "failed" "" "blocked" "render_failed" "$BRIEF_OUT" "$RENDER_OUTPUT"
       echo "[FAIL] render failed" >&2
       echo "$RENDER_OUTPUT" >&2
       exit 1
@@ -523,7 +667,7 @@ write_json "$BRIEF_CHECK" "$COVERAGE_CHECK" "$LAYOUT_CHECK" "$RENDER_RESULT" "$R
 
 if ! python3 "$SCRIPT_DIR/verify_package.py" "$OUT_DIR" >/dev/null 2>&1; then
   write_json "$BRIEF_CHECK" "$COVERAGE_CHECK" "$LAYOUT_CHECK" "$RENDER_RESULT" "$RENDER_SERVER" "blocked" "package_verification_failed" "$BRIEF_OUT"
-  echo "[FAIL] package v1.1 自校验失败" >&2
+  echo "[FAIL] package v1.2 自校验失败" >&2
   exit 1
 fi
 

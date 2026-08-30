@@ -1,4 +1,4 @@
-version: 2
+version: 3
 interface:
   display_name: "Skill 工程治理（中文）"
   short_description: "用于治理 skill 的命名、layer、触发、执行、模板、脚本与验证边界；仅在 skill 工程任务中触发。"

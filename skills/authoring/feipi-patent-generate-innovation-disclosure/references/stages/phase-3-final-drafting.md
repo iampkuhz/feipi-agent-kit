@@ -30,9 +30,19 @@
 
 `diagram-plan.json.diagrams[]` 的 `output_dir` 必须精确为 `disclosure-workspace/diagrams/<Dn>-<purpose>`，purpose 使用小写连字符。
 
+## Renderer 批次屏障
+
+冻结中心计划后、创建任何制图任务包或 worker 前，主 agent 只执行一次：
+
+```bash
+bash <feipi-plantuml-generate-diagram>/scripts/preflight_renderer.sh --out <working>/stages/phase-3/renderer-preflight.json
+```
+
+通用 preflight 首次探测失败时可执行一次固定 Podman 启动并复检一次。仅 `final_status=success` 时继续，并把 receipt 的 `renderer_url` 与 SHA-256 写入每个 `diagram-Dn-input.json.payload`。复检失败立即 `BLOCKED`：不创建制图 worker，不再启动、杀死、重启、等待或排查 renderer/proxy。正文可保留 pending，但不得绕过图包门禁封存阶段 3。
+
 ## 正文与逐图并行
 
-主 agent 从 `content-core.json` 撰写根部唯一对外稿 `disclosure.md`。每张图先预生成 `stages/agents/inputs/diagram-Dn-input.json` JSON envelope：`slice_version=1`、与任务包一致的 `task_type` / `role` / `checkpoint`、`diagram_id`、`purpose`、`diagram_plan_sha256`、`source_set_sha256` 和对象型 `payload`。source set 只含 `content-core.json` 与 `diagram-plan.json`；路径去重后按 UTF-8 字典序排序，逐项输入 `path + NUL + 当前文件 sha256 + LF` 再取 SHA-256。`payload` 只含当前 D 的职责、必要公开字段、已实现路径、D/E/S 和独占目录；worker 禁止读取完整中心文件。
+主 agent 从 `content-core.json` 撰写根部唯一对外稿 `disclosure.md`。每张图先预生成 `stages/agents/inputs/diagram-Dn-input.json` JSON envelope：`slice_version=1`、与任务包一致的 `task_type` / `role` / `checkpoint`、`diagram_id`、`purpose`、`diagram_plan_sha256`、`source_set_sha256` 和对象型 `payload`。source set 只含 `content-core.json` 与 `diagram-plan.json`；路径去重后按 UTF-8 字典序排序，逐项输入 `path + NUL + 当前文件 sha256 + LF` 再取 SHA-256。`payload` 只含当前 D 的职责、必要公开字段、已实现路径、D/E/S、独占目录，以及当前批次 `renderer_url` / `renderer_preflight_sha256`；worker 禁止读取完整中心文件。
 
 主 agent 为每张图生成独立三段式任务包；“需要判断/返回”只能分别写 `JUDGMENT-DIAGRAM-Dn-V1` / `RETURN-DIAGRAM-Dn-TSV-V1`，不得内嵌上下文、JSON、路径或 URL。派发或 fallback 前运行：
 
@@ -63,7 +73,7 @@ python3 scripts/stage_handoff.py validate-task --working <disclosure-workspace/w
 4. 生成 `build-map.tsv`，记录最终工件路径、SHA-256、owner 和状态。
 5. 写 `phase-3/handoff.md`，只传 build map 和待复核项，不复制正文、manifest、PUML 或 SVG。
 
-图包自身验证由单图 worker 调用一次 `validate_package.sh` 完成；不得重复手工调用 verifier。未变化图包用 `--reuse-valid-package`；brief/PUML/SVG 变化才重跑对应图，修复最多 2 轮。
+图包自身验证由单图 worker 调用 `validate_package.sh --server-url <renderer_url>` 完成；不得重复手工调用 verifier。未变化图包用 `--reuse-valid-package`；brief/PUML/SVG 变化才重跑对应图。每图总 renderer 调用最多 2 次：首次 1 次、定点修复 1 次。
 
 ## 完成与回退
 

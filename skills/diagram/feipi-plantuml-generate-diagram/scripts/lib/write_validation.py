@@ -18,7 +18,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Write validation.json")
     parser.add_argument("--output", required=True)
     parser.add_argument("--skill-name", default="feipi-plantuml-generate-diagram")
-    parser.add_argument("--render-contract-version", default="2")
+    parser.add_argument("--render-contract-version", default="3")
     parser.add_argument("--diagram-type", default="fallback")
     parser.add_argument("--profile", default="fallback")
     parser.add_argument("--diagram-path", default="")
@@ -30,6 +30,12 @@ def main() -> int:
     parser.add_argument("--render-server", default="")
     parser.add_argument("--final-status", default="pending")
     parser.add_argument("--blocked-reason", default="")
+    parser.add_argument("--issue-text", default="")
+    parser.add_argument("--attempt-index", type=int, default=0)
+    parser.add_argument("--max-render-attempts", type=int, default=2)
+    parser.add_argument(
+        "--brief-validation-reused", choices=("true", "false"), default="false"
+    )
     parser.add_argument("--brief-path", default="")
     parser.add_argument("--package-dir", default="")
     parser.add_argument("--total-duration-ms", type=float, default=0.0)
@@ -94,6 +100,39 @@ def main() -> int:
         "package_verifier_runs": max(0, args.package_verifier_runs),
         "cache_hits": max(0, args.cache_hits),
     }
+    issues = [
+        line.strip()
+        for line in args.issue_text.splitlines()
+        if line.strip()
+    ][:20]
+    if args.blocked_reason and not issues:
+        issues = [args.blocked_reason]
+    over_budget = any(
+        marker in issue
+        for issue in issues
+        for marker in ("最多允许", "显示宽度", "每层最多", "规模预算")
+    )
+    failure_policy = {
+        "missing_startuml": ("syntax", True),
+        "missing_enduml": ("syntax", True),
+        "brief_validation_failed": ("brief", False),
+        "coverage_validation_failed": ("coverage", True),
+        "layout_validation_failed": ("layout", True),
+        "render_syntax_error": ("syntax", True),
+        "render_server_unavailable": ("renderer", False),
+        "renderer_missing": ("renderer", False),
+        "render_failed": ("renderer", False),
+        "render_evidence_missing": ("renderer", False),
+        "attempt_limit_exceeded": ("retry_limit", False),
+    }
+    failure_class, repairable = failure_policy.get(
+        args.blocked_reason,
+        ("none", False) if args.final_status == "success" else ("contract", False),
+    )
+    if over_budget:
+        failure_class, repairable = "over_budget", False
+    attempt_index = max(0, args.attempt_index)
+    max_attempts = max(1, args.max_render_attempts)
     result = ValidationResult(
         skill_name=args.skill_name,
         render_contract_version=args.render_contract_version,
@@ -111,6 +150,13 @@ def main() -> int:
         render_server=args.render_server,
         final_status=args.final_status,
         blocked_reason=args.blocked_reason,
+        failure_class=failure_class,
+        repairable=repairable and attempt_index < max_attempts,
+        issues=issues,
+        attempt_index=attempt_index,
+        max_render_attempts=max_attempts,
+        attempts_remaining=max(0, max_attempts - attempt_index),
+        brief_validation_reused=args.brief_validation_reused == "true",
         metrics=compute_puml_metrics(args.profile, diagram_text),
         timings=timings,
         last_run_timings={**timings, "cache_hit": False},

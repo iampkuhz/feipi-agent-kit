@@ -1752,7 +1752,7 @@ def _validate_with_generic_verifier(ctx: ValidationContext, package_path: Path, 
         return
     if errors:
         detail = " | ".join(str(item).replace("\n", " ") for item in errors)[:800]
-        ctx.error("PKG-010", f"通用图包 v1.1 复核失败：{detail}", location)
+        ctx.error("PKG-010", f"通用图包 v1.2 复核失败：{detail}", location)
 
 
 def _validate_diagrams(
@@ -1810,8 +1810,8 @@ def _validate_diagrams(
         validation = _read_json(ctx, required_files["validation"], "PKG-007")
         if validation is None:
             continue
-        if str(validation.get("schema_version")) != "1.1":
-            ctx.error("PKG-007", "图包 validation.json 必须使用 schema_version 1.1", str(required_files["validation"].relative_to(package_dir)))
+        if str(validation.get("schema_version")) != "1.2":
+            ctx.error("PKG-007", "图包 validation.json 必须使用 schema_version 1.2", str(required_files["validation"].relative_to(package_dir)))
         if validation.get("diagram_id") != diagram_id or not _is_nonempty_scalar(validation.get("profile_version")):
             ctx.error("PKG-007", "diagram_id 必须匹配 manifest，且 profile_version 不得为空", str(required_files["validation"].relative_to(package_dir)))
         if validation.get("final_status") != "success" or validation.get("render_result") != "ok":
@@ -1889,7 +1889,7 @@ def _validate_diagrams(
 
         metrics = validation.get("metrics")
         if not isinstance(metrics, dict):
-            ctx.error("FIG-008", "图包 v1.1 必须包含 metrics", str(required_files["validation"].relative_to(package_dir)))
+            ctx.error("FIG-008", "图包 v1.2 必须包含 metrics", str(required_files["validation"].relative_to(package_dir)))
         elif role in {"component_overview", "deployment_boundary", "module_detail"}:
             for field, maximum in (("node_count", 8), ("edge_count", 10), ("max_degree", 4)):
                 value = metrics.get(field)

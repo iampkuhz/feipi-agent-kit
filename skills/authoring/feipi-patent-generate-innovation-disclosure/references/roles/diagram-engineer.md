@@ -4,7 +4,7 @@
 
 ## 允许输入与权限
 
-只读取有当前 dispatch receipt 的 `diagram-Dn-task.md`、绑定的 `diagram-Dn-input.json` envelope、本文件及 `$feipi-plantuml-generate-diagram` 的必需资源。envelope 的 `slice_version/task_type/role/checkpoint/diagram_id` 必须与任务一致，`source_set_sha256` 和 `diagram_plan_sha256` 必须有效。
+只读取有当前 dispatch receipt 的 `diagram-Dn-task.md`、绑定的 `diagram-Dn-input.json` envelope、本文件及 `$feipi-plantuml-generate-diagram` 的必需资源。envelope 的 `slice_version/task_type/role/checkpoint/diagram_id` 必须与任务一致，`source_set_sha256`、`diagram_plan_sha256` 和 `payload.renderer_preflight_sha256` 必须有效；只使用 payload 冻结的 loopback `renderer_url`。
 
 本角色按 `workspace_write` 只写分配的单图包目录；不读完整中心文件、其他图、专利 SKILL、阶段 guide、正文、原始材料或维护资料。不全或 hash 不一致即 `BLOCKED`。
 
@@ -31,9 +31,9 @@
 
 1. 依据单图任务包生成 normalized brief。
 2. 使用通用 PlantUML skill 生成 `diagram.puml`、`diagram.svg` 和 `validation.json`。
-3. 每个图包只调用一次 `validate_package.sh`；不要再手工调用 `verify_package.py`。
-4. 未变化且已有有效包时使用 `--reuse-valid-package`；brief/PUML/SVG 发生变化才重渲染。
-5. 修复最多 2 轮，只处理当前图；仍失败则返回 `BLOCKED`，不得用旧 validation 或手改 hash 伪造通过。
+3. 调用 `validate_package.sh --server-url <payload.renderer_url>`；不要再手工调用 `verify_package.py`，也不得自动发现或管理 renderer。
+4. 已有有效包时使用 `--reuse-valid-package`；brief/PUML/SVG 变化才重渲染。
+5. 每图总 renderer 调用最多 2 次：首次 1 次、仅针对 syntax/coverage/layout 的定点修复 1 次。renderer/brief/contract/审美失败不自动循环。
 
 最低成功条件：图包 `final_status=success`、`render_result=ok`，brief/coverage/layout 均为 ok，profile 与职责匹配，artifact 相对路径及 hash 自洽。视觉“零交叉/零遮挡”仍由阶段 4 reviewer 基于当前 SVG hash 复核，不由本角色宣称自动证明。
 

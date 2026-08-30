@@ -16,22 +16,11 @@ workflow:
   referenced_skills:
     - name: "feipi-plantuml-generate-diagram"
       path: "skills/diagram/feipi-plantuml-generate-diagram/SKILL.md"
-      role: "主入口（推荐使用）"
-    - name: "feipi-plantuml-generate-architecture-diagram"
-      path: "skills/diagram/feipi-plantuml-generate-architecture-diagram/SKILL.md"
-      role: "架构图兼容入口"
-    - name: "feipi-plantuml-generate-sequence-diagram"
-      path: "skills/diagram/feipi-plantuml-generate-sequence-diagram/SKILL.md"
-      role: "时序图兼容入口"
+      role: "唯一入口"
 
   # 路由逻辑
   routing:
     default: "feipi-plantuml-generate-diagram"
-    compatibility:
-      - condition: "用户明确要求架构图入口"
-        target: "feipi-plantuml-generate-architecture-diagram"
-      - condition: "用户明确要求时序图入口"
-        target: "feipi-plantuml-generate-sequence-diagram"
 
   # 校验步骤
   steps:

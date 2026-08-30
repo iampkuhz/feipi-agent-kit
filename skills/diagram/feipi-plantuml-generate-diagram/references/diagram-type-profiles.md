@@ -4,26 +4,24 @@
 
 每个 typed profile 维护自己的 schema、模板、覆盖规则和布局规则。统一 skill 通过 profile 注册表路由到对应逻辑。
 
-## 已迁移 profile
+## 已注册 profile
 
-### architecture（已迁移）
+### architecture
 
-- 来源：`feipi-plantuml-generate-architecture-diagram`
 - Brief schema：`assets/validation/types/architecture-brief.schema.json`
 - Brief template：`assets/templates/types/architecture-brief.yaml`
 - 覆盖校验：检查层名、组件 id、流程编号全部落图；额外组件 alias 被拦截
 - 布局校验：纵向布局，`top to bottom direction`，package 数量，legend
-- 渲染校验：通用渲染脚本
+- 规模预算：层 3–6、组件 3–12、流程 1–16、每层最多 5 个组件；标签受显示宽度约束
 
-### sequence（已迁移）
+### sequence
 
-- 来源：`feipi-plantuml-generate-sequence-diagram`
 - Brief schema：`assets/validation/types/sequence-brief.schema.json`
 - Brief template：`assets/templates/types/sequence-brief.yaml`
 - 编号策略：缺省 `interaction_mr` 保持 `M/R`；`process_s` 接受 `Sx/Sx.y`，禁止混用及 `autonumber`
 - 覆盖校验：检查参与者 id、消息编号全部落图；额外消息被拦截；separator 数量校验
 - 布局校验：box/separator 结构、编号策略、`box` 与 `left to right` 互斥，`separator` 关键字禁用
-- 渲染校验：通用渲染脚本
+- 规模预算：参与者 2–8、消息 1–20、group 最多 5；标签受显示宽度约束
 
 ### component（已注册）
 
@@ -65,4 +63,4 @@
 3. **布局校验**：`lint_layout.sh --type <type> <diagram.puml>`
 4. **渲染校验**：统一使用 `check_render.sh`
 
-所有 package 使用 `validation.json` v1.1：`diagram_id`、`profile_version`、`brief_sha256`、`normalized_puml_sha256`、`artifacts` 和 `metrics` 为新增合同字段；旧扁平 hash/status 字段继续保留。规范化 PlantUML hash 先把换行统一为 LF，删除行尾空白及首尾空行，再补一个末尾换行。`metrics` 必须从实际 PUML 重算，不能抄 brief；typed success 必须同时绑定 brief、diagram、当前 SVG，三项检查为 `ok` 且 renderer 非空。路径必须是包内安全相对路径，顶层字段与 artifact 记录双向一致。
+所有 package 使用 `validation.json` v1.2：除路径、hash、metrics 与 timing 外，还必须记录 `failure_class`、`repairable`、`issues`、`attempt_index`、`max_render_attempts` 和 `attempts_remaining`。规范化 PlantUML hash 先把换行统一为 LF，删除行尾空白及首尾空行，再补一个末尾换行。`metrics` 必须从实际 PUML 重算，不能抄 brief；typed success 必须同时绑定 brief、diagram、当前 SVG，三项检查为 `ok` 且 renderer 非空。路径必须是包内安全相对路径，顶层字段与 artifact 记录双向一致。

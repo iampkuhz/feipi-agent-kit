@@ -14,6 +14,7 @@ import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlparse
 
 
 STATE_HEADER = [
@@ -327,6 +328,7 @@ DIAGRAM_SOURCE_SET = (
     "disclosure-workspace/working/stages/phase-3/content-core.json",
     "disclosure-workspace/working/stages/phase-3/diagram-plan.json",
 )
+DIAGRAM_RENDERER_PREFLIGHT = "stages/phase-3/renderer-preflight.json"
 
 
 class ContractError(ValueError):
@@ -685,6 +687,30 @@ def validate_slice_envelope(
             )
     if not isinstance(envelope.get("payload"), dict):
         raise task_error("TASK-004", f"动态输入 JSON envelope payload 必须是对象：{relative}:{path_value}")
+    if spec.task_type == "diagram":
+        payload = envelope["payload"]
+        assert isinstance(payload, dict)
+        preflight_path = require_file(root, DIAGRAM_RENDERER_PREFLIGHT)
+        try:
+            preflight = json.loads(preflight_path.read_text(encoding="utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise task_error("TASK-004", "renderer preflight receipt 必须是合法 JSON") from exc
+        renderer_url = preflight.get("renderer_url") if isinstance(preflight, dict) else None
+        parsed = urlparse(renderer_url) if isinstance(renderer_url, str) else None
+        if (
+            not isinstance(preflight, dict)
+            or preflight.get("final_status") != "success"
+            or preflight.get("process_management_allowed") is not False
+            or preflight.get("startup_policy") != "podman_once"
+            or parsed is None
+            or parsed.scheme not in {"http", "https"}
+            or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}
+        ):
+            raise task_error("TASK-004", "renderer preflight receipt 未绑定可用 loopback renderer")
+        if payload.get("renderer_url") != renderer_url:
+            raise task_error("TASK-004", "逐图 payload.renderer_url 与 preflight receipt 不一致")
+        if payload.get("renderer_preflight_sha256") != hash_file(preflight_path):
+            raise task_error("TASK-004", "逐图 payload.renderer_preflight_sha256 与 receipt 不一致")
 
 
 def expected_dynamic_inputs(root: Path, relative: str, spec: TaskSpec) -> tuple[str, ...] | re.Pattern[str]:

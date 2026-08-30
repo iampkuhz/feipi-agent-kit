@@ -93,8 +93,8 @@ if [[ "$FRONTMATTER_NAME" != "feipi-patent-generate-innovation-disclosure" ]]; t
   echo "SKILL.md name 与目录名不一致：$FRONTMATTER_NAME" >&2
   exit 1
 fi
-if ! rg -q '^version:[[:space:]]*8[[:space:]]*$' "$TARGET_DIR/agents/openai.yaml"; then
-  echo "agents/openai.yaml version 必须为 8" >&2
+if ! rg -q '^version:[[:space:]]*9[[:space:]]*$' "$TARGET_DIR/agents/openai.yaml"; then
+  echo "agents/openai.yaml version 必须为 9" >&2
   exit 1
 fi
 if [[ -e "$TARGET_DIR/references/subagent-orchestration.json" || -e "$TARGET_DIR/references/checkpoint-task-catalog.json" ]]; then

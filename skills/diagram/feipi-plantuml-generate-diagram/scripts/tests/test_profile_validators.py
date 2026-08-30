@@ -38,6 +38,46 @@ def schema_errors(profile: str, data: dict) -> list[str]:
     return errors
 
 
+class ArchitectureAndSequenceBudgetTests(unittest.TestCase):
+    def test_architecture_schema_caps_layers_components_and_flows(self) -> None:
+        data = example("architecture")
+        data["layers"] = data["layers"] * 3
+        self.assertTrue(any("layers 最多允许 6 项" in item for item in schema_errors("architecture", data)))
+
+        data = example("architecture")
+        original = data["components"][0]
+        data["components"] = [
+            {**original, "id": f"component_{index}", "name": f"组件{index}"}
+            for index in range(13)
+        ]
+        self.assertTrue(any("components 最多允许 12 项" in item for item in schema_errors("architecture", data)))
+
+    def test_architecture_rejects_more_than_five_components_per_layer(self) -> None:
+        data = example("architecture")
+        original = data["components"][0]
+        layer = data["layers"][0]["id"]
+        data["components"] = [
+            {**original, "id": f"component_{index}", "name": f"组件{index}", "layer": layer}
+            for index in range(6)
+        ]
+        errors = validate_profile_semantics("architecture", data)[0]
+        self.assertTrue(any("每层最多 5 个组件" in item for item in errors))
+
+    def test_sequence_caps_participants_messages_and_display_width(self) -> None:
+        data = example("sequence")
+        participant = data["participants"][0]
+        data["participants"] = [
+            {**participant, "id": f"participant_{index}", "name": f"参与者{index}"}
+            for index in range(9)
+        ]
+        self.assertTrue(any("participants 最多允许 8 项" in item for item in schema_errors("sequence", data)))
+
+        data = example("sequence")
+        data["messages"][0]["description"] = "超宽消息" * 10
+        errors = validate_profile_semantics("sequence", data)[0]
+        self.assertTrue(any("显示宽度不得超过 32 列" in item for item in errors))
+
+
 class ComponentBoundaryTests(unittest.TestCase):
     def boundary_brief(self) -> dict:
         data = example("component")

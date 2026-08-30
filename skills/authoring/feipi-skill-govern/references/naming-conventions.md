@@ -93,8 +93,7 @@ feipi-<domain>-<action>-<object...>
 - `feipi-video-read-bilibili`
 - `feipi-video-read-url`
 - `feipi-video-summarize-url`
-- `feipi-plantuml-generate-architecture-diagram`
-- `feipi-plantuml-generate-sequence-diagram`
+- `feipi-plantuml-generate-diagram`
 - `feipi-dingtalk-send-webhook`
 - `feipi-openclaw-configure-runtime`
 - `feipi-patent-generate-innovation-disclosure`

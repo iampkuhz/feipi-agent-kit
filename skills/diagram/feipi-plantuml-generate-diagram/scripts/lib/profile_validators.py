@@ -6,6 +6,7 @@ from __future__ import annotations
 import collections
 import hashlib
 import re
+import unicodedata
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -20,6 +21,15 @@ IMPLEMENTATION_TERM = re.compile(
     r"类$|函数|字段|方法$|表字段)",
     re.IGNORECASE,
 )
+
+
+def _display_width(value: str) -> int:
+    return sum(2 if unicodedata.east_asian_width(char) in {"W", "F"} else 1 for char in value)
+
+
+def _validate_width(value: Any, field: str, limit: int, errors: list[str]) -> None:
+    if isinstance(value, str) and _display_width(value) > limit:
+        errors.append(f"{field} 显示宽度不得超过 {limit} 列，实际：{_display_width(value)}")
 
 
 def _items(data: dict[str, Any], key: str) -> list[dict[str, Any]]:
@@ -115,6 +125,8 @@ def _validate_sequence(data: dict[str, Any], errors: list[str]) -> None:
     participant_ids = set(_unique_ids(participants, "participants", errors))
     message_ids = _unique_ids(messages, "messages", errors)
     scheme = data.get("numbering_scheme", "interaction_mr")
+    for index, participant in enumerate(participants):
+        _validate_width(participant.get("name"), f"participants[{index}].name", 24, errors)
     for index, message in enumerate(messages):
         source = message.get("from")
         target = message.get("to")
@@ -122,6 +134,7 @@ def _validate_sequence(data: dict[str, Any], errors: list[str]) -> None:
             errors.append(f"messages[{index}].from 引用了未定义参与者：{source}")
         if target not in participant_ids:
             errors.append(f"messages[{index}].to 引用了未定义参与者：{target}")
+        _validate_width(message.get("description"), f"messages[{index}].description", 32, errors)
     if scheme == "interaction_mr":
         invalid = [value for value in message_ids if not MR_ID.fullmatch(value)]
         if invalid:
@@ -133,6 +146,33 @@ def _validate_sequence(data: dict[str, Any], errors: list[str]) -> None:
         _validate_s_ids(message_ids, "messages.id", errors)
     else:
         errors.append(f"未知 numbering_scheme：{scheme}")
+
+
+def _validate_architecture(data: dict[str, Any], errors: list[str]) -> None:
+    layers = _items(data, "layers")
+    components = _items(data, "components")
+    flows = _items(data, "flows")
+    layer_ids = set(_unique_ids(layers, "layers", errors))
+    component_ids = set(_unique_ids(components, "components", errors))
+    per_layer: collections.Counter[str] = collections.Counter()
+    for index, layer in enumerate(layers):
+        _validate_width(layer.get("name"), f"layers[{index}].name", 24, errors)
+    for index, component in enumerate(components):
+        layer = component.get("layer")
+        if layer not in layer_ids:
+            errors.append(f"components[{index}].layer 引用了未定义层：{layer}")
+        elif isinstance(layer, str):
+            per_layer[layer] += 1
+        _validate_width(component.get("name"), f"components[{index}].name", 28, errors)
+    crowded = sorted(name for name, count in per_layer.items() if count > 5)
+    if crowded:
+        errors.append(f"architecture 每层最多 5 个组件，超限层：{crowded}")
+    for index, flow in enumerate(flows):
+        if flow.get("from") not in component_ids:
+            errors.append(f"flows[{index}].from 引用了未定义组件：{flow.get('from')}")
+        if flow.get("to") not in component_ids:
+            errors.append(f"flows[{index}].to 引用了未定义组件：{flow.get('to')}")
+        _validate_width(flow.get("description"), f"flows[{index}].description", 32, errors)
 
 
 def _safe_relative_path(value: Any) -> PurePosixPath | None:
@@ -365,7 +405,9 @@ def validate_profile_semantics(
     if data.get("diagram_type") != diagram_type:
         errors.append(f"diagram_type 与 profile 不一致：{data.get('diagram_type')} != {diagram_type}")
         return errors, warnings
-    if diagram_type == "sequence":
+    if diagram_type == "architecture":
+        _validate_architecture(data, errors)
+    elif diagram_type == "sequence":
         _validate_sequence(data, errors)
     elif diagram_type == "component":
         _validate_component(data, errors, source_path)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""v1.1 package 合同的安全与双向一致回归。"""
+"""v1.2 package 合同的安全与双向一致回归。"""
 
 from __future__ import annotations
 
@@ -52,8 +52,8 @@ def build_package(base: Path) -> dict:
     diagram_path.write_text(PUML, encoding="utf-8")
     svg_path.write_text('<svg xmlns="http://www.w3.org/2000/svg"><text>fixture</text></svg>\n', encoding="utf-8")
     validation = {
-        "schema_version": "1.1",
-        "render_contract_version": "2",
+        "schema_version": "1.2",
+        "render_contract_version": "3",
         "skill_name": "feipi-plantuml-generate-diagram",
         "diagram_id": "D9",
         "diagram_type": "component",
@@ -94,6 +94,13 @@ def build_package(base: Path) -> dict:
         },
         "final_status": "success",
         "blocked_reason": "",
+        "failure_class": "none",
+        "repairable": False,
+        "issues": [],
+        "attempt_index": 1,
+        "max_render_attempts": 2,
+        "attempts_remaining": 1,
+        "brief_validation_reused": False,
     }
     (base / "validation.json").write_text(json.dumps(validation, ensure_ascii=False) + "\n", encoding="utf-8")
     return validation

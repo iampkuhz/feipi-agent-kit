@@ -13,8 +13,8 @@ from .svg_validation import is_success_svg
 
 @dataclass
 class ValidationResult:
-    schema_version: str = "1.1"
-    render_contract_version: str = "2"
+    schema_version: str = "1.2"
+    render_contract_version: str = "3"
     skill_name: str = "feipi-plantuml-generate-diagram"
     diagram_id: str = ""
     diagram_type: str = "fallback"
@@ -70,6 +70,13 @@ class ValidationResult:
     )
     final_status: str = "pending"
     blocked_reason: str = ""
+    failure_class: str = "none"
+    repairable: bool = False
+    issues: list[str] = field(default_factory=list)
+    attempt_index: int = 0
+    max_render_attempts: int = 2
+    attempts_remaining: int = 2
+    brief_validation_reused: bool = False
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -77,6 +84,9 @@ class ValidationResult:
     def set_success(self) -> None:
         self.final_status = "success"
         self.blocked_reason = ""
+        self.failure_class = "none"
+        self.repairable = False
+        self.issues = []
 
     def set_blocked(self, reason: str) -> None:
         self.final_status = "blocked"
@@ -196,5 +206,8 @@ def write_validation_json(
         if invalid_success:
             result.final_status = "blocked"
             result.blocked_reason = "invalid_success_contract:" + ",".join(invalid_success)
+            result.failure_class = "contract"
+            result.repairable = False
+            result.issues = list(invalid_success)
     p.write_text(json.dumps(result.to_dict(), indent=2, ensure_ascii=False) + "\n")
     return p

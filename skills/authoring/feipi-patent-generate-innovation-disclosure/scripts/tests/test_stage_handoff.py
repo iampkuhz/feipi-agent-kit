@@ -371,6 +371,21 @@ def populate(working: Path) -> None:
     write(stage_root / "phase-2/decision.md", "# Decision\n\nconfirmed\n")
     write(stage_root / "phase-3/content-core.json", '{"status":"frozen"}\n')
     write(stage_root / "phase-3/diagram-plan.json", diagram_plan("D1", "D2"))
+    renderer_preflight = stage_root / "phase-3/renderer-preflight.json"
+    write(
+        renderer_preflight,
+        json.dumps(
+            {
+                "schema_version": "1",
+                "final_status": "success",
+                "renderer_url": "http://127.0.0.1:8199",
+                "blocked_reason": "",
+                "startup_policy": "podman_once",
+                "process_management_allowed": False,
+            },
+            ensure_ascii=False,
+        ) + "\n",
+    )
     write(disclosure_dir / "disclosure.md", "# Disclosure\n\nPublic frozen draft.\n")
     write(
         disclosure_dir / "disclosure-workspace/disclosure-internal.md",
@@ -394,7 +409,12 @@ def populate(working: Path) -> None:
                     "disclosure-workspace/working/stages/phase-3/content-core.json",
                     "disclosure-workspace/working/stages/phase-3/diagram-plan.json",
                 ),
-                {"implemented_ids": ["SF1"], "output_dir": f"disclosure-workspace/diagrams/{diagram_id}-{purpose}"},
+                {
+                    "implemented_ids": ["SF1"],
+                    "output_dir": f"disclosure-workspace/diagrams/{diagram_id}-{purpose}",
+                    "renderer_url": "http://127.0.0.1:8199",
+                    "renderer_preflight_sha256": sha256(renderer_preflight),
+                },
                 diagram_id=diagram_id,
                 purpose=purpose,
                 diagram_plan_sha256=sha256(stage_root / "phase-3/diagram-plan.json"),
@@ -979,6 +999,20 @@ def test_validate_task_dispatch_entry_and_legal_diagram_write_dir() -> None:
         result = validate_task(working, "stages/agents/not-registered-task.md", expected=1)
         assert "[TASK-001]" in result.stderr
 
+
+def test_diagram_dispatch_requires_successful_renderer_preflight() -> None:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        working = Path(temp_dir) / "disclosure-workspace/working"
+        run(working, "init")
+        populate(working)
+        preflight = working / "stages/phase-3/renderer-preflight.json"
+        data = json.loads(preflight.read_text(encoding="utf-8"))
+        data["final_status"] = "blocked"
+        data["renderer_url"] = ""
+        preflight.write_text(json.dumps(data, ensure_ascii=False) + "\n", encoding="utf-8")
+        result = validate_task(working, "stages/agents/diagram-D2-task.md", expected=1)
+        assert "[TASK-004]" in result.stderr and "preflight" in result.stderr
+
     with tempfile.TemporaryDirectory() as temp_dir:
         working = Path(temp_dir) / "disclosure-workspace/working"
         run(working, "init")
@@ -1029,7 +1063,7 @@ def test_task_packets_separate_instruction_refs_dependencies_and_writes() -> Non
         (
             "stages/agents/diagram-D2-task.md",
             "- 依赖 Skill: `feipi-plantuml-generate-diagram`",
-            "- 依赖 Skill: `feipi-plantuml-generate-sequence-diagram`",
+            "- 依赖 Skill: `feipi-plantuml-render-proxy`",
         ),
         (
             "stages/agents/diagram-D2-task.md",
@@ -1409,6 +1443,7 @@ def main() -> None:
         test_phase3_rejects_invalid_diagram_row_fields,
         test_phase4_requires_semantic_join_and_successful_review_rows,
         test_validate_task_dispatch_entry_and_legal_diagram_write_dir,
+        test_diagram_dispatch_requires_successful_renderer_preflight,
         test_task_packets_bind_role_checkpoint_result_owner_and_minimum_check,
         test_task_packets_separate_instruction_refs_dependencies_and_writes,
         test_task_packets_reject_unsafe_path_references,

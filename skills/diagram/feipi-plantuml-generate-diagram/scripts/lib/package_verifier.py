@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""diagram package v1.1 的安全、双向且可重算验证。"""
+"""diagram package v1.2 的安全、双向且可重算验证。"""
 
 from __future__ import annotations
 
@@ -35,8 +35,8 @@ COUNTER_FIELDS = {
 
 def _validate_observation_contract(data: dict[str, Any]) -> list[str]:
     errors: list[str] = []
-    if data.get("render_contract_version") != "2":
-        errors.append("render_contract_version 必须为 2")
+    if data.get("render_contract_version") != "3":
+        errors.append("render_contract_version 必须为 3")
     timings = data.get("timings")
     last_timings = data.get("last_run_timings")
     counters = data.get("counters")
@@ -134,8 +134,8 @@ def verify_package_dir(package_dir: Path) -> list[str]:
     if data is None:
         return load_errors
 
-    if data.get("schema_version") != "1.1":
-        errors.append("schema_version 必须为 1.1")
+    if data.get("schema_version") != "1.2":
+        errors.append("schema_version 必须为 1.2")
     errors.extend(_validate_observation_contract(data))
     for field in ("diagram_id", "profile", "profile_version"):
         if not isinstance(data.get(field), str) or not data.get(field):
@@ -152,6 +152,37 @@ def verify_package_dir(package_dir: Path) -> list[str]:
         errors.append("final_status=blocked 时 blocked_reason 必须是字符串")
     elif final_status == "blocked" and not data.get("blocked_reason", "").strip():
         errors.append("final_status=blocked 时 blocked_reason 不能为空")
+    failure_class = data.get("failure_class")
+    allowed_failure_classes = {
+        "none", "brief", "over_budget", "coverage", "layout", "syntax",
+        "renderer", "visual_review", "contract", "retry_limit",
+    }
+    if failure_class not in allowed_failure_classes:
+        errors.append("failure_class 枚举无效")
+    if type(data.get("repairable")) is not bool:
+        errors.append("repairable 必须是布尔值")
+    issues = data.get("issues")
+    if not isinstance(issues, list) or any(not isinstance(item, str) or not item for item in issues):
+        errors.append("issues 必须是非空字符串数组或空数组")
+    attempt_index = data.get("attempt_index")
+    max_attempts = data.get("max_render_attempts")
+    attempts_remaining = data.get("attempts_remaining")
+    if type(attempt_index) is not int or attempt_index < 0:
+        errors.append("attempt_index 必须是非负整数")
+    if type(max_attempts) is not int or max_attempts != 2:
+        errors.append("max_render_attempts 必须为 2")
+    if type(attempts_remaining) is not int or not isinstance(attempt_index, int) \
+      or not isinstance(max_attempts, int) \
+      or attempts_remaining != max(0, max_attempts - attempt_index):
+        errors.append("attempts_remaining 与 attempt 合同不一致")
+    if type(data.get("brief_validation_reused")) is not bool:
+        errors.append("brief_validation_reused 必须是布尔值")
+    if final_status == "success" and (failure_class != "none" or data.get("repairable") or issues):
+        errors.append("success 不得保留失败分类、repairable 或 issues")
+    if final_status == "blocked" and failure_class == "none":
+        errors.append("blocked 必须声明 failure_class")
+    if data.get("repairable") and attempts_remaining == 0:
+        errors.append("无剩余渲染次数时 repairable 必须为 false")
     artifacts = data.get("artifacts")
     if not isinstance(artifacts, dict):
         return errors + ["artifacts 必须是对象"]

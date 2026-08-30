@@ -473,8 +473,8 @@ def write_diagram(root: Path, spec: dict[str, Any], blocked: bool) -> str:
     (directory / "diagram.puml").write_bytes(puml)
     (directory / "diagram.svg").write_bytes(svg)
     validation = {
-        "schema_version": "1.1",
-        "render_contract_version": "2",
+        "schema_version": "1.2",
+        "render_contract_version": "3",
         "skill_name": "feipi-plantuml-generate-diagram",
         "diagram_id": spec["id"],
         "diagram_type": spec["profile"],
@@ -512,6 +512,13 @@ def write_diagram(root: Path, spec: dict[str, Any], blocked: bool) -> str:
         "render_server": "synthetic_fixture",
         "final_status": "blocked" if blocked else "success",
         "blocked_reason": "synthetic_failure" if blocked else "",
+        "failure_class": "contract" if blocked else "none",
+        "repairable": False,
+        "issues": ["synthetic_failure"] if blocked else [],
+        "attempt_index": 1,
+        "max_render_attempts": 2,
+        "attempts_remaining": 1,
+        "brief_validation_reused": False,
     }
     (directory / "validation.json").write_text(
         json.dumps(validation, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"

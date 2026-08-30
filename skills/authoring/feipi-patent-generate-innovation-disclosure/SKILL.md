@@ -50,7 +50,7 @@ description: 用于把零散业务与技术事实整理为带来源台账、Plan
 
 ### 阶段 3：撰写最终版本
 
-读取 `references/stages/phase-3-final-drafting.md`。只消费已确认的阶段 2 handoff，先冻结 `content-core.json` 与中心 `diagram-plan.json`，再让主 agent 的唯一对外稿与逐图 worker 并行。每张图使用独立目录、任务包、结果和动态 checkpoint `phase-3-diagram-Dn`；全图汇合后才生成 manifest、内部稿、build map 和 handoff。
+读取 `references/stages/phase-3-final-drafting.md`。只消费已确认的阶段 2 handoff，先冻结 `content-core.json` 与中心 `diagram-plan.json`，再运行一次通用 PlantUML 批次预检；首次不可用时只允许该 preflight 尝试一次固定 Podman 启动和一次复检。预检成功才让主 agent 的唯一对外稿与逐图 worker 并行；失败直接 `BLOCKED`，不创建制图 worker、不再管理 renderer。每张图使用独立目录、任务包、结果和动态 checkpoint `phase-3-diagram-Dn`；全图汇合后才生成 manifest、内部稿、build map 和 handoff。
 
 逐图 worker 使用 `$feipi-plantuml-generate-diagram`，只写一张图包并返回 row。主 agent 写 Dn/聚合/build-map 行前复算对应 `diagram.svg` 的实际 SHA-256；三处一致，不使用 package hash。
 

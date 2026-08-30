@@ -1,5 +1,10 @@
 # 变更记录
 
+## 2026-08-30
+- feipi-plantuml-generate-diagram v5：合并入口、限时预检与一次启动
+- feipi-patent-generate-innovation-disclosure v9：前置预检并绑定一次启动
+- feipi-skill-govern v3：更新统一作图命名示例
+
 ## 2026-08-26
 - feipi-patent-generate-innovation-disclosure v8：固化阶段检查点、有界并行与渐进式上下文加载
 

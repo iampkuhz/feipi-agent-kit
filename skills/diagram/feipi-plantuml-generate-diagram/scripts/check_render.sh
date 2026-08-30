@@ -17,6 +17,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 SERVERS_CONFIG="$SKILL_DIR/assets/server_candidates.txt"
 DEFAULT_TIMEOUT=20
+DEFAULT_CONNECT_TIMEOUT=1
 DEFAULT_LOCAL_PORT="${AGENT_PLANTUML_SERVER_PORT:-8199}"
 REQUEST_COUNT=0
 
@@ -29,11 +30,20 @@ normalize_server_url() {
   value="$(trim "$1")"
   value="${value%/}"
   [[ -z "$value" ]] && return 1
-  if [[ "$value" =~ /plantuml$ ]]; then
-    printf '%s\n' "$value"
-  else
-    printf '%s/plantuml\n' "$value"
-  fi
+  printf '%s\n' "$value"
+}
+
+is_loopback_server_url() {
+  python3 - "$1" <<'PY'
+import sys
+from urllib.parse import urlparse
+
+value = urlparse(sys.argv[1])
+if value.scheme not in {"http", "https"} or value.hostname not in {"127.0.0.1", "localhost", "::1"}:
+    raise SystemExit(1)
+if value.username or value.password:
+    raise SystemExit(1)
+PY
 }
 
 encode_plantuml_file() {
@@ -159,6 +169,10 @@ append_candidate() {
   if ! value="$(normalize_server_url "$1")"; then
     return 0
   fi
+  if ! is_loopback_server_url "$value"; then
+    echo "拒绝非本地 renderer：$value" >&2
+    return 0
+  fi
 
   local item=""
   for item in "${CANDIDATES[@]:-}"; do
@@ -198,7 +212,7 @@ for candidate in "${CANDIDATES[@]}"; do
   SVG_ERR="$(mktemp)"
   SVG_HEADERS="$(mktemp)"
   REQUEST_COUNT=$((REQUEST_COUNT + 1))
-  if ! curl -sS --connect-timeout 2 --max-time "$TIMEOUT" -D "$SVG_HEADERS" -o "$REQUEST_SVG" -w '%{http_code}' "$candidate/svg/$ENCODED" >"$SVG_CODE" 2>"$SVG_ERR"; then
+  if ! curl -sS --connect-timeout "$DEFAULT_CONNECT_TIMEOUT" --max-time "$TIMEOUT" -D "$SVG_HEADERS" -o "$REQUEST_SVG" -w '%{http_code}' "$candidate/svg/$ENCODED" >"$SVG_CODE" 2>"$SVG_ERR"; then
     LAST_ERROR="$(cat "$SVG_ERR")"
     rm -f "$REQUEST_SVG" "$SVG_CODE" "$SVG_ERR" "$SVG_HEADERS"
     continue

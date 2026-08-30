@@ -107,7 +107,7 @@ if [[ -f "$FALLBACK_OUT/validation.json" ]]; then
   check_json_field "$FALLBACK_OUT/validation.json" skill_name "feipi-plantuml-generate-diagram" "skill_name"
   check_json_field "$FALLBACK_OUT/validation.json" diagram_type "fallback" "diagram_type"
   check_json_field "$FALLBACK_OUT/validation.json" profile "fallback" "profile"
-  check_json_field "$FALLBACK_OUT/validation.json" schema_version "1.1" "schema_version"
+  check_json_field "$FALLBACK_OUT/validation.json" schema_version "1.2" "schema_version"
   check_json_field_in "$FALLBACK_OUT/validation.json" final_status "final_status" "success" "blocked"
 else
   fail "validation.json 未生成"
@@ -256,7 +256,7 @@ for spec in \
   [[ "$brief" == "$SEQ_S_BRIEF" ]] && out_dir="/tmp/plantuml-sequence-process-s-smoke-test"
   run_validate "$out_dir" --diagram-type "$profile" --brief "$brief" --diagram "$diagram"
   if [[ -f "$out_dir/validation.json" ]]; then
-    check_json_field "$out_dir/validation.json" schema_version "1.1" "$profile schema_version"
+    check_json_field "$out_dir/validation.json" schema_version "1.2" "$profile schema_version"
     check_json_field "$out_dir/validation.json" profile "$profile" "$profile profile"
     check_json_field "$out_dir/validation.json" brief_check "ok" "$profile brief_check"
     check_json_field "$out_dir/validation.json" coverage_check "ok" "$profile coverage_check"
@@ -298,9 +298,9 @@ else
 fi
 
 if python3 "$TEST_DIR/test_package_verifier.py" >/dev/null 2>&1; then
-  pass "v1.1 package 安全与双向合同单元测试"
+  pass "v1.2 package 安全与双向合同单元测试"
 else
-  fail "v1.1 package 安全与双向合同单元测试"
+  fail "v1.2 package 安全与双向合同单元测试"
 fi
 
 if python3 "$TEST_DIR/test_check_render.py" >/dev/null 2>&1; then
@@ -319,7 +319,7 @@ else
   fail "未知图型 fallback 未生成 validation.json"
 fi
 
-# v1.1 hash 合同必须可复核，任一 artifact 被篡改都失败。
+# v1.2 hash 合同必须可复核，任一 artifact 被篡改都失败。
 HASH_OUT="/tmp/plantuml-component-v2-smoke-test"
 if python3 - "$HASH_OUT/validation.json" <<'PY' >/dev/null 2>&1
 import json
@@ -336,7 +336,12 @@ assert data["diagram_path"] == "diagram.puml"
 assert data["brief_sha256"] == data["artifacts"]["brief"]["sha256"]
 assert data["puml_sha256"] == data["artifacts"]["diagram"]["sha256"]
 assert data["metrics"] == {"node_count": 3, "edge_count": 2, "max_degree": 2}
-assert data["render_contract_version"] == "2"
+assert data["render_contract_version"] == "3"
+assert data["max_render_attempts"] == 2
+assert data["attempt_index"] in {0, 1}
+assert data["attempts_remaining"] == 2 - data["attempt_index"]
+assert isinstance(data["issues"], list)
+assert isinstance(data["repairable"], bool)
 assert set(data["timings"]) == {"total_ms", "render_ms", "static_validation_ms"}
 assert all(isinstance(value, (int, float)) and value >= 0 for value in data["timings"].values())
 counter_fields = {
@@ -353,16 +358,16 @@ if data["final_status"] == "success":
     assert data["counters"]["package_verifier_runs"] >= 1
 PY
 then
-  pass "v1.1 字段、相对路径、metrics 与 timing 合同"
+  pass "v1.2 字段、相对路径、metrics 与 timing 合同"
 else
-  fail "v1.1 字段、相对路径、metrics 与 timing 合同"
+  fail "v1.2 字段、相对路径、metrics 与 timing 合同"
 fi
 HASH_STATUS="$(python3 -c "import json; print(json.load(open('$HASH_OUT/validation.json'))['final_status'])")"
 if [[ "$HASH_STATUS" == "success" ]]; then
   if python3 "$SCRIPT_DIR/verify_package.py" "$HASH_OUT" >/dev/null 2>&1; then
-    pass "v1.1 package hash 复核"
+    pass "v1.2 package hash 复核"
   else
-    fail "v1.1 package hash 复核"
+    fail "v1.2 package hash 复核"
   fi
   printf '\n' >> "$HASH_OUT/diagram.puml"
   if python3 "$SCRIPT_DIR/verify_package.py" "$HASH_OUT" >/dev/null 2>&1; then
@@ -447,20 +452,21 @@ else
 fi
 
 # =============================================================================
-# Step 11: 触发边界一致 & 旧 skill 保护
+# Step 11: 唯一入口与已删除兼容 skill
 # =============================================================================
-echo "=== Step 11: 触发边界 & 旧 skill 保护 ==="
+echo "=== Step 11: 唯一入口 ==="
 if rg -q 'fallback' "$SKILL_DIR/SKILL.md"; then
   pass "SKILL.md 包含 fallback"
 else
   fail "SKILL.md 缺少 fallback"
 fi
-ARCH_OLD_SKILL="$REPO_ROOT/skills/diagram/feipi-plantuml-generate-architecture-diagram/SKILL.md"
-SEQ_OLD_SKILL="$REPO_ROOT/skills/diagram/feipi-plantuml-generate-sequence-diagram/SKILL.md"
-if [[ -f "$ARCH_OLD_SKILL" && -f "$SEQ_OLD_SKILL" ]]; then
-  pass "旧 skill 未被删除"
+REMOVED_SKILL_PREFIX="feipi-plantuml-generate"
+ARCH_OLD_SKILL="$REPO_ROOT/skills/diagram/${REMOVED_SKILL_PREFIX}-architecture-diagram/SKILL.md"
+SEQ_OLD_SKILL="$REPO_ROOT/skills/diagram/${REMOVED_SKILL_PREFIX}-sequence-diagram/SKILL.md"
+if [[ ! -e "$ARCH_OLD_SKILL" && ! -e "$SEQ_OLD_SKILL" ]]; then
+  pass "架构图与时序图兼容 skill 已删除"
 else
-  fail "旧 skill 已被删除"
+  fail "兼容 skill 目录仍然存在"
 fi
 
 # =============================================================================

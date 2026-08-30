@@ -234,10 +234,10 @@
 - `PKG-004`：文档和 manifest 不得残留模板占位符。
 - `PKG-005`：所有 manifest 路径必须是相对 `disclosure-workspace/` 的内部路径，禁止绝对路径和 `..`。
 - `PKG-006`：manifest 声明的图包目录及四类文件必须存在、解析后仍位于图包内，文本工件必须为可读 UTF-8。
-- `PKG-007`：图包 `validation.json` 必须使用 v1.1，并与图示编号和 profile 版本一致。
+- `PKG-007`：图包 `validation.json` 必须使用 v1.2，并与图示编号和 profile 版本一致。
 - `PKG-008`：brief、PlantUML、规范化 PlantUML、SVG 的实际 hash 与 artifact 路径必须和图包记录一致。
 - `PKG-009`：Markdown 内嵌 PlantUML 的规范化 hash 必须与图包同源。
-- `PKG-010`：每个图包必须再次通过直接依赖的 v1.1 verifier；路径、状态不变量、实际指标或双向 artifact 合同不一致时阻塞。
+- `PKG-010`：每个图包必须再次通过直接依赖的 v1.2 verifier；路径、状态不变量、实际指标或双向 artifact 合同不一致时阻塞。
 
 草稿兼容入口使用 `PKG-900...PKG-904`：它只验证文件、标题、占位符、固定章节和基本编号，并始终提示缺少完整包、hash 与语义/视觉复核。
 

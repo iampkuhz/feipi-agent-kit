@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 import threading
@@ -15,8 +16,12 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent.parent
 CHECK_RENDER = SCRIPT_DIR / "check_render.sh"
+PREFLIGHT_RENDERER = SCRIPT_DIR / "preflight_renderer.sh"
 VALIDATE_PACKAGE = SCRIPT_DIR / "validate_package.sh"
 VALID_DIAGRAM = SCRIPT_DIR.parent / "assets/examples/fallback/fallback-diagram.example.puml"
+ARCH_BRIEF = SCRIPT_DIR.parent / "assets/examples/architecture/architecture-brief.example.yaml"
+ARCH_DIAGRAM = SCRIPT_DIR.parent / "assets/examples/architecture/architecture-diagram.example.puml"
+ARCH_INVALID_DIAGRAM = SCRIPT_DIR / "tests/architecture-invalid-diagram.puml"
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -65,10 +70,87 @@ class _Handler(BaseHTTPRequestHandler):
 
 
 class CheckRenderTests(unittest.TestCase):
+    def run_preflight_with_fakes(
+        self, *, podman_exit: int, second_probe_success: bool,
+    ) -> tuple[subprocess.CompletedProcess[str], dict[str, object], list[str], int]:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            scripts = root / "scripts"
+            fake_bin = root / "bin"
+            scripts.mkdir()
+            fake_bin.mkdir()
+            preflight = scripts / "preflight_renderer.sh"
+            shutil.copy2(PREFLIGHT_RENDERER, preflight)
+            check_render = scripts / "check_render.sh"
+            check_render.write_text(
+                """#!/usr/bin/env bash
+set -euo pipefail
+count=0
+[[ -f \"$FAKE_PROBE_COUNTER\" ]] && count=\"$(cat \"$FAKE_PROBE_COUNTER\")\"
+count=$((count + 1))
+printf '%s\\n' \"$count\" >\"$FAKE_PROBE_COUNTER\"
+svg_output=\"\"
+while [[ $# -gt 0 ]]; do
+  if [[ \"$1\" == \"--svg-output\" ]]; then
+    svg_output=\"$2\"
+    shift 2
+  else
+    shift
+  fi
+done
+if [[ \"$count\" -eq 2 && \"$FAKE_SECOND_PROBE_SUCCESS\" == \"true\" ]]; then
+  printf '<svg xmlns=\"http://www.w3.org/2000/svg\"><text>ok</text></svg>\\n' >\"$svg_output\"
+  echo 'render_result=ok'
+  echo 'render_server=http://127.0.0.1:8199'
+  echo 'render_http_requests=1'
+  exit 0
+fi
+echo 'render_result=skipped'
+echo 'render_reason=unavailable'
+echo 'render_http_requests=1'
+exit 4
+""",
+                encoding="utf-8",
+            )
+            check_render.chmod(0o755)
+            podman = fake_bin / "podman"
+            podman.write_text(
+                """#!/usr/bin/env bash
+printf '%s\\n' \"$*\" >>\"$FAKE_PODMAN_LOG\"
+exit \"$FAKE_PODMAN_EXIT\"
+""",
+                encoding="utf-8",
+            )
+            podman.chmod(0o755)
+            output = root / "renderer-preflight.json"
+            counter = root / "probe-count"
+            podman_log = root / "podman.log"
+            env = dict(os.environ)
+            env.update({
+                "PATH": f"{fake_bin}{os.pathsep}{env['PATH']}",
+                "AGENT_PLANTUML_SERVER_PORT": "8199",
+                "FAKE_PROBE_COUNTER": str(counter),
+                "FAKE_SECOND_PROBE_SUCCESS": str(second_probe_success).lower(),
+                "FAKE_PODMAN_LOG": str(podman_log),
+                "FAKE_PODMAN_EXIT": str(podman_exit),
+                "PLANTUML_PODMAN_READINESS_DELAY_SECONDS": "0",
+            })
+            completed = subprocess.run(
+                ["bash", str(preflight), "--out", str(output)],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=10,
+                env=env,
+            )
+            data = json.loads(output.read_text(encoding="utf-8"))
+            commands = podman_log.read_text(encoding="utf-8").splitlines()
+            return completed, data, commands, int(counter.read_text(encoding="utf-8"))
+
     def run_case(self, mode: str) -> tuple[subprocess.CompletedProcess[str], int, bool]:
         handler = type("CaseHandler", (_Handler,), {"mode": mode, "request_count": 0})
         server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
-        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread = threading.Thread(target=server.serve_forever, args=(0.01,), daemon=True)
         thread.start()
         try:
             with tempfile.TemporaryDirectory() as tmp:
@@ -104,6 +186,90 @@ class CheckRenderTests(unittest.TestCase):
         self.assertTrue(output_exists)
         self.assertIn("render_result=ok", completed.stdout)
         self.assertIn("render_http_requests=1", completed.stdout)
+
+    def test_preflight_writes_single_request_bounded_contract(self) -> None:
+        handler = type("PreflightHandler", (_Handler,), {"mode": "success", "request_count": 0})
+        server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+        thread = threading.Thread(target=server.serve_forever, args=(0.01,), daemon=True)
+        thread.start()
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                output = Path(tmp) / "renderer-preflight.json"
+                completed = subprocess.run(
+                    [
+                        "bash", str(PREFLIGHT_RENDERER), "--out", str(output),
+                        "--server-url", f"http://127.0.0.1:{server.server_port}/plantuml",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    timeout=10,
+                )
+                self.assertEqual(0, completed.returncode, completed.stderr)
+                self.assertEqual(1, handler.request_count)
+                data = json.loads(output.read_text(encoding="utf-8"))
+                self.assertEqual("success", data["final_status"])
+                self.assertEqual(1, data["connect_timeout_seconds"])
+                self.assertEqual(2, data["total_timeout_seconds"])
+                self.assertEqual(1, data["probe_attempts"])
+                self.assertFalse(data["podman_start_attempted"])
+                self.assertEqual("not_needed", data["podman_start_result"])
+                self.assertFalse(data["process_management_allowed"])
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
+    def test_preflight_starts_podman_once_then_rechecks_once(self) -> None:
+        completed, data, commands, probe_count = self.run_preflight_with_fakes(
+            podman_exit=0, second_probe_success=True,
+        )
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertEqual(2, probe_count)
+        self.assertEqual(
+            [
+                "run --rm -d -p 8199:8080 --name plantuml "
+                "docker.io/plantuml/plantuml-server:jetty",
+            ],
+            commands,
+        )
+        self.assertEqual("success", data["final_status"])
+        self.assertEqual(2, data["http_requests"])
+        self.assertEqual(2, data["probe_attempts"])
+        self.assertTrue(data["podman_start_attempted"])
+        self.assertEqual("started", data["podman_start_result"])
+        self.assertEqual(0, data["podman_start_exit_code"])
+        self.assertFalse(data["process_management_allowed"])
+
+    def test_preflight_gives_up_after_failed_start_and_one_recheck(self) -> None:
+        completed, data, commands, probe_count = self.run_preflight_with_fakes(
+            podman_exit=125, second_probe_success=False,
+        )
+        self.assertEqual(4, completed.returncode)
+        self.assertEqual(2, probe_count)
+        self.assertEqual(1, len(commands))
+        self.assertEqual("blocked", data["final_status"])
+        self.assertEqual("render_server_unavailable", data["blocked_reason"])
+        self.assertEqual(2, data["http_requests"])
+        self.assertEqual(2, data["probe_attempts"])
+        self.assertTrue(data["podman_start_attempted"])
+        self.assertEqual("failed", data["podman_start_result"])
+        self.assertEqual(125, data["podman_start_exit_code"])
+
+    def test_remote_renderer_is_rejected_without_request(self) -> None:
+        completed = subprocess.run(
+            [
+                "bash", str(CHECK_RENDER), str(VALID_DIAGRAM),
+                "--server-url", "https://example.com/plantuml", "--timeout", "1",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=5,
+        )
+        self.assertEqual(4, completed.returncode)
+        self.assertIn("render_http_requests=0", completed.stdout)
+        self.assertIn("拒绝非本地 renderer", completed.stderr)
 
     def test_syntax_error_uses_one_svg_request(self) -> None:
         completed, count, output_exists = self.run_case("syntax")
@@ -153,7 +319,7 @@ class CheckRenderTests(unittest.TestCase):
     def test_package_exports_full_and_cache_hit_operation_counts(self) -> None:
         handler = type("PackageHandler", (_Handler,), {"mode": "success", "request_count": 0})
         server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
-        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread = threading.Thread(target=server.serve_forever, args=(0.01,), daemon=True)
         thread.start()
         try:
             with tempfile.TemporaryDirectory() as tmp:
@@ -207,6 +373,79 @@ class CheckRenderTests(unittest.TestCase):
                 data = json.loads((output / "validation.json").read_text(encoding="utf-8"))
                 self.assertFalse(data["last_run_timings"]["cache_hit"])
                 self.assertEqual(1, data["last_run_counters"]["package_verifier_runs"])
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
+    def test_failed_diagram_must_change_and_total_render_attempts_are_two(self) -> None:
+        handler = type("AttemptHandler", (_Handler,), {"mode": "syntax", "request_count": 0})
+        server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+        thread = threading.Thread(target=server.serve_forever, args=(0.01,), daemon=True)
+        thread.start()
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                output = root / "package"
+                diagram = root / "diagram-input.puml"
+                diagram.write_bytes(VALID_DIAGRAM.read_bytes())
+                command = [
+                    "bash", str(VALIDATE_PACKAGE), "--diagram", str(diagram),
+                    "--diagram-type", "fallback", "--out-dir", str(output),
+                    "--server-url", f"http://127.0.0.1:{server.server_port}/plantuml",
+                ]
+                first = subprocess.run(command, capture_output=True, text=True, check=False, timeout=20)
+                self.assertEqual(1, first.returncode)
+                first_data = json.loads((output / "validation.json").read_text(encoding="utf-8"))
+                self.assertEqual(1, first_data["attempt_index"])
+                self.assertTrue(first_data["repairable"])
+
+                unchanged = subprocess.run(command, capture_output=True, text=True, check=False, timeout=20)
+                self.assertEqual(1, unchanged.returncode)
+                self.assertEqual(1, handler.request_count)
+                self.assertIn("失败图未发生变化", unchanged.stderr)
+
+                diagram.write_text(VALID_DIAGRAM.read_text(encoding="utf-8") + "' targeted fix\n", encoding="utf-8")
+                handler.mode = "success"
+                second = subprocess.run(command, capture_output=True, text=True, check=False, timeout=20)
+                self.assertEqual(0, second.returncode, second.stderr)
+                second_data = json.loads((output / "validation.json").read_text(encoding="utf-8"))
+                self.assertEqual(2, second_data["attempt_index"])
+                self.assertEqual(0, second_data["attempts_remaining"])
+                self.assertEqual(2, handler.request_count)
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
+    def test_changed_typed_diagram_reuses_frozen_brief_validation(self) -> None:
+        handler = type("BriefCacheHandler", (_Handler,), {"mode": "success", "request_count": 0})
+        server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+        thread = threading.Thread(target=server.serve_forever, args=(0.01,), daemon=True)
+        thread.start()
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                output = root / "package"
+                diagram = root / "diagram-input.puml"
+                diagram.write_bytes(ARCH_INVALID_DIAGRAM.read_bytes())
+                command = [
+                    "bash", str(VALIDATE_PACKAGE), "--diagram-type", "architecture",
+                    "--brief", str(ARCH_BRIEF), "--diagram", str(diagram),
+                    "--out-dir", str(output),
+                    "--server-url", f"http://127.0.0.1:{server.server_port}/plantuml",
+                ]
+                first = subprocess.run(command, capture_output=True, text=True, check=False, timeout=20)
+                self.assertEqual(1, first.returncode)
+                self.assertTrue((output / ".brief-lock.json").is_file())
+                self.assertEqual(0, handler.request_count)
+
+                diagram.write_bytes(ARCH_DIAGRAM.read_bytes())
+                second = subprocess.run(command, capture_output=True, text=True, check=False, timeout=20)
+                self.assertEqual(0, second.returncode, second.stderr)
+                data = json.loads((output / "validation.json").read_text(encoding="utf-8"))
+                self.assertTrue(data["brief_validation_reused"])
+                self.assertEqual(1, handler.request_count)
         finally:
             server.shutdown()
             server.server_close()

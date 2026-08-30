@@ -20,7 +20,7 @@ PROFILES: dict[str, dict[str, Any]] = {
     },
     "architecture": {
         "profile": "architecture",
-        "profile_version": "1.0",
+        "profile_version": "1.1",
         "brief_schema": str(SKILL_DIR / "assets" / "validation" / "types" / "architecture-brief.schema.json"),
         "template": str(SKILL_DIR / "assets" / "templates" / "types" / "architecture-brief.yaml"),
         "coverage_mode": "architecture",
@@ -28,7 +28,7 @@ PROFILES: dict[str, dict[str, Any]] = {
     },
     "sequence": {
         "profile": "sequence",
-        "profile_version": "1.1",
+        "profile_version": "1.2",
         "brief_schema": str(SKILL_DIR / "assets" / "validation" / "types" / "sequence-brief.schema.json"),
         "template": str(SKILL_DIR / "assets" / "templates" / "types" / "sequence-brief.yaml"),
         "coverage_mode": "sequence",

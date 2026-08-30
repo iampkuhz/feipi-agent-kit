@@ -90,7 +90,7 @@ check_confirmation_contract() {
   rg -q '^### 阶段 2：提交写作思路并等待确认$' "$SKILL_DIR/SKILL.md" \
     && rg -q '明确确认后才能封存' "$SKILL_DIR/SKILL.md" \
     && rg -q '明确确认' "$SKILL_DIR/references/stages/phase-2-idea-confirmation.md" \
-    && rg -q '先提交写作思路供我确认，确认后只从已封存结果' "$SKILL_DIR/agents/openai.yaml"
+    && rg -q '先提交写作思路供我确认，确认后运行一次 PlantUML 批次预检' "$SKILL_DIR/agents/openai.yaml"
 }
 
 check_happy_audience_contract() {

@@ -1,5 +1,5 @@
-version: 8
+version: 9
 interface:
   display_name: "专利创新交底包生成"
   short_description: "将零散技术事实整理为含证据、图示与质量门禁的专利创新交底包"
-  default_prompt: "请使用 $feipi-patent-generate-innovation-disclosure，按渐进加载的四阶段 handoff、可恢复 CHECKPOINT 和有界并行 subagent 编排整理技术事实并检索竞品；先提交写作思路供我确认，确认后只从已封存结果并行生成正文与独立图包并复用未变图包，汇合语义/视觉复核，只上报关键事件且不轮询，同时保持唯一外发稿及已实现基础与拟扩展保护边界。"
+  default_prompt: "请使用 $feipi-patent-generate-innovation-disclosure，按渐进加载的四阶段 handoff、可恢复 CHECKPOINT 和有界并行 subagent 编排整理技术事实并检索竞品；先提交写作思路供我确认，确认后运行一次 PlantUML 批次预检，首次不可用时仅尝试一次固定 Podman 启动，成功才并行生成正文与独立图包，失败不创建制图 worker；汇合语义/视觉复核，只上报关键事件且不轮询。"

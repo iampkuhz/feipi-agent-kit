@@ -38,37 +38,15 @@ skills:
     status: stable
 
   # --- diagram layer ---
-  - name: feipi-plantuml-generate-architecture-diagram
-    path: skills/diagram/feipi-plantuml-generate-architecture-diagram
-    layer: diagram
-    description: PlantUML 架构图生成（兼容入口）
-    clients: [claude, codex]
-    entry: SKILL.md
-    validation:
-      type: script
-      command: bash skills/diagram/feipi-plantuml-generate-architecture-diagram/scripts/validate.sh
-    status: stable
-
   - name: feipi-plantuml-generate-diagram
     path: skills/diagram/feipi-plantuml-generate-diagram
     layer: diagram
-    description: PlantUML 作图主入口
+    description: PlantUML 作图唯一入口
     clients: [claude, codex]
     entry: SKILL.md
     validation:
       type: script
       command: bash skills/diagram/feipi-plantuml-generate-diagram/scripts/validate.sh
-    status: stable
-
-  - name: feipi-plantuml-generate-sequence-diagram
-    path: skills/diagram/feipi-plantuml-generate-sequence-diagram
-    layer: diagram
-    description: PlantUML 时序图生成（兼容入口）
-    clients: [claude, codex]
-    entry: SKILL.md
-    validation:
-      type: script
-      command: bash skills/diagram/feipi-plantuml-generate-sequence-diagram/scripts/validate.sh
     status: stable
 
   # --- integration layer ---
