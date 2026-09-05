@@ -1,0 +1,16 @@
+@startuml
+title 请求分支与终止流程
+skinparam nodesep 30
+skinparam ranksep 50
+start
+:S1 接收请求;
+if (是否快速处理？) then (是)
+  :S2 校验请求;
+  :S3 返回结果;
+  stop
+else (否)
+  :S4 进入常规处理;
+endif
+:S5 交付结果;
+stop
+@enduml

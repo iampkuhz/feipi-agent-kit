@@ -1,0 +1,18 @@
+diagram_id: D3
+diagram_type: activity
+title: "请求分支与终止流程"
+summary: "展示互斥分支、快速终止与常规处理的五步流程。"
+steps:
+  - {id: S1, name: 接收请求}
+  - {id: S2, name: 校验请求}
+  - {id: S3, name: 返回结果}
+  - {id: S4, name: 进入常规处理}
+  - {id: S5, name: 交付结果}
+transitions:
+  - {from: S1, to: S2, description: "是"}
+  - {from: S2, to: S3}
+  - {from: S1, to: S4, description: "否"}
+  - {from: S4, to: S5}
+narrative_step_ids: [S1, S2, S3, S4, S5]
+layout: {direction: top_to_bottom, include_legend: false}
+out_of_scope: [参数明细与重试循环]

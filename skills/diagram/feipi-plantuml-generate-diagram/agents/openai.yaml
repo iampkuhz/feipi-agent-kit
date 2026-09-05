@@ -1,4 +1,4 @@
-version: 5
+version: 6
 interface:
   display_name: "PlantUML 作图生成与校验"
   short_description: "唯一 PlantUML 入口，支持批次预检、类型校验与图包输出。"

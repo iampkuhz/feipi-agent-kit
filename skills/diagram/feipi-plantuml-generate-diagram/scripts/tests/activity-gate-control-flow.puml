@@ -1,0 +1,46 @@
+@startuml
+title Gate 控制面：规则、触发、执行与证据
+skinparam shadowing false
+skinparam nodesep 28
+skinparam ranksep 38
+skinparam activity {
+  BackgroundColor #F8FAFC
+  BorderColor #475569
+  FontColor #0F172A
+  DiamondBackgroundColor #FFF7D6
+  DiamondBorderColor #B7791F
+}
+start
+:S1 选择命令与运行范围;
+if (选择哪个命令？) then (health)
+  :S2 校验 Gate 规则目录;
+  :S3 编译全量静态计划;
+  :S4 运行 Harness 体检;
+  :S5 输出体检结果;
+  stop
+else (plan / run)
+  :S6 读取 Gate 规则目录;
+  :S7 冻结并匹配输入范围;
+  :S8 生成唯一执行计划;
+  if (执行 Gate？) then (run)
+    :S9 执行并判定检查;
+    :S10 保存并展示运行凭证;
+    stop
+  else (plan)
+    stop
+  endif
+endif
+
+legend right
+  |= 步骤 |= 阶段职责 |= 代码归属 |
+  | S1 | 互斥选择 health、plan 或 run | cli.py |
+  | S2 | 校验 Gate 规则目录 | catalog/ + maintenance/ |
+  | S3 | 编译计划并检查命令适配 | planning/ + execution/ + maintenance/ |
+  | S4 | 监管唯一 Harness doctor 进程 | execution/ + maintenance/ |
+  | S5 | 展示体检结果 | presentation/ |
+  | S6 | 声明 Gate、Trigger、分组与检查步骤 | catalog/ |
+  | S7-S8 | 冻结输入、解释触发并生成计划 | planning/ + execution/ |
+  | S9 | 监管进程并分类 owner 结果；checks/ 提供 Python owner | execution/ + checks/ |
+  | S10 | 保存凭证并展示摘要 | evidence/ + presentation/ |
+endlegend
+@enduml

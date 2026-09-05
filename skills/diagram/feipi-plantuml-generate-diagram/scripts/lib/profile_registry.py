@@ -44,7 +44,7 @@ PROFILES: dict[str, dict[str, Any]] = {
     },
     "activity": {
         "profile": "activity",
-        "profile_version": "1.1",
+        "profile_version": "1.2",
         "brief_schema": str(SKILL_DIR / "assets" / "validation" / "types" / "activity-brief.schema.json"),
         "template": str(SKILL_DIR / "assets" / "templates" / "types" / "activity-brief.yaml"),
         "coverage_mode": "activity",

@@ -1,0 +1,38 @@
+diagram_id: gate-control-plane-flow
+diagram_type: activity
+title: "Gate 控制面：规则、触发、执行与证据"
+summary: "用一张图说明 Gate 规则目录、plan/run 触发执行主线和 health 快速体检旁路。"
+
+steps:
+  - {id: S1, name: 选择命令与运行范围}
+  - {id: S2, name: 校验 Gate 规则目录}
+  - {id: S3, name: 编译全量静态计划}
+  - {id: S4, name: 运行 Harness 体检}
+  - {id: S5, name: 输出体检结果}
+  - {id: S6, name: 读取 Gate 规则目录}
+  - {id: S7, name: 冻结并匹配输入范围}
+  - {id: S8, name: 生成唯一执行计划}
+  - {id: S9, name: 执行并判定检查}
+  - {id: S10, name: 保存并展示运行凭证}
+
+transitions:
+  - {from: S1, to: S2, description: health}
+  - {from: S2, to: S3}
+  - {from: S3, to: S4}
+  - {from: S4, to: S5}
+  - {from: S1, to: S6, description: plan / run}
+  - {from: S6, to: S7}
+  - {from: S7, to: S8}
+  - {from: S8, to: S9, description: run}
+  - {from: S9, to: S10}
+
+narrative_step_ids: [S1, S2, S3, S4, S5, S6, S7, S8, S9, S10]
+
+layout:
+  direction: top_to_bottom
+  include_legend: true
+
+out_of_scope:
+  - 20 个 Gate 的静态清单
+  - 每个 owner 的完整命令参数
+  - 产品质量规则内部实现

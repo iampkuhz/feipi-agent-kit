@@ -33,32 +33,19 @@ check_json_field() {
   fi
 }
 
-check_json_field_in() {
-  local json_file="$1"
-  local field="$2"
-  local label="$3"
-  shift 3
-  local values=("$@")
-  local actual
-  actual="$(python3 -c "import json; print(json.load(open('${json_file}'))['${field}'])")"
-  local found=false
-  for v in "${values[@]}"; do
-    if [[ "$actual" == "$v" ]]; then
-      found=true
-      break
-    fi
-  done
-  if [[ "$found" == "true" ]]; then
-    pass "${label}：${actual}"
-  else
-    fail "${label}：期望 ${values[*]}，实际 '${actual}'"
-  fi
-}
-
 run_validate() {
   local out_dir="$1"; shift
   rm -rf "$out_dir"
-  bash "$SCRIPT_DIR/validate_package.sh" "$@" --out-dir "$out_dir" 2>/dev/null || true
+  if ! bash "$SCRIPT_DIR/validate_package.sh" "$@" --out-dir "$out_dir" --server-url "$RENDERER_URL"; then
+    fail "正向图包必须完成真实渲染：$out_dir"
+  fi
+}
+
+check_rendered_package() {
+  local json_file="$1"
+  local label="$2"
+  check_json_field "$json_file" render_result "ok" "$label render_result"
+  check_json_field "$json_file" final_status "success" "$label final_status"
 }
 
 # =============================================================================
@@ -82,18 +69,37 @@ COMPONENT_BRIEF="$SKILL_DIR/assets/examples/component/component-brief.example.ya
 COMPONENT_DIAGRAM="$SKILL_DIR/assets/examples/component/component-diagram.example.puml"
 ACTIVITY_BRIEF="$SKILL_DIR/assets/examples/activity/activity-brief.example.yaml"
 ACTIVITY_DIAGRAM="$SKILL_DIR/assets/examples/activity/activity-diagram.example.puml"
+ACTIVITY_BRANCH_BRIEF="$SKILL_DIR/assets/examples/activity/activity-branch-brief.example.yaml"
+ACTIVITY_BRANCH_DIAGRAM="$SKILL_DIR/assets/examples/activity/activity-branch-diagram.example.puml"
 DEPLOYMENT_BRIEF="$SKILL_DIR/assets/examples/deployment/deployment-brief.example.yaml"
 DEPLOYMENT_DIAGRAM="$SKILL_DIR/assets/examples/deployment/deployment-diagram.example.puml"
 SERVER_CANDIDATES="$SKILL_DIR/assets/server_candidates.txt"
 for f in "$FALLBACK_DIAGRAM" "$ARCH_BRIEF" "$ARCH_DIAGRAM" "$SEQ_BRIEF" "$SEQ_DIAGRAM" \
   "$SEQ_S_BRIEF" "$SEQ_S_DIAGRAM" "$COMPONENT_BRIEF" "$COMPONENT_DIAGRAM" \
-  "$ACTIVITY_BRIEF" "$ACTIVITY_DIAGRAM" "$DEPLOYMENT_BRIEF" "$DEPLOYMENT_DIAGRAM" "$SERVER_CANDIDATES"; do
+  "$ACTIVITY_BRIEF" "$ACTIVITY_DIAGRAM" "$ACTIVITY_BRANCH_BRIEF" "$ACTIVITY_BRANCH_DIAGRAM" \
+  "$DEPLOYMENT_BRIEF" "$DEPLOYMENT_DIAGRAM" "$SERVER_CANDIDATES"; do
   if [[ -f "$f" ]]; then
     pass "文件存在：$(basename "$f")"
   else
     fail "缺少文件：$f"
   fi
 done
+
+# 整个真实 renderer 测试批次只预检一次；不可用不能把集成测试算 PASS。
+PREFLIGHT_OUT="$(mktemp /tmp/plantuml-test-preflight.XXXXXX)"
+if ! bash "$SCRIPT_DIR/preflight_renderer.sh" --out "$PREFLIGHT_OUT"; then
+  echo "[BLOCKED] renderer preflight 失败；集成测试未执行：$PREFLIGHT_OUT" >&2
+  exit 2
+fi
+RENDERER_URL="$(python3 - "$PREFLIGHT_OUT" <<'PY'
+import json
+import sys
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+assert data["final_status"] == "success" and data["renderer_url"]
+print(data["renderer_url"])
+PY
+)"
+readonly RENDERER_URL
 
 # =============================================================================
 # Step 3: Fallback 正向验证
@@ -108,7 +114,7 @@ if [[ -f "$FALLBACK_OUT/validation.json" ]]; then
   check_json_field "$FALLBACK_OUT/validation.json" diagram_type "fallback" "diagram_type"
   check_json_field "$FALLBACK_OUT/validation.json" profile "fallback" "profile"
   check_json_field "$FALLBACK_OUT/validation.json" schema_version "1.2" "schema_version"
-  check_json_field_in "$FALLBACK_OUT/validation.json" final_status "final_status" "success" "blocked"
+  check_rendered_package "$FALLBACK_OUT/validation.json" "fallback"
 else
   fail "validation.json 未生成"
 fi
@@ -124,11 +130,12 @@ rm -rf "$INVALID_OUT"
 if bash "$SCRIPT_DIR/validate_package.sh" \
   --diagram "$INVALID_DIAGRAM" \
   --diagram-type fallback \
-  --out-dir "$INVALID_OUT" 2>/dev/null; then
+  --out-dir "$INVALID_OUT" --server-url "$RENDERER_URL" 2>/dev/null; then
   fail "负向用例应该被拦截"
 else
   if [[ -f "$INVALID_OUT/validation.json" ]]; then
     check_json_field "$INVALID_OUT/validation.json" final_status "blocked" "负向用例正确拦截"
+    check_json_field "$INVALID_OUT/validation.json" blocked_reason "missing_enduml" "缺 @enduml 原因一致"
   else
     fail "负向用例未生成 validation.json"
   fi
@@ -151,7 +158,7 @@ if [[ -f "$ARCH_OUT/validation.json" ]]; then
   check_json_field "$ARCH_OUT/validation.json" brief_check "ok" "brief_check"
   check_json_field "$ARCH_OUT/validation.json" coverage_check "ok" "coverage_check"
   check_json_field "$ARCH_OUT/validation.json" layout_check "ok" "layout_check"
-  check_json_field_in "$ARCH_OUT/validation.json" final_status "final_status" "success" "blocked"
+  check_rendered_package "$ARCH_OUT/validation.json" "architecture"
 else
   fail "architecture validation.json 未生成"
 fi
@@ -167,13 +174,13 @@ if bash "$SCRIPT_DIR/validate_package.sh" \
   --diagram-type architecture \
   --brief "$ARCH_BRIEF" \
   --diagram "$TEST_DIR/architecture-invalid-diagram.puml" \
-  --out-dir "$ARCH_NEG_OUT" 2>/dev/null; then
+  --out-dir "$ARCH_NEG_OUT" --server-url "$RENDERER_URL" 2>/dev/null; then
   fail "architecture 负向用例应该被拦截"
 else
   if [[ -f "$ARCH_NEG_OUT/validation.json" ]]; then
     STATUS="$(python3 -c "import json; print(json.load(open('$ARCH_NEG_OUT/validation.json'))['final_status'])")"
     if [[ "$STATUS" == "blocked" ]]; then
-      pass "architecture 负向用例正确拦截"
+      check_json_field "$ARCH_NEG_OUT/validation.json" blocked_reason "coverage_validation_failed" "architecture 负向覆盖失败原因一致"
     else
       fail "architecture 负向用例 final_status 不是 blocked：$STATUS"
     fi
@@ -199,7 +206,7 @@ if [[ -f "$SEQ_OUT/validation.json" ]]; then
   check_json_field "$SEQ_OUT/validation.json" brief_check "ok" "brief_check"
   check_json_field "$SEQ_OUT/validation.json" coverage_check "ok" "coverage_check"
   check_json_field "$SEQ_OUT/validation.json" layout_check "ok" "layout_check"
-  check_json_field_in "$SEQ_OUT/validation.json" final_status "final_status" "success" "blocked"
+  check_rendered_package "$SEQ_OUT/validation.json" "sequence"
 else
   fail "sequence validation.json 未生成"
 fi
@@ -215,11 +222,12 @@ if bash "$SCRIPT_DIR/validate_package.sh" \
   --diagram-type sequence \
   --brief "$SEQ_BRIEF" \
   --diagram "$TEST_DIR/sequence-extra-message-diagram.puml" \
-  --out-dir "$SEQ_NEG_EXTRA" 2>/dev/null; then
+  --out-dir "$SEQ_NEG_EXTRA" --server-url "$RENDERER_URL" 2>/dev/null; then
   fail "sequence 额外消息用例应该被拦截"
 else
   if [[ -f "$SEQ_NEG_EXTRA/validation.json" ]]; then
     check_json_field "$SEQ_NEG_EXTRA/validation.json" final_status "blocked" "sequence 额外消息正确拦截"
+    check_json_field "$SEQ_NEG_EXTRA/validation.json" blocked_reason "coverage_validation_failed" "sequence 额外消息失败原因一致"
   else
     fail "sequence 额外消息用例未生成 validation.json"
   fi
@@ -232,11 +240,12 @@ if bash "$SCRIPT_DIR/validate_package.sh" \
   --diagram-type sequence \
   --brief "$SEQ_BRIEF" \
   --diagram "$TEST_DIR/sequence-missing-separator-diagram.puml" \
-  --out-dir "$SEQ_NEG_SEP" 2>/dev/null; then
+  --out-dir "$SEQ_NEG_SEP" --server-url "$RENDERER_URL" 2>/dev/null; then
   fail "sequence 缺 separator 用例应该被拦截"
 else
   if [[ -f "$SEQ_NEG_SEP/validation.json" ]]; then
     check_json_field "$SEQ_NEG_SEP/validation.json" final_status "blocked" "sequence 缺 separator 正确拦截"
+    check_json_field "$SEQ_NEG_SEP/validation.json" blocked_reason "coverage_validation_failed" "sequence 缺 separator 失败原因一致"
   else
     fail "sequence 缺 separator 用例未生成 validation.json"
   fi
@@ -249,11 +258,13 @@ echo "=== Step 9: 新 typed profiles 与 process_s ==="
 for spec in \
   "component|$COMPONENT_BRIEF|$COMPONENT_DIAGRAM" \
   "activity|$ACTIVITY_BRIEF|$ACTIVITY_DIAGRAM" \
+  "activity|$ACTIVITY_BRANCH_BRIEF|$ACTIVITY_BRANCH_DIAGRAM" \
   "deployment|$DEPLOYMENT_BRIEF|$DEPLOYMENT_DIAGRAM" \
   "sequence|$SEQ_S_BRIEF|$SEQ_S_DIAGRAM"; do
   IFS='|' read -r profile brief diagram <<< "$spec"
   out_dir="/tmp/plantuml-${profile}-v2-smoke-test"
   [[ "$brief" == "$SEQ_S_BRIEF" ]] && out_dir="/tmp/plantuml-sequence-process-s-smoke-test"
+  [[ "$brief" == "$ACTIVITY_BRANCH_BRIEF" ]] && out_dir="/tmp/plantuml-activity-branch-smoke-test"
   run_validate "$out_dir" --diagram-type "$profile" --brief "$brief" --diagram "$diagram"
   if [[ -f "$out_dir/validation.json" ]]; then
     check_json_field "$out_dir/validation.json" schema_version "1.2" "$profile schema_version"
@@ -261,7 +272,7 @@ for spec in \
     check_json_field "$out_dir/validation.json" brief_check "ok" "$profile brief_check"
     check_json_field "$out_dir/validation.json" coverage_check "ok" "$profile coverage_check"
     check_json_field "$out_dir/validation.json" layout_check "ok" "$profile layout_check"
-    check_json_field_in "$out_dir/validation.json" final_status "$profile final_status" "success" "blocked"
+    check_rendered_package "$out_dir/validation.json" "$profile"
   else
     fail "$profile validation.json 未生成"
   fi
@@ -297,6 +308,12 @@ else
   fail "profile 边界与编号单元测试"
 fi
 
+if python3 "$TEST_DIR/test_activity_control_flow.py" >/dev/null 2>&1; then
+  pass "activity 控制流、覆盖与现代语法布局单元测试"
+else
+  fail "activity 控制流、覆盖与现代语法布局单元测试"
+fi
+
 if python3 "$TEST_DIR/test_package_verifier.py" >/dev/null 2>&1; then
   pass "v1.2 package 安全与双向合同单元测试"
 else
@@ -315,6 +332,7 @@ run_validate "$UNKNOWN_OUT" --diagram-type class --diagram "$FALLBACK_DIAGRAM"
 if [[ -f "$UNKNOWN_OUT/validation.json" ]]; then
   check_json_field "$UNKNOWN_OUT/validation.json" diagram_type "class" "保留请求图型"
   check_json_field "$UNKNOWN_OUT/validation.json" profile "fallback" "未注册图型路由 fallback"
+  check_rendered_package "$UNKNOWN_OUT/validation.json" "未知图型 fallback"
 else
   fail "未知图型 fallback 未生成 validation.json"
 fi
@@ -338,7 +356,7 @@ assert data["puml_sha256"] == data["artifacts"]["diagram"]["sha256"]
 assert data["metrics"] == {"node_count": 3, "edge_count": 2, "max_degree": 2}
 assert data["render_contract_version"] == "3"
 assert data["max_render_attempts"] == 2
-assert data["attempt_index"] in {0, 1}
+assert data["attempt_index"] == 1
 assert data["attempts_remaining"] == 2 - data["attempt_index"]
 assert isinstance(data["issues"], list)
 assert isinstance(data["repairable"], bool)
@@ -350,12 +368,13 @@ counter_fields = {
 }
 assert set(data["counters"]) == counter_fields
 assert all(type(value) is int and value >= 0 for value in data["counters"].values())
-if data["final_status"] == "success":
-    assert data["last_run_timings"]["cache_hit"] is False
-    assert data["last_run_timings"]["total_ms"] >= data["timings"]["total_ms"]
-    assert data["last_run_counters"] == data["counters"]
-    assert data["counters"]["package_validation_runs"] == 1
-    assert data["counters"]["package_verifier_runs"] >= 1
+assert data["final_status"] == "success" and data["render_result"] == "ok"
+assert data["last_run_timings"]["cache_hit"] is False
+assert data["last_run_timings"]["total_ms"] >= data["timings"]["total_ms"]
+assert data["last_run_counters"] == data["counters"]
+assert data["counters"]["package_validation_runs"] == 1
+assert data["counters"]["package_verifier_runs"] >= 1
+assert data["counters"]["render_rounds"] == 1
 PY
 then
   pass "v1.2 字段、相对路径、metrics 与 timing 合同"
@@ -376,7 +395,7 @@ if [[ "$HASH_STATUS" == "success" ]]; then
     pass "篡改 diagram.puml 正确拦截"
   fi
 else
-  check_json_field "$HASH_OUT/validation.json" blocked_reason "render_server_unavailable" "离线渲染如实阻塞"
+  fail "正向 component 未成功渲染，hash 篡改检查无法完成"
 fi
 
 # 完全未变且通过当前合同的图包可显式复用，且不得再次访问 renderer。

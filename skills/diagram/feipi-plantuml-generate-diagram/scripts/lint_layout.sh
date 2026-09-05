@@ -276,7 +276,11 @@ fi
 # =============================================================================
 if [[ "$DIAGRAM_TYPE" == "activity" ]]; then
   DIRECTION="$(brief_value "$BRIEF_FILE" "layout.direction" "top_to_bottom")"
-  require_declared_direction "$DIRECTION"
+  # 冒号活动图默认纵向；通用 direction 声明会干扰 renderer 的图型识别。
+  if [[ "$DIRECTION" != "top_to_bottom" ]] || printf '%s\n' "$CONTENT" | grep -Eiq '^[[:space:]]*(top to bottom|left to right) direction'; then
+    echo "布局校验失败：activity 使用默认纵向布局，不能声明通用 direction"
+    exit 2
+  fi
   require_spacing
   require_legend_if_configured
   if printf '%s\n' "$CONTENT" | grep -Eiq '^[[:space:]]*autonumber\b'; then

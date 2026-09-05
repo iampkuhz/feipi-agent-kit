@@ -13,10 +13,9 @@ from pathlib import Path
 from typing import Any
 
 from lib.puml_analysis import (
-    ACTIVITY_ANY_RE,
     OBJECT_RE,
+    analyze_activity_flow,
     parse_activities,
-    parse_activity_relations,
     parse_objects,
     parse_relations,
 )
@@ -384,17 +383,10 @@ def check_deployment_coverage(brief: dict, raw_text: str, normalized_text: str) 
 
 # ── Activity 模式 ─────────────────────────────────────────────
 
-ACTIVITY_RE = re.compile(
-    r'^\s*activity\s+"(S[1-9][0-9]*(?:\.[1-9][0-9]*)?)\s+([^"]+)"\s+as\s+(S[1-9][0-9]*(?:\.[1-9][0-9]*)?)\b'
-)
-ACTIVITY_EDGE_RE = re.compile(
-    r"^\s*(S[1-9][0-9]*(?:\.[1-9][0-9]*)?)\s+[-.]+>\s*(S[1-9][0-9]*(?:\.[1-9][0-9]*)?)(?:\s*:\s*(.*?))?\s*$"
-)
-
-
 def check_activity_coverage(brief: dict, raw_text: str, normalized_text: str) -> list[str]:
     del normalized_text
-    errors: list[str] = []
+    flow = analyze_activity_flow(raw_text)
+    errors = list(flow.errors)
     diagram_steps: dict[str, str] = {}
     diagram_edges: collections.Counter[tuple[str, str, str]] = collections.Counter()
     for declaration in parse_activities(raw_text):
@@ -414,11 +406,7 @@ def check_activity_coverage(brief: dict, raw_text: str, normalized_text: str) ->
             errors.append(f"activity alias 不允许重复：{declaration.alias}")
         diagram_steps[declaration.alias] = name.strip()
 
-    activity_syntaxes = {item.syntax for item in parse_activities(raw_text)}
-    if len(activity_syntaxes) > 1:
-        errors.append("同一 activity 图不得混用 `activity ... as ...` 与 `:Sx ...;` 两种步骤语法")
-
-    for relation in parse_activity_relations(raw_text):
+    for relation in flow.relations:
         if re.fullmatch(r"S[1-9][0-9]*(?:\.[1-9][0-9]*)?", relation.source) and re.fullmatch(
             r"S[1-9][0-9]*(?:\.[1-9][0-9]*)?", relation.target
         ):

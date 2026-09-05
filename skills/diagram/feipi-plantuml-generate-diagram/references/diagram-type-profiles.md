@@ -35,7 +35,9 @@
 - 顶层步骤使用连续 `S1...Sn`，允许 `Sx.y` 子步骤且父步骤必须存在
 - 顶层步骤 5–10 个，标签只写单一动作短语
 - `narrative_step_ids` 必须与图中步骤集合一致，孤立或额外步骤失败
-- 支持显式 `activity "Sx 动作" as Sx` 或连续 `:Sx 动作;`，同图不可混用；`include_legend=true` 时 legend 必须真实落图
+- 使用 `start`、`:Sx 动作;`、`if (...) then (标签)`、`else (标签)`、`endif`、`stop/end`；使用默认纵向布局，不写通用方向声明；`include_legend=true` 时 legend 必须真实落图
+- 条件标签进入对应转移签名；`else` 恢复条件入口，`endif` 合并仍可继续的分支，结束分支不得连接到后续步骤
+- 未实现的控制流或不完整的条件结构必须显式拒绝，不能退化为把所有步骤相邻连接；样例的静态通过必须同时由真实 renderer 验证
 
 ### deployment（已注册）
 

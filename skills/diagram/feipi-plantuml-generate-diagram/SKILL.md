@@ -49,7 +49,7 @@ description: PlantUML 唯一作图入口；在用户要求生成架构图、时�
 
 4. **Generate**：仅在 preflight 成功后生成 `.puml`。typed profile 按图类型执行 brief、跨字段语义、覆盖和布局校验；`sequence` 缺省使用 `interaction_mr`，专利流程使用 `process_s`。fallback 规则见 `references/fallback-mode.md`。
 
-5. **Validate and Repair**：每张图首次生成最多渲染 1 次；仅 `syntax`、`coverage`、`layout` 失败允许针对性修改当前失败图并再渲染 1 次。每张图总渲染上限是 2 次，修复上限是 1 次。修复时只读取 `validation.json`，不重新读取规则；brief 未变时复用冻结校验，只重跑发生变化图的 diagram-dependent checks。
+5. **Validate and Repair**：每张图首次生成最多渲染 1 次；仅 `syntax`、`coverage`、`layout` 失败允许针对性修改当前失败图并再渲染 1 次。每批次每张图总渲染上限是 2 次，修复上限是 1 次，换输出目录不能重置计数。普通图面修复依据 `validation.json`，brief 未变时复用冻结校验；若静态规则与真实 renderer 冲突，停止图面循环，进入下述工具缺陷处理，不要求继续改图迎合错误校验器。
 
 6. **Reuse**：同一输出目录再次验证且 diagram、brief、父 brief、profile 与渲染合同均未变化时，显式增加 `--reuse-valid-package`。命中后不访问 renderer；任一绑定变化则旧合同失效。
 
@@ -60,6 +60,14 @@ description: PlantUML 唯一作图入口；在用户要求生成架构图、时�
 - `syntax` / `coverage` / `layout`：最多修复 1 次；第二次失败后 `blocked`。
 - `visual_review`：交给 reviewer；不自动修改、不进入渲染循环。
 - `contract` / `retry_limit`：直接 `blocked`，由维护者处理。
+
+### 工具缺陷与授权边界
+
+- 静态通过却语法渲染失败，或有效分支被校验器连成顺序边，属于需核对 profile、样例、解析器和测试的工具缺陷线索，不等于缺少权限。
+- 普通作图任务不修改共享 skill；用户明确授权维护后，用 `feipi-skill-govern` 限定目标文件并补回归测试。此时允许读取失败直接相关的规则和实现，不能继续套用“只读 validation.json”的图面修复限制。
+- 已明确授权的目标 skill 修复、回归测试和结果验证无需每一步重复确认。授权不放宽 renderer 管理、校验规则或自动重试上限，不等于允许修改全局权限。
+- 保留失败批次。修复工具合同后，记录修复来源、profile 版本及新的验证批次，再验证最终源码；不得单靠换目录反复尝试同一失败图。
+- 活动图统一使用标准冒号动作与 `if/else/endif`、`stop/end` 控制流。方向默认纵向，不加会改变 renderer 图型识别的通用方向声明；分支边必须按控制流而非文本相邻步骤计算。
 
 ## 输入与输出
 
@@ -85,6 +93,7 @@ description: PlantUML 唯一作图入口；在用户要求生成架构图、时�
 6. `scripts/validate_package.sh` 已内置 `scripts/verify_package.py`，会双向复核 v1.2 路径、hash、状态与实际 PUML metrics；不要再手工调用 verifier。
 7. `max_render_attempts=2` 表示首次生成 1 次、针对性修复 1 次，不是 2 次重试；未修改的失败图不得重复渲染。
 8. `timings` / `counters` 保留最近一次完整生成数据，`last_run_timings` / `last_run_counters` 记录本次实际调用；上游应优先消费后者。命中复用时 `render_ms=0`、renderer 请求与轮次均为 0，并单独记录 cache hit，不得把首次生成的历史数据当作本次调用。
+9. `scripts/test.sh` 的正向样例必须使用真实 renderer 并断言 `render_result=ok`、`final_status=success`；负例单独断言预期失败。静态或 mock 测试通过不能代替正向样例的真实渲染证明。
 
 重复执行示例：
 
