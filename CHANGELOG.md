@@ -1,5 +1,8 @@
 # 变更记录
 
+## 2026-09-05
+- feipi-plantuml-generate-diagram v6：修复活动分支、真实渲染与缺陷升级
+
 ## 2026-09-04
 - feipi-techreport-ppt-skill v2：固化令牌、合同与真实验收
 
