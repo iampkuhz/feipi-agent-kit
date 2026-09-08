@@ -72,8 +72,9 @@ services:
       HTTPS_PROXY: ${LITELLM_CONTAINER_HTTPS_PROXY-http://host.containers.internal:7890}
       http_proxy: ${LITELLM_CONTAINER_HTTP_PROXY-http://host.containers.internal:7890}
       https_proxy: ${LITELLM_CONTAINER_HTTPS_PROXY-http://host.containers.internal:7890}
-      NO_PROXY: 127.0.0.1,localhost,litellm-db,postgres,host.containers.internal
-      no_proxy: 127.0.0.1,localhost,litellm-db,postgres,host.containers.internal
+      # DashScope 直连稳定；经本机代理可能在 CONNECT 后重置 TLS 握手。
+      NO_PROXY: 127.0.0.1,localhost,litellm-db,postgres,host.containers.internal,dashscope.aliyuncs.com,.dashscope.aliyuncs.com
+      no_proxy: 127.0.0.1,localhost,litellm-db,postgres,host.containers.internal,dashscope.aliyuncs.com,.dashscope.aliyuncs.com
       # ChatGPT Subscription OAuth token 持久化
       CHATGPT_TOKEN_DIR: /app/chatgpt-tokens
       # Podman Compose 不保证 container_name 自动成为可解析别名，
