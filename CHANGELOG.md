@@ -1,5 +1,8 @@
 # 变更记录
 
+## 2026-09-08
+- feipi-video-read-url v3：保留失败原因与依赖版本诊断
+
 ## 2026-09-05
 - feipi-plantuml-generate-diagram v6：修复活动分支、真实渲染与缺陷升级
 

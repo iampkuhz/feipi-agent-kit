@@ -29,3 +29,6 @@ summary|https://www.youtube.com/watch?v=6OiE0jIY93c||fast|extract
 
 # 统一提取 + 摘要请求包：Bilibili
 summary|https://www.bilibili.com/video/BV1LRcLzREG9||fast|extract
+
+# 离线错误诊断回归：scripts/test_error_diagnostics.sh（由 test.sh 自动执行）
+# 覆盖真实入口全失败、各次错误保留、依赖路径版本与 URL 脱敏。

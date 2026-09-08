@@ -1343,6 +1343,12 @@ fi
 
 rm -rf "$STUB_DIR"
 
+if bash "$SCRIPT_DIR/test_error_diagnostics.sh"; then
+  stub_pass "error-diagnostics-real-entrypoint"
+else
+  stub_fail_msg "error-diagnostics-real-entrypoint" "真实入口错误诊断回归失败"
+fi
+
 echo "测试汇总: total=$TOTAL pass=$PASSED fail=$FAILED"
 if [[ "$FAILED" -ne 0 ]]; then
   exit 1

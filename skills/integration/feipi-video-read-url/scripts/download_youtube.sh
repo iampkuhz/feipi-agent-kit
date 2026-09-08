@@ -494,6 +494,7 @@ run_whisper_mode() {
     # 标准路径失败，检查是否是格式/下载错误
     if rg -qi "403|HTTP Error|Requested format is not available|Only images" "$whisper_log"; then
       echo "whisper 标准音频下载失败，尝试 format fallback..." >&2
+      yt_common_print_diagnostic "$whisper_log" >&2
       rm -f "$whisper_log"
       whisper_log="$(mktemp "$OUT_DIR/.whisper-mode.XXXXXX")"
       if ! yt_common_run_whisper_mode_from_url "$URL" "$OUT_DIR" "$WHISPER_HELPER" zh "$resolved_profile" yt_common_mode_whisper_audio_with_format_fallback >"$whisper_log" 2>&1; then

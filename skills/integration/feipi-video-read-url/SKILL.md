@@ -218,6 +218,8 @@ description: 用于按用户意图处理视频网站 URL（如 YouTube、Bilibil
 - 再判断背景阶段是否明确要求“相关新闻/最新进展”；未明确时默认 `--news off`。
 - 若检测到 YouTube 在 Cookie、浏览器认证或风控相关失败，会自动以“无 Cookie”重试，并输出 `*-noauth.log` 便于排查；若日志不含认证/风控信号，不把普通字幕缺失或转写失败误报为 Cookie 问题。
 - 若转写失败，只能回到当前 skill 的本地脚本排查网络、认证或模型缺失；禁止切换转写工具。
+- 下载失败时先读本次 `logs/<source>-<mode>.log`：核对 `yt_dlp_path`、`yt_dlp_version`，按 `yt_dlp_attempt_exit` 和 client/format 回退信息追踪首次及后续错误。多版本环境以日志中的实际调用为准，不静默升级或修改 PATH。
+- 保留失败尝试的原始错误文本（输出副本脱敏 URL）；不能只输出“下载失败”。HTTP 403、格式不可用、PO Token 缺失和明确登录要求应分别解释，不能把所有 403 当作 Cookie 问题。
 - Bilibili 日志若出现 `bilibili_network_preflight_failed`，先按“网络权限复验 -> 代理监听状态”的顺序诊断；不得直接猜测代理端口或要求用户启动代理。
 - 如需配置 YouTube 登录态，优先引导用户运行 `scripts/setup_youtube_cookies.sh`，按向导导出 Netscape `cookies.txt` 并设置 `AGENT_YOUTUBE_COOKIE_FILE`；`AGENT_CHROME_PROFILE` 仅作为备用方式。
 

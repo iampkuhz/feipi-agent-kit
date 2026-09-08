@@ -25,7 +25,15 @@ yt_common_require_tools() {
     return 1
   fi
 
+  # 记录当前进程实际命中的程序，避免同机多个版本造成误判。
+  echo "yt_dlp_path=$(command -v yt-dlp)" >&2
+  echo "yt_dlp_version=$(yt-dlp --version 2>/dev/null || echo unknown)" >&2
   return 0
+}
+
+# 仅清理输出副本；错误判断仍读取原始 stderr，避免脱敏影响重试策略。
+yt_common_print_diagnostic() {
+  sed -E 's#https?://[^[:space:]]+#<url-redacted>#g' "$1"
 }
 
 yt_common_init() {
@@ -58,7 +66,14 @@ yt_common_run_cmd() {
   cmd+=("$@")
 
   if [[ -n "$err_file" ]]; then
-    "${cmd[@]}" 2>"$err_file"
+    local attempt_code=0
+    "${cmd[@]}" 2>"$err_file" || attempt_code=$?
+    # 每次失败立即进入来源日志，后续重试覆盖 err_file 也不会丢失历史。
+    if [[ "$attempt_code" -ne 0 ]]; then
+      echo "yt_dlp_attempt_exit=$attempt_code" >&2
+      yt_common_print_diagnostic "$err_file" >&2
+    fi
+    return "$attempt_code"
   else
     "${cmd[@]}"
   fi
@@ -80,7 +95,7 @@ yt_common_run() {
     fi
   fi
 
-  cat "$err_file" >&2
+  yt_common_print_diagnostic "$err_file" >&2
   rm -f "$err_file"
   return 1
 }
@@ -92,20 +107,20 @@ yt_common_run_with_success_log() {
   err_file="$(mktemp)"
 
   if yt_common_run_cmd "$err_file" "$@"; then
-    cat "$err_file"
+    yt_common_print_diagnostic "$err_file"
     rm -f "$err_file"
     return 0
   fi
 
   if type yt_common_on_error >/dev/null 2>&1; then
     if yt_common_on_error "$err_file" "$@"; then
-      cat "$err_file"
+      yt_common_print_diagnostic "$err_file"
       rm -f "$err_file"
       return 0
     fi
   fi
 
-  cat "$err_file" >&2
+  yt_common_print_diagnostic "$err_file" >&2
   rm -f "$err_file"
   return 1
 }
@@ -183,6 +198,7 @@ yt_common_mode_whisper_audio_with_format_fallback() {
     if rg -qi "403|HTTP Error|Requested format is not available|Only images" "$log_file"; then
       echo "yt_common_whisper_audio: format=$format_var 下载失败" >&2
     fi
+    yt_common_print_diagnostic "$log_file" >&2
     rm -f "$log_file"
   done
 
