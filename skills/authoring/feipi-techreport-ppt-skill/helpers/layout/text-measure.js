@@ -3,6 +3,8 @@
  * 不依赖 canvas / native fonts，基于字符宽度估算。
  */
 'use strict';
+const { TokenStore } = require('../../compiler/token-store');
+const tokens = TokenStore.loadDefault();
 
 // 中文字符宽度约等于字号（全角），英文字符约 0.55 倍字号（等宽近似）
 // 以下为保守估算值，实际渲染可能略有差异
@@ -92,7 +94,8 @@ function checkElementFit(element) {
   const layout = element.layout || {};
   if (!layout.w || !layout.h) return { fitStatus: 'unknown', reason: '缺少布局尺寸' };
 
-  const fontSizePt = element.style?.font_size_pt || 10;
+  const role = element.text_role || 'body';
+  const fontSizePt = element.style?.font_size_pt ?? tokens.typographyRole(role).font_size_pt;
   const text = typeof element.content === 'string'
     ? element.content
     : (element.content?.label || element.content?.text || '');

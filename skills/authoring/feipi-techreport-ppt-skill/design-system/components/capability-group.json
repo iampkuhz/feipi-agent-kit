@@ -16,7 +16,7 @@
     "fill": "surface.page",
     "line": "border.subtle",
     "corner_radius": "sm",
-    "font_size": "body_dense",
+    "font_size": "body",
     "text_color": "text.primary"
   },
   "priority": {
@@ -30,6 +30,22 @@
     "max_items_per_group": 6,
     "must_show_priority_when_planning": true,
     "prefer_grouping_over_table": true
+  },
+  "contract": {
+    "slots": {
+      "title": { "type": "string", "text_role": "section_title", "max_lines": 1 },
+      "items": { "type": "string_array", "text_role": "body", "max_items": 5, "max_lines_per_item": 2 }
+    },
+    "variants": ["standard", "primary", "muted"],
+    "sizes": {
+      "sm": { "min_height_in": 0.8, "padding_token": "card" },
+      "md": { "min_height_in": 1.0, "padding_token": "card" },
+      "lg": { "min_height_in": 1.3, "padding_token": "card" }
+    },
+    "allowed_regions": ["main", "main-left", "main-right", "evidence"],
+    "overflow_policy": ["compress_text", "change_component_size", "change_layout", "drop_secondary", "split_required"],
+    "editable": { "native_text": true, "native_shape": true, "object_name_required": true },
+    "ai_may_change": ["variant", "size", "region_id", "content"],
+    "ai_must_not_change": ["font", "font_size", "color", "padding", "corner_radius", "coordinates"]
   }
 }
-

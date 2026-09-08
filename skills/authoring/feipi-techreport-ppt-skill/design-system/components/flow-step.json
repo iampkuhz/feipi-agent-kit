@@ -29,6 +29,22 @@
     "each_step_label_max_chars": 18,
     "optional_note_max_chars": 40,
     "split_if_steps_exceed_limit": true
+  },
+  "contract": {
+    "slots": {
+      "label": { "type": "string", "text_role": "diagram_node", "max_lines": 3 },
+      "note": { "type": "string", "text_role": "caption", "max_lines": 2, "optional": true }
+    },
+    "variants": ["standard", "primary", "done", "doing", "planned"],
+    "sizes": {
+      "sm": { "min_width_in": 1.4, "min_height_in": 0.8, "padding_token": "diagram_node" },
+      "md": { "min_width_in": 1.7, "min_height_in": 1.0, "padding_token": "diagram_node" },
+      "lg": { "min_width_in": 2.1, "min_height_in": 1.2, "padding_token": "diagram_node" }
+    },
+    "allowed_regions": ["main"],
+    "overflow_policy": ["compress_text", "change_component_size", "change_layout", "drop_secondary", "split_required"],
+    "editable": { "native_text": true, "native_shape": true, "native_connector": true, "object_name_required": true },
+    "ai_may_change": ["variant", "size", "region_id", "content"],
+    "ai_must_not_change": ["font", "font_size", "color", "padding", "corner_radius", "coordinates", "arrow_style"]
   }
 }
-

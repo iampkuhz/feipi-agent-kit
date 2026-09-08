@@ -5,7 +5,7 @@
  * Pipeline CLI 入口
  *
  * 用法:
- *   node generate_pptx_pipeline.js <slide-ir.json> <output-dir> [--dry-run] [--no-render] [--json] [--max-rounds N] [--mode draft|production]
+ *   node generate_pptx_pipeline.js <slide-ir.json> <output-dir> [--dry-run] [--no-render] [--json] [--max-rounds N] [--mode fast|review|strict]
  *
  * 输出目录:
  *   pipeline-report.json   完整 pipeline 报告
@@ -27,7 +27,7 @@ const jsonFlag = args.includes('--json');
 const maxRoundsIdx = args.indexOf('--max-rounds');
 const maxRounds = maxRoundsIdx >= 0 ? parseInt(args[maxRoundsIdx + 1], 10) || 3 : 3;
 const modeIdx = args.indexOf('--mode');
-const mode = modeIdx >= 0 ? args[modeIdx + 1] : 'production';
+const mode = modeIdx >= 0 ? args[modeIdx + 1] : 'review';
 
 if (fileArgs.length < 2) {
   console.error('用法: node generate_pptx_pipeline.js <slide-ir.json> <output-dir> [options]');
@@ -37,12 +37,12 @@ if (fileArgs.length < 2) {
   console.error('  --no-render      跳过 Render QA');
   console.error('  --json           输出 JSON 格式的 pipeline report');
   console.error('  --max-rounds N   最大迭代轮次（默认 3）');
-  console.error('  --mode MODE      工作流模式：draft 或 production（默认 production）');
+  console.error('  --mode MODE      fast、review、strict；draft/production 为兼容 alias');
   process.exit(1);
 }
 
-if (mode !== 'draft' && mode !== 'production') {
-  console.error(`错误: 不支持的模式 "${mode}"，请使用 draft 或 production`);
+if (!['fast', 'review', 'strict', 'draft', 'production'].includes(mode)) {
+  console.error(`错误: 不支持的模式 "${mode}"，请使用 fast、review 或 strict`);
   process.exit(1);
 }
 
@@ -121,7 +121,7 @@ function printPipelineReport(report) {
 
   console.log(`=== Pipeline 报告 ${icon} ===\n`);
   console.log(`Slide: ${report.slide_id} (${report.layout_pattern})`);
-  console.log(`模式: ${report.mode || 'production'}`);
+  console.log(`模式: ${report.mode || 'review'}`);
   console.log(`运行轮次: ${report.rounds.length} / ${report.max_rounds}`);
   console.log(`Dry Run: ${report.dry_run ? '是' : '否'}`);
   console.log('');

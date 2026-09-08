@@ -6,25 +6,17 @@
 'use strict';
 
 const geo = require('./geometry');
+const { TokenStore } = require('../compiler/token-store');
+const tokens = TokenStore.loadDefault();
 
 // --- 默认阈值 ---
 const DEFAULTS = {
-  MIN_FONT_BODY: 10,
-  MIN_FONT_TABLE: 8.5,
-  MIN_FONT_TITLE: 18,
-  MIN_FONT_FOOTNOTE: 8.5,
-  MIN_GAP: 0.1,       // inch
+  MIN_GAP: tokens.resolve('spacing.rules.min_element_gap_in'),
   OVERLAP_TOLERANCE: 0.01,  // inch，极小重叠视为计算误差
   // 连接器端点容差：连接器边界框在端点元素附近的重叠视为正常
   CONNECTOR_ENDPOINT_MARGIN: 0.15,  // inch
   // 容器小重叠容差：重叠面积 < 此比例的较小元素面积时，视为有意包含
   CONTAINER_SMALL_OVERLAP_RATIO: 0.2,
-  // 文本高度估算：每行中文字符数（近似值）
-  CHARS_PER_LINE_10PT: 25,
-  CHARS_PER_LINE_12PT: 20,
-  CHARS_PER_LINE_14PT: 16,
-  CHARS_PER_LINE_18PT: 12,
-  CHARS_PER_LINE_22PT: 9,
   LINE_HEIGHT_RATIO: 1.3
 };
 
@@ -44,17 +36,18 @@ function _isFooter(kind) { return FOOTER_KINDS.has(kind); }
 // --- 字号下限 ---
 
 function minFontForElement(element) {
-  const kind = element.kind;
-  const role = element.semantic_role;
-  if (role === 'title') return DEFAULTS.MIN_FONT_TITLE;
-  if (kind === 'matrix' || kind === 'table' || kind === 'kpi_card' || kind === 'note' ||
-      role === 'source_note') {
-    return DEFAULTS.MIN_FONT_TABLE;
+  let role = element.text_role;
+  if (!role) {
+    if (element.semantic_role === 'title') role = 'title';
+    else if (element.semantic_role === 'subtitle') role = 'subtitle';
+    else if (element.kind === 'matrix' || element.kind === 'table') role = 'table_cell';
+    else if (element.kind === 'footer_note' || element.semantic_role === 'source_note') role = 'footer';
+    else if (element.kind === 'step_marker') role = 'diagram_badge';
+    else if (element.kind === 'component_node') role = 'diagram_node';
+    else if (element.kind === 'note' || element.kind === 'legend') role = 'caption';
+    else role = 'body';
   }
-  if (kind === 'step_marker') {
-    return DEFAULTS.MIN_FONT_TABLE;
-  }
-  return DEFAULTS.MIN_FONT_BODY;
+  return tokens.typographyRole(role).minimum_pt;
 }
 
 // --- 工具函数 ---
@@ -68,17 +61,6 @@ function _rectArea(rect) {
 }
 
 /**
- * 根据字号估算每行可容纳的中文字符数。
- */
-function _estimateCharsPerLine(fontSizePt) {
-  if (fontSizePt >= 22) return DEFAULTS.CHARS_PER_LINE_22PT;
-  if (fontSizePt >= 18) return DEFAULTS.CHARS_PER_LINE_18PT;
-  if (fontSizePt >= 14) return DEFAULTS.CHARS_PER_LINE_14PT;
-  if (fontSizePt >= 12) return DEFAULTS.CHARS_PER_LINE_12PT;
-  return DEFAULTS.CHARS_PER_LINE_10PT;
-}
-
-/**
  * 估算文本内容所需的渲染高度（inch）。
  * 基于字体大小、内容长度和区域宽度计算。
  * @param {Object} element
@@ -87,14 +69,15 @@ function _estimateCharsPerLine(fontSizePt) {
  */
 function estimateTextRequiredHeight(element, bounds) {
   const style = element.style;
-  const fontSize = style ? style.font_size_pt : DEFAULTS.MIN_FONT_BODY;
+  const role = element.text_role || 'body';
+  const fontSize = style?.font_size_pt ?? tokens.typographyRole(role).font_size_pt;
   const content = element.content;
   if (typeof content !== 'string' || content.length === 0) return null;
   if (!bounds || bounds.w <= 0) return null;
 
-  const charCount = content.length;
-  const charsPerLine = _estimateCharsPerLine(fontSize);
-  const lines = Math.ceil(charCount / charsPerLine);
+  const explicitLines = content.split(/\n/);
+  const charsPerLine = Math.max(4, Math.floor(bounds.w * 72 / (fontSize * 0.95)));
+  const lines = explicitLines.reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / charsPerLine)), 0);
 
   // 字号 pt 转 inch（1pt = 1/72 inch），乘以行高比
   const lineHeightInch = (fontSize / 72) * DEFAULTS.LINE_HEIGHT_RATIO;
@@ -298,6 +281,21 @@ function check_footer_collision(a, b, boundsA, boundsB) {
   );
 }
 
+function check_text_overlap(a, b, boundsA, boundsB) {
+  if (!_isTextKind(a.kind) || !_isTextKind(b.kind)) return null;
+  if (!boundsA || !boundsB) return null;
+  const overlap = geo.rectOverlapArea(boundsA, boundsB);
+  if (overlap <= DEFAULTS.OVERLAP_TOLERANCE * DEFAULTS.OVERLAP_TOLERANCE) return null;
+  return makeIssue(
+    'hard_fail',
+    'text_overlap',
+    [a.id, b.id],
+    `文本元素 "${a.id}" 与 "${b.id}" 发生重叠`,
+    { overlap_area: overlap, bounds_a: boundsA, bounds_b: boundsB },
+    '切换组件尺寸或布局；禁止通过缩小字号解决'
+  );
+}
+
 function check_low_font(element) {
   const style = element.style;
   if (!style || typeof style.font_size_pt !== 'number') return null;
@@ -405,6 +403,7 @@ module.exports = {
   check_label_overlap_node,
   check_container_contains_text,
   check_footer_collision,
+  check_text_overlap,
   check_low_font,
   check_out_of_bounds,
   check_too_close,

@@ -1,51 +1,25 @@
 {
   "id": "workflow-modes",
-  "description": "双流程模式配置：draft（快速样例）和 production（生产版本），差异仅体现在确认策略、布局复杂度、QA 门槛、修复轮次和输出声明上",
+  "description": "fast、review、strict 三种交互与 QA 模式；旧名称仅为 alias。",
+  "aliases": { "draft": "fast", "production": "strict" },
   "modes": {
-    "draft": {
-      "label": "快速样例",
+    "fast": {
       "requires_page_contract_confirmation": false,
       "requires_source_provenance": true,
-      "max_repair_rounds": 1,
-      "qa_gate": "draft",
-      "qa_strategy": {
-        "allow_warnings": true,
-        "require_layout_solver": false,
-        "render_skip_is_pass": true
-      },
-      "layout_complexity": "low_to_medium",
-      "allowed_components": [
-        "text-hierarchy",
-        "rounded-text-box",
-        "kpi-card",
-        "native-table",
-        "native-component-diagram",
-        "flow-step",
-        "source-note",
-        "layout-region",
-        "section-divider",
-        "badge-and-label",
-        "code-block",
-        "media-frame"
-      ],
-      "output_badge": "DRAFT",
-      "release_gate_strictness": "relaxed"
+      "qa_strategy": { "allow_warnings": true, "render_required": false, "visual_approval_required": false },
+      "decision_policy": "仅在业务含义变化、删除重要内容或 split_required 时询问"
     },
-    "production": {
-      "label": "生产版本",
-      "requires_page_contract_confirmation": true,
+    "review": {
+      "requires_page_contract_confirmation": "only_material_decisions",
       "requires_source_provenance": true,
-      "max_repair_rounds": 3,
-      "qa_gate": "production",
-      "qa_strategy": {
-        "allow_warnings": false,
-        "require_layout_solver": true,
-        "render_skip_is_pass": false
-      },
-      "layout_complexity": "full",
-      "allowed_components": "*",
-      "output_badge": null,
-      "release_gate_strictness": "strict"
+      "qa_strategy": { "allow_warnings": true, "render_required": true, "visual_approval_required": false },
+      "decision_policy": "仅展示影响内容、布局或业务含义的少量决策"
+    },
+    "strict": {
+      "requires_page_contract_confirmation": "only_material_decisions",
+      "requires_source_provenance": true,
+      "qa_strategy": { "allow_warnings": false, "render_required": true, "visual_approval_required": true },
+      "decision_policy": "完整合同、package/editability QA、权威渲染与视觉签字"
     }
   }
 }

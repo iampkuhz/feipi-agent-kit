@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Resolved Render Plan",
+  "type": "object",
+  "required": ["version", "slide_id", "layout_id", "canvas_emu", "elements", "geometry_hash"],
+  "properties": {
+    "version": { "const": "render-plan.v1" },
+    "slide_id": { "type": "string" },
+    "layout_id": { "type": "string" },
+    "canvas_emu": { "$ref": "#/$defs/rect" },
+    "elements": { "type": "array", "items": { "$ref": "#/$defs/element" } },
+    "geometry_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "source_version": { "enum": ["v1", "v2", "design-kit"] },
+    "overflow": {
+      "type": "object",
+      "required": ["status", "issues", "next_actions"],
+      "properties": {
+        "status": { "enum": ["fit", "compress_text", "change_component_size", "change_layout", "drop_secondary", "split_required"] },
+        "issues": { "type": "array" },
+        "next_actions": { "type": "array", "items": { "enum": ["compress_text", "change_component_size", "change_layout", "drop_secondary", "split_required"] } }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "rect": {
+      "type": "object",
+      "required": ["x", "y", "w", "h"],
+      "properties": {
+        "x": { "type": "integer" }, "y": { "type": "integer" },
+        "w": { "type": "integer", "minimum": 1 }, "h": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "element": {
+      "type": "object",
+      "required": ["id", "object_name", "kind", "component_id", "region_id", "bounds_emu", "content", "resolved_style"],
+      "properties": {
+        "id": { "type": "string" }, "object_name": { "type": "string" },
+        "kind": { "type": "string" }, "component_id": { "type": "string" },
+        "region_id": { "type": "string" }, "semantic_role": { "type": "string" },
+        "text_role": { "type": ["string", "null"] }, "bounds_emu": { "$ref": "#/$defs/rect" },
+        "content": {}, "resolved_style": { "type": "object" }, "z_order": { "type": "integer" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

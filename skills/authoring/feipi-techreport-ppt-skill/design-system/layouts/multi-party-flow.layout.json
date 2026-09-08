@@ -1,0 +1,16 @@
+{
+  "id": "multi-party-flow",
+  "version": "1.0.0",
+  "cognitive_task": "解释多方交互的顺序、责任边界与证据",
+  "canvas_token": "spacing.canvas",
+  "regions": {
+    "header": { "bounds_in": { "x": 0.5, "y": 0.35, "w": 12.33, "h": 0.9 }, "flow": "header", "allowed_components": ["text-hierarchy"] },
+    "main": { "bounds_in": { "x": 0.5, "y": 1.55, "w": 12.33, "h": 3.45 }, "flow": "horizontal", "allowed_components": ["flow-step"] },
+    "evidence": { "bounds_in": { "x": 0.5, "y": 5.25, "w": 12.33, "h": 1.15 }, "flow": "single", "allowed_components": ["native-table", "source-note", "text-hierarchy"] },
+    "footer": { "bounds_in": { "x": 0.5, "y": 6.78, "w": 12.33, "h": 0.28 }, "flow": "single", "allowed_components": ["source-note", "text-hierarchy"] }
+  },
+  "primary_visual_region": "main",
+  "capacity": { "min_steps": 3, "max_steps": 7 },
+  "fallback_layouts": ["layered-architecture"],
+  "forbidden_patterns": ["connector_through_text", "free_coordinates", "continuous_font_scaling"]
+}

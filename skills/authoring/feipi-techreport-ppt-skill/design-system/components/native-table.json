@@ -45,6 +45,22 @@
     "cell_max_chars": 60,
     "split_if_exceeds_budget": true,
     "avoid_full_page_table": true
+  },
+  "contract": {
+    "slots": {
+      "headers": { "type": "string_array", "text_role": "table_header", "max_lines": 2 },
+      "rows": { "type": "table_rows", "text_role": "table_cell", "max_lines_per_cell": 2 }
+    },
+    "variants": ["comparison_matrix", "metric_table", "appendix_dense", "standard", "tech", "matrix"],
+    "sizes": {
+      "sm": { "max_rows": 4, "max_cols": 4, "cell_padding_token": "table_cell" },
+      "md": { "max_rows": 6, "max_cols": 5, "cell_padding_token": "table_cell" },
+      "lg": { "max_rows": 8, "max_cols": 6, "cell_padding_token": "table_cell" }
+    },
+    "allowed_regions": ["main", "main-right", "evidence"],
+    "overflow_policy": ["compress_text", "change_component_size", "change_layout", "drop_secondary", "split_required"],
+    "editable": { "native_table": true, "native_text": true, "object_name_required": true },
+    "ai_may_change": ["variant", "size", "region_id", "content"],
+    "ai_must_not_change": ["font", "font_size", "color", "padding", "coordinates"]
   }
 }
-

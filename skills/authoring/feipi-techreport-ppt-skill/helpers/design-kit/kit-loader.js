@@ -1,75 +1,32 @@
 /**
- * Design Kit Loader — 读取 manifest.json 及所有 entrypoints。
+ * 仓内 Design System 兼容读取器。
  */
-
 'use strict';
 
 const path = require('path');
-const fs = require('fs');
+const { TokenStore, DEFAULT_SKILL_ROOT } = require('../../compiler/token-store');
+const { ContractRegistry } = require('../../compiler/contract-registry');
 
-const DESIGN_KIT_ROOT = '/Users/zhehan/Downloads/feipi-ppt-design-kit/';
+const DESIGN_KIT_ROOT = path.join(DEFAULT_SKILL_ROOT, 'design-system');
+let cached = null;
 
-let _cachedKit = null;
-
-/**
- * 加载并缓存整个 design kit。
- */
 function loadDesignKit() {
-  if (_cachedKit) return _cachedKit;
-
-  const manifest = loadJson(path.join(DESIGN_KIT_ROOT, 'manifest.json'));
-  const ep = manifest.entrypoints;
-
-  const theme = loadJson(path.join(DESIGN_KIT_ROOT, ep.theme));
-  const typography = loadJson(path.join(DESIGN_KIT_ROOT, ep.typography));
-  const density = loadJson(path.join(DESIGN_KIT_ROOT, ep.tables));
-  const densityTokens = loadJson(path.join(DESIGN_KIT_ROOT, 'tokens/density/default-density.json'));
-  const tables = loadJson(path.join(DESIGN_KIT_ROOT, ep.tables));
-  const validation = loadJson(path.join(DESIGN_KIT_ROOT, ep.validation));
-
-  // 加载组件注册表 + 各组件 spec
-  const compRegistry = loadJson(path.join(DESIGN_KIT_ROOT, ep.components));
-  const components = {};
-  for (const entry of compRegistry.components) {
-    components[entry.name] = loadJson(path.join(DESIGN_KIT_ROOT, entry.path));
-  }
-
-  // 加载布局注册表 + 各布局 spec
-  const layoutRegistry = loadJson(path.join(DESIGN_KIT_ROOT, ep.layouts));
-  const layouts = {};
-  for (const entry of layoutRegistry.layouts) {
-    layouts[entry.name] = loadJson(path.join(DESIGN_KIT_ROOT, entry.path));
-  }
-
-  _cachedKit = {
-    manifest,
-    theme,
-    typography,
-    density: densityTokens,
-    tables,
-    validation,
-    components,
-    layouts,
-    rootDir: DESIGN_KIT_ROOT
+  if (cached) return cached;
+  const tokens = TokenStore.loadDefault();
+  const registry = new ContractRegistry({ tokens });
+  cached = {
+    manifest: { id: 'feipi-in-repo-design-system', page: tokens.documents.spacing.canvas },
+    theme: tokens.documents.colors,
+    typography: tokens.documents.typography,
+    spacing: tokens.documents.spacing,
+    shape: tokens.documents.shape,
+    components: Object.fromEntries(registry.components),
+    layouts: Object.fromEntries(registry.layouts),
+    rootDir: DESIGN_KIT_ROOT,
   };
-
-  return _cachedKit;
+  return cached;
 }
 
-function loadJson(filePath) {
-  const raw = fs.readFileSync(filePath, 'utf-8');
-  return JSON.parse(raw);
-}
+function clearCache() { cached = null; }
 
-/**
- * 清除缓存（测试用）。
- */
-function clearCache() {
-  _cachedKit = null;
-}
-
-module.exports = {
-  loadDesignKit,
-  clearCache,
-  DESIGN_KIT_ROOT
-};
+module.exports = { loadDesignKit, clearCache, DESIGN_KIT_ROOT };

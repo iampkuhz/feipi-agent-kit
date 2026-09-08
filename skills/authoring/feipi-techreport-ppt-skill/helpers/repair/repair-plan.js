@@ -58,7 +58,7 @@ function generateRepairPlan(classified, slideIR, round) {
     return {
       status: 'needs_user_decision',
       round,
-      actions: actions.filter(a => a.type !== 'shrink_font'),
+      actions,
       requires_user_decision: true,
       recommendation: '建议拆成两页',
       reason: '页面内容密度过高，无法在不损失可读性的前提下自动修复',

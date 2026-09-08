@@ -1,128 +1,33 @@
-# 修复策略
+# Overflow 与修复策略
 
-## 修复原则
+Pipeline 检测问题并返回结构化状态，不静默改写业务内容，也不自动生成新字号。
 
-- **不要优先缩小字号**。字号是最后手段，不是默认方案。
-- **不要通过塞更多内容解决问题**。修复是减法，不是加法。
-- **优先重构信息**。删除、压缩、合并、重组。
-- **修复优先重排版面**。先解决结构和空间分配，再调整视觉细节。
-- **硬失败必须修复**。重叠、截断、溢出、脚注碰撞不能带着交付。
+固定动作顺序：
 
-## 修复优先级
+1. `compress_text`：删除重复表述、合并同义信息；
+2. `change_component_size`：切换登记的离散 size；
+3. `change_layout`：选择容量更合适的登记 Layout；
+4. `drop_secondary`：移除次要内容；重要内容需要用户确认；
+5. `split_required`：拆页，需要用户确认。
 
-按以下顺序尝试修复，前一项无效时再试下一项：
+## 禁止
 
-1. 明确主判断，删除不支撑结论的内容。
-2. 删除重复表达。
-3. 压缩长句为短语或标签。
-4. 合并 bullet（相似内容合并为一条）。
-5. 把段落改为短标签（关键词 + 数据）。
-6. 把大表改为"关键矩阵 + KPI cards + insight panel"。
-7. 把复杂架构图减少为主路径 + 旁路说明。
-8. 把流程图限制在 5-7 步（合并子步骤）。
-9. 调整主图和说明区比例（增大主图占比）。
-10. 重新分配脚注区，脚注不得覆盖主体。
-11. 增加分组和留白（拉开间距、增加分组框）。
-12. **最后才缩小字号**（不低于硬规则下限）。
+- 连续缩小字体、二分搜索字号或 PowerPoint autofit；
+- 低于 text role minimum；
+- 移动到任意坐标绕过 Layout Contract；
+- 删除重要事实、修改数字或改变业务含义；
+- 对相同 IR hash 重复运行并声称已修复。
 
-## 常见问题修复
+## 问题归属
 
-| 问题 | 优先修复 |
-|------|----------|
-| 大表过密 | 减少列/行，提取 KPI cards，保留关键维度 |
-| 右侧卡片覆盖表格 | 改成顶部 KPI 或独立右栏，并缩小主表宽度 |
-| 脚注压住表格 | 预留 footer，高度不足则压缩脚注或拆页 |
-| 单元格多行换行 | 改短标签，移除解释句 |
-| 标题挤占主体 | 缩短标题，把解释放到副标题 |
-| 下半页空白 | 重排为上下结构或扩大主视觉，而不是继续挤上半页 |
-| 主次不清 | 只保留一个强调色和一个主视觉中心 |
+| 问题 | 应修改层 |
+|---|---|
+| 重复或过长表述 | Composition / IR content |
+| 组件容量不足 | Component Contract size/overflow 或 IR size |
+| 页面认知任务不匹配 | Layout Contract 或 IR layout_id |
+| 任意字号/颜色 | Schema/validator 拒绝 |
+| token 缺失 | TokenStore/Design Token |
+| 元素重叠、截断、越界 | Compiler/Layout Contract/QA |
+| PPTX 包、对象名或编辑性 | Backend/Postcheck |
 
-## 拆页规则
-
-如果经过上述修复，内容仍然过载，输出：
-
-```
-当前内容不适合稳定压缩成一页。建议拆成两页：
-
-- 第 1 页：...（主题）
-- 第 2 页：...（主题）
-
-是否按这个拆页方案继续？
-```
-
-**不要自动拆页，必须用户确认。**
-
-## 修复输出格式
-
-修复后应输出：
-
-```
-## 修复报告
-
-- 发现问题：...
-- 修复操作：...
-- 修复结果：通过 / 仍有过载，建议拆页
-```
-
-## Repair Plan 数据结构
-
-Pipeline 产出的 repair plan 是结构化的 JSON 对象，用于驱动 LLM 在下一轮中调整 Slide IR：
-
-```json
-{
-  "status": "repairable",
-  "round": 1,
-  "actions": [
-    {
-      "type": "move_or_resize",
-      "target_element_ids": ["step_7_label"],
-      "reason": "与 component_node 重叠",
-      "instruction": "右移标签或缩短标签文本",
-      "conservative": true
-    }
-  ],
-  "requires_user_decision": false
-}
-```
-
-当内容过载或第 3 轮仍失败时：
-
-```json
-{
-  "status": "needs_user_decision",
-  "round": 3,
-  "actions": [],
-  "requires_user_decision": true,
-  "recommendation": "建议拆成两页",
-  "reason": "经过 3 轮自动修复仍存在布局溢出，1 项问题未解决。",
-  "remaining_issues": [
-    { "type": "layout_overflow", "message": "..." }
-  ]
-}
-```
-
-### Action Type 枚举
-
-| type | 含义 | 示例 |
-|------|------|------|
-| `move_or_resize` | 调整元素位置或尺寸 | 右移标签、缩小卡片宽度 |
-| `shorten_text` | 缩短文本内容 | 压缩长句为短语 |
-| `adjust_font` | 调整字号 | 提高至最小阈值 |
-| `reduce_content` | 删除或合并内容 | 合并相似 bullet |
-| `adjust_layout` | 重新分配版面比例 | 增大主图区域 |
-| `add_missing_element` | 补充缺失元素 | 添加 takeaway 区 |
-| `manual_review` | 需要人工审查 | 未知类型问题 |
-
-## 当前阶段边界
-
-**Pipeline 当前阶段不自动做激进改写：**
-
-- Pipeline 只负责发现问题并生成 repair plan。
-- 具体的 Slide IR 改写由 LLM 根据 repair plan 在下一轮中执行。
-- Pipeline 不做"聪明"的内容改写（如自动总结、自动翻译、自动删减）。
-- 保守调整仅限于明显的越界元素位移或输出修复建议。
-- 不要让 repair 自动添加用户未提供的事实。
-- 不要在无用户确认时拆页。
-- 不要为了通过 QA 而无限缩小字号。
-
-这些边界确保 repair plan 的可靠性：plan 给出的问题是准确的、建议是可执行的，不会在无人监督的情况下自动修改内容导致信息失真。
+任何“修复后重跑”都必须形成新的 IR 或合同版本，并产生新的 hash。

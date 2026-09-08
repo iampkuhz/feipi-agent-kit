@@ -14,6 +14,9 @@
  *   4. 是否存在 0 byte 或异常小图片 (<1KB)。
  *   5. 生成人工/模型检查 checklist。
  *
+ * 注意：这些自动检查只能证明渲染证据可用，不能证明页面没有重叠、
+ * 裁剪、缺字或视觉层级问题。没有显式视觉复核时不得输出 pass。
+ *
  * 输出:
  *   --json 模式: JSON 结构化报告
  *   默认:       中文可读摘要
@@ -169,7 +172,9 @@ const hardFail = issues.filter(i => i.severity === 'hard_fail').length;
 const warnings = issues.filter(i => i.severity === 'warning').length;
 
 const report = {
-  status: hardFail > 0 ? 'fail' : 'pass',
+  status: hardFail > 0 ? 'fail' : 'needs_visual_review',
+  automatic_status: hardFail > 0 ? 'fail' : 'pass',
+  visual_review_required: hardFail === 0,
   summary: {
     slides_checked: slidesChecked,
     hard_fail: hardFail,
@@ -200,14 +205,14 @@ if (jsonMode) {
 }
 
 function printReport(report) {
-  const statusIcon = report.status === 'pass' ? '[PASS]' : '[FAIL]';
+  const statusIcon = report.status === 'fail' ? '[FAIL]' : report.status === 'skip' ? '[SKIP]' : '[REVIEW]';
   console.log(`\n=== 视觉 QA 报告 ${statusIcon} ===\n`);
   console.log(`渲染引擎: ${manifestData.renderer || '未知'}`);
   console.log(`检查页数: ${report.summary.slides_checked}`);
   console.log();
 
   if (report.issues.length === 0) {
-    console.log('所有自动检查通过。');
+    console.log('自动渲染证据检查通过；尚未完成全尺寸视觉复核。');
   } else {
     for (const issue of report.issues) {
       const icon = issue.severity === 'hard_fail' ? '[✗]' : '[!]';
@@ -225,6 +230,9 @@ function printReport(report) {
   if (report.summary.hard_fail > 0) {
     console.log('存在硬失败，需要修复后重新渲染。');
     console.log('修复后可重新运行: bash scripts/render_pptx.sh <pptx> <output_dir>');
+  }
+  if (report.status === 'needs_visual_review') {
+    console.log('当前结果不是视觉通过；完成全尺寸人工/模型检查后方可签署视觉验收。');
   }
   console.log('================================\n');
 }

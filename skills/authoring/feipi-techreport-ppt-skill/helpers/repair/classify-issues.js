@@ -5,6 +5,9 @@
 
 'use strict';
 
+const { TokenStore } = require('../../compiler/token-store');
+const tokens = TokenStore.loadDefault();
+
 // Static QA → pipeline 分类映射
 const STATIC_QA_TYPE_MAP = {
   // 布局溢出类
@@ -138,12 +141,12 @@ function summarizeClassified(classified) {
 
 const REPAIR_HINTS = {
   layout_overflow: '调整元素位置或尺寸，确保不越界。优先考虑缩小内容区域或移动元素到空闲区域。',
-  text_too_small: '提高字号至最小阈值：正文 ≥ 10pt，表格/标签 ≥ 8.5pt。如空间不足，考虑缩短文本内容。',
+  text_too_small: `恢复到角色 token 最小值：body ≥ ${tokens.typographyRole('body').minimum_pt}pt，table_cell ≥ ${tokens.typographyRole('table_cell').minimum_pt}pt；空间不足时返回 overflow。`,
   text_clipping_risk: '缩短文本内容、减少列数、或增大元素高度。',
   semantic_overlap: '分离重叠元素。如果重叠是装饰性（badge 贴角等），可标记为 intentional。',
   density_overload: '减少元素数量或增大间距。考虑删除次要内容或拆页。',
   missing_dependency: '检查引用的 region、source_refs 是否存在。修复 Slide IR 中的引用错误。',
-  render_unavailable: '安装 LibreOffice 以启用渲染检查。当前只能依赖 Static QA 和人工视觉检查。',
+  render_unavailable: '启用 PowerPoint 或 QuickLook/CoreText 权威渲染；LibreOffice 仅作兼容对照。当前不能声称视觉通过。',
   content_policy_violation: '检查 Slide IR 是否缺少必需内容（标题、takeaway）。补充缺失元素。',
   unknown: '该问题类型未知，建议人工审查后决定修复策略。'
 };

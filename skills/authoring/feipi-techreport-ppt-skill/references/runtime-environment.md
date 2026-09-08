@@ -1,92 +1,29 @@
-# 运行时环境（Runtime Environment）
+# 运行时环境
 
-## 最小运行环境
+## 基础
 
-以下环境足以运行本 skill 的校验、Static QA 和 Pipeline dry-run 模式：
-
-| 依赖 | 最低版本 | 用途 |
-|------|----------|------|
-| Node.js | 18+ | 脚本运行时 |
-| npm | 9+ | 可选，仅用于安装 pptxgenjs |
-
-在最小环境下，以下功能**可用**：
-- `scripts/validate_slide_ir.js` — Slide IR 校验
-- `scripts/inspect_slide_ir_layout.js` — Static QA 布局检查
-- `scripts/generate_pptx_pipeline.js --dry-run` — Pipeline dry-run 模式
-- `scripts/doctor.js` — 运行时诊断
-- `scripts/runtime_capabilities.js` — JSON 能力探测
-
-在最小环境下，以下功能**会被跳过**：
-- PPTX 编译（需要 `pptxgenjs`）
-- Render QA（需要 LibreOffice/soffice）
-- Pipeline 完整运行（no-render 模式也需要 `pptxgenjs`）
-
-## 完整质量环境
-
-在最小环境基础上增加：
-
-| 依赖 | 用途 |
-|------|------|
-| pptxgenjs（npm 包） | Slide IR → PPTX 编译、PPTX 生成 |
-| LibreOffice / soffice | PPTX → PNG 渲染、Render QA |
-
-在完整环境下，所有 Pipeline 阶段均可运行：Validate → Static QA → Build PPTX → Render QA → Pipeline Report。
-
-## 安装建议
-
-### macOS
+- Node.js 与 skill 本地 `npm ci`；
+- `ajv` 用于 schema 校验；
+- `pptxgenjs` 用于 P0 backend；
+- `zip/unzip` 用于 OpenXML postcheck。
 
 ```bash
-# PPTX 生成
-cd skills/authoring/feipi-techreport-ppt-skill && npm ci
-# 或首次安装
-cd skills/authoring/feipi-techreport-ppt-skill && npm install
-
-# 渲染引擎（可选）
-brew install --cask libreoffice
-```
-
-### Linux（Debian/Ubuntu）
-
-```bash
-# PPTX 生成
-cd skills/authoring/feipi-techreport-ppt-skill && npm ci
-
-# 渲染引擎（可选）
-apt-get install libreoffice
-```
-
-> `node_modules/` 已在仓库根 `.gitignore` 中声明忽略。始终在 skill 目录下运行 `npm ci` 或 `npm install`。
-
-## 可选依赖的影响
-
-- **缺少 pptxgenjs**：所有 PPTX 生成步骤会被跳过，Pipeline 报告中标记为 `build: skipped`。不影响 Static QA 和 IR 校验。
-- **缺少 LibreOffice**：Render QA 阶段会被跳过，Pipeline 报告中标记为 `render: skipped`。不影响 PPTX 编译和 Static QA。
-- 两个都缺少时，Pipeline 级别为 `static-only`。此时只能验证 Slide IR 的结构和布局语义，无法验证渲染后视觉效果。
-
-## CI 环境
-
-CI 环境中建议：
-
-- 安装 `pptxgenjs` 以验证 PPTX 编译。
-- 不强制安装 LibreOffice（CI 中 headless 渲染通常不需要，可用 skip manifest 验证）。
-- 运行 `scripts/test.sh` 作为 CI 门禁。
-- 在 CI 中可通过 `node scripts/doctor.js --json` 获取环境状态用于日志记录。
-
-## 环境探测
-
-```bash
-# 人类可读诊断
-node scripts/doctor.js
-
-# JSON 格式（供脚本/CI 消费）
+cd skills/authoring/feipi-techreport-ppt-skill
+npm ci
 node scripts/doctor.js --json
-# 或
-node scripts/runtime_capabilities.js
 ```
 
-`pipeline_level` 枚举值：
-- `static-only` — 仅可运行 Static QA 和 IR 校验
-- `pptx-build` — 可运行 Static QA + PPTX 编译
-- `render-qa` — 可运行 Static QA + PPTX 编译 + 渲染（当前未使用，`full` 的同义词）
-- `full` — 完整链路可用
+## 渲染优先级
+
+macOS：PowerPoint 导出（若可自动化）→ QuickLook/CoreText → LibreOffice 对照。Linux 可使用 LibreOffice，但必须记录字体环境差异。
+
+`Kaiti SC` 在 strict 目标环境必须可由 PowerPoint/CoreText 解析。LibreOffice/fontconfig 缺少该 macOS 字体时，不能把中文方框误判为 PowerPoint 字体缺失，也不能静默改成 Verdana。
+
+## 能力声明
+
+- 只有 schema/Static QA：不能声称 PPTX 已验证。
+- 生成并通过 package QA：只能声称结构与编辑性自动门禁通过。
+- 有渲染图片但未查看原图：不能声称视觉通过。
+- strict 缺少权威渲染或 PowerPoint 编辑回环：状态为 `incomplete` 或明确报告验证边界。
+
+CI 应运行 `bash scripts/test.sh`；视觉签字和 PowerPoint 编辑回环可在具备桌面环境的验收机执行。

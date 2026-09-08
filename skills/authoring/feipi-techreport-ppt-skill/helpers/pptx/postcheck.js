@@ -9,6 +9,8 @@
 const fs = require('fs');
 const path = require('path');
 const JSZip = require('jszip');
+const { TokenStore } = require('../../compiler/token-store');
+const tokenStore = TokenStore.loadDefault();
 
 // Placeholder 关键词
 const PLACEHOLDER_PATTERNS = [
@@ -259,6 +261,60 @@ function checkTableGeometry(slideXml) {
   return issues;
 }
 
+function checkDeterministicText(slideXml) {
+  const issues = [];
+  if (/<a:(?:spAutoFit|normAutofit)\b/.test(slideXml)) {
+    issues.push({ severity: 'hard_fail', type: 'automatic_font_fit', message: '检测到 DrawingML 自动字号，输出不再确定' });
+  }
+  const allowedSizes = tokenStore.allowedFontSizes({ includeLegacy: false });
+  const sizeRegex = /\bsz="(\d+)"/g;
+  let match;
+  const seen = new Set();
+  while ((match = sizeRegex.exec(slideXml)) !== null) {
+    const size = Number(match[1]) / 100;
+    seen.add(size);
+    if (!allowedSizes.has(size)) {
+      issues.push({ severity: 'hard_fail', type: 'unregistered_font_size', message: `PPTX 使用未登记字号 ${size}pt` });
+    }
+  }
+  return { issues, fontSizes: [...seen].sort((a, b) => a - b) };
+}
+
+function checkSemanticObjectNames(slideXml) {
+  const issues = [];
+  const names = [];
+  const regex = /<p:cNvPr\s+id="(\d+)"\s+name="([^"]*)"/g;
+  let match;
+  while ((match = regex.exec(slideXml)) !== null) {
+    const id = Number(match[1]);
+    const name = match[2];
+    if (id === 1) continue;
+    names.push(name);
+    if (!name.startsWith('feipi__')) {
+      issues.push({ severity: 'hard_fail', type: 'unstable_object_name', message: `对象 id=${id} 缺少稳定语义名称: ${name || '(empty)'}` });
+    }
+  }
+  if (new Set(names).size !== names.length) {
+    issues.push({ severity: 'hard_fail', type: 'duplicate_object_name', message: '同页存在重复 objectName' });
+  }
+  return { issues, names };
+}
+
+function inspectNativeObjects(slideXml) {
+  const counts = {
+    text_shapes: (slideXml.match(/<p:sp\b/g) || []).length,
+    native_tables: (slideXml.match(/<a:tbl\b/g) || []).length,
+    native_charts: (slideXml.match(/<c:chart\b/g) || []).length,
+    native_lines: (slideXml.match(/<a:prstGeom\s+prst="line"/g) || []).length,
+    pictures: (slideXml.match(/<p:pic\b/g) || []).length,
+  };
+  const issues = [];
+  if (counts.pictures > 0 && counts.text_shapes === 0 && counts.native_tables === 0 && counts.native_charts === 0) {
+    issues.push({ severity: 'hard_fail', type: 'full_page_image_delivery', message: '页面仅包含图片，缺少原生可编辑内容' });
+  }
+  return { counts, issues };
+}
+
 /**
  * 验证 slide 数量与预期一致。
  */
@@ -376,6 +432,9 @@ async function postcheck(outputPath, options = {}) {
   let extractedTexts = [];
   let masterTexts = [];
   let slideXmls = new Map();
+  const editableObjects = { text_shapes: 0, native_tables: 0, native_charts: 0, native_lines: 0, pictures: 0 };
+  const semanticNames = [];
+  const fontSizes = new Set();
   try {
     const pptxStructure = await inspectPptxStructure(outputPath);
     slideCount = pptxStructure.slideCount;
@@ -399,7 +458,19 @@ async function postcheck(outputPath, options = {}) {
     const shapeCoords = extractShapeCoords(xmlContent);
     allIssues.push(...checkFallbackClustering(shapeCoords));
     allIssues.push(...checkTableGeometry(xmlContent));
+    const deterministic = checkDeterministicText(xmlContent);
+    allIssues.push(...deterministic.issues);
+    deterministic.fontSizes.forEach(size => fontSizes.add(size));
+    const naming = checkSemanticObjectNames(xmlContent);
+    allIssues.push(...naming.issues);
+    semanticNames.push(...naming.names);
+    const native = inspectNativeObjects(xmlContent);
+    allIssues.push(...native.issues);
+    for (const key of Object.keys(editableObjects)) editableObjects[key] += native.counts[key];
   }
+  stats.editable_objects = editableObjects;
+  stats.semantic_object_names = semanticNames;
+  stats.font_sizes_pt = [...fontSizes].sort((a, b) => a - b);
 
   // 5. Placeholder scan (slide text only)
   if (extractedTexts.length > 0) {
@@ -451,6 +522,9 @@ module.exports = {
   extractShapeCoords,
   checkFallbackClustering,
   checkTableGeometry,
+  checkDeterministicText,
+  checkSemanticObjectNames,
+  inspectNativeObjects,
   MASTER_RESIDUAL_PATTERNS,
   PLACEHOLDER_PATTERNS,
   PATH_LEAK_PATTERNS,

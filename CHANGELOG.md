@@ -1,5 +1,8 @@
 # 变更记录
 
+## 2026-09-04
+- feipi-techreport-ppt-skill v2：固化令牌、合同与真实验收
+
 ## 2026-08-30
 - feipi-plantuml-generate-diagram v5：合并入口、限时预检与一次启动
 - feipi-patent-generate-innovation-disclosure v9：前置预检并绑定一次启动

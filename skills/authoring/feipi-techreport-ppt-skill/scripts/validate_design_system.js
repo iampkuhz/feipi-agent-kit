@@ -10,6 +10,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { ContractRegistry } = require('../compiler/contract-registry');
 
 const SKILL_DIR = path.resolve(__dirname, '..');
 const DESIGN_DIR = path.join(SKILL_DIR, 'design-system');
@@ -40,10 +41,12 @@ function main() {
   const tokensDir = path.join(DESIGN_DIR, 'tokens');
   const componentsDir = path.join(DESIGN_DIR, 'components');
   const profilesDir = path.join(DESIGN_DIR, 'profiles');
+  const layoutsDir = path.join(DESIGN_DIR, 'layouts');
 
   const tokenFiles = listJsonFiles(tokensDir);
   const componentFiles = listJsonFiles(componentsDir);
   const profileFiles = listJsonFiles(profilesDir);
+  const layoutFiles = listJsonFiles(layoutsDir);
 
   const tokenIds = new Set();
   const componentIds = new Set();
@@ -78,6 +81,27 @@ function main() {
     }
   }
 
+  for (const file of layoutFiles) {
+    try {
+      const doc = readJson(file);
+      requireId(doc, file);
+      if (!doc.regions || Object.keys(doc.regions).length === 0) issues.push(`${file}: Layout Contract 缺少 regions`);
+      for (const [regionId, region] of Object.entries(doc.regions || {})) {
+        if (!region.bounds_in) issues.push(`${file}: region ${regionId} 缺少 bounds_in`);
+        if (!Array.isArray(region.allowed_components)) issues.push(`${file}: region ${regionId} 缺少 allowed_components`);
+      }
+    } catch (e) {
+      issues.push(e.message);
+    }
+  }
+
+  try {
+    const registry = new ContractRegistry();
+    issues.push(...registry.validateTokenReferences());
+  } catch (e) {
+    issues.push(e.message);
+  }
+
   for (const file of profileFiles) {
     try {
       const doc = readJson(file);
@@ -104,6 +128,7 @@ function main() {
     design_system_dir: DESIGN_DIR,
     tokens: tokenFiles.length,
     components: componentFiles.length,
+    layouts: layoutFiles.length,
     profiles: profileFiles.length,
     issues,
     status: issues.length === 0 ? 'pass' : 'fail',
@@ -115,6 +140,7 @@ function main() {
     console.log('Design System Validation');
     console.log(`  tokens: ${summary.tokens}`);
     console.log(`  components: ${summary.components}`);
+    console.log(`  layouts: ${summary.layouts}`);
     console.log(`  profiles: ${summary.profiles}`);
     if (issues.length > 0) {
       console.log('  issues:');

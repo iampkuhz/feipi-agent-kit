@@ -1,116 +1,75 @@
 /**
- * PPTX 主题定义
- * 中文技术汇报默认主题：克制、清晰、结构化、高信息密度。
- *
- * 本文件是向后兼容的默认值来源；新增代码应优先通过
- * helpers/style/style-lock.js 加载 style lock token。
+ * PptxGenJS 兼容主题视图。
+ * 所有数值均从 design-system/tokens 读取；本文件不再维护视觉值。
  */
-
 'use strict';
 
+const { TokenStore } = require('../../compiler/token-store');
 const { loadDefaultStyleLock, resolveStyleLock } = require('../style/style-lock');
 
-// --- 颜色 token ---
-const COLORS = {
-  navy:    '#1B2A4A',
-  blue:    '#1A73E8',
-  green:   '#0D652D',
-  orange:  '#E37400',
-  red:     '#C5221F',
-  gray:    '#5F6368',
-  border:  '#DADCE0',
-  pale:    '#F8F9FA',
-  paleBlue:'#E8F0FE',
-  paleOrange:'#FEF7E0',
-  paleRed: '#FCE8E6',
-  paleGreen:'#E6F4EA',
-  white:   '#FFFFFF',
-  black:   '#000000'
-};
+const tokens = TokenStore.loadDefault();
+const typography = tokens.documents.typography;
 
-// --- 字号 token (pt) ---
-const FONT_SIZES = {
-  title:     28,
-  subtitle:  14,
-  regionTitle: 13,
-  body:      10,
-  label:     9,
-  caption:   9,
-  takeaway:  13,
-  footer:    8.5,
-  kpiValue:  14,
-  kpiLabel:  10,
-  tableHeader: 10,
-  tableCell:  9,
-  stepMarker: 9
-};
+const COLORS = Object.freeze({
+  navy: tokens.color('text.primary'),
+  blue: tokens.color('brand.secondary'),
+  green: tokens.color('semantic.success'),
+  orange: tokens.color('semantic.warning'),
+  red: tokens.color('semantic.danger'),
+  gray: tokens.color('text.secondary'),
+  border: tokens.color('border.default'),
+  pale: tokens.color('surface.panel'),
+  paleBlue: tokens.color('surface.panel_blue'),
+  paleOrange: tokens.color('surface.panel_orange'),
+  paleRed: tokens.color('surface.panel_red'),
+  paleGreen: tokens.color('surface.panel_green'),
+  white: tokens.color('surface.page'),
+  black: tokens.color('text.primary'),
+});
 
-// --- 字体 fallback 链 ---
-const FONT_FACES = {
-  default: ['Kaiti SC', 'PingFang SC', 'Microsoft YaHei', 'SimHei', 'sans-serif'],
-  title:   ['Kaiti SC', 'PingFang SC', 'Microsoft YaHei', 'SimHei', 'sans-serif'],
-  monospace: ['Menlo', 'Consolas', 'Monaco', 'monospace']
-};
+const FONT_SIZES = Object.freeze({
+  title: typography.sizes_pt.title,
+  subtitle: typography.sizes_pt.subtitle,
+  regionTitle: typography.sizes_pt.section_title,
+  body: typography.sizes_pt.body,
+  label: typography.sizes_pt.label,
+  caption: typography.sizes_pt.caption,
+  takeaway: typography.sizes_pt.section_title,
+  footer: typography.sizes_pt.footer,
+  kpiValue: typography.sizes_pt.kpi_value,
+  kpiLabel: typography.sizes_pt.kpi_label,
+  tableHeader: typography.sizes_pt.table_header,
+  tableCell: typography.sizes_pt.table_cell,
+  stepMarker: typography.sizes_pt.diagram_badge,
+});
 
-function resolveFontFace(family) {
-  const faces = FONT_FACES[family] || FONT_FACES.default;
-  return faces[0];
-}
+const FONT_FACES = Object.freeze(typography.font_families);
+const CANVAS_PRESETS = Object.freeze({ wide_16_9: Object.freeze({ ...tokens.documents.spacing.canvas }) });
 
-// --- Canvas 预设 ---
-const CANVAS_PRESETS = {
-  wide_16_9: { width_in: 13.33, height_in: 7.5 }
-};
+function resolveFontFace(family = 'default') { return tokens.fontFace(family); }
 
-/**
- * 从 Slide IR canvas 获取尺寸。
- */
 function getCanvasSize(canvas) {
-  if (!canvas) return CANVAS_PRESETS.wide_16_9;
-  const preset = CANVAS_PRESETS[canvas.preset];
-  if (preset) return preset;
-  if (canvas.width_in && canvas.height_in) {
-    return { width_in: canvas.width_in, height_in: canvas.height_in };
-  }
-  return CANVAS_PRESETS.wide_16_9;
+  if (canvas?.width_in && canvas?.height_in) return { width_in: canvas.width_in, height_in: canvas.height_in };
+  return { width_in: tokens.documents.spacing.canvas.width_in, height_in: tokens.documents.spacing.canvas.height_in };
 }
 
-/**
- * 根据语义角色选择文本颜色。
- */
 function textColorForRole(role, isHighlighted) {
   if (isHighlighted) return COLORS.blue;
-  switch (role) {
-    case 'risk':         return COLORS.red;
-    case 'takeaway':     return COLORS.blue;
-    case 'source_note':  return COLORS.gray;
-    case 'title':        return COLORS.navy;
-    default:             return COLORS.navy;
-  }
+  if (role === 'risk') return COLORS.red;
+  if (role === 'takeaway') return COLORS.blue;
+  if (role === 'source_note') return COLORS.gray;
+  return COLORS.navy;
 }
 
-/**
- * 根据语义角色选择背景色。
- */
 function bgColorForRole(role) {
-  switch (role) {
-    case 'risk':         return COLORS.paleRed;
-    case 'evidence':     return COLORS.paleBlue;
-    case 'explanation':  return COLORS.pale;
-    default:             return COLORS.paleBlue;
-  }
+  if (role === 'risk') return COLORS.paleRed;
+  if (role === 'evidence') return COLORS.paleBlue;
+  if (role === 'explanation') return COLORS.pale;
+  return COLORS.paleBlue;
 }
 
 module.exports = {
-  COLORS,
-  FONT_SIZES,
-  FONT_FACES,
-  resolveFontFace,
-  CANVAS_PRESETS,
-  getCanvasSize,
-  textColorForRole,
-  bgColorForRole,
-  // Style lock integration
-  loadDefaultStyleLock,
-  resolveStyleLock,
+  COLORS, FONT_SIZES, FONT_FACES, CANVAS_PRESETS,
+  resolveFontFace, getCanvasSize, textColorForRole, bgColorForRole,
+  loadDefaultStyleLock, resolveStyleLock, tokens,
 };

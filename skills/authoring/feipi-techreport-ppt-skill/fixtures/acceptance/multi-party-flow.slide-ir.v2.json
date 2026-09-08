@@ -1,0 +1,22 @@
+{
+  "version": "v2",
+  "slide_id": "acceptance-multi-party-flow",
+  "language": "zh-CN",
+  "audience": "CTO / technical executive",
+  "layout_id": "multi-party-flow",
+  "density": "standard",
+  "source_summary": [{ "source_id": "src_1", "content_type": "diagram_desc", "description": "多方交互流程验收事实" }],
+  "takeaway": "跨系统调用必须在每一跳保留责任主体和可验证回执",
+  "elements": [
+    { "id": "title", "component_id": "text-hierarchy", "variant": "title", "size": "default", "region_id": "header", "semantic_role": "title", "text_role": "title", "content": "跨系统请求通过五步闭环完成可验证交付", "source_refs": ["src_1"] },
+    { "id": "subtitle", "component_id": "text-hierarchy", "variant": "subtitle", "size": "default", "region_id": "header", "semantic_role": "subtitle", "text_role": "subtitle", "content": "调用、校验、执行、回执与审计均保留原生证据", "source_refs": ["src_1"] },
+    { "id": "request", "component_id": "flow-step", "variant": "primary", "size": "md", "region_id": "main", "semantic_role": "process_step", "content": { "label": "业务系统\n发起请求" }, "source_refs": ["src_1"] },
+    { "id": "validate", "component_id": "flow-step", "variant": "standard", "size": "md", "region_id": "main", "semantic_role": "process_step", "content": { "label": "网关\n校验与路由" }, "source_refs": ["src_1"] },
+    { "id": "execute", "component_id": "flow-step", "variant": "standard", "size": "md", "region_id": "main", "semantic_role": "process_step", "content": { "label": "执行节点\n处理事务" }, "source_refs": ["src_1"] },
+    { "id": "receipt", "component_id": "flow-step", "variant": "standard", "size": "md", "region_id": "main", "semantic_role": "process_step", "content": { "label": "回执服务\n确认结果" }, "source_refs": ["src_1"] },
+    { "id": "audit", "component_id": "flow-step", "variant": "done", "size": "md", "region_id": "main", "semantic_role": "process_step", "content": { "label": "审计平台\n固化证据" }, "source_refs": ["src_1"] },
+    { "id": "evidence", "component_id": "source-note", "variant": "methodology_note", "size": "default", "region_id": "evidence", "semantic_role": "evidence", "content": "关键证据：请求 ID、校验结果、执行回执和审计记录必须可关联", "source_refs": ["src_1"] },
+    { "id": "footer", "component_id": "source-note", "variant": "standard", "size": "default", "region_id": "footer", "semantic_role": "source_note", "content": "来源：P0 acceptance fixture，仅用于结构与视觉回归", "source_refs": ["src_1"] }
+  ],
+  "provenance": [{ "source_id": "src_1", "source_type": "user_input", "quote_or_summary": "多方交互流程验收事实", "used_by_elements": ["title", "subtitle", "request", "validate", "execute", "receipt", "audit", "evidence", "footer"] }]
+}

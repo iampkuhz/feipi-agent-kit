@@ -1,0 +1,21 @@
+{
+  "version": "v2",
+  "slide_id": "acceptance-layered-architecture",
+  "language": "zh-CN",
+  "audience": "CTO / technical executive",
+  "layout_id": "layered-architecture",
+  "density": "standard",
+  "source_summary": [{ "source_id": "src_1", "content_type": "diagram_desc", "description": "分层架构验收事实" }],
+  "takeaway": "核心链路分层后，职责边界和演进风险可以独立治理",
+  "elements": [
+    { "id": "title", "component_id": "text-hierarchy", "variant": "title", "size": "default", "region_id": "header", "semantic_role": "title", "text_role": "title", "content": "高性能链路采用四层解耦架构", "source_refs": ["src_1"] },
+    { "id": "subtitle", "component_id": "text-hierarchy", "variant": "subtitle", "size": "default", "region_id": "header", "semantic_role": "subtitle", "text_role": "subtitle", "content": "共识、执行、数据与接入层分别承担稳定性责任", "source_refs": ["src_1"] },
+    { "id": "consensus", "component_id": "capability-group", "variant": "primary", "size": "md", "region_id": "main", "semantic_role": "system_component", "content": { "title": "共识层", "items": ["并行提议与投票", "确定性最终确认"] }, "source_refs": ["src_1"] },
+    { "id": "execution", "component_id": "capability-group", "variant": "standard", "size": "md", "region_id": "main", "semantic_role": "system_component", "content": { "title": "执行层", "items": ["交易并行调度", "状态缓存与回放"] }, "source_refs": ["src_1"] },
+    { "id": "data", "component_id": "capability-group", "variant": "standard", "size": "md", "region_id": "main", "semantic_role": "system_component", "content": { "title": "数据层", "items": ["索引与归档", "可观测证据"] }, "source_refs": ["src_1"] },
+    { "id": "access", "component_id": "capability-group", "variant": "standard", "size": "md", "region_id": "main", "semantic_role": "system_component", "content": { "title": "接入层", "items": ["RPC 与 SDK", "钱包和业务系统"] }, "source_refs": ["src_1"] },
+    { "id": "evidence", "component_id": "capability-group", "variant": "muted", "size": "md", "region_id": "evidence", "semantic_role": "evidence", "content": { "title": "验收证据", "items": ["每层可独立压测", "接口可追踪", "故障域可隔离"] }, "source_refs": ["src_1"] },
+    { "id": "footer", "component_id": "source-note", "variant": "standard", "size": "default", "region_id": "footer", "semantic_role": "source_note", "content": "来源：P0 acceptance fixture，仅用于结构与视觉回归", "source_refs": ["src_1"] }
+  ],
+  "provenance": [{ "source_id": "src_1", "source_type": "user_input", "quote_or_summary": "分层架构验收事实", "used_by_elements": ["title", "subtitle", "consensus", "execution", "data", "access", "evidence", "footer"] }]
+}

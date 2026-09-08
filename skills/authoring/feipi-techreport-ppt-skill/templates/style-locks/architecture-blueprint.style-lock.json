@@ -1,120 +1,18 @@
 {
   "$schema": "../../schemas/style-lock.schema.json",
   "name": "architecture-blueprint",
+  "version": "2.0.0",
   "description": "架构蓝图风格：强调分层、模块边界、数据流方向",
-  "version": "1.0.0",
-  "canvas": {
-    "width_in": 13.33,
-    "height_in": 7.5,
-    "aspect_ratio": "16:9"
-  },
-  "fonts": {
-    "default": ["Kaiti SC", "PingFang SC", "Microsoft YaHei", "SimHei", "sans-serif"],
-    "title": ["Kaiti SC", "PingFang SC", "Microsoft YaHei", "SimHei", "sans-serif"],
-    "monospace": ["Menlo", "Consolas", "Monaco", "monospace"]
-  },
-  "colors": {
-    "primary": "#1B2A4A",
-    "secondary": "#1A73E8",
-    "accent": "#1A73E8",
-    "text": "#1B2A4A",
-    "text_secondary": "#5F6368",
-    "background": "#FFFFFF",
-    "surface": "#F8F9FA",
-    "border": "#DADCE0",
-    "semantic": {
-      "success": "#0D652D",
-      "warning": "#E37400",
-      "danger": "#C5221F",
-      "info": "#1A73E8"
-    },
-    "layer": {
-      "presentation": "#E8F0FE",
-      "application": "#E6F4EA",
-      "data": "#FEF7E0",
-      "infrastructure": "#F8F9FA"
-    }
-  },
-  "spacing": {
-    "page_margin_in": 0.5,
-    "section_gap_in": 0.2,
-    "card_gap_in": 0.12,
-    "layer_gap_in": 0.15,
-    "table_cell_padding_in": 0.05
-  },
-  "min_font_sizes": {
-    "title": 26,
-    "subtitle": 14,
-    "region_title": 13,
-    "body": 10,
-    "table_cell": 8.5,
-    "label": 8.5,
-    "caption": 7.5,
-    "footer": 7.5
-  },
-  "font_sizes": {
-    "title": 28,
-    "subtitle": 14,
-    "region_title": 13,
-    "body": 10,
-    "label": 9,
-    "caption": 9,
-    "takeaway": 13,
-    "footer": 8.5,
-    "node_title": 11,
-    "node_body": 9,
-    "layer_label": 10
-  },
-  "region_style": {
-    "header": {
-      "bg": "background",
-      "max_height_pct": 16,
-      "border_bottom": true
-    },
-    "main_visual": {
-      "bg": "surface",
-      "min_width_pct": 55,
-      "max_width_pct": 70
-    },
-    "evidence_panel": {
-      "bg": "surface",
-      "width_pct_range": [15, 25]
-    },
-    "footer_takeaway": {
-      "bg": "background",
-      "min_height_pct": 8,
-      "max_height_pct": 12,
-      "border_top": true
-    }
-  },
-  "card_style": {
-    "corner_radius": 0,
-    "border_color": "border",
-    "bg": "white",
-    "title_color": "primary",
-    "body_color": "text",
-    "padding_in": 0.1,
-    "node_min_width_in": 1.2,
-    "node_min_height_in": 0.5
-  },
-  "connector_style": {
-    "color": "secondary",
-    "width_pt": 1.5,
-    "arrow_type": "triangle",
-    "highlight_color": "accent",
-    "data_flow_color": "#5F6368",
-    "async_color": "#E37400"
-  },
-  "table_style": {
-    "header_bg": "primary",
-    "header_text": "background",
-    "row_alt_bg": "surface",
-    "border_color": "border",
-    "max_rows": 5,
-    "max_cols": 4,
-    "cell_max_chars": 60,
-    "highlight_col_color": "layer.presentation"
-  },
+  "design_profile": "cto-technical-report",
+  "token_refs": [
+    "typography.core",
+    "colors.core",
+    "spacing.core",
+    "shape.core"
+  ],
+  "layout_refs": [
+    "layered-architecture"
+  ],
   "prohibited": [
     "full_page_gradient",
     "excessive_decoration",

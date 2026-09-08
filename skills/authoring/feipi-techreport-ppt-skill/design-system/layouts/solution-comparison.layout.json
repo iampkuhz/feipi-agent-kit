@@ -1,0 +1,19 @@
+{
+  "id": "solution-comparison",
+  "version": "1.0.0",
+  "cognitive_task": "比较候选方案并突出影响决策的差异",
+  "canvas_token": "spacing.canvas",
+  "regions": {
+    "header": { "bounds_in": { "x": 0.5, "y": 0.35, "w": 12.33, "h": 0.9 }, "flow": "header", "allowed_components": ["text-hierarchy"] },
+    "main": { "bounds_in": { "x": 0.5, "y": 1.45, "w": 12.33, "h": 4.75 }, "flow": "single", "allowed_components": ["native-table", "capability-group"] },
+    "main-left": { "bounds_in": { "x": 0.5, "y": 1.45, "w": 5.0, "h": 4.75 }, "flow": "single", "allowed_components": ["capability-group"] },
+    "main-right": { "bounds_in": { "x": 5.7, "y": 1.45, "w": 7.13, "h": 3.55 }, "flow": "single", "allowed_components": ["native-table"] },
+    "evidence": { "bounds_in": { "x": 5.7, "y": 5.2, "w": 7.13, "h": 1.0 }, "flow": "single", "allowed_components": ["capability-group", "source-note"] },
+    "takeaway": { "bounds_in": { "x": 0.5, "y": 6.35, "w": 12.33, "h": 0.42 }, "flow": "single", "allowed_components": ["text-hierarchy"] },
+    "footer": { "bounds_in": { "x": 0.5, "y": 6.9, "w": 12.33, "h": 0.25 }, "flow": "single", "allowed_components": ["source-note", "text-hierarchy"] }
+  },
+  "primary_visual_region": "main",
+  "capacity": { "table_max_rows": 6, "table_max_cols": 5 },
+  "fallback_layouts": ["layered-architecture"],
+  "forbidden_patterns": ["full_page_dense_table", "free_coordinates", "continuous_font_scaling"]
+}

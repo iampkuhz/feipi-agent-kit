@@ -1,0 +1,16 @@
+{
+  "id": "layered-architecture",
+  "version": "1.0.0",
+  "cognitive_task": "解释系统分层、层间职责与关键约束",
+  "canvas_token": "spacing.canvas",
+  "regions": {
+    "header": { "bounds_in": { "x": 0.5, "y": 0.35, "w": 12.33, "h": 0.9 }, "flow": "header", "allowed_components": ["text-hierarchy"] },
+    "main": { "bounds_in": { "x": 0.5, "y": 1.45, "w": 8.5, "h": 4.95 }, "flow": "stack", "allowed_components": ["capability-group", "text-hierarchy"] },
+    "evidence": { "bounds_in": { "x": 9.2, "y": 1.45, "w": 3.63, "h": 4.95 }, "flow": "stack", "allowed_components": ["capability-group", "source-note", "text-hierarchy"] },
+    "footer": { "bounds_in": { "x": 0.5, "y": 6.78, "w": 12.33, "h": 0.28 }, "flow": "single", "allowed_components": ["source-note", "text-hierarchy"] }
+  },
+  "primary_visual_region": "main",
+  "capacity": { "main_max_items": 5, "evidence_max_items": 4 },
+  "fallback_layouts": ["solution-comparison"],
+  "forbidden_patterns": ["free_coordinates", "continuous_font_scaling", "nested_cards"]
+}

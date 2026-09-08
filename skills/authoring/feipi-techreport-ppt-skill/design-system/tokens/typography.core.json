@@ -26,12 +26,22 @@
   "minimums_pt": {
     "title": 24,
     "subtitle": 13,
+    "section_title": 13,
     "body": 10,
+    "body_dense": 9,
     "table_cell": 8.5,
+    "table_header": 10,
     "label": 8.5,
     "caption": 7.5,
-    "footer": 7.5
+    "footer": 7.5,
+    "kpi_value": 14,
+    "kpi_label": 10,
+    "diagram_node": 10,
+    "diagram_badge": 8.5
   },
+  "legacy_sizes_pt": [7, 7.5, 8, 9.5, 11, 12, 16, 22, 26],
+  "legacy_text_roles": ["body_dense"],
+  "compatibility_font_aliases": ["STKaiti", "KaiTi"],
   "weights": {
     "regular": false,
     "emphasis": true,
@@ -46,4 +56,3 @@
     "do_not_scale_font_by_viewport": true
   }
 }
-

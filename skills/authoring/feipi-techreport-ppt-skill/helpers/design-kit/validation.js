@@ -3,6 +3,8 @@
  */
 
 'use strict';
+const { TokenStore } = require('../../compiler/token-store');
+const tokens = TokenStore.loadDefault();
 
 /**
  * 对渲染后的元素执行 basic 级验证。
@@ -12,12 +14,9 @@
  * @returns {{ passed: boolean, failures: string[], warnings: string[] }}
  */
 function validateSlide(spec, renderedElements, designKit) {
-  const rules = designKit.validation;
-  const thresholds = rules.thresholds || {};
-  const minFont = thresholds.minFontSizePt || 7;
-  const pageW = spec._pageWidth || 13.333;
-  const pageH = spec._pageHeight || 7.5;
-  const safeMargin = thresholds.minSafeMarginIn || 0.22;
+  const pageW = spec._pageWidth || tokens.resolve('spacing.canvas.width_in');
+  const pageH = spec._pageHeight || tokens.resolve('spacing.canvas.height_in');
+  const safeMargin = tokens.resolve('spacing.page.margin_in');
 
   const failures = [];
   const warnings = [];
@@ -42,9 +41,11 @@ function validateSlide(spec, renderedElements, designKit) {
     // --- min-font ---
     if (el.fontSizes && el.fontSizes.length > 0) {
       for (const fs of el.fontSizes) {
-        if (fs < minFont) {
-          failures.push(`min-font: ${el.type} fontSize=${fs} < ${minFont}`);
-        }
+        try {
+          const role = el.text_role || 'body';
+          tokens.assertRegisteredFontSize(fs, `${el.type}/${role}`);
+          tokens.assertRoleMinimum(role, fs);
+        } catch (error) { failures.push(error.message); }
       }
     }
 

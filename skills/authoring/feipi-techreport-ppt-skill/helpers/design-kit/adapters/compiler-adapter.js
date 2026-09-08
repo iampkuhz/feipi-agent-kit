@@ -1,106 +1,77 @@
 /**
- * Compiler Adapter — 将 design-kit slide spec 格式规范化为 Slide IR 格式，
- * 使 pipeline 能正确处理两种格式。
+ * 旧 design-kit spec -> Semantic Slide IR v2 兼容适配器。
+ * 只读取仓内 contract，不再依赖 Downloads 目录。
  */
-
 'use strict';
 
-const { loadDesignKit } = require('../kit-loader');
-
-/**
- * 检测是否为 design-kit slide spec 格式。
- */
-function isDesignKitSpec(obj) {
-  return obj.slideType && Array.isArray(obj.components) && !obj.layout_pattern;
+function isDesignKitSpec(value) {
+  return Boolean(value && value.slideType && Array.isArray(value.components) && !value.version);
 }
 
-/**
- * 将 design-kit slide spec 规范化为最小 Slide IR 格式。
- * @param {Object} spec - design-kit spec
- * @returns {Object} Slide IR 对象
- */
-function normalizeToSlideIR(spec) {
-  const kit = loadDesignKit();
-  const layout = kit.layouts[spec.slideType];
-  const pageWidth = layout ? layout.page.width : 13.333;
-  const pageHeight = layout ? layout.page.height : 7.5;
-  const safeMargin = kit.manifest.page.safeMarginIn || 0.28;
+function mapLayout(slideType) {
+  if (slideType === 'left-diagram-right-table') return 'solution-comparison';
+  if (slideType === 'roadmap-5-stage') return 'multi-party-flow';
+  throw new Error(`不支持的 legacy design-kit slideType: ${slideType}`);
+}
 
-  // 将 components 转换为 elements（带 region_id 和 layout）
-  const elements = [];
-  const regions = [];
-
-  // 构建 region 列表（来自 layout spec）
-  if (layout) {
-    for (const [id, region] of Object.entries(layout.regions)) {
-      regions.push({
-        id,
-        ...region
-      });
-    }
+function mapRegion(slideType, region) {
+  if (slideType === 'left-diagram-right-table') {
+    return { 'left.main': 'main-left', 'right.main': 'main-right', 'right.notes': 'evidence' }[region] || region;
   }
+  if (slideType === 'roadmap-5-stage') return region === 'matrix' ? 'evidence' : region.startsWith('stage.') ? 'main' : region;
+  return region;
+}
 
-  // 将每个 component 转换为 element
-  for (const comp of spec.components) {
-    const regionName = comp.region;
-    const region = layout ? layout.regions[regionName] : null;
-
-    elements.push({
-      id: comp.type + '_' + comp.region,
-      kind: comp.type,
-      region_id: regionName,
-      semantic_role: region ? region.role : 'body',
-      layout: region ? {
-        x: region.x,
-        y: region.y,
-        w: region.w,
-        h: region.h
-      } : {},
-      content: comp.slots || {},
-      _designKitComponent: comp // 保留原始 component 供 builder 使用
-    });
+function mapComponent(component) {
+  if (component.type === 'native-table') {
+    return { component_id: 'native-table', variant: 'standard', size: 'md', semantic_role: 'evidence', content: component.slots };
   }
-
-  // 添加 title element
-  if (spec.title && layout && layout.regions.title) {
-    const titleRegion = layout.regions.title;
-    // 确保 title y >= safe_margin_in 以避免 out_of_bounds
-    const adjustedY = Math.max(titleRegion.y, safeMargin);
-    elements.push({
-      id: 'title',
-      kind: 'text',
-      region_id: 'title',
-      semantic_role: 'title',
-      layout: {
-        x: titleRegion.x,
-        y: adjustedY,
-        w: titleRegion.w,
-        h: titleRegion.h
-      },
-      content: spec.title
-    });
+  if (component.type === 'timeline-card') {
+    const slots = component.slots || {};
+    return {
+      component_id: 'flow-step', variant: ['done', 'doing', 'planned'].includes(component.variant) ? component.variant : 'standard', size: 'md', semantic_role: 'process_step',
+      content: { label: [slots.stage, slots.headline, slots.metric].filter(Boolean).join('\n'), note: (slots.items || []).join('；') },
+    };
   }
-
+  const slots = component.slots || {};
   return {
-    slide_id: spec.slide_id || `design-kit-${spec.slideType}`,
-    layout_pattern: spec.slideType,
-    canvas: {
-      width_in: pageWidth,
-      height_in: pageHeight,
-      safe_margin_in: safeMargin,
-      preset: 'wide_16_9'
-    },
-    regions,
-    elements,
-    // 传递 design-kit 特有字段
-    _designKitSpec: spec,
-    components: spec.components,
-    density: spec.density,
-    theme: spec.theme
+    component_id: 'capability-group', variant: ['primary', 'muted'].includes(component.variant) ? component.variant : 'standard', size: 'md', semantic_role: 'system_component',
+    content: { title: slots.title || slots.headline || component.type, items: slots.items || (slots.subtitle ? [slots.subtitle] : []) },
   };
 }
 
-module.exports = {
-  isDesignKitSpec,
-  normalizeToSlideIR
-};
+function normalizeToSlideIR(spec) {
+  if (!isDesignKitSpec(spec)) return spec;
+  const sourceId = 'legacy_design_kit_input';
+  const elements = [{
+    id: 'title', component_id: 'text-hierarchy', variant: 'title', size: 'default', region_id: 'header',
+    semantic_role: 'title', text_role: 'title', content: spec.title || spec.slideType, source_refs: [sourceId],
+  }];
+  for (let index = 0; index < spec.components.length; index++) {
+    const component = spec.components[index];
+    const mapped = mapComponent(component);
+    elements.push({
+      id: `${mapped.component_id}_${index + 1}`,
+      ...mapped,
+      region_id: mapRegion(spec.slideType, component.region),
+      source_refs: [sourceId],
+    });
+  }
+  return {
+    version: 'v2',
+    slide_id: spec.slide_id || `design-kit-${spec.slideType}`,
+    language: 'zh-CN',
+    audience: 'CTO / technical executive',
+    layout_id: mapLayout(spec.slideType),
+    density: ['compact', 'standard', 'spacious'].includes(spec.density) ? spec.density : 'standard',
+    source_summary: [{ source_id: sourceId, content_type: 'other', description: 'legacy design-kit 输入' }],
+    takeaway: spec.title || spec.slideType,
+    elements,
+    provenance: [{
+      source_id: sourceId, source_type: 'user_input', quote_or_summary: 'legacy design-kit 输入',
+      used_by_elements: elements.map(element => element.id),
+    }],
+  };
+}
+
+module.exports = { isDesignKitSpec, normalizeToSlideIR, mapLayout, mapRegion, mapComponent };

@@ -1,0 +1,18 @@
+{
+  "version": "v2",
+  "slide_id": "acceptance-solution-comparison",
+  "language": "zh-CN",
+  "audience": "CTO / technical executive",
+  "layout_id": "solution-comparison",
+  "density": "standard",
+  "source_summary": [{ "source_id": "src_1", "content_type": "comparison", "description": "方案对比验收事实" }],
+  "takeaway": "方案甲在可控性上更优，方案乙的短期交付成本更低",
+  "elements": [
+    { "id": "title", "component_id": "text-hierarchy", "variant": "title", "size": "default", "region_id": "header", "semantic_role": "title", "text_role": "title", "content": "两种建设方案的核心差异集中在控制权与交付周期", "source_refs": ["src_1"] },
+    { "id": "subtitle", "component_id": "text-hierarchy", "variant": "subtitle", "size": "default", "region_id": "header", "semantic_role": "subtitle", "text_role": "subtitle", "content": "仅比较会改变技术决策的四个维度", "source_refs": ["src_1"] },
+    { "id": "comparison", "component_id": "native-table", "variant": "comparison_matrix", "size": "md", "region_id": "main", "semantic_role": "evidence", "content": { "headers": ["维度", "方案甲：自建", "方案乙：托管"], "rows": [["控制权", "完整掌控", "受平台边界约束"], ["交付周期", "较长", "较短"], ["长期成本", "随规模摊薄", "按使用量持续增长"], ["演进能力", "可按业务定制", "依赖供应商路线"]] }, "source_refs": ["src_1"] },
+    { "id": "takeaway", "component_id": "text-hierarchy", "variant": "takeaway", "size": "default", "region_id": "takeaway", "semantic_role": "takeaway", "text_role": "section_title", "content": "建议先用托管方案验证需求，同时保留自建接口边界", "source_refs": ["src_1"] },
+    { "id": "footer", "component_id": "source-note", "variant": "standard", "size": "default", "region_id": "footer", "semantic_role": "source_note", "content": "来源：P0 acceptance fixture，仅用于结构与视觉回归", "source_refs": ["src_1"] }
+  ],
+  "provenance": [{ "source_id": "src_1", "source_type": "user_input", "quote_or_summary": "方案对比验收事实", "used_by_elements": ["title", "subtitle", "comparison", "takeaway", "footer"] }]
+}

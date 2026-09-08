@@ -51,6 +51,19 @@
     "title_must_contain_claim": true,
     "avoid_empty_generic_title": true,
     "max_text_hierarchy_levels_per_slide": 4
+  },
+  "contract": {
+    "slots": {
+      "text": { "type": "string", "text_role_from_variant": true }
+    },
+    "variants": ["title", "subtitle", "section_title", "body", "caption", "footer", "takeaway"],
+    "sizes": {
+      "default": { "padding_token": "text_box" }
+    },
+    "allowed_regions": ["header", "main", "main-left", "main-right", "evidence", "takeaway", "footer"],
+    "overflow_policy": ["compress_text", "change_layout", "drop_secondary", "split_required"],
+    "editable": { "native_text": true, "object_name_required": true },
+    "ai_may_change": ["variant", "region_id", "content"],
+    "ai_must_not_change": ["font", "font_size", "color", "padding", "coordinates"]
   }
 }
-

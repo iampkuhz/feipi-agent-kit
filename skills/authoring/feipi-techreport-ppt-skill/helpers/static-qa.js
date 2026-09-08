@@ -39,6 +39,10 @@ function calcSafeBounds(canvas) {
  * @returns {{status: string, summary: Object, issues: Array<Object>}}
  */
 function runStaticQA(slideIR) {
+  if (slideIR.version === 'v1' || slideIR.version === 'v2') {
+    const { compileRenderPlan, toLegacyQAIR } = require('../compiler/render-plan-compiler');
+    slideIR = toLegacyQAIR(compileRenderPlan(slideIR));
+  }
   const issues = [];
   const elements = slideIR.elements || [];
   const regions = slideIR.regions || [];
@@ -112,6 +116,9 @@ function runStaticQA(slideIR) {
 
       // 脚注碰撞
       issue = rules.check_footer_collision(a, b, boundsA, boundsB);
+      if (issue) issues.push(issue);
+
+      issue = rules.check_text_overlap(a, b, boundsA, boundsB);
       if (issue) issues.push(issue);
 
       // 间距过小

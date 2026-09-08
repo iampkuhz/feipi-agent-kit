@@ -1,5 +1,5 @@
-version: 1
+version: 2
 interface:
-  display_name: "技术汇报 PPT 单页"
-  short_description: "将中文技术材料重构成 CTO 可读的高密度 PPT 单页，并强制执行版面预算、视觉 QA 和修复策略。生成后自动运行 pipeline（Static QA → Build PPTX → Render QA → Repair Plan），最多 3 轮自动迭代。"
-  default_prompt: "请基于用户提供的原始材料，先做信息充足性检查，再输出 Page Contract；确认后生成 Slide IR 并运行 pipeline（validate → static QA → build PPTX → render QA → repair plan），完成渲染检查、视觉 QA 和必要修复。"
+  display_name: "中文技术汇报 PPT"
+  short_description: "将中文技术材料重构为 CTO 可读、视觉确定且原生可编辑的 PPT，并强制执行 token、组件/布局合同与真实 QA。"
+  default_prompt: "请基于用户材料先提炼结论和认知任务，从登记的 Layout、Component、Variant、Size 中选择表达，生成 Semantic Slide IR v2，并运行 schema、contract、role-aware 字号、原生可编辑性和真实渲染验收。仅在结论、拆页、重要内容删除或业务含义存在关键分歧时请求确认。"

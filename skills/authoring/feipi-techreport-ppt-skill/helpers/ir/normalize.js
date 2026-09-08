@@ -4,11 +4,16 @@
  */
 'use strict';
 
+const { TokenStore } = require('../../compiler/token-store');
+const tokens = TokenStore.loadDefault();
+const canvas = tokens.resolve('spacing.canvas');
+const pageMargin = tokens.resolve('spacing.page.margin_in');
+
 const DEFAULT_CANVAS = {
   preset: 'wide_16_9',
-  width_in: 13.33,
-  height_in: 7.5,
-  safe_margin_in: { top: 0.5, right: 0.5, bottom: 0.5, left: 0.5 },
+  width_in: canvas.width_in,
+  height_in: canvas.height_in,
+  safe_margin_in: { top: pageMargin, right: pageMargin, bottom: pageMargin, left: pageMargin },
 };
 
 const REGION_ROLE_PRIORITY = {
@@ -122,7 +127,12 @@ function normalize(ir) {
   if (!out.constraints) {
     out.constraints = {
       no_overlap: true,
-      min_font_pt: { title: 18, body: 10, footnote: 8.5, table_cell: 8.5 },
+      min_font_pt: {
+        title: tokens.typographyRole('title').minimum_pt,
+        body: tokens.typographyRole('body').minimum_pt,
+        footnote: tokens.typographyRole('footer').minimum_pt,
+        table_cell: tokens.typographyRole('table_cell').minimum_pt,
+      },
     };
   }
 

@@ -1,110 +1,36 @@
-# 后端选择策略（Backend Selection）
+# Backend 边界
 
-## 定位
+Backend 只把 Resolved Render Plan 写成 PPTX，不选择字体、字号、颜色、组件或布局。
 
-本 skill 是 authoring + orchestration 层，不负责直接写入 PPTX 文件格式。
-PPTX 的创建、编辑、shape 生成由 backend 实现。本文档定义后端选择策略。
+## P0
 
-## 后端类型
+默认使用 `adapters/pptxgenjs/backend.js`：
 
-### 1. `pptxgenjs-native`（默认后端）
+- 输入为 schema 校验后的 Render Plan；
+- 将 EMU 转为 PptxGenJS 所需单位；
+- 输出原生文本、形状、表格和连接线；
+- 设置稳定语义对象名和 z-order；
+- 禁止 autofit、未知样式 fallback 和整页图片；
+- 后端兼容修复不得改变设计合同。
 
-**适用场景**：
-- 复杂架构图、流程图、可编辑 shape 组合。
-- 需要精细控制位置、大小、颜色、连接线的页面。
-- 需要 native editable PPTX（PowerPoint 中可直接编辑）。
+`helpers/pptx/compiler.js` 和旧 CLI 只是兼容入口，不是第二套 compiler。
 
-**优势**：
-- 完全可编程控制，适合 Layout Solver 输出的坐标方案。
-- 生成的 PPTX 元素均为原生 shape/text/table，可编辑性强。
+## 官方 Presentations 能力
 
-**限制**：
-- 复杂图形（如自定义路径、渐变）支持有限。
-- 需要 Node.js 运行时和 `pptxgenjs` 依赖（详见 `references/runtime-environment.md`）。
+通用 PPTX 读取、写入、渲染、文件检查、PowerPoint 兼容性和通用编辑优先复用官方 Presentations skill。P1 新增官方 Artifact Tool adapter，并用同一 Render Plan 与 PptxGenJS 比较：
 
-### 2. `template-placeholder`
+- geometry；
+- 字体、字号、颜色；
+- 原生文本/表格/图表/连接线；
+- 对象名和可编辑性；
+- PowerPoint 渲染结果。
 
-**适用场景**：
-- 企业已有模板（`.potx` / `.pptx` 带 master slide）。
-- 固定版式、已有 layout 的页面（如固定 header/footer/logo）。
-- 需要严格遵循品牌规范的场景。
+达到 parity 后才切换默认 adapter。切换不允许重写 Design Token、Component/Layout Contract 或 Semantic Slide IR。
 
-**优势**：
-- 保留模板中的主题色、字体、logo、母版布局。
-- 通过 placeholder 替换，降低坐标计算复杂度。
+## 不允许的后端
 
-**限制**：
-- 依赖用户或企业提供模板文件。
-- 动态内容超出 placeholder 容量时需 fallback 到其他后端。
-
-### 3. `svg-to-drawingml`（后续增强）
-
-**适用场景**：
-- 复杂视觉（如自定义图标、数据可视化图）但仍需尽量 editable。
-- 需要将外部 SVG 转换为 PowerPoint DrawingML 元素。
-
-**优势**：
-- 支持更复杂的矢量图形。
-- 转换为 DrawingML 后仍可编辑（优于整页图片）。
-
-**限制**：
-- 当前阶段为规划中，未实现。
-- SVG 到 DrawingML 的转换可能存在保真度损失。
-
-### 4. `html-to-pptx`（备选）
-
-**适用场景**：
-- 排版预览友好、需要快速原型的场景。
-- 内容以表格、列表为主，对 editability 要求不高。
-
-**优势**：
-- 开发迭代快，CSS 排版成熟。
-- 适合内容验证阶段。
-
-**限制**：
-- Editability 有损：生成的元素可能是图片组或扁平化 shape。
-- 不推荐作为最终交付后端，除非用户明确接受。
-
-## 支持的版式（Layout Patterns）
-
-当前 `pptxgenjs-native` 后端支持以下版式：
-
-| 版式 | Builder | 说明 |
-|------|---------|------|
-| `architecture-map` | `builders/architecture-map.js` | 单体架构图，组件节点 + 连接线 |
-| `flow-diagram` | `builders/flow-diagram.js` | 流程图，步骤节点 + 箭头连接 |
-| `comparison-matrix` | `builders/comparison-matrix.js` | 对比矩阵，KPI + 表格 + 洞察 |
-| `layered-stack` | `builders/layered-stack.js` | 分层架构，垂直堆叠层 + 层间连接 |
-| `roadmap-timeline` | `builders/roadmap-timeline.js` | 交付路线图，时间轴 + 里程碑 |
-| `metrics-dashboard` | `builders/metrics-dashboard.js` | 指标仪表板，KPI 卡片行 + 主图 |
-| `decision-tree` | `builders/decision-tree.js` | 决策树，分支节点 + 条件连接 |
-| `capability-map` | `builders/capability-map.js` | 能力域分组，域网格 + 域间关系 |
-
-## 选择决策树
-
-```
-用户是否提供了企业模板？
-  ├── 是 → template-placeholder
-  └── 否
-      ├── 是否需要复杂可编辑 shape（架构图、流程图）？
-      │   ├── 是 → pptxgenjs-native
-      │   └── 否
-      │       ├── 是否以表格/列表为主？
-      │       │   ├── 是 → html-to-pptx（预览）或 pptxgenjs-native（最终）
-      │       │   └── 否 → pptxgenjs-native（默认）
-      │       └──
-      └── 是否需要复杂矢量图形？
-          ├── 是 → svg-to-drawingml（若可用）否则 pptxgenjs-native
-          └── 否 → pptxgenjs-native
-```
-
-## 禁止项
-
-- **禁止默认整页截图式图片交付**：除非用户明确要求或当前环境只能这样，否则不要将整页渲染为图片后插入 PPTX。
-- **禁止在 backend 不可用时静默降级**：如果环境缺少必要依赖，应报告阻塞点而不是输出低质量结果。
-- **禁止绕过 Slide IR 直接写坐标**：所有 backend 调用必须基于 Layout Solver 输出的布局方案。
-
-## 与底层 pptx Skill 的关系
-
-当前默认后端调用底层 `pptx` skill 完成 PPTX 级别的读写。
-后续如果引入独立 backend（如直接调用 `pptxgenjs`），仍需遵循本 skill 的 Slide IR 和 Layout Solver 输出。
+- 整页截图、SVG 或位图伪装成可编辑 PPT；
+- 读取用户 Downloads 中的外部 design kit；
+- 通过 HTML/CSS 自由布局绕过合同；
+- 后端自带字号或坐标 fallback；
+- 为适配某个引擎而修改 `Kaiti SC` 视觉规范。

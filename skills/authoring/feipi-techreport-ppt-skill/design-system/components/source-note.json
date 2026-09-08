@@ -19,6 +19,19 @@
     "must_stay_in_footer_region": true,
     "max_sources_on_slide": 3,
     "move_long_sources_to_notes": true
+  },
+  "contract": {
+    "slots": {
+      "text": { "type": "string", "text_role": "footer", "max_lines": 2 }
+    },
+    "variants": ["single_source", "numbered_sources", "methodology_note", "standard"],
+    "sizes": {
+      "default": { "padding_token": "text_box" }
+    },
+    "allowed_regions": ["evidence", "footer"],
+    "overflow_policy": ["compress_text", "drop_secondary", "split_required"],
+    "editable": { "native_text": true, "object_name_required": true },
+    "ai_may_change": ["variant", "region_id", "content"],
+    "ai_must_not_change": ["font", "font_size", "color", "padding", "coordinates"]
   }
 }
-

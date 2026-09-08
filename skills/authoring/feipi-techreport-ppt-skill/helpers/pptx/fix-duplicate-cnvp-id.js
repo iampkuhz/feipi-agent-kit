@@ -51,6 +51,7 @@ function fixDuplicateCnvpIds(pptxPath) {
 
     // Fix all slide XML files
     const slidesDir = path.join(tmpDir, 'ppt', 'slides');
+    let changed = false;
     if (fs.existsSync(slidesDir)) {
       const slideFiles = fs.readdirSync(slidesDir).filter(f => f.startsWith('slide') && f.endsWith('.xml'));
       for (const file of slideFiles) {
@@ -59,12 +60,15 @@ function fixDuplicateCnvpIds(pptxPath) {
         const fixed = deduplicateCnvpIds(xml);
         if (fixed !== xml) {
           fs.writeFileSync(filePath, fixed, 'utf-8');
+          changed = true;
         }
       }
     }
 
     // Repack
-    execSync(`cd "${tmpDir}" && zip -u "${pptxPath}" ppt/slides/slide*.xml 2>/dev/null`, { stdio: 'pipe' });
+    if (changed) {
+      execSync(`cd "${tmpDir}" && zip -u "${pptxPath}" ppt/slides/slide*.xml 2>/dev/null`, { stdio: 'pipe' });
+    }
 
     // Cleanup
     fs.rmSync(tmpDir, { recursive: true, force: true });

@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://feipi.local/schemas/slide-ir.v2.schema.json",
+  "title": "Semantic Slide IR v2",
+  "type": "object",
+  "required": ["version", "slide_id", "language", "audience", "layout_id", "density", "source_summary", "takeaway", "elements", "provenance"],
+  "properties": {
+    "version": { "const": "v2" },
+    "slide_id": { "type": "string", "minLength": 1 },
+    "language": { "type": "string", "default": "zh-CN" },
+    "audience": { "type": "string", "minLength": 1 },
+    "layout_id": { "enum": ["layered-architecture", "solution-comparison", "multi-party-flow", "custom-grid"] },
+    "density": { "enum": ["standard", "compact", "spacious"] },
+    "source_summary": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/source" } },
+    "takeaway": { "type": "string", "minLength": 1 },
+    "elements": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/element" } },
+    "provenance": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/provenance" } }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "source": {
+      "type": "object",
+      "required": ["source_id", "content_type", "description"],
+      "properties": {
+        "source_id": { "type": "string", "minLength": 1 },
+        "content_type": { "enum": ["text", "data", "diagram_desc", "table", "comparison", "roadmap", "other"] },
+        "description": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "grid_position": {
+      "type": "object",
+      "required": ["column", "row", "column_span", "row_span"],
+      "properties": {
+        "column": { "type": "integer", "minimum": 1, "maximum": 12 },
+        "row": { "type": "integer", "minimum": 1 },
+        "column_span": { "type": "integer", "minimum": 1, "maximum": 12 },
+        "row_span": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "element": {
+      "type": "object",
+      "required": ["id", "component_id", "variant", "size", "region_id", "semantic_role", "content", "source_refs"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "component_id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+        "variant": { "type": "string", "pattern": "^[a-z0-9_-]+$" },
+        "size": { "type": "string", "pattern": "^[a-z0-9_-]+$" },
+        "region_id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+        "semantic_role": { "enum": ["title", "subtitle", "takeaway", "system_component", "process_step", "data_flow", "explanation", "risk", "evidence", "source_note"] },
+        "text_role": { "enum": ["title", "subtitle", "section_title", "body", "label", "caption", "footer", "kpi_value", "kpi_label", "table_header", "table_cell", "diagram_node", "diagram_badge"] },
+        "content": { "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "object" }] },
+        "source_refs": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "grid_position": { "$ref": "#/$defs/grid_position" }
+      },
+      "additionalProperties": false
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["source_id", "source_type", "quote_or_summary", "used_by_elements"],
+      "properties": {
+        "source_id": { "type": "string" },
+        "source_type": { "enum": ["user_input", "derived", "layout_only"] },
+        "quote_or_summary": { "type": "string", "minLength": 1 },
+        "used_by_elements": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "layout_id": { "const": "custom-grid" } } },
+      "then": { "properties": { "elements": { "items": { "required": ["grid_position"] } } } },
+      "else": { "properties": { "elements": { "items": { "not": { "required": ["grid_position"] } } } } }
+    }
+  ]
+}
