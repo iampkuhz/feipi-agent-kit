@@ -1,25 +1,6 @@
 # Mindmap 编写指南
 
-## 最短路径
-
-1. 先把用户内容整理为一棵树：一个中心主题，通常 3–6 个一级分支，每个节点只写一个概念。同级采用一致的分类维度，不把处理顺序或交叉依赖强塞进树。
-2. 只读取本指南与 `assets/templates/types/mindmap-brief.yaml`。从模板填写 `nodes: [{id, parent, label}]`，根的 `parent` 为 `""`；ID 只用于建模，不显示在图上。无需重复列边、深度和子节点。
-3. `layout.direction` 默认填写 `right`，全部分支向右展开；仅在用户明确要求左右均衡或向左展开时分别用 `balanced` 或 `left`。balanced 根据子树叶节点文本行数估计高度，按 brief 同级顺序分配到较空的一侧；同一输入始终生成相同代码。
-4. 先检查 brief，再执行批次 preflight；成功后运行生成器与统一图包验证。生成器是纯本地源码工具，不调用 renderer，也不声称完成了渲染验证。
-
-以下命令在 skill 目录运行；`brief.yaml` 为已填写的输入，`out/` 为本图产物目录：
-
-```bash
-python3 scripts/lib/validate_brief_cli.py brief.yaml --type mindmap \
-  --schema assets/validation/types/mindmap-brief.schema.json
-bash scripts/preflight_renderer.sh --out renderer-preflight.json
-# 仅在 preflight 成功后继续，复用回执里的 renderer_url。
-python3 scripts/generate_mindmap.py --brief brief.yaml --out out/diagram.puml
-bash scripts/validate_package.sh --diagram-type mindmap --brief brief.yaml \
-  --diagram out/diagram.puml --out-dir out --server-url http://127.0.0.1:8199
-```
-
-最后命令的 URL 须替换为回执中的实际地址。单图首次渲染一次，修复最多一次；其余失败与缓存规则沿用主入口。不要额外调用内部 verifier。
+普通生成使用主入口中的 `run_mindmap.py`；只在手写 PUML、修改样式或修复图面时阅读本指南。执行合同与依赖见 `mindmap-execution.md`。
 
 ## 受支持的源码写法
 

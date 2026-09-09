@@ -87,12 +87,26 @@ for f in "$FALLBACK_DIAGRAM" "$ARCH_BRIEF" "$ARCH_DIAGRAM" "$SEQ_BRIEF" "$SEQ_DI
   fi
 done
 
-# 整个真实 renderer 测试批次只预检一次；不可用不能把集成测试算 PASS。
-PREFLIGHT_OUT="$(mktemp /tmp/plantuml-test-preflight.XXXXXX)"
-if ! bash "$SCRIPT_DIR/preflight_renderer.sh" --out "$PREFLIGHT_OUT"; then
-  echo "[BLOCKED] renderer preflight 失败；集成测试未执行：$PREFLIGHT_OUT" >&2
+# Mindmap 完整入口产生本批唯一预检回执；后续图型共享它，不重复预检。
+MINDMAP_OUT="$(mktemp -d "${TMPDIR:-/tmp}/plantuml-mindmap-runner.XXXXXX")"
+PREFLIGHT_OUT="$MINDMAP_OUT/renderer-preflight.json"
+if ! python3 "$SCRIPT_DIR/run_mindmap.py" --brief "$MINDMAP_BRIEF" --out-dir "$MINDMAP_OUT" > "$MINDMAP_OUT/cli-result.json"; then
+  cat "$MINDMAP_OUT/cli-result.json" >&2
+  echo "[BLOCKED] mindmap 真实入口未通过；其余集成测试未执行：$MINDMAP_OUT" >&2
   exit 2
 fi
+for field in brief_check coverage_check layout_check; do
+  check_json_field "$MINDMAP_OUT/validation.json" "$field" "ok" "mindmap $field"
+done
+check_json_field "$MINDMAP_OUT/validation.json" profile "mindmap" "mindmap profile"
+check_rendered_package "$MINDMAP_OUT/validation.json" "mindmap"
+check_json_field "$MINDMAP_OUT/cli-result.json" visual_review "pending" "入口不伪报视觉审阅"
+if [[ -s "$MINDMAP_OUT/diagram.png" ]]; then
+  pass "mindmap PNG 预览已生成"
+else
+  fail "mindmap PNG 预览缺失"
+fi
+echo "mindmap_preview=$MINDMAP_OUT/diagram.png"
 RENDERER_URL="$(python3 - "$PREFLIGHT_OUT" <<'PY'
 import json
 import sys
@@ -258,7 +272,6 @@ fi
 # =============================================================================
 echo "=== Step 9: 新 typed profiles 与 process_s ==="
 for spec in \
-  "mindmap|$MINDMAP_BRIEF|$MINDMAP_DIAGRAM" \
   "component|$COMPONENT_BRIEF|$COMPONENT_DIAGRAM" \
   "activity|$ACTIVITY_BRIEF|$ACTIVITY_DIAGRAM" \
   "activity|$ACTIVITY_BRANCH_BRIEF|$ACTIVITY_BRANCH_DIAGRAM" \
@@ -309,6 +322,12 @@ if python3 "$TEST_DIR/test_mindmap.py"; then
   pass "mindmap 树语义、覆盖、布局与生成回归"
 else
   fail "mindmap 树语义、覆盖、布局与生成回归"
+fi
+
+if python3 "$TEST_DIR/test_mindmap_runner.py"; then
+  pass "mindmap 统一入口与跨环境隔离回归"
+else
+  fail "mindmap 统一入口与跨环境隔离回归"
 fi
 
 if python3 "$TEST_DIR/test_profile_validators.py" >/dev/null 2>&1; then

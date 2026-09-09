@@ -328,11 +328,17 @@ fi
 # 旧 SVG/合同不得被下一轮失败或缺 renderer 的运行误收录。仅清理本包的固定产物。
 rm -f "$SVG_OUT" "$VALIDATION_OUT"
 
-# 复制输入文件到输出目录
-cp -f "$DIAGRAM_FILE" "$DIAGRAM_OUT"
+# 按文件身份判断：兼容相对/绝对路径、符号链接与硬链接；同文件仍参与后续快照校验。
+copy_snapshot() {
+  if [[ ! "$1" -ef "$2" ]]; then
+    cp -f "$1" "$2"
+  fi
+}
+
+copy_snapshot "$DIAGRAM_FILE" "$DIAGRAM_OUT"
 if [[ "$IS_TYPED" == "true" && -n "$BRIEF_FILE" ]]; then
   BRIEF_OUT="$OUT_DIR/brief.normalized.yaml"
-  cp -f "$BRIEF_FILE" "$BRIEF_OUT"
+  copy_snapshot "$BRIEF_FILE" "$BRIEF_OUT"
 
   # module_detail 的父 overview brief 作为只读快照复制进包；后续校验只读副本。
   PARENT_BRIEF_REL="$(python3 - "$BRIEF_FILE" "$LIB_DIR" <<'PY'
@@ -357,7 +363,7 @@ PY
 )"
   if [[ -n "$PARENT_BRIEF_REL" ]]; then
     mkdir -p "$OUT_DIR/$(dirname "$PARENT_BRIEF_REL")"
-    cp -f "$(dirname "$BRIEF_FILE")/$PARENT_BRIEF_REL" "$OUT_DIR/$PARENT_BRIEF_REL"
+    copy_snapshot "$(dirname "$BRIEF_FILE")/$PARENT_BRIEF_REL" "$OUT_DIR/$PARENT_BRIEF_REL"
   fi
 fi
 

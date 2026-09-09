@@ -49,7 +49,7 @@
 
 - Brief schema/template：`assets/validation/types/mindmap-brief.schema.json`、`assets/templates/types/mindmap-brief.yaml`
 - 只建模 `nodes: [{id, parent, label}]` 单根树，自动派生边与深度；`layout.direction` 默认为 `right`；显式支持 `balanced/left`
-- `scripts/generate_mindmap.py` 从 brief 生成带原生样式的 arithmetic 源码；支持手写 OrgMode；定界符为 `@startmindmap` / `@endmindmap`
+- 单图入口 `scripts/run_mindmap.py` 串联预检、生成、图包验证与 PNG 预览；内部 `scripts/generate_mindmap.py` 生成带原生样式的 arithmetic 源码；支持手写 OrgMode；定界符为 `@startmindmap` / `@endmindmap`
 - 校验唯一根、ID/父引用、循环、同级标签、路径覆盖、左右归属及真实源码 metrics；预算为 2–32 节点、含根最多 4 层、每节点最多 6 子节点
 - 默认白底、浅色分支、深色文字、自动折行；布局规则独立于架构图；完整用法与限制见 `mindmap-authoring.md`
 

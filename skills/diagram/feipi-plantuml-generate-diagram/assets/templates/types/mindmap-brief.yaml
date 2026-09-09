@@ -1,5 +1,7 @@
 # 单根树；同级顺序取 nodes 出现顺序，父节点可在子节点之后定义。
 # 每个节点只写一个概念；parent 为空字符串表示根。ID 不显示在图上。
+# 图 ID：单图沿用 D1；自定义使用小写连字符（如 technical-review），不能使用下划线。
+# 节点 ID：小写字母起始，可含数字和下划线（如 next_step）。
 diagram_id: D1
 diagram_type: mindmap
 title: 主题拆解
