@@ -41,7 +41,7 @@ skills:
   - name: feipi-plantuml-generate-diagram
     path: skills/diagram/feipi-plantuml-generate-diagram
     layer: diagram
-    description: PlantUML 作图唯一入口
+    description: PlantUML 作图唯一入口，支持思维导图自动布局
     clients: [claude, codex]
     entry: SKILL.md
     validation:

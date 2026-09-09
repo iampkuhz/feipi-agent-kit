@@ -1,0 +1,25 @@
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+<style>
+mindmapDiagram {
+  node {
+    FontColor #1E293B
+    FontSize 14
+    LineColor #94A3B8
+    LineThickness 1
+    RoundCorner 12
+    Padding 10
+    Margin 8
+    MaximumWidth 180
+  }
+  rootNode {
+    FontSize 18
+    FontStyle bold
+    LineColor #475569
+  }
+  arrow {
+    LineColor #94A3B8
+    LineThickness 1.2
+  }
+}
+</style>

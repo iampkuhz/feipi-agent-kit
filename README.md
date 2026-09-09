@@ -43,7 +43,7 @@ cp .env.example .env
 | `feipi-skill-govern` | Skill 的创建、重构、自检与治理 |
 | `feipi-patent-generate-innovation-disclosure` | 专利创新交底书生成 |
 | `feipi-video-read-url` | 视频 URL 处理（YouTube / Bilibili） |
-| `feipi-plantuml-generate-diagram` | PlantUML 架构图、时序图及通用作图唯一入口 |
+| `feipi-plantuml-generate-diagram` | PlantUML 架构图、时序图、思维导图及通用作图唯一入口 |
 | `feipi-techreport-ppt-skill` | 技术报告 PPT 单页 |
 | `feipi-dingtalk-send-webhook` | 钉钉群机器人 webhook |
 

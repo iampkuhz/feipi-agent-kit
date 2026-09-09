@@ -110,11 +110,13 @@ def main() -> int:
     over_budget = any(
         marker in issue
         for issue in issues
-        for marker in ("最多允许", "显示宽度", "每层最多", "规模预算")
+        for marker in ("最多允许", "显示宽度", "每层最多", "规模预算", "节点预算", "层级预算", "布局预算", "每个节点最多", "标签超出预算")
     )
     failure_policy = {
         "missing_startuml": ("syntax", True),
         "missing_enduml": ("syntax", True),
+        "missing_startmindmap": ("syntax", True),
+        "missing_endmindmap": ("syntax", True),
         "brief_validation_failed": ("brief", False),
         "coverage_validation_failed": ("coverage", True),
         "layout_validation_failed": ("layout", True),

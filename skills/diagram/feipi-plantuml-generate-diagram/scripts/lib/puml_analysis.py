@@ -285,6 +285,10 @@ def _degree_metrics(node_count: int, relations: list[Relation]) -> dict[str, int
 
 def compute_puml_metrics(diagram_type: str, raw_text: str) -> dict[str, int]:
     """从实际 PUML 计算指标，不能从 brief 反推。"""
+    if diagram_type == "mindmap":
+        from .mindmap import mindmap_metrics
+        return mindmap_metrics(raw_text)
+
     if diagram_type == "activity":
         activities = parse_activities(raw_text)
         aliases = {item.alias for item in activities}

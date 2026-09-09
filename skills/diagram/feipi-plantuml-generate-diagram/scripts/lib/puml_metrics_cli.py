@@ -5,8 +5,10 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import sys
 
-from puml_analysis import compute_puml_metrics
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from lib.puml_analysis import compute_puml_metrics
 
 
 def main() -> int:

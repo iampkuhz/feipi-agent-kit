@@ -2,7 +2,7 @@
 
 ## 何时扩展
 
-当用户需求无法被现有 typed profile（architecture / sequence / component / activity / deployment）覆盖时，按本流程新增图类型。
+当用户需求无法被现有 typed profile（architecture / sequence / component / activity / deployment / mindmap）覆盖时，按本流程新增图类型。
 
 ## 步骤
 
@@ -22,6 +22,7 @@ assets/examples/<type>/<type>-diagram.example.puml
 
 ### 3. 更新路由
 
+- 在 `scripts/lib/profile_registry.py` 注册 schema/template 与 profile 版本。
 - 在 `references/type-routing.md` 中添加关键词映射。
 - 在 `references/diagram-type-profiles.md` 中注册新 profile。
 
@@ -29,7 +30,9 @@ assets/examples/<type>/<type>-diagram.example.puml
 
 - 在 `assets/validation/types/<type>-brief.schema.json` 中新增 JSON Schema（由 `validate_package.sh` 通过 `lib/validate_brief_cli.py` 调用）
 - `check_coverage.py` 中新增 `<type>` 覆盖逻辑。
-- `lint_layout.sh` 中新增 `<type>` 布局规则。
+- `lint_layout.sh` 中新增 `<type>` 布局规则；不可直接套用其他图型的布局参数。
+- 接入 `profile_validators.py` 的语义检查与 `puml_analysis.py` 的真实源码指标。新模块须纳入冻结 brief 的规则 hash。
+- 若定界符不同于 `@startuml/@enduml`（如 mindmap），同步包入口结构检查并添加负例。
 
 ### 5. 更新 SKILL.md
 

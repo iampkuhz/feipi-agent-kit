@@ -415,4 +415,7 @@ def validate_profile_semantics(
         _validate_activity(data, errors)
     elif diagram_type == "deployment":
         _validate_deployment(data, errors)
+    elif diagram_type == "mindmap":
+        from .mindmap import validate_mindmap
+        errors.extend(validate_mindmap(data))
     return errors, warnings

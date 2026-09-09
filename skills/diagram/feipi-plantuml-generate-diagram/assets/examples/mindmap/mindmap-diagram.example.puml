@@ -1,0 +1,42 @@
+@startmindmap
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+<style>
+mindmapDiagram {
+  node {
+    FontColor #1E293B
+    FontSize 14
+    LineColor #94A3B8
+    LineThickness 1
+    RoundCorner 12
+    Padding 10
+    Margin 8
+    MaximumWidth 180
+  }
+  rootNode {
+    FontSize 18
+    FontStyle bold
+    LineColor #475569
+  }
+  arrow {
+    LineColor #94A3B8
+    LineThickness 1.2
+  }
+}
+</style>
+title 技术方案评审要点
+
++[#E2E8F0] 技术方案
+++[#DBEAFE] 业务价值
++++[#DBEAFE] 目标用户与使用场景
++++[#DBEAFE] 衡量收益与验收标准
+--[#D1FAE5] 系统设计
+---[#D1FAE5] 模块职责与数据边界
+---[#D1FAE5] API 契约
+++[#FEF3C7] 风险控制
++++[#FEF3C7] 故障降级与恢复
++++[#FEF3C7] 权限与数据保护
+--[#EDE9FE] 交付计划
+---[#EDE9FE] 里程碑与责任人
+---[#EDE9FE] 验证与上线回滚
+@endmindmap

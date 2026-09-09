@@ -384,7 +384,7 @@ BRIEF_LOCK_OUT="$OUT_DIR/.brief-lock.json"
 BRIEF_RULESET_SHA256=""
 if [[ "$IS_TYPED" == "true" ]]; then
   BRIEF_RULESET_SHA256="$(python3 - "$SCHEMA_FILE" "$LIB_DIR/profile_registry.py" \
-    "$LIB_DIR/brief_loader.py" "$LIB_DIR/validate_brief_cli.py" "$LIB_DIR/profile_validators.py" <<'PY'
+    "$LIB_DIR/brief_loader.py" "$LIB_DIR/validate_brief_cli.py" "$LIB_DIR/profile_validators.py" "$LIB_DIR/mindmap.py" <<'PY'
 import hashlib
 import sys
 from pathlib import Path
@@ -504,17 +504,19 @@ read_render_request_count() {
 echo "Step 0: Validating basic structure..."
 
 DIAGRAM_CONTENT="$(cat "$DIAGRAM_OUT")"
-if ! printf '%s\n' "$DIAGRAM_CONTENT" | grep -qE '^[[:space:]]*@startuml[[:space:]]*$'; then
-  write_json "skipped" "skipped" "skipped" "skipped" "" "blocked" "missing_startuml" "" "diagram 缺少 @startuml"
-  echo "[FAIL] diagram 缺少 @startuml" >&2
-  exit 1
+START_MARKER="startuml"
+END_MARKER="enduml"
+if [[ "$DIAGRAM_TYPE" == "mindmap" ]]; then
+  START_MARKER="startmindmap"
+  END_MARKER="endmindmap"
 fi
-
-if ! printf '%s\n' "$DIAGRAM_CONTENT" | grep -qE '^[[:space:]]*@enduml[[:space:]]*$'; then
-  write_json "skipped" "skipped" "skipped" "skipped" "" "blocked" "missing_enduml" "" "diagram 缺少 @enduml"
-  echo "[FAIL] diagram 缺少 @enduml" >&2
-  exit 1
-fi
+for marker in "$START_MARKER" "$END_MARKER"; do
+  if ! printf '%s\n' "$DIAGRAM_CONTENT" | grep -qE "^[[:space:]]*@${marker}[[:space:]]*$"; then
+    write_json "skipped" "skipped" "skipped" "skipped" "" "blocked" "missing_${marker}" "" "diagram 缺少 @${marker}"
+    echo "[FAIL] diagram 缺少 @${marker}" >&2
+    exit 1
+  fi
+done
 
 echo "[OK] basic structure passed"
 

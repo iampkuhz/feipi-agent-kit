@@ -1,13 +1,13 @@
 ---
 name: feipi-plantuml-generate-diagram
-description: PlantUML 唯一作图入口；在用户要求生成架构图、时序图、组件图、活动图、部署图或其他 PlantUML 图时触发，按图型 brief 生成并校验 diagram package。
+description: PlantUML 唯一作图入口；在用户要求生成架构图、时序图、组件图、活动图、部署图、mindmap 思维导图或其他 PlantUML 图时触发，按图型 brief 生成并校验 diagram package。
 ---
 
 # PlantUML 通用作图生成与校验
 
 ## 核心目标
 
-- 作为仓库内唯一 PlantUML 作图入口，覆盖架构图、时序图、组件图、活动图、部署图及其他请求。
+- 作为仓库内唯一 PlantUML 作图入口，覆盖架构图、时序图、组件图、活动图、部署图、mindmap 思维导图及其他请求。
 - 先识别图类型，再路由到对应 typed profile；识别不了则进入 fallback 模式，不拒绝用户。
 - 输出不仅是 `.puml` 源码，还要产出 diagram package（含 `validation.json`），供上游集成。
 - 默认消费已经存在的本地 renderer；唯一启动例外是批次 preflight 首次不可用时执行一次固定 Podman 命令。禁止杀死、重启、等待或排查 renderer/proxy 进程。
@@ -15,7 +15,7 @@ description: PlantUML 唯一作图入口；在用户要求生成架构图、时�
 ## 适用场景
 
 - 用户说"用 PlantUML 画个图"，未指定具体图类型。
-- 用户明确说"画架构图"、"画时序图"、"画组件图"、"画活动图"或"画部署图"等。
+- 用户明确说"画架构图"、"画时序图"、"画组件图"、"画活动图"、"画部署图"或"画思维导图 / mindmap"等。
 - 用户描述中包含"参与者、调用、返回"（推断 sequence）或"层、组件、依赖"（推断 architecture）。
 - 用户已有 YAML brief，希望直接生成并校验。
 
@@ -37,8 +37,8 @@ description: PlantUML 唯一作图入口；在用户要求生成架构图、时�
 
 ## 工作流
 
-1. **Router**：识别用户意图的图类型，并一次性读取对应 profile 规则。
-   - 已注册类型：`architecture`、`sequence`、`component`、`activity`、`deployment` → 进入对应 typed profile。
+1. **Router**：识别用户意图的图类型，并一次性读取对应 profile 规则；mindmap 只需额外读取 `references/mindmap-authoring.md` 与对应 brief 模板。
+   - 已注册类型：`architecture`、`sequence`、`component`、`activity`、`deployment`、`mindmap` → 进入对应 typed profile。
    - 未注册类型：保留用户请求的 `diagram_type`，但明确进入 `fallback`，不跳过 schema 后伪装成 typed profile。
    - 可推断类型：用户描述包含特定关键词 → 推断后进入对应 typed profile。
    - 不确定类型 → 进入 fallback mode。
@@ -47,7 +47,7 @@ description: PlantUML 唯一作图入口；在用户要求生成架构图、时�
 
 3. **Preflight**：每个批次只运行一次 `scripts/preflight_renderer.sh`。先探测默认本地地址；不可用时只执行一次固定的 `podman run --rm -d -p 8199:8080 --name plantuml docker.io/plantuml/plantuml-server:jetty`，随后只复检一次。成功后把 `renderer_url` 传给所有图；仍失败则返回 `status: blocked`，不创建 worker、不再操作进程。单图任务也使用同一 preflight。
 
-4. **Generate**：仅在 preflight 成功后生成 `.puml`。typed profile 按图类型执行 brief、跨字段语义、覆盖和布局校验；`sequence` 缺省使用 `interaction_mr`，专利流程使用 `process_s`。fallback 规则见 `references/fallback-mode.md`。
+4. **Generate**：仅在 preflight 成功后生成 `.puml`。typed profile 按图类型执行 brief、跨字段语义、覆盖和布局校验；`sequence` 缺省使用 `interaction_mr`，专利流程使用 `process_s`。`mindmap` 优先使用 `scripts/generate_mindmap.py --brief brief.yaml --out diagram.puml`，自动生成树层级与内联样式，默认向右展开；仅在用户明确要求时选择左右均衡或向左展开。fallback 规则见 `references/fallback-mode.md`。
 
 5. **Validate and Repair**：每张图首次生成最多渲染 1 次；仅 `syntax`、`coverage`、`layout` 失败允许针对性修改当前失败图并再渲染 1 次。每批次每张图总渲染上限是 2 次，修复上限是 1 次，换输出目录不能重置计数。普通图面修复依据 `validation.json`，brief 未变时复用冻结校验；若静态规则与真实 renderer 冲突，停止图面循环，进入下述工具缺陷处理，不要求继续改图迎合错误校验器。
 
@@ -86,7 +86,7 @@ description: PlantUML 唯一作图入口；在用户要求生成架构图、时�
 ## 验收标准
 
 1. 必须产出 `validation.json`，不可口头声称成功。
-2. fallback 模式下 `.puml` 必须包含 `@startuml` 与 `@enduml`。
+2. `mindmap` 使用 `@startmindmap` 与 `@endmindmap`；其他现有 typed profile 与 fallback 使用 `@startuml` 与 `@enduml`。
 3. typed profile 模式下必须执行对应的 brief 校验和覆盖校验。
 4. 渲染可用时必须产出 `diagram.svg`。
 5. 若 `render_result` 不为 `ok`、renderer 身份缺失或当前 SVG 不存在，`final_status` 必须为 `blocked`；不可复用旧 SVG。
@@ -105,11 +105,14 @@ bash scripts/validate_package.sh --diagram-type component --brief brief.yaml --d
 ## 资源说明
 
 - `assets/templates/diagram-brief.yaml`：通用 brief 空白模板。
-- `assets/templates/types/`：五种已注册 typed profile 的 brief 模板。
+- `assets/templates/types/`：六种已注册 typed profile 的 brief 模板。
 - `assets/examples/fallback/fallback-brief.example.yaml`：fallback 模式示例 brief。
 - `assets/examples/fallback/fallback-diagram.example.puml`：fallback 模式示例图。
 - `assets/server_candidates.txt`：PlantUML server 候选地址。
 - `scripts/preflight_renderer.sh`：批次级 renderer 预检；首次不可用时只允许一次固定 Podman 启动和一次复检。
+- `references/mindmap-authoring.md`：思维导图最短生成路径、语法子集、布局预算与视觉复核。
+- `assets/templates/types/mindmap-style.puml`：可复用的原生 mindmap 样式。
+- `scripts/generate_mindmap.py`：从 brief 确定性生成思维导图源码。
 - `references/type-routing.md`：类型识别与路由规则。
 - `references/fallback-mode.md`：兜底模式工作流与校验要求。
 - `references/diagram-type-profiles.md`：typed profile 注册表与接口约定。

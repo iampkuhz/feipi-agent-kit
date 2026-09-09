@@ -1,5 +1,8 @@
 # 变更记录
 
+## 2026-09-09
+- feipi-plantuml-generate-diagram v7：新增思维导图生成校验，默认向右展开
+
 ## 2026-09-08
 - feipi-video-read-url v3：保留失败原因与依赖版本诊断
 

@@ -73,11 +73,13 @@ ACTIVITY_BRANCH_BRIEF="$SKILL_DIR/assets/examples/activity/activity-branch-brief
 ACTIVITY_BRANCH_DIAGRAM="$SKILL_DIR/assets/examples/activity/activity-branch-diagram.example.puml"
 DEPLOYMENT_BRIEF="$SKILL_DIR/assets/examples/deployment/deployment-brief.example.yaml"
 DEPLOYMENT_DIAGRAM="$SKILL_DIR/assets/examples/deployment/deployment-diagram.example.puml"
+MINDMAP_BRIEF="$SKILL_DIR/assets/examples/mindmap/mindmap-brief.example.yaml"
+MINDMAP_DIAGRAM="$SKILL_DIR/assets/examples/mindmap/mindmap-diagram.example.puml"
 SERVER_CANDIDATES="$SKILL_DIR/assets/server_candidates.txt"
 for f in "$FALLBACK_DIAGRAM" "$ARCH_BRIEF" "$ARCH_DIAGRAM" "$SEQ_BRIEF" "$SEQ_DIAGRAM" \
   "$SEQ_S_BRIEF" "$SEQ_S_DIAGRAM" "$COMPONENT_BRIEF" "$COMPONENT_DIAGRAM" \
   "$ACTIVITY_BRIEF" "$ACTIVITY_DIAGRAM" "$ACTIVITY_BRANCH_BRIEF" "$ACTIVITY_BRANCH_DIAGRAM" \
-  "$DEPLOYMENT_BRIEF" "$DEPLOYMENT_DIAGRAM" "$SERVER_CANDIDATES"; do
+  "$DEPLOYMENT_BRIEF" "$DEPLOYMENT_DIAGRAM" "$MINDMAP_BRIEF" "$MINDMAP_DIAGRAM" "$SERVER_CANDIDATES"; do
   if [[ -f "$f" ]]; then
     pass "文件存在：$(basename "$f")"
   else
@@ -256,6 +258,7 @@ fi
 # =============================================================================
 echo "=== Step 9: 新 typed profiles 与 process_s ==="
 for spec in \
+  "mindmap|$MINDMAP_BRIEF|$MINDMAP_DIAGRAM" \
   "component|$COMPONENT_BRIEF|$COMPONENT_DIAGRAM" \
   "activity|$ACTIVITY_BRIEF|$ACTIVITY_DIAGRAM" \
   "activity|$ACTIVITY_BRANCH_BRIEF|$ACTIVITY_BRANCH_DIAGRAM" \
@@ -300,6 +303,12 @@ if bash "$SCRIPT_DIR/lint_layout.sh" --type sequence "$PROCESS_S_AUTONUMBER" "$S
   fail "process_s autonumber 应被拦截"
 else
   pass "process_s autonumber 正确拦截"
+fi
+
+if python3 "$TEST_DIR/test_mindmap.py"; then
+  pass "mindmap 树语义、覆盖、布局与生成回归"
+else
+  fail "mindmap 树语义、覆盖、布局与生成回归"
 fi
 
 if python3 "$TEST_DIR/test_profile_validators.py" >/dev/null 2>&1; then

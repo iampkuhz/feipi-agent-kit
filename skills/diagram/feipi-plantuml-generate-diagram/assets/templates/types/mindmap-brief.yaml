@@ -1,0 +1,14 @@
+# 单根树；同级顺序取 nodes 出现顺序，父节点可在子节点之后定义。
+# 每个节点只写一个概念；parent 为空字符串表示根。ID 不显示在图上。
+diagram_id: D1
+diagram_type: mindmap
+title: 主题拆解
+nodes:
+  - {id: root, parent: "", label: 核心主题}
+  - {id: goal, parent: root, label: 目标}
+  - {id: outcome, parent: goal, label: 预期成果}
+  - {id: action, parent: root, label: 行动}
+  - {id: next_step, parent: action, label: 下一步}
+layout:
+  # 默认 right 全部向右；明确要求时使用 balanced 左右均衡或 left 全部向左。
+  direction: right

@@ -45,6 +45,14 @@
 - 至少包含一个物理端点和一条跨区连接；结构关系使用 `E1...En`
 - `boundary_triggers` 六项必须与实际端点/连接语义双向一致：网络 id、链 id、在线/离线连通域、HSM、人工摆渡点、人工交接点既不能漏报也不能虚报
 
+### mindmap（已注册）
+
+- Brief schema/template：`assets/validation/types/mindmap-brief.schema.json`、`assets/templates/types/mindmap-brief.yaml`
+- 只建模 `nodes: [{id, parent, label}]` 单根树，自动派生边与深度；`layout.direction` 默认为 `right`；显式支持 `balanced/left`
+- `scripts/generate_mindmap.py` 从 brief 生成带原生样式的 arithmetic 源码；支持手写 OrgMode；定界符为 `@startmindmap` / `@endmindmap`
+- 校验唯一根、ID/父引用、循环、同级标签、路径覆盖、左右归属及真实源码 metrics；预算为 2–32 节点、含根最多 4 层、每节点最多 6 子节点
+- 默认白底、浅色分支、深色文字、自动折行；布局规则独立于架构图；完整用法与限制见 `mindmap-authoring.md`
+
 ## 待扩展 profile
 
 以下 profile 已预留，待后续通过 `references/expansion-playbook.md` 流程接入：
@@ -52,7 +60,6 @@
 - `class` - 类图
 - `state` - 状态图
 - `usecase` - 用例图
-- `mindmap` - 思维导图
 - `gantt` - 甘特图
 - `wireframe` - 线框图
 

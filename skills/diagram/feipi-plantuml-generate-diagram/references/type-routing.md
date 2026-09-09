@@ -17,6 +17,7 @@ Router 只负责判断用户意图属于哪种 PlantUML 图，不做复杂校验
 | 活动图、流程图、activity diagram | `activity` |
 | 组件图、组件关系图、component diagram | `component` |
 | 部署图、物理边界、deployment diagram | `deployment` |
+| 思维导图、脑图、mindmap、mind map | `mindmap` |
 
 `class`、`state`、`usecase` 等未注册类型保留请求类型，但进入 `fallback`；不得因为文档提到该类型就当作 typed profile。
 
@@ -28,6 +29,8 @@ Router 只负责判断用户意图属于哪种 PlantUML 图，不做复杂校验
 - "层"、"组件"、"依赖"、"架构"、"分层" → 推断 `architecture`
 - "步骤"、"分支"、"活动"、"流程" → 推断 `activity`
 - "物理区"、"跨网"、"离线"、"HSM"、"人工交接" → 推断 `deployment`
+
+- "中心主题"、"知识梳理"、"主题分解"且内容是父子分类树 → 推断 `mindmap`；步骤先后关系仍路由 `activity`
 
 ### 不确定类型
 

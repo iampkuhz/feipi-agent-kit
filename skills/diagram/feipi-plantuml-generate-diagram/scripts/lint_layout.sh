@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 usage() {
   cat <<'USAGE'
 用法:
-  bash scripts/lint_layout.sh --type <architecture|sequence|component|activity|deployment> <diagram.puml> [brief.yaml]
+  bash scripts/lint_layout.sh --type <architecture|sequence|component|activity|deployment|mindmap> <diagram.puml> [brief.yaml]
 
 说明:
   按 profile 执行布局校验。
@@ -55,6 +55,22 @@ fi
 if [[ -z "$INPUT_FILE" || ! -f "$INPUT_FILE" ]]; then
   echo "输入文件不存在：$INPUT_FILE" >&2
   exit 1
+fi
+
+if [[ "$DIAGRAM_TYPE" == "mindmap" ]]; then
+  python3 - "$INPUT_FILE" "$SCRIPT_DIR" <<'PYMM'
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[2])
+from lib.mindmap import layout_errors
+errors = layout_errors(Path(sys.argv[1]).read_text(encoding="utf-8"))
+for error in errors:
+    print(error, file=sys.stderr)
+if errors:
+    raise SystemExit(1)
+print("layout_check=ok")
+PYMM
+  exit $?
 fi
 
 CONTENT="$(awk '

@@ -50,6 +50,14 @@ PROFILES: dict[str, dict[str, Any]] = {
         "coverage_mode": "activity",
         "layout_mode": "activity",
     },
+    "mindmap": {
+        "profile": "mindmap",
+        "profile_version": "1.0",
+        "brief_schema": str(SKILL_DIR / "assets/validation/types/mindmap-brief.schema.json"),
+        "template": str(SKILL_DIR / "assets/templates/types/mindmap-brief.yaml"),
+        "coverage_mode": "mindmap",
+        "layout_mode": "mindmap",
+    },
     "deployment": {
         "profile": "deployment",
         "profile_version": "1.1",

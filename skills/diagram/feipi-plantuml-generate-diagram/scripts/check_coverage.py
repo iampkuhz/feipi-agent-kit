@@ -474,7 +474,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="按 profile 检查 brief 与 PlantUML 覆盖关系")
     parser.add_argument(
         "--type", required=True,
-        choices=["architecture", "sequence", "component", "activity", "deployment"],
+        choices=["architecture", "sequence", "component", "activity", "deployment", "mindmap"],
         help="图类型",
     )
     parser.add_argument("--brief", required=True, help="brief YAML 文件")
@@ -513,6 +513,9 @@ def main() -> int:
         errors = check_activity_coverage(brief, raw_text, normalized_text)
     elif args.type == "deployment":
         errors = check_deployment_coverage(brief, raw_text, normalized_text)
+    elif args.type == "mindmap":
+        from lib.mindmap import coverage_errors
+        errors = coverage_errors(brief, raw_text)
     else:
         print(f"不支持的图类型：{args.type}", file=sys.stderr)
         return 1

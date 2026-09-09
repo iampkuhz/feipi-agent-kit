@@ -1,0 +1,19 @@
+diagram_id: D1
+diagram_type: mindmap
+title: 技术方案评审要点
+nodes:
+  - {id: root, parent: "", label: 技术方案}
+  - {id: value, parent: root, label: 业务价值}
+  - {id: audience, parent: value, label: 目标用户与使用场景}
+  - {id: outcome, parent: value, label: 衡量收益与验收标准}
+  - {id: design, parent: root, label: 系统设计}
+  - {id: boundary, parent: design, label: 模块职责与数据边界}
+  - {id: interfaces, parent: design, label: API 契约}
+  - {id: risk, parent: root, label: 风险控制}
+  - {id: failure, parent: risk, label: 故障降级与恢复}
+  - {id: security, parent: risk, label: 权限与数据保护}
+  - {id: delivery, parent: root, label: 交付计划}
+  - {id: milestone, parent: delivery, label: 里程碑与责任人}
+  - {id: checks, parent: delivery, label: 验证与上线回滚}
+layout:
+  direction: balanced
