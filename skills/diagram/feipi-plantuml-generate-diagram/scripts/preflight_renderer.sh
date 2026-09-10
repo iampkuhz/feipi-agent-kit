@@ -134,7 +134,8 @@ PY
 run_probe
 
 PODMAN_START_ATTEMPTED=false
-PODMAN_START_RESULT="not_needed"
+# 首次探测已经取得有效 SVG；明确 renderer 可用，而不是笼统地说无需启动。
+PODMAN_START_RESULT="renderer_available"
 PODMAN_START_EXIT_CODE=""
 PODMAN_START_ELIGIBLE=false
 if [[ "$SERVER_URL" == "auto" && "$DEFAULT_LOCAL_PORT" == "8199" ]]; then

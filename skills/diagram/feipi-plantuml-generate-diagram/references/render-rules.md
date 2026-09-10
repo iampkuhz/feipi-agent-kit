@@ -15,6 +15,8 @@
 4. 成功时冻结唯一 `renderer_url`，后续所有图显式复用该地址，不再自动发现。
 5. 复检若遇到明确连接权限错误，同样返回 `render_access_denied`；其他失败返回 `render_server_unavailable`。不再重试、不切换地址、不创建 worker，也不停止或排查容器。
 
+预检回执的 `podman_start_result` 表示本次启动决策：`renderer_available` 表示首次探测已取得有效 SVG、renderer 可用且未执行 Podman 启动；`started` 表示已成功执行一次固定 Podman 启动；`failed` / `timeout` 表示启动命令未成功；`podman_unavailable` 表示需要启动但找不到 Podman；`skipped_access_denied` 表示连接访问被拒绝而未尝试启动。该字段不用于推断 renderer 由哪个进程或容器提供。
+
 ## 渲染流程
 
 1. 将 `.puml` 源码 URL-encode。

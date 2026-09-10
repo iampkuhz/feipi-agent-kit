@@ -213,7 +213,7 @@ exit \"$FAKE_PODMAN_EXIT\"
                 self.assertEqual(2, data["total_timeout_seconds"])
                 self.assertEqual(1, data["probe_attempts"])
                 self.assertFalse(data["podman_start_attempted"])
-                self.assertEqual("not_needed", data["podman_start_result"])
+                self.assertEqual("renderer_available", data["podman_start_result"])
                 self.assertFalse(data["process_management_allowed"])
         finally:
             server.shutdown()
