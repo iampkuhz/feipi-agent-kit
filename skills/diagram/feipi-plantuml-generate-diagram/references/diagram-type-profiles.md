@@ -21,6 +21,7 @@
 - 编号策略：缺省 `interaction_mr` 保持 `M/R`；`process_s` 接受 `Sx/Sx.y`，禁止混用及 `autonumber`
 - 覆盖校验：检查参与者 id、消息编号全部落图；额外消息被拦截；separator 数量校验
 - 布局校验：box/separator 结构、编号策略、`box` 与 `left to right` 互斥，`separator` 关键字禁用
+- 消息 note：原始需求使用 `messages[].note`，可选布局坐标使用 `layout.note_geometry`；生成前按 [sequence-notes.md](sequence-notes.md) 批量计算方向、折行和全宽兜底；使用消息旁 `note left/right`，最终图包仍须渲染与视觉复核
 - 规模预算：参与者 2–8、消息 1–20、group 最多 5；标签受显示宽度约束
 
 ### component（已注册）

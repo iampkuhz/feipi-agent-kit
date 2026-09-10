@@ -25,6 +25,9 @@ endbox
 autonumber
 
 user -> web_portal : M1 提交下单请求
+note right
+校验商品与数量，保留客户端请求编号用于重复提交检查。
+end note
 activate web_portal
 == 后端层 ==
 web_portal -> order_service : M2 转发创建订单请求
@@ -32,6 +35,9 @@ activate order_service
 order_service -> inventory_service : M3 预占库存
 activate inventory_service
 inventory_service -> inventory_db : M6 更新库存状态
+note left
+库存预占结果必须与订单状态一致，失败时释放已预占的数量。
+end note
 inventory_service --> order_service : R1 返回预占结果
 deactivate inventory_service
 order_service -> payment_gateway : M4 发起支付
@@ -40,6 +46,9 @@ payment_gateway --> order_service : R2 返回支付结果
 deactivate payment_gateway
 order_service -> order_db : M5 写入订单记录
 order_service --> web_portal : R3 返回下单结果
+note right
+返回订单编号与支付状态，前台据此展示结果。
+end note
 deactivate order_service
 web_portal --> user : R4 展示下单结果
 deactivate web_portal

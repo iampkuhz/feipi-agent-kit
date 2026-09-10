@@ -29,7 +29,7 @@ python3 scripts/run_mindmap.py --brief brief.yaml --out-dir package
 
 1. 从 `assets/templates/types/` 选择对应 brief；图型边界与预算见 `references/diagram-type-profiles.md`。先完成 schema、语义和预算校验，输入失败不调用 renderer。
 2. 每批次执行一次 `scripts/preflight_renderer.sh`，后续图复用回执的 `renderer_url`。
-3. 按 profile 生成源码，调用 `scripts/validate_package.sh --diagram-type <type> --brief <brief> --diagram <puml> --out-dir <package> --server-url <renderer_url>`。
+3. 按 profile 生成源码；`sequence` 含消息 note 时，将说明写入同一 brief 的 `messages[].note`，按 `references/sequence-notes.md` 调用 `scripts/plan_sequence_notes.py --brief <brief...>` 批量计算左右定位、按空间换行与下方全宽兜底。消息说明用紧跟箭头的 `note left/right`，不用 `note left/right of XX`；侧边至少 4 行且全宽至少少 3 行才改 `note across`。随后调用 `scripts/validate_package.sh --diagram-type <type> --brief <brief> --diagram <puml> --out-dir <package> --server-url <renderer_url>`。
 4. `sequence` 默认 `interaction_mr`，专利流程使用 `process_s`。已有 mindmap 的定点修复也用该验证入口；不要重新运行生成器覆盖人工修改。
 5. 未变成功包显式使用 `--reuse-valid-package`；brief、diagram、父 brief、profile 或渲染合同变化时缓存失效。合同细节见 `references/package-contract.md`。
 

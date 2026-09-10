@@ -54,6 +54,13 @@ check_rendered_package() {
 echo "=== Step 1: 结构校验 ==="
 bash "$SCRIPT_DIR/validate.sh" "$SKILL_DIR" >/dev/null && pass "结构校验" || fail "结构校验"
 
+# note 规划不依赖 renderer，即使后续预检 blocked 也先覆盖批量与阈值行为。
+if python3 "$TEST_DIR/test_sequence_notes.py"; then
+  pass "时序 note 批量规划、换行与全宽兜底"
+else
+  fail "时序 note 批量规划、换行与全宽兜底"
+fi
+
 # =============================================================================
 # Step 2: 样例文件存在
 # =============================================================================

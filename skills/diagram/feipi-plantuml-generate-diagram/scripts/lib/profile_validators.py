@@ -11,6 +11,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from .brief_loader import load_yaml
+from .sequence_notes import plan_brief as plan_sequence_notes
 
 E_ID = re.compile(r"^E([1-9][0-9]*)$")
 S_ID = re.compile(r"^S([1-9][0-9]*)(?:\.([1-9][0-9]*))?$")
@@ -146,6 +147,14 @@ def _validate_sequence(data: dict[str, Any], errors: list[str]) -> None:
         _validate_s_ids(message_ids, "messages.id", errors)
     else:
         errors.append(f"未知 numbering_scheme：{scheme}")
+
+    # note 是原始消息需求的一部分，统一 brief 校验也检查其内容与布局坐标。
+    if not errors and (any("note" in message for message in messages)
+                       or "note_geometry" in data.get("layout", {})):
+        try:
+            plan_sequence_notes(data)
+        except (ValueError, TypeError, KeyError) as exc:
+            errors.append(f"sequence note 排版输入无效：{exc}")
 
 
 def _validate_architecture(data: dict[str, Any], errors: list[str]) -> None:

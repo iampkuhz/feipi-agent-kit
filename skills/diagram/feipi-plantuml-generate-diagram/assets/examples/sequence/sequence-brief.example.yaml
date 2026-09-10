@@ -35,6 +35,7 @@ participants:
 
 messages:
   - id: M1
+    note: 校验商品与数量，保留客户端请求编号用于重复提交检查。
     from: user
     to: web_portal
     description: 提交下单请求
@@ -70,11 +71,13 @@ messages:
     description: 写入订单记录
     type: sync
   - id: M6
+    note: 库存预占结果必须与订单状态一致，失败时释放已预占的数量。
     from: inventory_service
     to: inventory_db
     description: 更新库存状态
     type: sync
   - id: R3
+    note: 返回订单编号与支付状态，前台据此展示结果。
     from: order_service
     to: web_portal
     description: 返回下单结果

@@ -5,6 +5,7 @@
 # 2. 执行校验：bash scripts/validate_package.sh --diagram-type sequence --brief your-brief.yaml --diagram your-diagram.puml --out-dir <dir>
 #    或手动校验：python3 scripts/lib/validate_brief_cli.py your-brief.yaml --schema assets/validation/types/sequence-brief.schema.json
 # 3. 校验通过后，再根据 brief 生成 PlantUML。
+# 消息说明直接写入 messages[].note；排版器读取同一份 brief，见 references/sequence-notes.md。
 
 diagram_id: <diagram-id>
 diagram_type: sequence
@@ -37,6 +38,7 @@ messages:
     to: service_a
     description: <消息描述>
     type: sync
+    note: <可选的消息说明，不需要 note 时删除此字段>
   - id: M2
     from: service_a
     to: service_b

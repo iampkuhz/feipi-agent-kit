@@ -8,6 +8,14 @@ participant "约束校验器" as verifier
 participant "离线端点" as endpoint
 requester -> issuer : S1 提交申请
 issuer -> verifier : S2 校验约束
+note across
+校验申请中的交付对象、使用范围与有效期
+限，确认各项约束满足后再继续签发。离线
+端点只能使用约定范围内的凭据，签发系统
+保留申请编号、约束校验结果与交付状态，
+便于后续核对；校验未通过时返回明确原因
+，避免把失败结果当作已完成交付。
+end note
 verifier --> issuer : S3 返回校验
 issuer -> endpoint : S4 交付凭据
 endpoint --> issuer : S4.1 确认接收

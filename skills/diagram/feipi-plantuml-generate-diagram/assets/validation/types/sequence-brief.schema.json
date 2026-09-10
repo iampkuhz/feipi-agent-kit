@@ -99,6 +99,11 @@
           "type": {
             "type": "string",
             "enum": ["sync", "return", "async", "create", "destroy"]
+          },
+          "note": {
+            "type": "string",
+            "minLength": 1,
+            "description": "可选消息说明，与当前消息一同输入；换行和方向由 note 排版器计算"
           }
         }
       }
@@ -114,6 +119,17 @@
         },
         "include_legend": {
           "type": "boolean"
+        },
+        "note_geometry": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["left", "right", "x"],
+          "description": "可选的 note 布局坐标，统一使用显示列；省略时按参与者顺序估算",
+          "properties": {
+            "left": {"type": "number"},
+            "right": {"type": "number"},
+            "x": {"type": "object", "additionalProperties": {"type": "number"}}
+          }
         }
       }
     },
