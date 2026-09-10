@@ -11,6 +11,7 @@
 7. `max_render_attempts=2` 表示首次生成 1 次、针对性修复 1 次，不是 2 次重试；未修改的失败图不得重复渲染。
 8. `timings` / `counters` 保留最近一次完整生成数据，`last_run_timings` / `last_run_counters` 记录本次实际调用；上游应优先消费后者。命中复用时 `render_ms=0`、renderer 请求与轮次均为 0，并单独记录 cache hit，不得把首次生成的历史数据当作本次调用。
 9. `scripts/test.sh` 的正向样例必须使用真实 renderer 并断言 `render_result=ok`、`final_status=success`；负例单独断言预期失败。静态或 mock 测试通过不能代替正向样例的真实渲染证明。
+10. 明确连接权限错误记录为 `blocked_reason=render_access_denied`、`failure_class=renderer`、`repairable=false`；`issues` 保留底层错误、目标地址和 curl/HTTP 诊断。它只说明访问被拒绝，不证明服务宕机或沙箱是唯一原因；本合同不增加提权或自动恢复。
 
 
 ## 工具缺陷与授权边界

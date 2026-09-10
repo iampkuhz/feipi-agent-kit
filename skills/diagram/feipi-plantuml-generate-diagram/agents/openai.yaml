@@ -1,4 +1,4 @@
-version: 7
+version: 8
 interface:
   display_name: "PlantUML 作图生成与校验"
   short_description: "唯一 PlantUML 入口，支持思维导图自动布局、类型校验与图包输出。"

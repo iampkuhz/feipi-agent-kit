@@ -626,6 +626,11 @@ if [[ -f "$RENDER_SCRIPT" ]]; then
       echo "[FAIL] render syntax error" >&2
       echo "$RENDER_OUTPUT" >&2
       exit 1
+    elif [[ "$render_exit" -eq 5 ]]; then
+      write_json "$BRIEF_CHECK" "$COVERAGE_CHECK" "$LAYOUT_CHECK" "skipped" "" "blocked" "render_access_denied" "$BRIEF_OUT" "$RENDER_OUTPUT"
+      echo "[FAIL] renderer 连接被拒绝访问，可能受沙箱或系统权限限制；不能据此认定服务未启动" >&2
+      echo "$RENDER_OUTPUT" >&2
+      exit 1
     elif [[ "$render_exit" -eq 4 ]]; then
       write_json "$BRIEF_CHECK" "$COVERAGE_CHECK" "$LAYOUT_CHECK" "skipped" "" "blocked" "render_server_unavailable" "$BRIEF_OUT" "$RENDER_OUTPUT"
       echo "[FAIL] no render server available" >&2

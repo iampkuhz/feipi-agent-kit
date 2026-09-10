@@ -34,6 +34,8 @@ stdout 只返回一份 JSON，退出码 0 表示执行及预览完成，1 表示
 
 `stage` 为 prepare/dependencies/brief/preflight/generate/validate/preview/complete；优先看 `reason` 与至多三条 issues，必要时读取对应日志或回执。摘要不代替既有 v1.2 `validation.json`，前置失败不伪造图包成功合同。
 
+预检或实际渲染识别到明确连接权限错误时，返回 `reason=render_access_denied`，`issues` 保留原始错误摘要。此时不启动 Podman、不增加重试或提权；完整诊断读取 preflight、validation 或 run.log。访问拒绝可能来自沙箱或系统权限，不能据此断言服务未启动。
+
 `visual_review: pending` 只表示预览已准备，尚未看图。查看 `paths.preview` 后确认中文可读、层级/方向正确、无截断，再交付 SVG 与源码。SVG 图包通过但 PNG 转换失败时，总入口仍返回 blocked/preview，并保留已验证的 SVG。
 
 ## 重复执行与边界

@@ -354,6 +354,12 @@ else
   fail "renderer 单 SVG 请求回归"
 fi
 
+if python3 "$TEST_DIR/test_render_permissions.py"; then
+  pass "renderer 连接权限识别与诊断传递"
+else
+  fail "renderer 连接权限识别与诊断传递"
+fi
+
 # 未注册图型只能进入 fallback，不得跳过 typed schema 后伪装成 typed profile。
 UNKNOWN_OUT="/tmp/plantuml-unknown-fallback-test"
 run_validate "$UNKNOWN_OUT" --diagram-type class --diagram "$FALLBACK_DIAGRAM"

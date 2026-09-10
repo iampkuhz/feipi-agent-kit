@@ -1,5 +1,8 @@
 # 变更记录
 
+## 2026-09-10
+- feipi-plantuml-generate-diagram v8：识别连接权限拒绝并保留诊断
+
 ## 2026-09-09
 - feipi-plantuml-generate-diagram v7：思维导图默认向右，统一执行与修复同文件校验
 

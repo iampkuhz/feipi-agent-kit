@@ -132,6 +132,8 @@ def run(brief: Path, out: Path, server_url: str = "auto") -> dict:
         ], stage, paths["log"])
         validation = read_receipt(paths["validation"], stage)
         if code or validation.get("final_status") != "success" or validation.get("render_result") != "ok":
+            if validation.get("blocked_reason") == "render_access_denied":
+                raise RunError(stage, "render_access_denied", validation.get("issues") or ["renderer 连接被拒绝访问"])
             raise RunError(stage, str(validation.get("blocked_reason") or "package_failed"), ["图包校验未通过，按 validation.json 定点处理；本入口不自动重试"])
 
         stage = "preview"

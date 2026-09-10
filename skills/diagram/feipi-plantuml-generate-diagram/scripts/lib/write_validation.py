@@ -122,6 +122,7 @@ def main() -> int:
         "layout_validation_failed": ("layout", True),
         "render_syntax_error": ("syntax", True),
         "render_server_unavailable": ("renderer", False),
+        "render_access_denied": ("renderer", False),
         "renderer_missing": ("renderer", False),
         "render_failed": ("renderer", False),
         "render_evidence_missing": ("renderer", False),

@@ -18,6 +18,7 @@ usage() {
 返回码:
   0 - 本地 renderer 可用
   4 - 首次探测和一次 Podman 启动后的复检均失败；调用方必须 blocked
+  5 - 连接被明确拒绝访问；不启动 Podman，调用方必须 blocked
 USAGE
 }
 
@@ -70,6 +71,10 @@ RENDER_OUTPUT=""
 RENDER_EXIT=4
 RENDERER_URL=""
 REASON=""
+FAILURE_KIND=""
+RENDER_TARGET=""
+CURL_EXIT_CODE=""
+HTTP_STATUS=""
 
 run_probe() {
   local request_count=0
@@ -82,6 +87,10 @@ run_probe() {
   RENDERER_URL="$(printf '%s\n' "$RENDER_OUTPUT" | awk -F= '/^render_server=/{print $2; exit}')"
   request_count="$(printf '%s\n' "$RENDER_OUTPUT" | awk -F= '/^render_http_requests=/{print $2; exit}')"
   REASON="$(printf '%s\n' "$RENDER_OUTPUT" | awk -F= '/^render_reason=/{sub(/^render_reason=/, ""); print; exit}')"
+  FAILURE_KIND="$(printf '%s\n' "$RENDER_OUTPUT" | awk -F= '/^render_failure_kind=/{print $2; exit}')"
+  RENDER_TARGET="$(printf '%s\n' "$RENDER_OUTPUT" | awk '/^render_target=/{sub(/^render_target=/, ""); print; exit}')"
+  CURL_EXIT_CODE="$(printf '%s\n' "$RENDER_OUTPUT" | awk -F= '/^render_curl_exit_code=/{print $2; exit}')"
+  HTTP_STATUS="$(printf '%s\n' "$RENDER_OUTPUT" | awk -F= '/^render_http_status=/{print $2; exit}')"
   [[ "$request_count" =~ ^[0-9]+$ ]] || request_count=0
   HTTP_REQUESTS=$((HTTP_REQUESTS + request_count))
 }
@@ -159,6 +168,12 @@ END_NS="$(python3 -c 'import time; print(time.monotonic_ns())')"
 
 FINAL_STATUS="blocked"
 BLOCKED_REASON="render_server_unavailable"
+if [[ "$RENDER_EXIT" -eq 5 ]]; then
+  BLOCKED_REASON="render_access_denied"
+  if [[ "$PODMAN_START_ATTEMPTED" == "false" ]]; then
+    PODMAN_START_RESULT="skipped_access_denied"
+  fi
+fi
 if [[ "$RENDER_EXIT" -eq 0 && -n "$RENDERER_URL" && -s "$PROBE_SVG" ]]; then
   FINAL_STATUS="success"
   BLOCKED_REASON=""
@@ -167,7 +182,8 @@ fi
 JSON_OUTPUT="$(python3 - "$FINAL_STATUS" "$RENDERER_URL" "$BLOCKED_REASON" "$REASON" \
   "$CONNECT_TIMEOUT" "$TOTAL_TIMEOUT" "$START_NS" "$END_NS" "$HTTP_REQUESTS" \
   "$PROBE_ATTEMPTS" "$PODMAN_START_ATTEMPTED" "$PODMAN_START_RESULT" \
-  "$PODMAN_START_EXIT_CODE" "$PODMAN_START_TIMEOUT" "$PODMAN_READINESS_DELAY" <<'PY'
+  "$PODMAN_START_EXIT_CODE" "$PODMAN_START_TIMEOUT" "$PODMAN_READINESS_DELAY" \
+  "$FAILURE_KIND" "$RENDER_TARGET" "$CURL_EXIT_CODE" "$HTTP_STATUS" <<'PY'
 import json
 import sys
 
@@ -180,6 +196,10 @@ print(json.dumps({
     "renderer_url": renderer,
     "blocked_reason": blocked,
     "issue": reason or blocked,
+    "failure_kind": sys.argv[16],
+    "render_target": sys.argv[17],
+    "curl_exit_code": int(sys.argv[18]) if sys.argv[18] else None,
+    "http_status": sys.argv[19],
     "connect_timeout_seconds": int(sys.argv[5]),
     "total_timeout_seconds": int(sys.argv[6]),
     "elapsed_ms": elapsed_ms,
@@ -202,4 +222,7 @@ if [[ -n "$OUTPUT" ]]; then
 fi
 printf '%s\n' "$JSON_OUTPUT"
 
-[[ "$FINAL_STATUS" == "success" ]] || exit 4
+if [[ "$FINAL_STATUS" != "success" ]]; then
+  [[ "$BLOCKED_REASON" == "render_access_denied" ]] && exit 5
+  exit 4
+fi

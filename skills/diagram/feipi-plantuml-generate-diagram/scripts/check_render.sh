@@ -10,6 +10,7 @@ usage() {
   0 - 渲染成功
   2 - 语法或渲染内容错误
   4 - 没有可用渲染后端
+  5 - 连接被明确拒绝访问（可能是沙箱或系统权限）
 USAGE
 }
 
@@ -212,8 +213,23 @@ for candidate in "${CANDIDATES[@]}"; do
   SVG_ERR="$(mktemp)"
   SVG_HEADERS="$(mktemp)"
   REQUEST_COUNT=$((REQUEST_COUNT + 1))
-  if ! curl -sS --connect-timeout "$DEFAULT_CONNECT_TIMEOUT" --max-time "$TIMEOUT" -D "$SVG_HEADERS" -o "$REQUEST_SVG" -w '%{http_code}' "$candidate/svg/$ENCODED" >"$SVG_CODE" 2>"$SVG_ERR"; then
+  CURL_EXIT=0
+  LC_ALL=C curl -sS --connect-timeout "$DEFAULT_CONNECT_TIMEOUT" --max-time "$TIMEOUT" -D "$SVG_HEADERS" -o "$REQUEST_SVG" -w '%{http_code}' "$candidate/svg/$ENCODED" >"$SVG_CODE" 2>"$SVG_ERR" || CURL_EXIT=$?
+  if [[ "$CURL_EXIT" -ne 0 ]]; then
     LAST_ERROR="$(cat "$SVG_ERR")"
+    # 仅将连接阶段的明确权限错误归类为访问被拒绝；curl 7 本身不能证明沙箱限制。
+    # 排除本地输出写入等错误，避免把文件权限问题误认成网络权限问题。
+    if [[ "$CURL_EXIT" -eq 7 ]] && printf '%s\n' "$LAST_ERROR" | grep -Eqi 'Operation not permitted|Permission denied'; then
+      echo "render_result=skipped"
+      echo "render_reason=$LAST_ERROR"
+      echo "render_failure_kind=permission_denied"
+      echo "render_target=$candidate"
+      echo "render_curl_exit_code=$CURL_EXIT"
+      echo "render_http_status=$(cat "$SVG_CODE")"
+      echo "render_http_requests=$REQUEST_COUNT"
+      rm -f "$REQUEST_SVG" "$SVG_CODE" "$SVG_ERR" "$SVG_HEADERS"
+      exit 5
+    fi
     rm -f "$REQUEST_SVG" "$SVG_CODE" "$SVG_ERR" "$SVG_HEADERS"
     continue
   fi
