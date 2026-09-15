@@ -15,6 +15,5 @@
 | QA 与 overflow | `qa-gates.md`、`visual-qa.md`、`repair-policy.md` |
 | 有效重跑 | `auto-iteration.md` |
 | 环境诊断 | `runtime-environment.md` |
-| 开发回归 | `fixtures/acceptance/`、`fixtures/benchmarks/` |
 
-`examples.md`、P0 taxonomy 和历史 fixture 只在开发或确需对照时加载。样例不能替代 token 或合同。
+`examples.md` 只在确需对照时加载。样例不能替代 token 或合同。

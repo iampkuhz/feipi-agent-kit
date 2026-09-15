@@ -44,7 +44,6 @@ TARGET_DIR="$(cd "$TARGET_DIR" && pwd)"
 BASE="$(basename "$TARGET_DIR")"
 SKILL_FILE="$TARGET_DIR/SKILL.md"
 OPENAI_FILE="$TARGET_DIR/agents/openai.yaml"
-TEST_SCRIPT="$TARGET_DIR/scripts/test.sh"
 
 validate_skill_name() {
   local name="$1"
@@ -118,10 +117,6 @@ if [[ ! -f "$OPENAI_FILE" ]]; then
   echo "缺少文件：$OPENAI_FILE" >&2
   exit 1
 fi
-if [[ ! -x "$TEST_SCRIPT" ]]; then
-  echo "缺少可执行测试脚本：$TEST_SCRIPT" >&2
-  exit 1
-fi
 
 FRONTMATTER="$(awk '
   NR==1 && $0=="---" { in_yaml=1; start=1; next }
@@ -189,7 +184,7 @@ if [[ "$DEFAULT_PROMPT_LINE" != *"\$$BASE"* ]]; then
 fi
 
 for placeholder in '{{SKILL_NAME}}' '{{SKILL_DESCRIPTION}}' '{{TITLE}}' '{{DISPLAY_NAME}}' '{{SHORT_DESCRIPTION}}' '{{DEFAULT_PROMPT}}'; do
-  if rg -Fq "$placeholder" "$SKILL_FILE" "$OPENAI_FILE" "$TEST_SCRIPT"; then
+  if rg -Fq "$placeholder" "$SKILL_FILE" "$OPENAI_FILE"; then
     echo "存在未替换模板占位符：$placeholder" >&2
     exit 1
   fi

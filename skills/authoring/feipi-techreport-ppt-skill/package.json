@@ -4,11 +4,6 @@
   "private": true,
   "description": "Technical report PPT generation skill — slide IR, static QA, PPTX compiler, render QA",
   "scripts": {
-    "test": "bash scripts/test.sh",
-    "bench": "node scripts/run_benchmarks.js --dry-run --full --json",
-    "bench:full": "node scripts/run_benchmarks.js --full --json",
-    "release": "bash scripts/release_gate.sh",
-    "release:strict": "bash scripts/release_gate.sh --strict",
     "doctor": "node scripts/doctor.js",
     "demo": "node scripts/generate_demo_deck.js"
   },

@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "skill": "feipi-patent-generate-innovation-disclosure",
+  "cases": [
+    {
+      "id": "confirm-before-draft",
+      "prompt": "根据这些技术材料先整理专利创新交底，写作思路先给我确认",
+      "expected": [
+        "完成材料建模",
+        "提交写作思路",
+        "等待明确确认后进入后续阶段"
+      ],
+      "forbidden": [
+        "确认前直接完成最终交底稿",
+        "让后续阶段重复读取全部原始材料"
+      ]
+    },
+    {
+      "id": "source-boundaries",
+      "prompt": "材料里没有竞品信息，请完成创新交底",
+      "expected": [
+        "主动检索竞品",
+        "区分事实、推断和待确认内容",
+        "保留来源台账"
+      ],
+      "forbidden": [
+        "伪造竞品证据",
+        "把未经确认的推断写成事实"
+      ]
+    }
+  ]
+}

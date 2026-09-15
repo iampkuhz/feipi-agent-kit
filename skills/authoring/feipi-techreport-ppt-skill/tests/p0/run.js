@@ -65,33 +65,33 @@ async function main() {
     });
 
     await test('v2 Schema 拒绝任意 font_size=9.7', () => {
-      const doc = readJson('fixtures/acceptance/layered-architecture.slide-ir.v2.json');
+      const doc = readJson('tests/fixtures/acceptance/layered-architecture.slide-ir.v2.json');
       doc.elements[0].font_size = 9.7;
       expectInvalid(doc, /additional properties|must NOT have/);
     });
 
     await test('body_dense 仅为 legacy token，v2 正文不能选择该角色', () => {
-      const doc = readJson('fixtures/acceptance/layered-architecture.slide-ir.v2.json');
+      const doc = readJson('tests/fixtures/acceptance/layered-architecture.slide-ir.v2.json');
       doc.elements[0].text_role = 'body_dense';
       expectInvalid(doc, /must be equal to one of the allowed values/);
       assert.equal(readJson('design-system/components/capability-group.json').contract.slots.items.text_role, 'body');
     });
 
     await test('v1 compatibility 拒绝未登记 font_size_pt=9.7', () => {
-      const doc = readJson('fixtures/architecture-map.slide-ir.json');
+      const doc = readJson('tests/fixtures/architecture-map.slide-ir.json');
       doc.elements[0].style.font_size_pt = 9.7;
       expectInvalid(doc, /未登记到 typography token/);
     });
 
     await test('普通模式拒绝任意 style 和坐标', () => {
-      const doc = readJson('fixtures/acceptance/layered-architecture.slide-ir.v2.json');
+      const doc = readJson('tests/fixtures/acceptance/layered-architecture.slide-ir.v2.json');
       doc.elements[0].style = { color: '#000000' };
       doc.elements[0].x = 1;
       expectInvalid(doc, /additional properties|must NOT have/);
     });
 
     await test('custom-grid 只接受整数网格，不接受 inch 坐标', () => {
-      const base = readJson('fixtures/acceptance/layered-architecture.slide-ir.v2.json');
+      const base = readJson('tests/fixtures/acceptance/layered-architecture.slide-ir.v2.json');
       const doc = {
         ...base, layout_id: 'custom-grid',
         elements: [{ ...base.elements[0], region_id: 'main', grid_position: { column: 1, row: 1, column_span: 12, row_span: 2 } }],
@@ -143,10 +143,10 @@ async function main() {
       assert.equal(plan.elements[0].resolved_style.font_size_pt, 10);
     });
 
-    const acceptance = fs.readdirSync(path.join(ROOT, 'fixtures', 'acceptance')).filter(name => name.endsWith('.json')).sort();
+    const acceptance = fs.readdirSync(path.join(ROOT, 'tests', 'fixtures', 'acceptance')).filter(name => name.endsWith('.json')).sort();
     await test('三个 v2 场景产生稳定 Render Plan 几何 hash', () => {
       for (const file of acceptance) {
-        const doc = readJson(path.join('fixtures', 'acceptance', file));
+        const doc = readJson(path.join('tests', 'fixtures', 'acceptance', file));
         const first = compileRenderPlan(doc);
         const second = compileRenderPlan(doc);
         assert.equal(first.geometry_hash, second.geometry_hash, file);
@@ -158,7 +158,7 @@ async function main() {
     const outputs = [];
     await test('三个 v2 场景生成真实原生可编辑 PPTX', async () => {
       for (const file of acceptance) {
-        const doc = readJson(path.join('fixtures', 'acceptance', file));
+        const doc = readJson(path.join('tests', 'fixtures', 'acceptance', file));
         const plan = compileRenderPlan(doc);
         const output = path.join(tempDir, file.replace('.slide-ir.v2.json', '.pptx'));
         const built = await compiler.compile(doc, output);
@@ -186,7 +186,7 @@ async function main() {
     await test('现有三份 v1 代表 fixture 仍可生成', async () => {
       for (const file of ['architecture-map.slide-ir.json', 'comparison-matrix.slide-ir.json', 'flow-diagram.slide-ir.json']) {
         const output = path.join(tempDir, `v1-${file}.pptx`);
-        const built = await compiler.compile(readJson(path.join('fixtures', file)), output);
+        const built = await compiler.compile(readJson(path.join('tests', 'fixtures', file)), output);
         assert.equal(built.success, true, `${file}: ${built.error}`);
         assert.ok(fs.statSync(output).size > 0);
       }
@@ -194,7 +194,7 @@ async function main() {
 
     await test('两份 legacy design-kit fixture 通过仓内 adapter 生成', async () => {
       for (const file of ['design-kit-left-diagram-right-table.json', 'design-kit-roadmap-5-stage.json']) {
-        const normalized = designKitAdapter.normalizeToSlideIR(readJson(path.join('fixtures', file)));
+        const normalized = designKitAdapter.normalizeToSlideIR(readJson(path.join('tests', 'fixtures', file)));
         assert.equal(validateSlideIR(normalized).valid, true, file);
         const built = await compiler.compile(normalized, path.join(tempDir, `${file}.pptx`));
         assert.equal(built.success, true, built.error);
@@ -204,7 +204,7 @@ async function main() {
     await test('Render Plan Schema 可校验编译产物', () => {
       const schema = readJson('schemas/render-plan.schema.json');
       const validate = new Ajv2020({ strict: false, allowUnionTypes: true }).compile(schema);
-      const doc = readJson('fixtures/acceptance/solution-comparison.slide-ir.v2.json');
+      const doc = readJson('tests/fixtures/acceptance/solution-comparison.slide-ir.v2.json');
       assert.equal(validate(compileRenderPlan(doc)), true, JSON.stringify(validate.errors));
     });
 

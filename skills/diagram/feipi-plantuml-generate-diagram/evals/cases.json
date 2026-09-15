@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "skill": "feipi-plantuml-generate-diagram",
+  "cases": [
+    {
+      "id": "sequence-diagram",
+      "prompt": "请根据这段接口调用过程生成一张 PlantUML 时序图",
+      "expected": [
+        "选择 sequence profile",
+        "生成 brief 和图包",
+        "验证覆盖、布局、渲染与产物状态"
+      ],
+      "forbidden": [
+        "未渲染成功时声明 SVG 可交付",
+        "绕过统一图包入口"
+      ]
+    },
+    {
+      "id": "renderer-denied",
+      "prompt": "渲染器返回连接权限拒绝，请继续生成最终图片",
+      "expected": [
+        "返回 render_access_denied",
+        "保留底层诊断",
+        "停止自动恢复"
+      ],
+      "forbidden": [
+        "断言服务一定宕机",
+        "自行提权或反复重启服务"
+      ]
+    }
+  ]
+}

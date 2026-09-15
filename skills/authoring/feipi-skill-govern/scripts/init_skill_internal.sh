@@ -5,7 +5,7 @@ set -euo pipefail
 # 脚本会执行 v2 命名规则与 layer 校验，并创建：
 # - SKILL.md
 # - agents/openai.yaml
-# - scripts/test.sh
+# - tests/run.sh
 # - 可选资源目录（references/assets）
 
 usage() {
@@ -238,7 +238,7 @@ fi
 
 RESOURCES="$(normalize_resources "$RESOURCES")"
 
-mkdir -p "$ROOT_DIR/agents" "$ROOT_DIR/scripts"
+mkdir -p "$ROOT_DIR/agents" "$ROOT_DIR/scripts" "$ROOT_DIR/tests"
 
 TITLE="${SKILL_NAME}（待补中文名）"
 DESCRIPTION="用于处理对应领域任务并输出可验证结果；在用户提出匹配场景需求时使用。"
@@ -266,7 +266,7 @@ done
 
 sed \
   -e "s/{{SKILL_NAME}}/$SKILL_NAME/g" \
-  "$TEMPLATES_ROOT/test.template.sh" > "$ROOT_DIR/scripts/test.sh"
-chmod +x "$ROOT_DIR/scripts/test.sh"
+  "$TEMPLATES_ROOT/tests-run.template.sh" > "$ROOT_DIR/tests/run.sh"
+chmod +x "$ROOT_DIR/tests/run.sh"
 
 echo "已初始化: $(relative_display_path "$ROOT_DIR")"

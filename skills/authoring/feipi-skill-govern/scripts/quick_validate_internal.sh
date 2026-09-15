@@ -302,7 +302,7 @@ if ! rg -Pq '\p{Han}' "$OPENAI_FILE"; then
   exit 1
 fi
 
-TEST_SCRIPT="$TARGET_DIR/scripts/test.sh"
+TEST_SCRIPT="$TARGET_DIR/tests/run.sh"
 if [[ ! -x "$TEST_SCRIPT" ]]; then
   echo "缺少可执行测试脚本：$TEST_SCRIPT" >&2
   exit 1
@@ -317,7 +317,7 @@ for placeholder in \
   '{{DEFAULT_PROMPT}}'
 do
   if rg -Fq "$placeholder" "$TEST_SCRIPT"; then
-    echo "scripts/test.sh 存在未替换模板占位符：$placeholder" >&2
+    echo "tests/run.sh 存在未替换模板占位符：$placeholder" >&2
     exit 1
   fi
 done

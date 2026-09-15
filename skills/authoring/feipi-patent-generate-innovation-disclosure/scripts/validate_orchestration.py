@@ -117,10 +117,8 @@ EXPECTED_SCRIPT_ONLY = [
 EXPECTED_MAINTAINER_ONLY = [
     "MAINTAINER_HISTORY.md",
     "handbook/",
-    "references/cases/",
     "references/content-quality-gates.md",
     "references/stage-delivery-contract.md",
-    "references/test_cases.txt",
 ]
 EXPECTED_LOADING_LIMITS = {
     "skill_entry_max_bytes": 12 * 1024,

@@ -1,4 +1,4 @@
-version: 2
+version: 3
 interface:
   display_name: "中文技术汇报 PPT"
   short_description: "将中文技术材料重构为 CTO 可读、视觉确定且原生可编辑的 PPT，并强制执行 token、组件/布局合同与真实 QA。"

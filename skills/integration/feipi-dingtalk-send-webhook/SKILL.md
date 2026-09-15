@@ -121,7 +121,7 @@ bash scripts/send_dingtalk_md.sh DINGTALK_WEBHOOK_URL "巡检结果" "| 服务 |
 1. 环境变量缺失时，脚本能明确报错。
 2. 提供加签密钥环境变量名但变量缺失时，脚本能明确报错。
 3. 文本与 Markdown 两类脚本都能通过基础参数校验。
-4. 本地校验脚本 `scripts/validate.sh` 与测试脚本 `scripts/test.sh` 可运行。
+4. 两类发送脚本都能正确处理成功响应和服务端错误。
 
 ## 资源说明
 
@@ -129,5 +129,3 @@ bash scripts/send_dingtalk_md.sh DINGTALK_WEBHOOK_URL "巡检结果" "| 服务 |
 - `scripts/send_dingtalk_md.sh`：Markdown 消息发送脚本
 - `scripts/normalize_dingtalk_markdown.py`：删除不支持 Markdown 语法的收敛脚本
 - `scripts/validate.sh`：本地结构校验入口
-- `scripts/test.sh`：统一测试入口
-- `references/test_cases.txt`：测试项列表

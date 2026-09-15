@@ -113,7 +113,7 @@ JSON Schema 不作为模型上下文；由校验脚本直接执行。
 
 - `agents/subagents/checkpoint-task-catalog.json`：由 `checkpoint.py` 消费。
 - `assets/*.schema.json`：由 validator 消费。
-- `scripts/` 实现、测试夹具和图包 hash：直接运行或按错误定位，不为执行任务全文读取。
+- `scripts/` 实现和图包 hash：直接运行或按错误定位，不为执行任务全文读取。
 - `disclosure-validation.json` 的规则枚举：主 agent 读取结果摘要和失败规则，不加载 validator 源码证明内容质量。
 
 ### Maintainer-only
@@ -122,7 +122,6 @@ JSON Schema 不作为模型上下文；由校验脚本直接执行。
 - `references/content-quality-gates.md`：完整规则编号总表。
 - `handbook/`：人工流程、并行与加载说明。
 - `MAINTAINER_HISTORY.md`、`CHANGELOG.md`。
-- `references/cases/`、`references/test_cases.txt`：回归测试和维护样例。
 
 维护或排错时可以人工打开这些文件；业务运行不能把它们声明为所有 agent 的公共前置阅读。
 

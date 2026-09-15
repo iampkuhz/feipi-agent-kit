@@ -66,6 +66,10 @@ description: 用于治理 repo 内 skill 的命名、触发、执行、模板、
 - 仓库级脚本或 `make` 只能作为包装器；主流程必须可通过当前 skill 本地脚本闭环执行。
 - 仓库根目录不再保留给多个 skill 兜底的公共 `templates/`；模板要么放在 `feipi-skill-govern/templates/`，要么放在目标 skill 自己的 `templates/` 或 `assets/`。
 - 若发现历史 rename 建议是按旧规则得出的，只记录到待重审清单，不在本次顺手重命名其他 skills。
+- 运行内容与开发内容分层：普通 skill 的 `SKILL.md` 不引用 `tests/` 或 `evals/`；只有本 Skill Creator 在创建、维护、评估或审计 skill 时读取这些目录。
+- `tests/` 保存确定性脚本测试、集成测试和 fixtures，统一入口为 `tests/run.sh`；`evals/` 保存真实 Agent 行为用例、判定标准和基线，不保存运行产物。
+- `tests/`、`evals/` 都是源码维护目录，安装器必须排除；评估输出写入仓库 `tmp/`，不能回流到 skill。
+- 创建或迁移开发资料时按需读取 `references/development-layout.md`。
 
 ## 执行流程（治理态）
 
@@ -124,7 +128,7 @@ description: 用于治理 repo 内 skill 的命名、触发、执行、模板、
 1. 当前 skill 目录执行
 ```bash
 bash scripts/validate.sh .
-bash scripts/test.sh
+bash tests/run.sh
 ```
 
 2. 仓库根目录执行
@@ -135,7 +139,7 @@ bash skills/authoring/feipi-skill-govern/scripts/init_skill.sh feipi-video-read-
 
 说明：
 - `scripts/validate.sh` 是结构校验主入口。
-- `scripts/test.sh` 是行为校验与旧规则残留搜索入口。
+- `tests/run.sh` 是开发回归与旧规则残留搜索入口。
 - `scripts/init_skill.sh` 是新建 skill 的本地脚手架入口；仓库级 `make` 只可作为包装器，不是唯一真源。
 
 ## 验收标准

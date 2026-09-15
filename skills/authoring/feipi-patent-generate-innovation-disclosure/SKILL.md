@@ -30,7 +30,7 @@ description: 用于把零散业务与技术事实整理为带来源台账、Plan
 4. 阶段 1/逐图 slice 必须是带 task identity 和 `source_set_sha256` 的 JSON envelope。派发/fallback 前运行 `validate-task`；成功会生成绑定任务、TaskSpec 与动态输入集合的 dispatch receipt。失败、receipt 缺失或过期不得启动，seal 会复验本阶段 receipt 并纳入 cache digest。
 5. subagent 使用 `fork_turns: none`，只读自己的任务包、hash 绑定输入和专用小合同；不得读取本文件、阶段说明、配置、其他合同、完整对话或未点名材料。制图只写独占图包，其余角色只读，结果由主 agent 写入。
 6. 阶段 3 的三个模板按节点延迟读取：`public-draft` 读取对外稿模板，`manifest` 读取 manifest 模板，`internal-draft` 读取内部附录模板；制图 worker 不读取这些模板。
-7. Schema、catalog、校验器和测试只由脚本消费；handbook、history、案例、总索引和内容总表仅供维护者阅读。
+7. Schema、catalog 和校验器只由脚本消费；handbook、history、案例、总索引和内容总表仅供维护者阅读。
 
 如果声明资源与实际任务不一致，先修任务包或配置，不得用读取整个目录、总合同或其他阶段文件绕过。加载矩阵的人读说明见 `handbook/progressive-loading.md`，但该文件运行时禁止读取。
 

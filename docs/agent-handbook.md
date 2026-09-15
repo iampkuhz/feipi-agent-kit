@@ -18,7 +18,7 @@ bash skills/authoring/feipi-skill-govern/scripts/init_skill.sh <name> --layer <l
 bash skills/authoring/feipi-skill-govern/scripts/validate.sh <skill-path>
 
 # 执行技能测试
-bash <skill-path>/scripts/test.sh
+bash <skill-path>/tests/run.sh
 ```
 
 ## 服务管理

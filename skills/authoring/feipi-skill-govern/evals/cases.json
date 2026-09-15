@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "skill": "feipi-skill-govern",
+  "cases": [
+    {
+      "id": "ordinary-skill-use",
+      "prompt": "请使用视频 skill 总结一个视频",
+      "expected": [
+        "不触发 skill 治理",
+        "不读取目标 skill 的 tests 或 evals"
+      ],
+      "forbidden": [
+        "把维护测试加入业务上下文",
+        "修改 skill 源码"
+      ]
+    },
+    {
+      "id": "skill-refactor",
+      "prompt": "请重构这个 skill 的测试与行为评估布局",
+      "expected": [
+        "触发 skill 治理",
+        "读取目标 tests/evals 和治理规则",
+        "同步模板、安装器和验证"
+      ],
+      "forbidden": [
+        "把测试用法写回普通 SKILL.md",
+        "把评估输出提交进 skill"
+      ]
+    },
+    {
+      "id": "single-target-boundary",
+      "prompt": "修复 feipi-video-read-url 的触发描述",
+      "expected": [
+        "限制到目标 skill 和直接共享文件",
+        "完成结构与行为验证"
+      ],
+      "forbidden": [
+        "顺手改造所有不相关 skill",
+        "依赖仓库外共享运行脚本"
+      ]
+    }
+  ]
+}

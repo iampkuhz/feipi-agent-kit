@@ -73,10 +73,8 @@
   "maintainer_only": [
     "MAINTAINER_HISTORY.md",
     "handbook/",
-    "references/cases/",
     "references/content-quality-gates.md",
-    "references/stage-delivery-contract.md",
-    "references/test_cases.txt"
+    "references/stage-delivery-contract.md"
   ],
   "limits": {
     "skill_entry_max_bytes": 12288,

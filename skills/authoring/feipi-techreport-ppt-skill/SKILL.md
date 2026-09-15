@@ -135,8 +135,5 @@ LibreOffice 只做兼容性对照；它无法解析 macOS 字体时，不得据�
 | IR 结构 | `references/slide-ir.md`、对应 schema |
 | Pipeline / QA | `references/executable-framework.md`、`references/qa-gates.md` |
 | 后端边界 | `references/backend-selection.md` |
-| 开发与回归 | `fixtures/benchmarks/`、`fixtures/acceptance/` |
 
 不要在每次生成时读取全部 references、历史 PPTX、golden 或所有 benchmark。完整路由见 `references/index.md`。
-
-修改 token、合同、schema、compiler、adapter 或 QA 时，必须同步更新测试和文档；不要把样例当作规范真源。开发验证命令只保留在仓内 README，不进入运行时入口。

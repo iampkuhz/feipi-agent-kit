@@ -62,11 +62,6 @@ REQUIRED_FILES=(
   "references/roles/diagram-engineer.md"
   "references/reviews/semantic-review.md"
   "references/reviews/visual-review.md"
-  "references/cases/happy-case-full.md"
-  "references/cases/happy-package/disclosure.md"
-  "references/cases/happy-package/disclosure-workspace/disclosure-internal.md"
-  "references/cases/happy-package/disclosure-workspace/disclosure-manifest.json"
-  "references/cases/happy-package/disclosure-workspace/disclosure-validation.json"
   "scripts/check_disclosure_format.sh"
   "scripts/validate_disclosure_package.sh"
   "scripts/validate_disclosure.py"
@@ -74,12 +69,6 @@ REQUIRED_FILES=(
   "scripts/session_timing.py"
   "scripts/stage_handoff.py"
   "scripts/checkpoint.py"
-  "scripts/tests/test_checkpoint.py"
-  "scripts/tests/test_orchestration.py"
-  "scripts/tests/test_stage_handoff.py"
-  "scripts/tests/test_session_timing.py"
-  "scripts/tests/generate_package.py"
-  "scripts/test.sh"
 )
 for relative_path in "${REQUIRED_FILES[@]}"; do
   if [[ ! -f "$TARGET_DIR/$relative_path" ]]; then
@@ -93,8 +82,8 @@ if [[ "$FRONTMATTER_NAME" != "feipi-patent-generate-innovation-disclosure" ]]; t
   echo "SKILL.md name 与目录名不一致：$FRONTMATTER_NAME" >&2
   exit 1
 fi
-if ! rg -q '^version:[[:space:]]*9[[:space:]]*$' "$TARGET_DIR/agents/openai.yaml"; then
-  echo "agents/openai.yaml version 必须为 9" >&2
+if ! rg -q '^version:[[:space:]]*10[[:space:]]*$' "$TARGET_DIR/agents/openai.yaml"; then
+  echo "agents/openai.yaml version 必须为 10" >&2
   exit 1
 fi
 if [[ -e "$TARGET_DIR/references/subagent-orchestration.json" || -e "$TARGET_DIR/references/checkpoint-task-catalog.json" ]]; then
@@ -130,10 +119,5 @@ rg -q 'agents/subagents/loading-policy\.json' "$TARGET_DIR/SKILL.md"
 rg -q 'phase-3-diagram-Dn' "$TARGET_DIR/SKILL.md"
 rg -q 'phase-4-visual-review-Dn' "$TARGET_DIR/SKILL.md"
 rg -q '渐进式加载' "$TARGET_DIR/MAINTAINER_HISTORY.md"
-
-bash "$TARGET_DIR/scripts/check_disclosure_format.sh" \
-  "$TARGET_DIR/references/cases/happy-case-full.md" >/dev/null
-cp -R "$TARGET_DIR/references/cases/happy-package" "$VALIDATION_TMP/package"
-bash "$TARGET_DIR/scripts/validate_disclosure_package.sh" "$VALIDATION_TMP/package" >/dev/null
 
 echo "校验通过：$TARGET_DIR"

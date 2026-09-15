@@ -1,4 +1,4 @@
-version: 4
+version: 5
 interface:
   display_name: "钉钉 Webhook 消息发送"
   short_description: "发送钉钉文本或 Markdown webhook 消息，支持加签、语法收敛和结果校验；仅用于 webhook 消息发送。"

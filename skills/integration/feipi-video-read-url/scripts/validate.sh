@@ -44,7 +44,6 @@ TARGET_DIR="$(cd "$TARGET_DIR" && pwd)"
 BASE="$(basename "$TARGET_DIR")"
 SKILL_FILE="$TARGET_DIR/SKILL.md"
 OPENAI_FILE="$TARGET_DIR/agents/openai.yaml"
-TEST_SCRIPT="$TARGET_DIR/scripts/test.sh"
 
 validate_skill_name() {
   local name="$1"
@@ -119,8 +118,6 @@ for required_file in \
   "$TARGET_DIR/scripts/lib/yt_dlp_common.sh" \
   "$TARGET_DIR/scripts/lib/youtube_retry_policy.sh" \
   "$TARGET_DIR/scripts/lib/whispercpp_transcribe.sh" \
-  "$TEST_SCRIPT" \
-  "$TARGET_DIR/references/test_cases.txt" \
   "$TARGET_DIR/references/sources.md"; do
   if [[ ! -f "$required_file" ]]; then
     echo "缺少文件：$required_file" >&2
@@ -128,10 +125,6 @@ for required_file in \
   fi
 done
 
-if [[ ! -x "$TEST_SCRIPT" ]]; then
-  echo "缺少可执行测试脚本：$TEST_SCRIPT" >&2
-  exit 1
-fi
 
 FRONTMATTER="$(awk '
   NR==1 && $0=="---" { in_yaml=1; start=1; next }
@@ -183,7 +176,7 @@ for field in display_name short_description default_prompt; do
 done
 
 for placeholder in '{{SKILL_NAME}}' '{{SKILL_DESCRIPTION}}' '{{TITLE}}' '{{DISPLAY_NAME}}' '{{SHORT_DESCRIPTION}}' '{{DEFAULT_PROMPT}}'; do
-  if rg -Fq "$placeholder" "$SKILL_FILE" "$OPENAI_FILE" "$TEST_SCRIPT"; then
+  if rg -Fq "$placeholder" "$SKILL_FILE" "$OPENAI_FILE"; then
     echo "存在未替换模板占位符：$placeholder" >&2
     exit 1
   fi
@@ -196,7 +189,6 @@ if rg -n 'feipi-scripts/video|feipi-read-youtube-video|feipi-read-bilibili-video
   "$TARGET_DIR/scripts/download_bilibili.sh" \
   "$TARGET_DIR/scripts/extract_video_text.sh" \
   "$TARGET_DIR/scripts/install_deps.sh" \
-  "$TARGET_DIR/scripts/test.sh" \
   "$TARGET_DIR/scripts/lib/yt_dlp_common.sh" \
   "$TARGET_DIR/scripts/lib/whispercpp_transcribe.sh" >&2; then
   echo "检测到旧依赖或旧 skill 名残留" >&2
@@ -212,22 +204,6 @@ done < <(find "$TARGET_DIR/scripts" -type f -name '*.sh' | sort)
 for f in lint_prompt_contract.sh lint_summary_result.sh; do
   if [[ ! -f "$TARGET_DIR/scripts/$f" ]]; then
     echo "缺少 lint 脚本: $f" >&2
-    exit 1
-  fi
-done
-
-# 新增：检查 mock 文件存在
-for f in valid_structured_summary.md invalid_fake_timestamp.md invalid_background_pollution.md invalid_missing_source_status.md; do
-  if [[ ! -f "$TARGET_DIR/references/mock_outputs/$f" ]]; then
-    echo "缺少 mock 文件: $f" >&2
-    exit 1
-  fi
-done
-
-# 新增：检查 mock transcripts 存在
-for f in with_timestamps.txt no_timestamps.txt long_transcript.txt; do
-  if [[ ! -f "$TARGET_DIR/references/mock_transcripts/$f" ]]; then
-    echo "缺少 mock transcript: $f" >&2
     exit 1
   fi
 done

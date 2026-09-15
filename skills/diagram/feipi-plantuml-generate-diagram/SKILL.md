@@ -42,4 +42,4 @@ python3 scripts/run_mindmap.py --brief brief.yaml --out-dir package
 - 明确的连接权限错误优先返回 `render_access_denied`，不启动 Podman、不复检。报告“访问被拒绝，可能受沙箱或系统权限限制”，不能断言服务未启动；普通连接失败或超时也不能直接断言沙箱限制。脚本不能自行提权，遵循宿主权限策略；详情见 `references/render-rules.md`。
 - 每图首次渲染一次，仅 syntax/coverage/layout 失败允许定点修复一次；总渲染上限两次。未修改失败图不重复运行，不通过更换目录重置计数。
 - brief/over_budget、renderer、contract/retry_limit 失败停止；视觉问题交给 reviewer，不自动进入渲染循环。
-- 静态校验与 renderer 冲突时转工具缺陷处理；维护与合同规则见 `references/package-contract.md`。正向测试必须有真实渲染证据，mock 通过不能替代。
+- 静态校验与 renderer 冲突时转工具缺陷处理；维护与合同规则见 `references/package-contract.md`。

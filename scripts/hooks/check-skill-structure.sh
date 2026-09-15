@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # pre-commit hook: 校验 skill 结构
-# 检查范围: 所有被修改的 SKILL.md 和 agents/openai.yaml
+# 检查范围: 所有被修改的 SKILL.md
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -21,9 +21,9 @@ while IFS= read -r skill_file; do
     FAIL=1
   fi
 
-  # 检查 scripts/test.sh 存在且可执行
-  if [[ ! -x "$skill_dir/scripts/test.sh" ]]; then
-    echo "[FAIL] 缺少可执行测试脚本 scripts/test.sh" >&2
+  # 开发测试与运行脚本分离；安装器会排除 tests/。
+  if [[ ! -x "$skill_dir/tests/run.sh" ]]; then
+    echo "[FAIL] 缺少可执行测试脚本 tests/run.sh" >&2
     FAIL=1
   fi
 

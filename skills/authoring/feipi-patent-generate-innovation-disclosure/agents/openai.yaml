@@ -1,4 +1,4 @@
-version: 9
+version: 10
 interface:
   display_name: "专利创新交底包生成"
   short_description: "将零散技术事实整理为含证据、图示与质量门禁的专利创新交底包"

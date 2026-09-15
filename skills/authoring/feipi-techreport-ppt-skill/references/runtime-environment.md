@@ -26,4 +26,4 @@ macOS：PowerPoint 导出（若可自动化）→ QuickLook/CoreText → LibreOf
 - 有渲染图片但未查看原图：不能声称视觉通过。
 - strict 缺少权威渲染或 PowerPoint 编辑回环：状态为 `incomplete` 或明确报告验证边界。
 
-CI 应运行 `bash scripts/test.sh`；视觉签字和 PowerPoint 编辑回环可在具备桌面环境的验收机执行。
+视觉签字和 PowerPoint 编辑回环应在具备桌面环境的验收机执行。

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # YouTube 重试策略判断函数（仓库级共享）。
-# 下载方脚本和测试脚本均可 source 此文件，避免重复维护正则。
+# 下载调用方统一 source 此文件，避免重复维护正则。
 
 is_challenge_error() {
   local err_file="$1"

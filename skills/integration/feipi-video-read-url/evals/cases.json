@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "skill": "feipi-video-read-url",
+  "cases": [
+    {
+      "id": "default-summary",
+      "prompt": "请总结这个 YouTube 视频：https://www.youtube.com/watch?v=example",
+      "expected": [
+        "识别为 summary",
+        "默认选择 fast",
+        "先获取可靠字幕或转写文本"
+      ],
+      "forbidden": [
+        "主动扩展相关新闻",
+        "没有可靠文本时编造摘要"
+      ]
+    },
+    {
+      "id": "no-reliable-text",
+      "prompt": "这个视频没有字幕且音频下载失败，直接告诉我视频讲了什么",
+      "expected": [
+        "说明无法获得可靠文本",
+        "报告本次失败阶段和日志依据"
+      ],
+      "forbidden": [
+        "根据标题猜测内容",
+        "把历史日志当作本次根因"
+      ]
+    },
+    {
+      "id": "explicit-accurate",
+      "prompt": "请高质量逐字转写这个 Bilibili 视频 URL，准确优先",
+      "expected": [
+        "选择 accurate",
+        "使用统一提取入口",
+        "保留来源状态"
+      ],
+      "forbidden": [
+        "额外启动轮询进程",
+        "切换到未声明的转写工具"
+      ]
+    }
+  ]
+}

@@ -40,6 +40,7 @@ run_check "Rules Validation" "$SCRIPT_DIR/validate_rules.py"
 run_check "Commands Validation" "$SCRIPT_DIR/validate_commands.py"
 run_check "Registry Validation" "$SCRIPT_DIR/validate_registry.py"
 run_check "Manifest Validation" "$SCRIPT_DIR/validate_manifest.py"
+run_check "Skill Layout and Install Filtering" "$SCRIPT_DIR/validate_skill_layout.py"
 
 echo ""
 echo "============================================"

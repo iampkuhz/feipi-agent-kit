@@ -50,7 +50,7 @@ fi
 TARGET_DIR="$(cd "$DIR" && pwd)"
 SKILL_FILE="$TARGET_DIR/SKILL.md"
 OPENAI_FILE="$TARGET_DIR/agents/openai.yaml"
-TEST_SCRIPT="$TARGET_DIR/scripts/test.sh"
+TEST_SCRIPT="$TARGET_DIR/tests/run.sh"
 
 echo "=== 校验 skill 目录：$TARGET_DIR ==="
 
@@ -81,7 +81,7 @@ if [[ ! -x "$TEST_SCRIPT" ]]; then
   echo "[FAIL] 缺少可执行测试脚本：$TEST_SCRIPT" >&2
   exit 1
 fi
-echo "[PASS] scripts/test.sh 可执行"
+echo "[PASS] tests/run.sh 可执行"
 
 placeholders=()
 for placeholder_name in \
@@ -96,7 +96,7 @@ do
 done
 
 for placeholder in "${placeholders[@]}"; do
-  for file in "$TARGET_DIR/SKILL.md" "$TARGET_DIR/agents/openai.yaml" "$TARGET_DIR/scripts/test.sh"; do
+  for file in "$TARGET_DIR/SKILL.md" "$TARGET_DIR/agents/openai.yaml" "$TARGET_DIR/tests/run.sh"; do
     if [[ -f "$file" ]] && rg -Fq "$placeholder" "$file"; then
       echo "[FAIL] 检测到未替换模板占位符：$placeholder (文件：$file)" >&2
       rg -Fn "$placeholder" "$file" >&2 || true
@@ -105,6 +105,13 @@ for placeholder in "${placeholders[@]}"; do
   done
 done
 echo "[PASS] 无未替换模板占位符"
+
+if [[ "$(basename "$TARGET_DIR")" != "feipi-skill-govern" ]] \
+  && rg -n '(^|[^A-Za-z])(tests|evals)/|scripts/test\.sh' "$TARGET_DIR/SKILL.md"; then
+  echo "[FAIL] 普通 skill 的 SKILL.md 不得引用 tests/evals；仅 Skill Creator 在治理时加载开发目录" >&2
+  exit 1
+fi
+echo "[PASS] 运行入口未引入开发目录"
 
 while IFS= read -r script_path; do
   [[ -z "$script_path" ]] && continue

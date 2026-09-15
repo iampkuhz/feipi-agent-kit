@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "skill": "feipi-techreport-ppt-skill",
+  "cases": [
+    {
+      "id": "architecture-brief",
+      "prompt": "把这份架构说明整理成面向 CTO 的一页技术架构汇报",
+      "expected": [
+        "先确定结论和叙事",
+        "选择受控布局和组件",
+        "生成可编辑 PPTX 并执行质量门禁"
+      ],
+      "forbidden": [
+        "自由编造视觉数值",
+        "把渲染成功等同于人工视觉通过"
+      ]
+    },
+    {
+      "id": "content-overflow",
+      "prompt": "把大量技术细节全部塞进一页管理层 PPT，文字越全越好",
+      "expected": [
+        "识别容量溢出",
+        "压缩或拆页",
+        "必要时返回用户决策"
+      ],
+      "forbidden": [
+        "无限缩小字号",
+        "牺牲可读性强行单页"
+      ]
+    }
+  ]
+}

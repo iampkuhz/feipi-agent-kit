@@ -3,8 +3,10 @@ set -euo pipefail
 
 # 将当前仓库的 skills 目录下所有技能安装到目标目录。
 # 支持两种模式：
-# 1. 软链接模式：安装到用户级 agent 目录（~/.claude/skills 等）
-# 2. 拷贝模式：安装到项目目录内（<project>/.agents/skills 等）
+# 1. 过滤链接模式：安装到用户级 agent 目录（~/.claude/skills 等）
+# 2. 过滤拷贝模式：安装到项目目录内（<project>/.agents/skills 等）
+#
+# skill 根目录下的 tests/ 与 evals/ 只供源码维护，不进入任何安装目标。
 #
 # 安装前自动验证：
 # 1. 运行 scripts/harness/validate_registry.py 校验 registry.yaml
@@ -176,10 +178,41 @@ collect_shared_roots() {
     done
 }
 
+is_skill_development_dir() {
+  case "$1" in
+    tests|evals) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 link_item() {
   local src="$1"
   local dest="$2"
   local label="$3"
+
+  # Skill 目录不能整目录软链接，否则 tests/evals 会绕过安装过滤。
+  # 这里创建一个浅层链接目录：运行内容仍随源码更新，开发目录不会暴露给 Agent。
+  if [[ -f "$src/SKILL.md" ]]; then
+    local staging
+    staging="$(mktemp -d "${dest}.tmp.XXXXXX")"
+    local entry name
+    while IFS= read -r -d '' entry; do
+      name="$(basename "$entry")"
+      if is_skill_development_dir "$name"; then
+        continue
+      fi
+      ln -s "$entry" "$staging/$name"
+    done < <(find "$src" -mindepth 1 -maxdepth 1 -print0)
+
+    if [[ -L "$dest" ]]; then
+      rm -f "$dest"
+    elif [[ -e "$dest" ]]; then
+      rm -rf "$dest"
+    fi
+    mv "$staging" "$dest"
+    echo "  已安装：${label}（已排除 tests/evals）"
+    return 0
+  fi
 
   if [[ -L "$dest" ]]; then
     local current_target
@@ -218,12 +251,29 @@ copy_dir() {
   local dest="$2"
   local label="$3"
 
-  if [[ -e "$dest" ]]; then
-    rm -rf "$dest"
+  if [[ -f "$src/SKILL.md" ]]; then
+    local staging
+    staging="$(mktemp -d "${dest}.tmp.XXXXXX")"
+    local entry name
+    while IFS= read -r -d '' entry; do
+      name="$(basename "$entry")"
+      if is_skill_development_dir "$name"; then
+        continue
+      fi
+      cp -R -p "$entry" "$staging/$name"
+    done < <(find "$src" -mindepth 1 -maxdepth 1 -print0)
+    if [[ -e "$dest" || -L "$dest" ]]; then
+      rm -rf "$dest"
+    fi
+    mv "$staging" "$dest"
+    echo "  已安装：${label}（已排除 tests/evals）"
+  else
+    if [[ -e "$dest" || -L "$dest" ]]; then
+      rm -rf "$dest"
+    fi
+    cp -R -p "$src" "$dest"
+    echo "  已安装：$label"
   fi
-
-  cp -R -p "$src" "$dest"
-  echo "  已安装：$label"
 }
 
 # 递归收集所有技能目录（平铺到一维）

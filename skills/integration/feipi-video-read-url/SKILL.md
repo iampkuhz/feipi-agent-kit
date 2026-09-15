@@ -152,7 +152,7 @@ description: 用于按用户意图处理视频网站 URL（如 YouTube、Bilibil
 
 3. 后续新增站点的约束
 - 只在当前 skill 内新增 `scripts/download_<source>.sh`。
-- 同步更新 `scripts/download_video.sh`、`scripts/extract_video_text.sh`、`SKILL.md`、`agents/openai.yaml`、`references/test_cases.txt` 和 `scripts/test.sh`。
+- 同步更新统一入口、来源适配脚本、运行说明与调用元数据。
 - 不再为单一站点新建平行 skill。
 
 ## 输入与输出
@@ -378,6 +378,4 @@ bash "$SKILL_DIR/scripts/render_background_prompt.sh" \
 - 请求包模板脚本：`scripts/render_summary_prompt.sh`、`scripts/render_background_prompt.sh`
 - 本地公共库：`scripts/lib/yt_dlp_common.sh`、`scripts/lib/whispercpp_transcribe.sh`
 - 字幕转换：`scripts/lib/subtitle_to_text.py`（Python 3 标准库）
-- 可靠性回归：`scripts/test_reliability.py`、`scripts/test_error_diagnostics.sh`（由 `scripts/test.sh` 调用）
-- 测试用例：`references/test_cases.txt`
 - 来源说明：`references/sources.md`

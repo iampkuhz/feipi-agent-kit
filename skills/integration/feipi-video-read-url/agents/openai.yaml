@@ -1,4 +1,4 @@
-version: 5
+version: 6
 interface:
   display_name: "视频 URL 读取与总结（中文）"
   short_description: "按用户意图统一处理视频网站 URL，覆盖下载、转写、摘要和背景扩展。"

@@ -32,7 +32,7 @@
 
 5. Step 3 验证与收口
 - 结构校验：`bash scripts/validate.sh <skill-dir>`。
-- 行为校验：`bash scripts/test.sh` 或更贴近目标 skill 的本地 test。
+- 行为校验：`bash tests/run.sh` 或更贴近目标 skill 的本地 test。
 - 旧规则残留搜索：搜索旧命名文本、过时模板占位符、旧入口依赖。
 - 版本与记录：按 `references/version-policy.md` 与 `references/changelog-policy.md` 收口。
 
@@ -47,7 +47,7 @@
 - 模板漂移：
   改 `templates/` 与 `references/governance-artifacts.md` 的字段约束，不把临时治理文档提交进 skill。
 - 本地闭环不足：
-  改 `scripts/init_skill*.sh`、`scripts/validate.sh`、`scripts/test.sh`。
+  改 `scripts/init_skill*.sh`、`scripts/validate.sh`、`tests/run.sh`。
 
 ## 共享文件边界
 
@@ -76,12 +76,12 @@ bash skills/authoring/feipi-skill-govern/scripts/init_skill.sh feipi-video-read-
 
 ```bash
 bash scripts/validate.sh .
-bash scripts/test.sh
+bash tests/run.sh
 ```
 
 说明：
 - `scripts/validate.sh` 是主结构校验入口。
-- `scripts/test.sh` 是主行为校验入口。
+- `tests/run.sh` 是主行为校验入口。
 - 仓库级 `make` 只能包装本地脚本，不可替代本地入口。
 
 ## 最低验证矩阵

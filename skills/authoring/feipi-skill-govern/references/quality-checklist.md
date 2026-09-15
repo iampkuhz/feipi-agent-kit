@@ -27,6 +27,10 @@
 - [ ] references/ 只保留需要下沉的长规则、案例、清单
 - [ ] scripts/ 只保留确定性、可复用、可验证脚本
 - [ ] assets/ 只保留真正复用的模板或静态资源
+- [ ] tests/ 只保留确定性测试、集成测试、fixture 与 golden，入口为 tests/run.sh
+- [ ] evals/ 只保留 Agent 行为用例与判定标准，运行结果写入 tmp/
+- [ ] 普通 SKILL.md 未引用 tests/、evals/ 或开发命令
+- [ ] 业务运行脚本不依赖 tests/ 或 evals/
 - [ ] 核心流程可通过当前 skill 本地脚本闭环，不依赖仓库级共享脚本
 - [ ] 未继续依赖仓库根 `templates/` 或仓库根 `feipi-scripts/` 作为现役 skill 的运行时资源
 - [ ] Step 1 / Step 1.5 / Step 2 / Step 3 文档与 rename plan 未写回 skill 内部，已落到 `tmp/` 或系统临时目录

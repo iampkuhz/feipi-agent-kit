@@ -1,5 +1,13 @@
 # 变更记录
 
+## 2026-09-16
+- feipi-patent-generate-innovation-disclosure v10：分离测试与行为评估
+- feipi-skill-govern v4：固化开发目录与安装边界
+- feipi-techreport-ppt-skill v3：归位基准场景与回归产物
+- feipi-plantuml-generate-diagram v9：分离图包测试与运行资源
+- feipi-dingtalk-send-webhook v5：分离离线测试与运行资源
+- feipi-video-read-url v6：分离回归测试与运行资源
+
 ## 2026-09-13
 - feipi-video-read-url v5：统一版本筛选，修复文本截断与终态诊断
 

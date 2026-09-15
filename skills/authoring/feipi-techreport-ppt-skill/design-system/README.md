@@ -40,12 +40,10 @@ P0 已建立三个固定 Layout Contract：分层架构、方案对比、多方�
 
 1. 判断需求应落在 token、Component Contract、Layout Contract 还是 Composition Policy。
 2. 只修改对应真源，不在 consumer 中复制值。
-3. 更新 schema/编译器测试和代表 fixture。
-4. 运行：
+3. 运行确定性设计系统校验：
 
 ```bash
 node scripts/validate_design_system.js
-bash scripts/test.sh
 ```
 
 人工认可的 PPTX 或截图应先离线提取并确认，再写回真源；不得要求运行时模型重新理解全部历史样例。

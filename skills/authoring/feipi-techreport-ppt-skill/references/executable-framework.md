@@ -53,5 +53,4 @@ Raw Material
 ```bash
 node scripts/generate_pptx_pipeline.js <ir> <output-dir> --mode strict
 node scripts/inspect_pptx_artifact.js <output.pptx> --json --release
-bash scripts/test.sh
 ```
