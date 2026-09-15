@@ -1,5 +1,8 @@
 # 变更记录
 
+## 2026-09-13
+- feipi-video-read-url v5：统一版本筛选，修复文本截断与终态诊断
+
 ## 2026-09-10
 - feipi-plantuml-generate-diagram v8：完善权限与预检回执，注释随需求批量排版
 

@@ -18,6 +18,8 @@ MODE="auto"
 AUTH_PRESENT="0"
 MAX_MODE_CALLS=4
 MODE_CALL_COUNT=0
+LAST_MODE_LOG=""
+ATTEMPT_LOGS=()
 
 usage() {
   echo "用法: bash scripts/extract_video_text.sh <url> [output_root_dir] [auto|subtitle|whisper] [--instruction \"文本\"] [--quality auto|fast|accurate] [--check-deps]" >&2
@@ -323,6 +325,7 @@ resolve_url_key() {
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INSTALL_SCRIPT="$SCRIPT_DIR/install_deps.sh"
+YT_COMMON_LIB="$SCRIPT_DIR/lib/yt_dlp_common.sh"
 SOURCE="$(detect_source "$URL")"
 URL_KEY="$(resolve_url_key "$SOURCE" "$URL")"
 RUN_DIR="$OUT_ROOT_DIR/${SOURCE}-${URL_KEY}"
@@ -350,6 +353,16 @@ if [[ ! -x "$SOURCE_SCRIPT" ]]; then
   exit 1
 fi
 
+if [[ ! -r "$YT_COMMON_LIB" ]]; then
+  echo "缺少当前 skill 的通用脚本: $YT_COMMON_LIB" >&2
+  exit 1
+fi
+# shellcheck disable=SC1090
+source "$YT_COMMON_LIB"
+if ! yt_common_require_tools dryrun; then
+  exit 1
+fi
+
 if [[ "$CHECK_ONLY" == "1" ]]; then
   bash "$INSTALL_SCRIPT" --check >/dev/null
   echo "dependency_ok=1"
@@ -374,7 +387,7 @@ DURATION_SEC=""
 ESTIMATED_RISK="low"
 if [[ "$MODE" == "whisper" || "$MODE" == "auto" ]]; then
   set +e
-  DURATION_RAW="$(yt-dlp --socket-timeout 5 --skip-download --no-playlist --print "%(duration)s" "$URL" 2>/dev/null | head -n1)"
+  DURATION_RAW="$("$YT_DLP_BIN" --socket-timeout 5 --skip-download --no-playlist --print "%(duration)s" "$URL" 2>/dev/null | head -n1)"
   set -e
   if [[ "$DURATION_RAW" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
     DURATION_SEC="${DURATION_RAW%.*}"
@@ -407,6 +420,9 @@ run_mode() {
   else
     log_file="$LOG_DIR/${SOURCE}-${mode}.log"
   fi
+  LAST_MODE_LOG="$log_file"
+  ATTEMPT_LOGS+=("$log_file")
+  TEXT_FILE=""
   marker="$(mktemp "$RUN_DIR/.txt-marker.XXXXXX")"
 
   set +e
@@ -431,7 +447,7 @@ run_mode() {
   rm -f "$marker"
 
   if [[ $code -eq 0 && -n "$newest_txt" ]]; then
-    echo "$newest_txt"
+    TEXT_FILE="$newest_txt"
     return 0
   fi
 
@@ -445,8 +461,11 @@ log_indicates_auth_issue() {
     return 1
   fi
 
-  rg -qi \
-    "Sign in to confirm|confirm you're not a bot|HTTP Error 429|403 Forbidden|Subtitles are only available when logged in|检测到可能的 YouTube bot/风控拦截|检测到可能需要登录态|检测到带认证请求失败|cookies-from-browser|AGENT_YOUTUBE_COOKIE_FILE 指向的文件不存在|AGENT_YOUTUBE_COOKIE_FILE 不可读" \
+  case "$(yt_common_last_stage "$log_file")" in
+    audio_conversion|transcription|text_conversion) return 1 ;;
+  esac
+  rg -aqi \
+    "Sign in to confirm|confirm you're not a bot|HTTP Error 429|Subtitles are only available when logged in|检测到可能的 YouTube bot/风控拦截|检测到可能需要登录态|检测到带认证请求失败|cookies-from-browser|AGENT_YOUTUBE_COOKIE_FILE 指向的文件不存在|AGENT_YOUTUBE_COOKIE_FILE 不可读" \
     "$log_file"
 }
 
@@ -454,7 +473,7 @@ run_mode_with_fallback() {
   local mode="$1"
   local auth_log_file="$LOG_DIR/${SOURCE}-${mode}.log"
 
-  if TEXT_FILE="$(run_mode "$mode" "auth")"; then
+  if run_mode "$mode" "auth"; then
     return 0
   fi
 
@@ -463,7 +482,7 @@ run_mode_with_fallback() {
   if [[ "$SOURCE" == "youtube" && "$AUTH_PRESENT" -eq 1 ]]; then
     if log_indicates_auth_issue "$auth_log_file"; then
       echo "检测到认证或风控相关失败，尝试无 Cookie 重试: mode=$mode" >&2
-      if TEXT_FILE="$(run_mode "$mode" "no_auth")"; then
+      if run_mode "$mode" "no_auth"; then
         return 0
       fi
     else
@@ -553,9 +572,15 @@ else
 fi
 
 if [[ -z "$TEXT_FILE" ]]; then
+  echo "mode_calls=$MODE_CALL_COUNT" >&2
   echo "文本提取失败: source=$SOURCE mode=$MODE strategy=$STRATEGY whisper_profile=$WHISPER_PROFILE" >&2
   if [[ "$SOURCE" == "bilibili" ]]; then
     report_bilibili_network_failure "$LOG_DIR" "$MODE" || true
+  elif [[ "$SOURCE" == "youtube" ]]; then
+    for attempt_log in "${ATTEMPT_LOGS[@]}"; do
+      echo "attempt_log=$attempt_log" >&2
+    done
+    yt_common_report_youtube_failure "$LAST_MODE_LOG" || true
   fi
   echo "请检查日志目录: $LOG_DIR" >&2
   exit 1

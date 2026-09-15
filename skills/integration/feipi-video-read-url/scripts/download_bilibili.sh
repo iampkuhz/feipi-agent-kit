@@ -96,6 +96,7 @@ fi
 # shellcheck disable=SC1090
 source "$YT_COMMON_LIB"
 
+echo "pipeline_stage=dependency" >&2
 yt_common_require_tools "$MODE"
 yt_common_init "$OUT_DIR" "$AGENT_CHROME_PROFILE"
 if [[ -n "$AGENT_BILIBILI_COOKIE_FILE" ]]; then
@@ -165,7 +166,7 @@ probe_bilibili_connectivity() {
   if ! command -v curl >/dev/null 2>&1; then
     local -a ytdlp_cmd
     ytdlp_cmd=(
-      yt-dlp
+      "${YT_DLP_BIN:-yt-dlp}"
       --skip-download
       --no-playlist
       --socket-timeout "$YT_CONNECT_TIMEOUT_SEC"
@@ -251,6 +252,7 @@ ensure_bilibili_network_ready() {
   return 1
 }
 
+echo "pipeline_stage=network_preflight" >&2
 if ! ensure_bilibili_network_ready; then
   exit 1
 fi
@@ -304,6 +306,7 @@ precheck_subtitle_auth() {
 }
 
 run_subtitle_mode() {
+  echo "pipeline_stage=subtitle_download" >&2
   local marker subtitle_file text_file danmaku_file
 
   marker="$(mktemp "$OUT_DIR/.subtitle-marker.XXXXXX")"
@@ -355,7 +358,7 @@ run_subtitle_mode() {
   fi
 
   text_file="${subtitle_file%.*}.txt"
-  yt_common_subtitle_to_text "$subtitle_file" "$text_file"
+  yt_common_subtitle_to_text "$subtitle_file" "$text_file" || return 1
   echo "完成: mode=subtitle, subtitle=$subtitle_file, text=$text_file"
 }
 
@@ -387,11 +390,11 @@ run_whisper_mode() {
   fi
 
   cat "$whisper_log"
-  used_device="$(sed -n 's/^device=//p' "$whisper_log" | tail -n1)"
-  used_profile="$(sed -n 's/^profile=//p' "$whisper_log" | tail -n1)"
-  used_model="$(sed -n 's/^model=//p' "$whisper_log" | tail -n1)"
-  audio_file="$(sed -n 's/^audio_file=//p' "$whisper_log" | tail -n1)"
-  text_file="$(sed -n 's/^text_file=//p' "$whisper_log" | tail -n1)"
+  used_device="$(LC_ALL=C sed -n 's/^device=//p' "$whisper_log" | tail -n1)"
+  used_profile="$(LC_ALL=C sed -n 's/^profile=//p' "$whisper_log" | tail -n1)"
+  used_model="$(LC_ALL=C sed -n 's/^model=//p' "$whisper_log" | tail -n1)"
+  audio_file="$(LC_ALL=C sed -n 's/^audio_file=//p' "$whisper_log" | tail -n1)"
+  text_file="$(LC_ALL=C sed -n 's/^text_file=//p' "$whisper_log" | tail -n1)"
   rm -f "$whisper_log"
 
   if [[ -z "$used_device" ]]; then

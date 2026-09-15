@@ -121,6 +121,8 @@ description: 用于按用户意图处理视频网站 URL（如 YouTube、Bilibil
 - 禁止额外启动 `Wait for whisper srt completion`、`tail -f`、轮询 `.srt` 或其他产物文件、重复后台 monitor。
 - 脚本标准输出已包含 `run_dir`、`mode`、`text_path`、`log_dir`、`whisper_profile`、`duration_sec`、`long_video`、`estimated_risk` 等字段，执行方可据此判断完成状态。
 - 长视频保护：whisper 模式会输出 `duration_sec`、`long_video` 和 `estimated_risk`，执行方可据此预估耗时，不做交互式确认。用户显式传 `accurate` 仍可按设计执行。
+- 字幕原文件保留不动；转换时将无效 UTF-8 字节替换为 `�`，用 `subtitle_encoding_replaced_bytes` 披露受损字节数。先完整解析全部有效字幕、核对末尾时间戳，再原子写入 TXT；失败不能返回成功文本路径。
+- 复用 SRT 时也会重新生成并校验 TXT，修复历史残留的半份文本；成功日志包含 `subtitle_cue_count`、`text_last_timestamp`。有字节替换时必须在摘要来源状态披露文本损坏风险。
 - 中断后残留的 `.whisper.wav` + `.srt` 会被自动复用，不会触发重复下载或重复转写。执行方不要删除 run_dir 下已有的媒体文件，除非是本次 run 明确的临时文件。
 
 9. Bilibili 网络诊断契约（强制）
@@ -213,13 +215,16 @@ description: 用于按用户意图处理视频网站 URL（如 YouTube、Bilibil
 
 1. Explore
 - `scripts/download_video.sh` 与 `scripts/extract_video_text.sh` 内部识别来源（当前为 YouTube/Bilibili）。
-- `scripts/install_deps.sh --check` 或 `scripts/extract_video_text.sh --check-deps` 校验依赖与自动选档结果。
+- `scripts/install_deps.sh --check` 或 `scripts/extract_video_text.sh --check-deps` 校验依赖与自动选档结果；安装检查与真实执行共用 yt-dlp 候选解析器。字幕转换依赖 Python 3 标准库，由安装入口统一检查。
 - 先判断用户意图属于直接读取还是总结模式。
 - 再判断背景阶段是否明确要求“相关新闻/最新进展”；未明确时默认 `--news off`。
 - 若检测到 YouTube 在 Cookie、浏览器认证或风控相关失败，会自动以“无 Cookie”重试，并输出 `*-noauth.log` 便于排查；若日志不含认证/风控信号，不把普通字幕缺失或转写失败误报为 Cookie 问题。
 - 若转写失败，只能回到当前 skill 的本地脚本排查网络、认证或模型缺失；禁止切换转写工具。
-- 下载失败时先读本次 `logs/<source>-<mode>.log`：核对 `yt_dlp_path`、`yt_dlp_version`，按 `yt_dlp_attempt_exit` 和 client/format 回退信息追踪首次及后续错误。多版本环境以日志中的实际调用为准，不静默升级或修改 PATH。
-- 保留失败尝试的原始错误文本（输出副本脱敏 URL）；不能只输出“下载失败”。HTTP 403、格式不可用、PO Token 缺失和明确登录要求应分别解释，不能把所有 403 当作 Cookie 问题。
+- 每次运行先枚举 `$PATH` 中的 `yt-dlp` 与已安装的 Homebrew formula，跳过版本命令失败或格式不可识别的候选，再比较日期版本与 nightly 构建号，自动选取最新有效版本；若版本相同则保留 `$PATH` 优先级。脚本不修改用户的 `$PATH`、pyenv 或已安装包。
+- 下载失败时先读 `failure_log` 指向的本次最终尝试日志（含实际执行的 `*-noauth.log`），结合 `failure_stage` 判断失败阶段；`attempt_log` 保留本轮尝试清单，不读取旧重试残留。核对本次日志：核对 `yt_dlp_candidate`、`yt_dlp_path`、`yt_dlp_version`、`yt_dlp_selection_reason`、`yt_dlp_release_date`、`yt_dlp_age_days` 与 `yt_dlp_stale`，再按 `yt_dlp_attempt_exit` 和 client/format 回退信息追踪首次及后续错误。
+- 若 `yt_dlp_stale=1` 且终态诊断为 `youtube_media_download_blocked`，先由用户按实际安装来源更新 `yt-dlp`，再保持 URL、模式、输出目录和代理不变，重跑同一统一入口；不得在一次重试中叠加多个变量。
+- `gvs_po_token_observed=1` 只表示某客户端出现提示，不证明整条链路必须提供 Token；下载已恢复后出现的转写或文本转换失败，不再按历史 403 归因为下载受阻。
+- 保留失败尝试的原始错误文本（输出副本脱敏 URL）；不能只输出“下载失败”。HTTP 403、格式不可用、PO Token 缺失和明确登录要求应分别解释，不能把所有 403 当作 Cookie 问题。PO Token 不由 skill 生成或注入，只有更新后的日志仍明确要求时才由用户自行处理。
 - Bilibili 日志若出现 `bilibili_network_preflight_failed`，先按“网络权限复验 -> 代理监听状态”的顺序诊断；不得直接猜测代理端口或要求用户启动代理。
 - 如需配置 YouTube 登录态，优先引导用户运行 `scripts/setup_youtube_cookies.sh`，按向导导出 Netscape `cookies.txt` 并设置 `AGENT_YOUTUBE_COOKIE_FILE`；`AGENT_CHROME_PROFILE` 仅作为备用方式。
 
@@ -267,6 +272,9 @@ description: 用于按用户意图处理视频网站 URL（如 YouTube、Bilibil
 
 6. 站点不受支持
 - 处理：明确告知当前支持范围，并把新增来源记录为当前 skill 的后续适配任务，而不是新建独立 skill。
+
+7. YouTube 无字幕且音频下载被 403、格式不可用或 GVS PO Token 限制阻断
+- 处理：读取同次 `youtube-whisper.log` 的候选、选中路径、版本与 `yt_dlp_stale`，以及统一入口的 `diagnostic_code`。若存在更高版本候选，脚本已经自动选用；若选中版本仍过旧，再更新该实际来源后重跑同一命令。不要伪造 Token、或同时切换 URL、模式、格式和代理。若新版仍失败，按最终阶段和具体错误排查；不要仅凭某个客户端的 Token warning 要求用户配置登录态或 Token。
 
 ## 标准命令
 
@@ -369,5 +377,7 @@ bash "$SKILL_DIR/scripts/render_background_prompt.sh" \
 - 依赖安装入口：`scripts/install_deps.sh`
 - 请求包模板脚本：`scripts/render_summary_prompt.sh`、`scripts/render_background_prompt.sh`
 - 本地公共库：`scripts/lib/yt_dlp_common.sh`、`scripts/lib/whispercpp_transcribe.sh`
+- 字幕转换：`scripts/lib/subtitle_to_text.py`（Python 3 标准库）
+- 可靠性回归：`scripts/test_reliability.py`、`scripts/test_error_diagnostics.sh`（由 `scripts/test.sh` 调用）
 - 测试用例：`references/test_cases.txt`
 - 来源说明：`references/sources.md`

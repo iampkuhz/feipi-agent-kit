@@ -10,6 +10,9 @@ set -euo pipefail
 #   bash scripts/install_deps.sh --check      # 仅检查，不安装
 #   bash scripts/install_deps.sh --check --accurate  # 仅检查，要求 accurate
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/yt_dlp_common.sh"
+
 WHISPER_CPP_BIN_DEFAULT="/opt/homebrew/opt/whisper-cpp/bin/whisper-cli"
 WHISPER_MODEL_DIR_DEFAULT="$HOME/Library/Caches/whisper.cpp/models"
 WHISPER_MODEL_FILE_ACCURATE="$WHISPER_MODEL_DIR_DEFAULT/ggml-large-v3-q5_0.bin"
@@ -59,7 +62,12 @@ fi
 
 need_cmd() {
   local cmd="$1"
-  command -v "$cmd" >/dev/null 2>&1
+  if [[ "$cmd" == "yt-dlp" ]]; then
+    yt_common_select_ytdlp || return 1
+    yt_common_report_ytdlp_provenance
+  else
+    command -v "$cmd" >/dev/null 2>&1
+  fi
 }
 
 install_with_brew() {
@@ -148,6 +156,10 @@ install_yt_dlp() {
   install_with_brew yt-dlp
 }
 
+install_python() {
+  install_with_brew python
+}
+
 install_ffmpeg() {
   install_with_brew ffmpeg
 }
@@ -182,6 +194,7 @@ FAILED=0
 
 check_and_install yt-dlp install_yt_dlp || FAILED=1
 check_and_install ffmpeg install_ffmpeg || FAILED=1
+check_and_install python3 install_python || FAILED=1
 
 if has_whisper_cpp; then
   echo "[OK] whisper-cli"

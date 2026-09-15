@@ -32,3 +32,7 @@ summary|https://www.bilibili.com/video/BV1LRcLzREG9||fast|extract
 
 # 离线错误诊断回归：scripts/test_error_diagnostics.sh（由 test.sh 自动执行）
 # 覆盖真实入口全失败、各次错误保留、依赖路径版本与 URL 脱敏。
+
+# 可靠性回归：scripts/test_reliability.py（由 test.sh 自动执行）。
+# 覆盖有效版本筛选、依赖检查同源、坏字节容错、原子写入与复用半份 TXT 修复。
+# 真实统一入口另覆盖 noauth 终态日志、历史日志隔离及实际调用次数。

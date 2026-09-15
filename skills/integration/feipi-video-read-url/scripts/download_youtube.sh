@@ -132,6 +132,7 @@ fi
 # shellcheck disable=SC1090
 source "$YT_RETRY_POLICY_LIB"
 
+echo "pipeline_stage=dependency" >&2
 yt_common_require_tools "$MODE"
 yt_common_init "$OUT_DIR" "$AGENT_CHROME_PROFILE"
 AUTH_SOURCE="none"
@@ -255,7 +256,7 @@ probe_youtube_connectivity() {
     # macOS 默认有 curl；若缺失则回退到 yt-dlp 轻量探测。
     local -a ytdlp_cmd
     ytdlp_cmd=(
-      yt-dlp
+      "${YT_DLP_BIN:-yt-dlp}"
       --skip-download
       --no-playlist
       --socket-timeout "$YT_CONNECT_TIMEOUT_SEC"
@@ -347,6 +348,7 @@ ensure_youtube_network_ready() {
   return 1
 }
 
+echo "pipeline_stage=network_preflight" >&2
 if ! ensure_youtube_network_ready; then
   exit 1
 fi
@@ -425,6 +427,7 @@ yt_common_on_error() {
 }
 
 run_subtitle_mode() {
+  echo "pipeline_stage=subtitle_download" >&2
   local marker subtitle_file text_file
 
   marker="$(mktemp "$OUT_DIR/.subtitle-marker.XXXXXX")"
@@ -465,7 +468,7 @@ run_subtitle_mode() {
   fi
 
   text_file="${subtitle_file%.*}.txt"
-  yt_common_subtitle_to_text "$subtitle_file" "$text_file"
+  yt_common_subtitle_to_text "$subtitle_file" "$text_file" || return 1
   echo "完成: mode=subtitle, subtitle=$subtitle_file, text=$text_file"
 }
 
@@ -492,7 +495,8 @@ run_whisper_mode() {
   whisper_log="$(mktemp "$OUT_DIR/.whisper-mode.XXXXXX")"
   if ! yt_common_run_whisper_mode_from_url "$URL" "$OUT_DIR" "$WHISPER_HELPER" zh "$resolved_profile" >"$whisper_log" 2>&1; then
     # 标准路径失败，检查是否是格式/下载错误
-    if rg -qi "403|HTTP Error|Requested format is not available|Only images" "$whisper_log"; then
+    if [[ "$(yt_common_last_stage "$whisper_log")" == "media_download" ]] \
+      && rg -qi "403|HTTP Error|Requested format is not available|Only images" "$whisper_log"; then
       echo "whisper 标准音频下载失败，尝试 format fallback..." >&2
       yt_common_print_diagnostic "$whisper_log" >&2
       rm -f "$whisper_log"
@@ -510,11 +514,11 @@ run_whisper_mode() {
   fi
 
   cat "$whisper_log"
-  used_device="$(sed -n 's/^device=//p' "$whisper_log" | tail -n1)"
-  used_profile="$(sed -n 's/^profile=//p' "$whisper_log" | tail -n1)"
-  used_model="$(sed -n 's/^model=//p' "$whisper_log" | tail -n1)"
-  audio_file="$(sed -n 's/^audio_file=//p' "$whisper_log" | tail -n1)"
-  text_file="$(sed -n 's/^text_file=//p' "$whisper_log" | tail -n1)"
+  used_device="$(LC_ALL=C sed -n 's/^device=//p' "$whisper_log" | tail -n1)"
+  used_profile="$(LC_ALL=C sed -n 's/^profile=//p' "$whisper_log" | tail -n1)"
+  used_model="$(LC_ALL=C sed -n 's/^model=//p' "$whisper_log" | tail -n1)"
+  audio_file="$(LC_ALL=C sed -n 's/^audio_file=//p' "$whisper_log" | tail -n1)"
+  text_file="$(LC_ALL=C sed -n 's/^text_file=//p' "$whisper_log" | tail -n1)"
   rm -f "$whisper_log"
 
   if [[ -z "$used_device" ]]; then

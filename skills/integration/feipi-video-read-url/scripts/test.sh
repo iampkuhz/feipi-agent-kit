@@ -567,8 +567,14 @@ BILI_NETWORK_BIN="$STUB_DIR/bili-network-bin"
 mkdir -p "$BILI_NETWORK_BIN"
 ln -s "$(command -v dirname)" "$BILI_NETWORK_BIN/dirname"
 ln -s "$(command -v mkdir)" "$BILI_NETWORK_BIN/mkdir"
+ln -s "$(command -v date)" "$BILI_NETWORK_BIN/date"
 ln -s "$(type -P false)" "$BILI_NETWORK_BIN/curl"
-ln -s "$(type -P false)" "$BILI_NETWORK_BIN/yt-dlp"
+cat > "$BILI_NETWORK_BIN/yt-dlp" <<'MOCK'
+#!/bin/bash
+if [[ "${1:-}" == "--version" ]]; then echo 2026.08.19; exit 0; fi
+exit 1
+MOCK
+chmod +x "$BILI_NETWORK_BIN/yt-dlp"
 
 run_bili_network_stub() {
   local output_dir="$1"
@@ -918,7 +924,7 @@ echo "requested_profile=fast"
 echo "profile=fast"
 echo "model=mock"
 echo "device=mock"
-echo "[mock whisper output]" > "$srt_file"
+printf '1\n00:00:00,000 --> 00:00:01,000\nmock transcript text\n' > "$srt_file"
 echo "- [00:00] mock transcript text" > "$text_file"
 exit 0
 WHISPER_MOCK
@@ -1347,6 +1353,12 @@ if bash "$SCRIPT_DIR/test_error_diagnostics.sh"; then
   stub_pass "error-diagnostics-real-entrypoint"
 else
   stub_fail_msg "error-diagnostics-real-entrypoint" "真实入口错误诊断回归失败"
+fi
+
+if python3 "$SCRIPT_DIR/test_reliability.py"; then
+  stub_pass "reliability-regressions"
+else
+  stub_fail_msg "reliability-regressions" "版本筛选、文本完整性和终态诊断回归失败"
 fi
 
 echo "测试汇总: total=$TOTAL pass=$PASSED fail=$FAILED"
