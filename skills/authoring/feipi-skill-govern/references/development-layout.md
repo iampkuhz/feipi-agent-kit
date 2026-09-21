@@ -21,5 +21,5 @@
 
 - 普通 skill 的 `SKILL.md` 不引用 `tests/`、`evals/` 或开发命令。
 - 只有 `feipi-skill-govern` 在治理态按需读取目标 skill 的开发目录。
-- `scripts/install_skills.sh` 的链接与拷贝模式都排除 skill 根目录下的 `tests/` 和 `evals/`。
+- `scripts/install_skills.sh` 的链接与拷贝模式都排除 skill 根目录下的 `tests/` 和 `evals/`；用户级链接模式实拷入口文件、只链接运行目录，确保客户端能发现 skill。
 - 初始化默认创建 `tests/run.sh`；只有确有 Agent 行为用例时才创建 `evals/`，不创建空目录。

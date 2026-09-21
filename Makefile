@@ -1,6 +1,6 @@
 # Feipi Agent Kit Makefile
 # 仓库级包装命令：
-# - `make install-links`：软链接安装到用户级 agent 目录
+# - `make install-links`：过滤安装到用户级 agent 目录（入口实拷、运行目录链接）
 # - `make install-project PROJECT=/path/to/project`：拷贝安装到项目目录
 # - `make install`：兼容旧入口；未传项目路径时等价于 `install-links`
 # - `make <service>-up`：启动服务

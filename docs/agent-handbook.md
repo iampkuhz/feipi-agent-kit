@@ -5,7 +5,7 @@
 ## Skills 管理
 
 ```bash
-# 安装 skills（软链接）
+# 安装 skills（入口实拷、运行目录链接，排除 tests/evals）
 make install-links
 
 # 安装到项目目录
@@ -81,5 +81,5 @@ make searxng-restart     # 重启
 ### Skill 无法使用
 
 1. 检查安装：`ls ~/.claude/skills/`
-2. 检查权限和软链接
+2. 检查入口文件权限和运行目录链接
 3. 重新安装：`make install-links`

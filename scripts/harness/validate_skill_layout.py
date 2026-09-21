@@ -91,10 +91,17 @@ def assert_installed_tree(root: Path, skills: list[Path], link_mode: bool) -> No
         for excluded in ("tests", "evals"):
             if (installed / excluded).exists() or (installed / excluded).is_symlink():
                 fail(f"安装内容泄漏 {excluded}/：{installed}")
-        if link_mode and not (installed / "SKILL.md").is_symlink():
-            fail(f"链接模式未保留源码联动：{installed / 'SKILL.md'}")
+        if link_mode and (installed / "SKILL.md").is_symlink():
+            fail(f"链接模式的入口文件必须实拷：{installed / 'SKILL.md'}")
         if not link_mode and (installed / "SKILL.md").is_symlink():
             fail(f"拷贝模式产生了意外软链接：{installed / 'SKILL.md'}")
+        if link_mode:
+            runtime_dirs = [
+                entry for entry in source.iterdir()
+                if entry.is_dir() and entry.name not in {"tests", "evals"}
+            ]
+            if runtime_dirs and not any((installed / entry.name).is_symlink() for entry in runtime_dirs):
+                fail(f"链接模式未保留运行目录源码联动：{installed}")
 
 
 def run_installer(args: list[str], env: dict[str, str]) -> None:

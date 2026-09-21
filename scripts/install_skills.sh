@@ -3,7 +3,7 @@ set -euo pipefail
 
 # 将当前仓库的 skills 目录下所有技能安装到目标目录。
 # 支持两种模式：
-# 1. 过滤链接模式：安装到用户级 agent 目录（~/.claude/skills 等）
+# 1. 过滤链接模式：入口文件实拷、运行目录链接到用户级 agent 目录
 # 2. 过滤拷贝模式：安装到项目目录内（<project>/.agents/skills 等）
 #
 # skill 根目录下的 tests/ 与 evals/ 只供源码维护，不进入任何安装目标。
@@ -18,9 +18,9 @@ set -euo pipefail
 #
 # 用法：
 #   ./scripts/install_skills.sh
-#     软链接到所有已存在的用户级 agent 目录
+#     过滤安装到所有已存在的用户级 agent 目录
 #   ./scripts/install_skills.sh --agent claudecode
-#     软链接到 ~/.claude/skills
+#     过滤安装到 ~/.claude/skills
 #   ./scripts/install_skills.sh --agent openclaw
 #     实拷到 ~/.openclaw/skills（非软链接）
 #   ./scripts/install_skills.sh --dir /path/to/project
@@ -49,8 +49,8 @@ while [[ $# -gt 0 ]]; do
       echo "  2. 对比 registry.yaml 与文件系统技能目录的一致性"
       echo ""
       echo "示例:"
-      echo "  $0                              # 软链接到所有已存在的用户级目录"
-      echo "  $0 --agent claudecode           # 软链接到 ~/.claude/skills"
+      echo "  $0                              # 过滤安装到所有已存在的用户级目录"
+      echo "  $0 --agent claudecode           # 过滤安装到 ~/.claude/skills"
       echo "  $0 --agent openclaw             # 实拷到 ~/.openclaw/skills"
       echo "  $0 --dir /path/to/project       # 拷贝到 /path/to/project/.agents/skills"
       echo "  $0 --agent qwen --dir /path     # 拷贝到 /path/to/project/.qwen/skills"
@@ -191,7 +191,7 @@ link_item() {
   local label="$3"
 
   # Skill 目录不能整目录软链接，否则 tests/evals 会绕过安装过滤。
-  # 这里创建一个浅层链接目录：运行内容仍随源码更新，开发目录不会暴露给 Agent。
+  # SKILL.md 等根文件必须实拷，避免客户端忽略软链接入口；运行目录保留源码联动。
   if [[ -f "$src/SKILL.md" ]]; then
     local staging
     staging="$(mktemp -d "${dest}.tmp.XXXXXX")"
@@ -201,7 +201,11 @@ link_item() {
       if is_skill_development_dir "$name"; then
         continue
       fi
-      ln -s "$entry" "$staging/$name"
+      if [[ -d "$entry" ]]; then
+        ln -s "$entry" "$staging/$name"
+      else
+        cp -p "$entry" "$staging/$name"
+      fi
     done < <(find "$src" -mindepth 1 -maxdepth 1 -print0)
 
     if [[ -L "$dest" ]]; then
@@ -210,7 +214,7 @@ link_item() {
       rm -rf "$dest"
     fi
     mv "$staging" "$dest"
-    echo "  已安装：${label}（已排除 tests/evals）"
+    echo "  已安装：${label}（入口实拷，已排除 tests/evals）"
     return 0
   fi
 

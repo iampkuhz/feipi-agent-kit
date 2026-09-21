@@ -1,5 +1,8 @@
 # 变更记录
 
+## 2026-09-21
+- feipi-skill-govern v5：修复过滤安装与入口发现
+
 ## 2026-09-16
 - feipi-patent-generate-innovation-disclosure v10：分离测试与行为评估
 - feipi-skill-govern v4：固化开发目录与安装边界
