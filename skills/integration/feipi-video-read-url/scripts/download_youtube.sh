@@ -135,6 +135,7 @@ source "$YT_RETRY_POLICY_LIB"
 echo "pipeline_stage=dependency" >&2
 yt_common_require_tools "$MODE"
 yt_common_init "$OUT_DIR" "$AGENT_CHROME_PROFILE"
+trap 'yt_common_finish_identity' EXIT
 AUTH_SOURCE="none"
 
 apply_youtube_auth_mode() {

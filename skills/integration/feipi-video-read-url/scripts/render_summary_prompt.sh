@@ -195,7 +195,7 @@ cat <<EOF
 目标：只交付可直接阅读的结构化摘要，不主动扩展到背景、影响或相关新闻。
 
 视频 URL: $URL
-视频标题: $TITLE
+$(python3 "$(dirname "${BASH_SOURCE[0]}")/lib/video_identity.py" --prompt "$URL" "$TITLE" "$(dirname "$TRANSCRIPT_PATH")")
 视频时长(秒): $DURATION_SEC
 文本来源: $TRANSCRIPT_PATH
 转写文本字符数: $raw_chars

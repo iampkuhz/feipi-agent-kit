@@ -142,7 +142,7 @@ if [[ "$MODE" == "expand" ]]; then
 本轮不要重复第一轮内容，不要复述原文。
 
 视频 URL: $URL
-视频标题: $TITLE
+$(python3 "$(dirname "${BASH_SOURCE[0]}")/lib/video_identity.py" --prompt "$URL" "$TITLE" "$(dirname "$TRANSCRIPT_PATH")")
 摘要参考文件: $SUMMARY_PATH
 转写文件: $TRANSCRIPT_PATH
 摘要参考字符数: $summary_chars
@@ -194,7 +194,7 @@ else
 本轮聚焦解释来龙去脉、关键概念和与视频的关系；除非用户额外要求，否则不要展开"关键影响"或相关新闻综述。
 
 视频 URL: $URL
-视频标题: $TITLE
+$(python3 "$(dirname "${BASH_SOURCE[0]}")/lib/video_identity.py" --prompt "$URL" "$TITLE" "$(dirname "$TRANSCRIPT_PATH")")
 摘要参考文件: ${SUMMARY_PATH:--}
 转写文件: $TRANSCRIPT_PATH
 摘要参考字符数: $summary_chars

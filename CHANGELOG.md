@@ -1,5 +1,8 @@
 # 变更记录
 
+## 2026-09-28
+- feipi-video-read-url v7：补齐视频身份与聊天标题闭环
+
 ## 2026-09-21
 - feipi-skill-govern v5：修复过滤安装与入口发现
 

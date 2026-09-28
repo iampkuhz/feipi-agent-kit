@@ -40,6 +40,10 @@
 8. `scripts/lib/yt_dlp_common.sh`
 - 用途：当前 skill 内置的 yt-dlp 公共流程，提供通用下载模式、字幕转文本和 whisper 模式公共逻辑。
 
+9. `scripts/lib/video_identity.py`
+- 用途：离线整理同次请求的最小视频元数据、提供命名候选和请求包身份展示；缓存仅按完全匹配的输入 URL 复用。
+- 使用 yt-dlp 的 `--print-to-file` 在原请求中捕获 ID 和标题，不增加视频请求。
+
 ## 上游参考
 
 1. GitHub: daymade/claude-code-skills（`youtube-downloader` 技能方向）

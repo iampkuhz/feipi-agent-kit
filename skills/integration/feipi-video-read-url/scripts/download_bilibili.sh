@@ -99,6 +99,7 @@ source "$YT_COMMON_LIB"
 echo "pipeline_stage=dependency" >&2
 yt_common_require_tools "$MODE"
 yt_common_init "$OUT_DIR" "$AGENT_CHROME_PROFILE"
+trap 'yt_common_finish_identity' EXIT
 if [[ -n "$AGENT_BILIBILI_COOKIE_FILE" ]]; then
   if [[ ! -f "$AGENT_BILIBILI_COOKIE_FILE" ]]; then
     echo "AGENT_BILIBILI_COOKIE_FILE 指向的文件不存在: $AGENT_BILIBILI_COOKIE_FILE" >&2

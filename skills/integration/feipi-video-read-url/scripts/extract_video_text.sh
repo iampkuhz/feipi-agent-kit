@@ -572,6 +572,7 @@ else
 fi
 
 if [[ -z "$TEXT_FILE" ]]; then
+  yt_common_report_identity "$URL" - "$RUN_DIR"
   echo "mode_calls=$MODE_CALL_COUNT" >&2
   echo "文本提取失败: source=$SOURCE mode=$MODE strategy=$STRATEGY whisper_profile=$WHISPER_PROFILE" >&2
   if [[ "$SOURCE" == "bilibili" ]]; then
@@ -589,6 +590,7 @@ fi
 echo "source=$SOURCE"
 echo "run_dir=$RUN_DIR"
 echo "mode=$USED_MODE"
+yt_common_report_identity "$URL" - "$RUN_DIR"
 echo "text_path=$TEXT_FILE"
 echo "log_dir=$LOG_DIR"
 echo "strategy=$STRATEGY"

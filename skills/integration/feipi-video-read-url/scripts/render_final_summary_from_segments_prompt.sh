@@ -50,7 +50,7 @@ cat > "$output_file" <<EOF
 请基于以下分段摘要汇总为完整的视频摘要。
 
 视频 URL: $URL
-视频标题: $TITLE
+$(python3 "$(dirname "${BASH_SOURCE[0]}")/lib/video_identity.py" --prompt "$URL" "$TITLE" "$OUTPUT_DIR")
 分段数量: $segment_count
 
 当前只执行"摘要汇总"，必须严格按下面结构输出，标题完全一致：

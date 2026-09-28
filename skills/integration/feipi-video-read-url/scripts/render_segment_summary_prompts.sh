@@ -63,7 +63,7 @@ if [[ "$HAS_TIMESTAMPS" -eq 1 ]]; then
 请基于以下视频转写文本片段生成该段落的摘要。
 
 视频 URL: $URL
-视频标题: $TITLE
+$(python3 "$(dirname "${BASH_SOURCE[0]}")/lib/video_identity.py" --prompt "$URL" "$TITLE" "$(dirname "$TRANSCRIPT_PATH")")
 段落范围: 第 $segment_idx 段（最多 ${SEGMENT_MAX_CHARS} 字符）
 
 要求：
@@ -102,7 +102,7 @@ ${line}"
 请基于以下视频转写文本片段生成该段落的摘要。
 
 视频 URL: $URL
-视频标题: $TITLE
+$(python3 "$(dirname "${BASH_SOURCE[0]}")/lib/video_identity.py" --prompt "$URL" "$TITLE" "$(dirname "$TRANSCRIPT_PATH")")
 段落范围: 第 $segment_idx 段（最多 ${SEGMENT_MAX_CHARS} 字符）
 
 要求：
@@ -135,7 +135,7 @@ else
 请基于以下视频转写文本片段生成该段落的摘要。
 
 视频 URL: $URL
-视频标题: $TITLE
+$(python3 "$(dirname "${BASH_SOURCE[0]}")/lib/video_identity.py" --prompt "$URL" "$TITLE" "$(dirname "$TRANSCRIPT_PATH")")
 段落范围: 第 $segment_idx 段（字符偏移 ${offset}~$((offset + SEGMENT_MAX_CHARS))）
 
 要求：

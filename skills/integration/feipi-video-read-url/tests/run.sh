@@ -1362,6 +1362,12 @@ else
   stub_fail_msg "reliability-regressions" "版本筛选、文本完整性和终态诊断回归失败"
 fi
 
+if python3 "$SCRIPT_DIR/test_video_identity.py"; then
+  stub_pass "video-identity-regressions"
+else
+  stub_fail_msg "video-identity-regressions" "视频身份与请求包回归失败"
+fi
+
 echo "测试汇总: total=$TOTAL pass=$PASSED fail=$FAILED"
 if [[ "$FAILED" -ne 0 ]]; then
   exit 1

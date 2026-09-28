@@ -192,10 +192,40 @@ yt_common_init() {
     --output "$out_dir/%(title).200B [%(id)s].%(ext)s"
   )
 
+  # 与原请求一起采集最小身份信息，不增加网络请求或改变下载模式。
+  YT_IDENTITY_RAW=""
+  if command -v python3 >/dev/null 2>&1; then
+    YT_IDENTITY_RAW="$(mktemp "$out_dir/.video-identity-raw.XXXXXX")" || YT_IDENTITY_RAW=""
+    if [[ -n "$YT_IDENTITY_RAW" ]]; then
+      YT_COMMON_ARGS+=(--print-to-file 'video:%(.{id,title})j' "${YT_IDENTITY_RAW//%/%%}")
+    fi
+  fi
+
   YT_COMMON_AUTH_ARGS=()
   if [[ -n "$chrome_profile" ]]; then
     YT_COMMON_AUTH_ARGS+=(--cookies-from-browser "$chrome_profile")
   fi
+}
+
+# 由来源适配器的 EXIT trap 调用；元数据失败不能覆盖下载/转写退出码。
+yt_common_finish_identity() {
+  if [[ -n "${URL:-}" && -n "${OUT_DIR:-}" ]]; then
+    yt_common_report_identity "$URL" "${YT_IDENTITY_RAW:--}" "$OUT_DIR"
+  fi
+  if [[ -n "${YT_IDENTITY_RAW:-}" ]]; then
+    rm -f "$YT_IDENTITY_RAW"
+  fi
+  return 0
+}
+
+yt_common_report_identity() {
+  if command -v python3 >/dev/null 2>&1; then
+    python3 "$YT_COMMON_LIB_DIR/video_identity.py" "$1" "$2" "$3" ||
+      echo "identity_status=unavailable" >&2
+  else
+    echo "identity_status=unavailable" >&2
+  fi
+  return 0
 }
 
 yt_common_run_cmd() {
