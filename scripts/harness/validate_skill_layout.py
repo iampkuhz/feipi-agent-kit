@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -117,6 +118,159 @@ def run_installer(args: list[str], env: dict[str, str]) -> None:
         fail(f"安装器验证失败：{' '.join(args)}\n{result.stdout[-1200:]}\n{result.stderr[-1200:]}")
 
 
+def entry_snapshot(path: Path):
+    """不跟随链接，检查保留入口的全部内容。"""
+    if path.is_symlink():
+        return ("link", os.readlink(path))
+    if path.is_dir():
+        return ("directory", {child.name: entry_snapshot(child) for child in path.iterdir()})
+    return ("file", path.read_bytes())
+
+
+def validate_retired_entries(root: Path, link_root: Path, project: Path, env: dict[str, str]) -> None:
+    """在最小仓库副本执行真实 make 入口，不修改源码或用户安装目录。"""
+    repo = root / "source repo"
+    scripts = repo / "scripts"
+    (scripts / "harness").mkdir(parents=True)
+    shutil.copy2(INSTALLER, scripts / INSTALLER.name)
+    shutil.copy2(REPO_ROOT / "scripts/harness/validate_registry.py", scripts / "harness")
+    shutil.copy2(REPO_ROOT / "Makefile", repo / "Makefile")
+    source_root = repo / "skills"
+    marker = ".feipi-agent-kit-source"
+
+    def create_skill(name: str, resources: bool = True) -> Path:
+        skill = source_root / "integration" / name
+        skill.mkdir(parents=True)
+        (skill / "SKILL.md").write_text(f"---\nname: {name}\n---\nfixture\n", encoding="utf-8")
+        if resources:
+            (skill / "scripts").mkdir()
+            (skill / "scripts/run.sh").write_text("runtime\n", encoding="utf-8")
+        for excluded in ("tests", "evals"):
+            (skill / excluded).mkdir()
+        return skill
+
+    def write_registry(skills: list[Path]) -> None:
+        records = ["skills:"]
+        for skill in skills:
+            records.append(
+                f"  - name: {skill.name}\n    path: {skill.relative_to(repo)}\n"
+                f"    layer: {skill.parent.name}\n    description: fixture\n"
+                "    clients: [codex]\n    entry: SKILL.md\n    validation: null\n    status: stable"
+            )
+        (source_root / "registry.yaml").write_text("\n".join(records) + "\n", encoding="utf-8")
+
+    commands = (
+        (["make", "install-links", "AGENT=codex"], link_root, True),
+        (["make", "install-project", f"PROJECT={project}"], project / ".agents/skills", False),
+    )
+
+    def install(expect_success: bool = True) -> None:
+        for command, _, _ in commands:
+            result = subprocess.run(command, cwd=repo, env=env, text=True, capture_output=True, timeout=60)
+            if (result.returncode == 0) != expect_success:
+                fail(f"同步清理验证失败：{command}\n{result.stdout[-1200:]}\n{result.stderr[-1200:]}")
+
+    current = create_skill("feipi-current")
+    retired = create_skill("feipi-retired")
+    marker_only = create_skill("feipi-marker-only", resources=False)
+    write_registry([current, retired, marker_only])
+    install()
+
+    preserved = {}
+    removed = []
+    foreign_source = root / "other source/skills/feipi-foreign"
+    (foreign_source / "scripts").mkdir(parents=True)
+    for _, destination, link_mode in commands:
+        assert_installed_tree(destination, [current, retired, marker_only], link_mode)
+        for source in (current, retired, marker_only):
+            if Path((destination / source.name / marker).read_text().strip()).resolve() != source.resolve():
+                fail(f"缺少安装来源：{destination / source.name}")
+        if link_mode:
+            # 模拟已部署的旧版真实目录：入口实拷，只有内部链接证明归属。
+            (destination / retired.name / marker).unlink()
+
+        removed.extend([destination / retired.name, destination / marker_only.name])
+        for name, target in (
+            ("feipi-old-absolute", source_root / "integration/feipi-old-absolute"),
+            ("feipi-old-relative", source_root / "integration/feipi-old-relative"),
+            ("feipi-live-retired", source_root / "integration/feipi-live-retired"),
+            ("foreign-absolute", foreign_source),
+            ("foreign-relative", foreign_source),
+            ("foreign-broken", foreign_source / "missing"),
+            ("foreign-broken-relative", foreign_source / "missing-relative"),
+            ("feipi-prefix-neighbor", repo / "skills-other/feipi-prefix-neighbor"),
+        ):
+            if name == "feipi-live-retired":
+                target.mkdir(exist_ok=True)
+                (target / "keep.txt").write_text("source must survive", encoding="utf-8")
+            entry = destination / name
+            entry.symlink_to(os.path.relpath(target, destination) if "relative" in name else target)
+            if name.startswith("feipi-old-") or name == "feipi-live-retired":
+                removed.append(entry)
+            else:
+                preserved[entry] = entry_snapshot(entry)
+
+        legacy = destination / "feipi-legacy-relative"
+        legacy.mkdir()
+        (legacy / "SKILL.md").write_text("old copied entry", encoding="utf-8")
+        (legacy / "scripts").symlink_to(os.path.relpath(
+            source_root / "integration" / legacy.name / "scripts", legacy
+        ))
+        removed.append(legacy)
+
+        for name in ("feipi-foreign", "feipi-unmarked-copy", "feipi-mixed", "feipi-foreign-marked"):
+            entry = destination / name
+            entry.mkdir()
+            (entry / "SKILL.md").write_text("preserve me", encoding="utf-8")
+            if name != "feipi-unmarked-copy":
+                resource_source = source_root / "integration" / name if name == "feipi-foreign-marked" else foreign_source
+                (entry / "scripts").symlink_to(resource_source / "scripts")
+            if name in {"feipi-mixed", "feipi-foreign-marked"}:
+                (entry / "assets").symlink_to(source_root / "integration" / name / "assets")
+            if name == "feipi-foreign-marked":
+                (entry / marker).write_text(str(foreign_source) + "\n", encoding="utf-8")
+            preserved[entry] = entry_snapshot(entry)
+
+        # 初次安装的真仓库内容，对 fixture 仓库来说也属于其他来源。
+        original_entry = destination / "feipi-skill-govern/SKILL.md"
+        preserved[original_entry] = entry_snapshot(original_entry)
+
+    renamed = retired.with_name("feipi-renamed")
+    retired.rename(renamed)
+    shutil.rmtree(marker_only)
+    marker_only.mkdir()  # 目录仍存在但已无 SKILL.md，也应退役。
+    moved = source_root / "authoring" / current.name
+    moved.parent.mkdir()
+    current.rename(moved)
+    (moved / "SKILL.md").write_text("updated current skill", encoding="utf-8")
+
+    # 注册表未同步时，必须在任何清理或安装之前中止。
+    before = {entry: entry_snapshot(entry) for entry in removed}
+    install(expect_success=False)
+    for entry, snapshot in before.items():
+        if entry_snapshot(entry) != snapshot:
+            fail(f"注册表无效时改动了入口：{entry}")
+
+    write_registry([moved, renamed])
+    for _ in range(2):
+        install()
+        for entry in removed:
+            if os.path.lexists(entry):
+                fail(f"本仓库旧入口未清理：{entry}")
+        for entry, snapshot in preserved.items():
+            if entry_snapshot(entry) != snapshot:
+                fail(f"其他来源入口被修改：{entry}")
+        for _, destination, link_mode in commands:
+            assert_installed_tree(destination, [moved, renamed], link_mode)
+            for source in (moved, renamed):
+                if Path((destination / source.name / marker).read_text().strip()).resolve() != source.resolve():
+                    fail(f"改名或迁层后来源未同步：{destination / source.name}")
+            if (destination / moved.name / "SKILL.md").read_text() != "updated current skill":
+                fail(f"当前入口未更新：{destination / moved.name}")
+        if not (source_root / "integration/feipi-live-retired/keep.txt").is_file():
+            fail("清理旧入口误删了链接指向的源码")
+
+
 def validate_installation(skills: list[Path]) -> None:
     with tempfile.TemporaryDirectory(prefix="feipi-skill-layout-") as temporary:
         root = Path(temporary)
@@ -131,13 +285,14 @@ def validate_installation(skills: list[Path]) -> None:
         env["CODEX_HOME"] = str(codex_home)
         run_installer(["--agent", "codex"], env)
         assert_installed_tree(codex_home / "skills", skills, link_mode=True)
+        validate_retired_entries(root, codex_home / "skills", project, env)
 
 
 def main() -> None:
     skills = registry_paths()
     validate_source_layout(skills)
     validate_installation(skills)
-    print(f"Skill layout validation passed: {len(skills)} skills; tests/evals excluded from copy and link installs")
+    print(f"Skill layout validation passed: {len(skills)} skills; install filtering and ownership cleanup verified")
 
 
 if __name__ == "__main__":

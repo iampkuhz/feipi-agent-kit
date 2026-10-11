@@ -21,6 +21,10 @@ bash skills/authoring/feipi-skill-govern/scripts/validate.sh <skill-path>
 bash <skill-path>/tests/run.sh
 ```
 
+再次运行 `make install-links` 会按当前技能列表同步清理本仓库因源码删除、改名或退役留下的旧入口。请先同步 `skills/registry.yaml`；注册表校验失败时不会安装或清理。
+
+安装器在每个 skill 目录写入 `.feipi-agent-kit-source` 来源标记，链接与实拷模式均适用。旧版未标记的安装通过指向本仓库的顶层链接，或指向同一源码 skill 的内部资源链接识别；相对链接按所在目录解析。清理时保留其他来源的 skill（包括失效链接）。不含来源标记或链接证据的旧版纯实拷目录无法安全确认归属，会保留。
+
 ## 服务管理
 
 ### LiteLLM

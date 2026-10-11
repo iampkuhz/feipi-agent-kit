@@ -7,6 +7,7 @@ set -euo pipefail
 # 2. 过滤拷贝模式：安装到项目目录内（<project>/.agents/skills 等）
 #
 # skill 根目录下的 tests/ 与 evals/ 只供源码维护，不进入任何安装目标。
+# 安装来源写入隐藏标记；再次安装时只清理本仓库已退役的入口。
 #
 # 安装前自动验证：
 # 1. 运行 scripts/harness/validate_registry.py 校验 registry.yaml
@@ -31,6 +32,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SRC_ROOT="$REPO_ROOT/skills"
+INSTALL_SOURCE_MARKER=".feipi-agent-kit-source"
 
 AGENT_NAME=""
 TARGET_DIR=""
@@ -207,6 +209,7 @@ link_item() {
         cp -p "$entry" "$staging/$name"
       fi
     done < <(find "$src" -mindepth 1 -maxdepth 1 -print0)
+    printf '%s\n' "$src" > "$staging/$INSTALL_SOURCE_MARKER"
 
     if [[ -L "$dest" ]]; then
       rm -f "$dest"
@@ -266,6 +269,7 @@ copy_dir() {
       fi
       cp -R -p "$entry" "$staging/$name"
     done < <(find "$src" -mindepth 1 -maxdepth 1 -print0)
+    printf '%s\n' "$src" > "$staging/$INSTALL_SOURCE_MARKER"
     if [[ -e "$dest" || -L "$dest" ]]; then
       rm -rf "$dest"
     fi
@@ -483,6 +487,85 @@ echo ""
 
 # ===== 开始安装 =====
 
+cleanup_retired_skills() {
+  local dest_root="$1"
+  shift
+
+  # 不按名称前缀或链接是否失效判断归属；旧版安装通过直接链接迁移识别。
+  # Python 按链接所在目录解析相对路径，即使源码已经删除也能判断归属。
+  python3 - "$SRC_ROOT" "$dest_root" "$INSTALL_SOURCE_MARKER" "$@" <<'PYEOF'
+import os
+from pathlib import Path
+import shutil
+import sys
+
+source_root = Path(os.path.realpath(sys.argv[1]))
+destination = Path(sys.argv[2])
+marker_name = sys.argv[3]
+active_names = {Path(source).name for source in sys.argv[4:]}
+
+
+def is_repository_source(source):
+    if not source.is_absolute():
+        return False
+    # realpath 可解析仍存在的祖先，兼容 /var 与 /private/var 等路径别名。
+    return source_root in Path(os.path.realpath(source)).parents
+
+
+def link_target(link):
+    return Path(os.path.abspath(link.parent / os.readlink(link)))
+
+
+def belongs_to_repository(entry):
+    if entry.is_symlink():
+        return is_repository_source(link_target(entry))
+    if not entry.is_dir():
+        return False
+
+    marker = entry / marker_name
+    if os.path.lexists(marker):
+        # 显式标记优先，其他仓库或不可读标记不能由内部链接覆盖。
+        if marker.is_symlink() or not marker.is_file():
+            return False
+        try:
+            source = Path(marker.read_text(encoding="utf-8").strip())
+        except (OSError, UnicodeError):
+            return False
+        return is_repository_source(Path(os.path.normpath(source)))
+
+    if not (entry / "SKILL.md").is_file():
+        return False
+    links = [child for child in entry.iterdir() if child.is_symlink()]
+    if not links:
+        return False
+    targets = [link_target(link) for link in links]
+    source = Path(os.path.realpath(targets[0].parent))
+    # 旧过滤安装的所有直接链接都对应同一 skill 的同名资源。
+    return (
+        is_repository_source(source)
+        and source.name == entry.name
+        and all(Path(os.path.realpath(target.parent)) == source and target.name == link.name
+                for link, target in zip(links, targets))
+    )
+
+
+cleaned = 0
+for entry in sorted(destination.iterdir()):
+    if entry.name.startswith(".") or entry.name in active_names:
+        continue
+    if not belongs_to_repository(entry):
+        continue
+    if entry.is_symlink():
+        entry.unlink()
+    else:
+        shutil.rmtree(entry)
+    print(f"  已移除本仓库旧入口：{entry}")
+    cleaned += 1
+if cleaned:
+    print(f"共移除 {cleaned} 个本仓库旧入口")
+PYEOF
+}
+
 install_skills() {
   local mode="$1"
   local dest_root="$2"
@@ -495,24 +578,6 @@ install_skills() {
   echo "目标目录：$dest_root"
 
   mkdir -p "$dest_root"
-
-  # 清理目标目录中所有失效的软链接（指向不存在的目标）
-  echo "清理失效的软链接..."
-  local cleaned=0
-  for item in "$dest_root"/*; do
-    if [[ -L "$item" ]]; then
-      local target
-      target="$(readlink "$item")"
-      if [[ ! -e "$target" ]]; then
-        rm -f "$item"
-        echo "  已移除：$item (原指向：$target)"
-        cleaned=$((cleaned + 1))
-      fi
-    fi
-  done
-  if [[ $cleaned -gt 0 ]]; then
-    echo "共移除 $cleaned 个失效软链接"
-  fi
 
   # 收集所有技能（递归扫描，平铺输出）
   # 如果提供了预收集的列表（用于注册表校验），直接使用
@@ -528,6 +593,9 @@ install_skills() {
   fi
 
   echo "发现 ${#skill_paths[@]} 个技能"
+
+  echo "清理本仓库旧入口..."
+  cleanup_retired_skills "$dest_root" "${skill_paths[@]}" || return 1
 
   local installed=0
   local skipped=0
