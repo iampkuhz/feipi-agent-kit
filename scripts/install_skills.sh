@@ -167,7 +167,8 @@ find_existing_agents() {
 collect_shared_roots() {
   local root_name=""
 
-  rg -o --no-filename '\$REPO_ROOT/[A-Za-z0-9._/-]+' "$SRC_ROOT" -g '*.sh' 2>/dev/null \
+  rg -o --no-filename '\$REPO_ROOT/[A-Za-z0-9._/-]+' "$SRC_ROOT" -g '*.sh' \
+    -g '!**/tests/**' -g '!**/evals/**' 2>/dev/null \
     | sed -E 's#^\$REPO_ROOT/##' \
     | cut -d'/' -f1 \
     | sort -u \
@@ -187,6 +188,65 @@ is_skill_development_dir() {
   esac
 }
 
+installation_trees_equal() {
+  python3 - "$1" "$2" <<'PYEOF'
+import filecmp
+import os
+from pathlib import Path
+import stat
+import sys
+
+
+def equal(left, right):
+    if not os.path.lexists(right):
+        return False
+    left_mode, right_mode = left.lstat().st_mode, right.lstat().st_mode
+    if stat.S_IFMT(left_mode) != stat.S_IFMT(right_mode):
+        return False
+    if stat.S_IMODE(left_mode) != stat.S_IMODE(right_mode):
+        return False
+    if stat.S_ISLNK(left_mode):
+        return os.readlink(left) == os.readlink(right)
+    if stat.S_ISDIR(left_mode):
+        names = {child.name for child in left.iterdir()}
+        return names == {child.name for child in right.iterdir()} and all(
+            equal(left / name, right / name) for name in names
+        )
+    return stat.S_ISREG(left_mode) and filecmp.cmp(left, right, shallow=False)
+
+
+try:
+    sys.exit(0 if equal(Path(sys.argv[1]), Path(sys.argv[2])) else 1)
+except OSError as error:
+    print(f"[ERROR] 无法比较安装内容：{error}", file=sys.stderr)
+    sys.exit(2)
+PYEOF
+}
+
+# 安装函数返回 0 表示有更新，2 表示跳过，其他状态表示失败。
+finish_staged_install() {
+  local staging="$1" dest="$2" label="$3" detail="$4"
+  local comparison_status
+  if installation_trees_equal "$staging" "$dest"; then
+    rm -rf "$staging" || return 1
+    echo "  内容未变，跳过：$label"
+    return 2
+  else
+    comparison_status=$?
+    if [[ "$comparison_status" -ne 1 ]]; then
+      rm -rf "$staging"
+      return 1
+    fi
+  fi
+
+  if [[ -e "$dest" || -L "$dest" ]]; then
+    rm -rf "$dest" || return 1
+  fi
+  mv "$staging" "$dest" || return 1
+  echo "  已安装：${label}${detail}"
+  return 0
+}
+
 link_item() {
   local src="$1"
   local dest="$2"
@@ -196,7 +256,7 @@ link_item() {
   # SKILL.md 等根文件必须实拷，避免客户端忽略软链接入口；运行目录保留源码联动。
   if [[ -f "$src/SKILL.md" ]]; then
     local staging
-    staging="$(mktemp -d "${dest}.tmp.XXXXXX")"
+    staging="$(mktemp -d "${dest}.tmp.XXXXXX")" || return 1
     local entry name
     while IFS= read -r -d '' entry; do
       name="$(basename "$entry")"
@@ -204,21 +264,15 @@ link_item() {
         continue
       fi
       if [[ -d "$entry" ]]; then
-        ln -s "$entry" "$staging/$name"
+        ln -s "$entry" "$staging/$name" || { rm -rf "$staging"; return 1; }
       else
-        cp -p "$entry" "$staging/$name"
+        cp -p "$entry" "$staging/$name" || { rm -rf "$staging"; return 1; }
       fi
     done < <(find "$src" -mindepth 1 -maxdepth 1 -print0)
-    printf '%s\n' "$src" > "$staging/$INSTALL_SOURCE_MARKER"
+    printf '%s\n' "$src" > "$staging/$INSTALL_SOURCE_MARKER" || { rm -rf "$staging"; return 1; }
 
-    if [[ -L "$dest" ]]; then
-      rm -f "$dest"
-    elif [[ -e "$dest" ]]; then
-      rm -rf "$dest"
-    fi
-    mv "$staging" "$dest"
-    echo "  已安装：${label}（入口实拷，已排除 tests/evals）"
-    return 0
+    finish_staged_install "$staging" "$dest" "$label" "（入口实拷，已排除 tests/evals）"
+    return $?
   fi
 
   if [[ -L "$dest" ]]; then
@@ -227,28 +281,28 @@ link_item() {
 
     # 检查软链接是否有效（目标是否存在）
     local is_broken=false
-    if [[ ! -e "$current_target" ]]; then
+    if [[ ! -e "$dest" ]]; then
       is_broken=true
     fi
 
     if [[ "$current_target" == "$src" ]] && [[ "$is_broken" == false ]]; then
       echo "  已存在，跳过：$label"
-      return 0
+      return 2
     fi
 
     # 需要移除旧软链接的情况：
     # 1. 软链接已失效（目标不存在）
     # 2. 软链接指向其他路径
-    rm -f "$dest"
+    rm -f "$dest" || return 1
     if [[ "$is_broken" == true ]]; then
       echo "  已移除失效软链接：$label"
     fi
   elif [[ -e "$dest" ]]; then
     echo "  警告：目标已存在且非软链接，跳过：$dest" >&2
-    return 1
+    return 2
   fi
 
-  ln -s "$src" "$dest"
+  ln -s "$src" "$dest" || return 1
   echo "  已安装：$label"
   return 0
 }
@@ -260,27 +314,23 @@ copy_dir() {
 
   if [[ -f "$src/SKILL.md" ]]; then
     local staging
-    staging="$(mktemp -d "${dest}.tmp.XXXXXX")"
+    staging="$(mktemp -d "${dest}.tmp.XXXXXX")" || return 1
     local entry name
     while IFS= read -r -d '' entry; do
       name="$(basename "$entry")"
       if is_skill_development_dir "$name"; then
         continue
       fi
-      cp -R -p "$entry" "$staging/$name"
+      cp -R -p "$entry" "$staging/$name" || { rm -rf "$staging"; return 1; }
     done < <(find "$src" -mindepth 1 -maxdepth 1 -print0)
-    printf '%s\n' "$src" > "$staging/$INSTALL_SOURCE_MARKER"
-    if [[ -e "$dest" || -L "$dest" ]]; then
-      rm -rf "$dest"
-    fi
-    mv "$staging" "$dest"
-    echo "  已安装：${label}（已排除 tests/evals）"
+    printf '%s\n' "$src" > "$staging/$INSTALL_SOURCE_MARKER" || { rm -rf "$staging"; return 1; }
+    finish_staged_install "$staging" "$dest" "$label" "（已排除 tests/evals）"
   else
-    if [[ -e "$dest" || -L "$dest" ]]; then
-      rm -rf "$dest"
-    fi
-    cp -R -p "$src" "$dest"
-    echo "  已安装：$label"
+    local staging
+    staging="$(mktemp -d "${dest}.tmp.XXXXXX")" || return 1
+    rmdir "$staging" || return 1
+    cp -R -p "$src" "$staging" || return 1
+    finish_staged_install "$staging" "$dest" "$label" ""
   fi
 }
 
@@ -493,16 +543,61 @@ cleanup_retired_skills() {
 
   # 不按名称前缀或链接是否失效判断归属；旧版安装通过直接链接迁移识别。
   # Python 按链接所在目录解析相对路径，即使源码已经删除也能判断归属。
-  python3 - "$SRC_ROOT" "$dest_root" "$INSTALL_SOURCE_MARKER" "$@" <<'PYEOF'
+  local repository_origin
+  repository_origin="$(git -C "$REPO_ROOT" config --get remote.origin.url 2>/dev/null || true)"
+  python3 - "$SRC_ROOT" "$dest_root" "$INSTALL_SOURCE_MARKER" "$repository_origin" "$@" <<'PYEOF'
+import json
 import os
 from pathlib import Path
 import shutil
 import sys
+from urllib.parse import urlsplit
 
 source_root = Path(os.path.realpath(sys.argv[1]))
 destination = Path(sys.argv[2])
 marker_name = sys.argv[3]
-active_names = {Path(source).name for source in sys.argv[4:]}
+active_names = {Path(source).name for source in sys.argv[5:]}
+
+
+def repository_identity(url):
+    if not isinstance(url, str) or not url:
+        return None
+    if url.startswith("git@") and ":" in url:
+        url = "ssh://" + url.replace(":", "/", 1)
+    try:
+        parsed = urlsplit(url)
+        if parsed.scheme not in {"https", "http", "ssh", "git"} or not parsed.hostname:
+            return None
+        path = parsed.path.rstrip("/")
+        if path.endswith(".git"):
+            path = path[:-4]
+        return parsed.hostname, parsed.port, path
+    except ValueError:
+        return None
+
+
+repository = repository_identity(sys.argv[4])
+
+
+def openclaw_repository_source(entry, origin):
+    if repository is None or origin.is_symlink() or origin.parent.is_symlink():
+        return False
+    try:
+        data = json.loads(origin.read_text(encoding="utf-8"))
+        if not isinstance(data, dict) or data.get("source") != "git" or data.get("slug") != entry.name:
+            return False
+        git_source = data.get("git")
+        subdirectory = data.get("subdirectory")
+        if not isinstance(git_source, dict) or not isinstance(subdirectory, str):
+            return False
+        parts = subdirectory.split("/")
+        return (
+            repository_identity(git_source.get("url")) == repository
+            and len(parts) >= 3 and parts[0] == "skills" and parts[-1] == entry.name
+            and all(part not in {"", ".", ".."} for part in parts)
+        )
+    except (OSError, UnicodeError, ValueError):
+        return False
 
 
 def is_repository_source(source):
@@ -533,6 +628,11 @@ def belongs_to_repository(entry):
             return False
         return is_repository_source(Path(os.path.normpath(source)))
 
+    origin = entry / ".openclaw/source-origin.json"
+    if os.path.lexists(origin):
+        # OpenClaw 的 Git 安装本来就保存来源；其他仓库或无效记录优先保留。
+        return openclaw_repository_source(entry, origin)
+
     if not (entry / "SKILL.md").is_file():
         return False
     links = [child for child in entry.iterdir() if child.is_symlink()]
@@ -556,7 +656,9 @@ for entry in sorted(destination.iterdir()):
         continue
     if not belongs_to_repository(entry):
         reason = "无法确认属于本仓库"
-        if entry.is_dir() and not entry.is_symlink() and not os.path.lexists(entry / marker_name):
+        if not entry.is_symlink() and os.path.lexists(entry / ".openclaw/source-origin.json"):
+            reason = "OpenClaw 来源不属于本仓库或记录无效"
+        elif entry.is_dir() and not entry.is_symlink() and not os.path.lexists(entry / marker_name):
             reason = "无来源标记，内部链接不足以确认归属"
         print(f"  保留入口：{entry}（{reason}）")
         preserved += 1
@@ -612,7 +714,13 @@ install_skills() {
     if $install_func "$src" "$dest" "$name"; then
       installed=$((installed + 1))
     else
-      skipped=$((skipped + 1))
+      local status=$?
+      if [[ "$status" -eq 2 ]]; then
+        skipped=$((skipped + 1))
+      else
+        echo "[ERROR] 安装失败：$dest" >&2
+        return 1
+      fi
     fi
   done
 
@@ -640,7 +748,13 @@ install_skills() {
       if $install_func "$src" "$dest" "$root_name"; then
         installed=$((installed + 1))
       else
-        skipped=$((skipped + 1))
+        local status=$?
+        if [[ "$status" -eq 2 ]]; then
+          skipped=$((skipped + 1))
+        else
+          echo "[ERROR] 安装共享路径失败：$dest" >&2
+          return 1
+        fi
       fi
     done <<< "$shared_roots_text"
   fi

@@ -127,6 +127,13 @@ def entry_snapshot(path: Path):
     return ("file", path.read_bytes())
 
 
+def entry_identity(path: Path):
+    info = path.lstat()
+    children = {child.name: entry_identity(child) for child in path.iterdir()} \
+        if path.is_dir() and not path.is_symlink() else None
+    return info.st_ino, info.st_mtime_ns, children
+
+
 def validate_retired_entries(root: Path, link_root: Path, project: Path, env: dict[str, str]) -> None:
     """在最小仓库副本执行真实 make 入口，不修改源码或用户安装目录。"""
     repo = root / "source repo"
@@ -135,8 +142,16 @@ def validate_retired_entries(root: Path, link_root: Path, project: Path, env: di
     shutil.copy2(INSTALLER, scripts / INSTALLER.name)
     shutil.copy2(REPO_ROOT / "scripts/harness/validate_registry.py", scripts / "harness")
     shutil.copy2(REPO_ROOT / "Makefile", repo / "Makefile")
+    subprocess.run(["git", "init", "--quiet", str(repo)], check=True)
+    subprocess.run(["git", "-C", str(repo), "remote", "add", "origin",
+                    "git@github.com:iampkuhz/feipi-agent-kit.git"], check=True)
     source_root = repo / "skills"
     marker = ".feipi-agent-kit-source"
+    shared = repo / "fixture-shared"
+    shared.mkdir()
+    (shared / "resource.txt").write_text("shared fixture", encoding="utf-8")
+    openclaw_home = root / "openclaw-home"
+    env = dict(env, OPENCLAW_HOME=str(openclaw_home))
 
     def create_skill(name: str, resources: bool = True) -> Path:
         skill = source_root / "integration" / name
@@ -144,7 +159,9 @@ def validate_retired_entries(root: Path, link_root: Path, project: Path, env: di
         (skill / "SKILL.md").write_text(f"---\nname: {name}\n---\nfixture\n", encoding="utf-8")
         if resources:
             (skill / "scripts").mkdir()
-            (skill / "scripts/run.sh").write_text("runtime\n", encoding="utf-8")
+            (skill / "scripts/run.sh").write_text(
+                "runtime\n# $REPO_ROOT/fixture-shared/resource.txt\n", encoding="utf-8"
+            )
         for excluded in ("tests", "evals"):
             (skill / excluded).mkdir()
         return skill
@@ -162,6 +179,7 @@ def validate_retired_entries(root: Path, link_root: Path, project: Path, env: di
     commands = (
         (["make", "install-links", "AGENT=codex"], link_root, True),
         (["make", "install-project", f"PROJECT={project}"], project / ".agents/skills", False),
+        (["make", "install-links", "AGENT=openclaw"], openclaw_home / "skills", False),
     )
 
     def install(expect_success: bool = True) -> dict[Path, str]:
@@ -181,11 +199,81 @@ def validate_retired_entries(root: Path, link_root: Path, project: Path, env: di
             outputs[destination] = result.stdout
         return outputs
 
+    def assert_counts(outputs: dict[Path, str], updates: dict[Path, int], total: int) -> None:
+        for destination, output in outputs.items():
+            count = updates.get(destination, 0)
+            if f"总计：安装/更新 {count}，跳过 {total - count}" not in output:
+                fail(f"重复安装或跳过计数不正确：{destination}\n{output[-1000:]}")
+
     current = create_skill("feipi-current")
     retired = create_skill("feipi-retired")
     marker_only = create_skill("feipi-marker-only", resources=False)
+    development_shared = repo / "development-only"
+    development_shared.mkdir()
+    (development_shared / "resource.txt").write_text("source only", encoding="utf-8")
+    for excluded in ("tests", "evals"):
+        (current / excluded / "dependency.sh").write_text(
+            "# $REPO_ROOT/development-only/resource.txt\n", encoding="utf-8"
+        )
     write_registry([current, retired, marker_only])
-    install()
+    outputs = install()
+    assert_counts(outputs, {dest: 4 for _, dest, _ in commands}, total=4)
+    for _, destination, _ in commands:
+        if os.path.lexists(destination.parent / development_shared.name):
+            fail(f"开发脚本依赖泄漏到共享安装：{destination}")
+    installed_paths = [dest / source.name for _, dest, _ in commands for source in (current, retired, marker_only)]
+    installed_paths.extend(dest.parent / shared.name for _, dest, _ in commands)
+    before_repeat = {path: entry_identity(path) for path in installed_paths}
+    (current / "tests/local-test.txt").write_text("development only", encoding="utf-8")
+    assert_counts(install(), {}, total=4)
+    for path, identity in before_repeat.items():
+        if entry_identity(path) != identity:
+            fail(f"内容未变时仍然替换或改写安装内容：{path}")
+
+    # 内容变化即使大小和时间戳不变也必须更新。
+    skill_file = current / "SKILL.md"
+    original_stat = skill_file.stat()
+    skill_file.write_bytes(skill_file.read_bytes().replace(b"fixture", b"changed"))
+    os.utime(skill_file, ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns))
+    assert_counts(install(), {dest: 1 for _, dest, _ in commands}, total=4)
+    for _, destination, _ in commands:
+        if (destination / current.name / "SKILL.md").read_bytes() != skill_file.read_bytes():
+            fail(f"入口内容变化未同步：{destination}")
+
+    runtime = current / "scripts/run.sh"
+    runtime.write_text("updated runtime\n# $REPO_ROOT/fixture-shared/resource.txt\n", encoding="utf-8")
+    copied_destinations = {dest: 1 for _, dest, link_mode in commands if not link_mode}
+    assert_counts(install(), copied_destinations, total=4)
+    runtime.chmod(0o755)
+    assert_counts(install(), copied_destinations, total=4)
+    for _, destination, _ in commands:
+        installed_runtime = destination / current.name / "scripts/run.sh"
+        if installed_runtime.read_bytes() != runtime.read_bytes() or installed_runtime.stat().st_mode & 0o777 != 0o755:
+            fail(f"运行文件内容或权限未同步：{destination}")
+
+    # 修复被改坏的链接；纯拷贝目标内容不变，仍应跳过。
+    bad_link = link_root / current.name / "scripts"
+    bad_link.unlink()
+    bad_link.symlink_to(root / "missing runtime")
+    assert_counts(install(), {link_root: 1}, total=4)
+    if bad_link.resolve() != (current / "scripts").resolve():
+        fail("错误运行目录链接未修复")
+
+    extra = current / "EXTRA.md"
+    extra.write_text("temporary runtime file", encoding="utf-8")
+    assert_counts(install(), {dest: 1 for _, dest, _ in commands}, total=4)
+    extra.unlink()
+    assert_counts(install(), {dest: 1 for _, dest, _ in commands}, total=4)
+    for _, destination, _ in commands:
+        if (destination / current.name / extra.name).exists():
+            fail(f"源码删除的运行文件仍残留：{destination}")
+
+    (shared / "resource.txt").write_text("updated shared fixture", encoding="utf-8")
+    assert_counts(install(), copied_destinations, total=4)
+    for _, destination, _ in commands:
+        if (destination.parent / shared.name / "resource.txt").read_text() != "updated shared fixture":
+            fail(f"共享资源未同步：{destination}")
+    assert_counts(install(), {}, total=4)
 
     preserved = {}
     removed = []
@@ -242,9 +330,49 @@ def validate_retired_entries(root: Path, link_root: Path, project: Path, env: di
                 (entry / marker).write_text(str(foreign_source) + "\n", encoding="utf-8")
             preserved[entry] = entry_snapshot(entry)
 
+        def origin_data(name: str, **overrides):
+            return {
+                "version": 1, "source": "git", "slug": name,
+                "git": {"url": "https://github.com/iampkuhz/feipi-agent-kit.git", "commit": "historical"},
+                "subdirectory": f"skills/authoring/{name}", **overrides,
+            }
+
+        for name in ("feipi-patent-generate-innovation-disclosure", "feipi-openclaw-foreign",
+                     "feipi-openclaw-invalid", "feipi-openclaw-wrong-path", "feipi-openclaw-conflict",
+                     "feipi-openclaw-wrong-slug", "feipi-openclaw-other-marker", "feipi-openclaw-symlink-meta"):
+            entry = destination / name
+            entry.mkdir()
+            (entry / "SKILL.md").write_text("legacy pure copy", encoding="utf-8")
+            metadata = entry / ".openclaw/source-origin.json"
+            metadata.parent.mkdir()
+            data = origin_data(name)
+            is_own_patent = name == "feipi-patent-generate-innovation-disclosure" and destination != project / ".agents/skills"
+            if name in {"feipi-openclaw-foreign", "feipi-openclaw-conflict"} or (
+                name == "feipi-patent-generate-innovation-disclosure" and not is_own_patent
+            ):
+                data["git"] = {"url": "https://github.com/other/skills.git"}
+            if name == "feipi-openclaw-wrong-path":
+                data["subdirectory"] = f"skills/../authoring/{name}"
+            if name == "feipi-openclaw-wrong-slug":
+                data["slug"] = "different skill"
+            if name == "feipi-openclaw-conflict":
+                (entry / "scripts").symlink_to(source_root / "integration" / name / "scripts")
+            if name == "feipi-openclaw-other-marker":
+                (entry / marker).write_text(str(foreign_source), encoding="utf-8")
+            metadata.write_text("invalid JSON" if name == "feipi-openclaw-invalid" else json.dumps(data), encoding="utf-8")
+            if name == "feipi-openclaw-symlink-meta":
+                external = root / f"external-{destination.parent.name}.json"
+                metadata.rename(external)
+                metadata.symlink_to(external)
+            if is_own_patent:
+                removed.append(entry)
+            else:
+                preserved[entry] = entry_snapshot(entry)
+
         # 初次安装的真仓库内容，对 fixture 仓库来说也属于其他来源。
         original_entry = destination / "feipi-skill-govern/SKILL.md"
-        preserved[original_entry] = entry_snapshot(original_entry)
+        if original_entry.is_file():
+            preserved[original_entry] = entry_snapshot(original_entry)
 
     renamed = retired.with_name("feipi-renamed")
     retired.rename(renamed)
@@ -265,6 +393,7 @@ def validate_retired_entries(root: Path, link_root: Path, project: Path, env: di
     write_registry([moved, renamed])
     for iteration in range(2):
         outputs = install()
+        assert_counts(outputs, {dest: 2 for _, dest, _ in commands} if iteration == 0 else {}, total=3)
         for destination, output in outputs.items():
             expected = [entry for entry in removed if entry.parent == destination] if iteration == 0 else []
             messages = [line for line in output.splitlines() if "已移除本仓库旧入口：" in line]
@@ -292,6 +421,21 @@ def validate_retired_entries(root: Path, link_root: Path, project: Path, env: di
                 fail(f"当前入口未更新：{destination / moved.name}")
         if not (source_root / "integration/feipi-live-retired/keep.txt").is_file():
             fail("清理旧入口误删了链接指向的源码")
+
+    # 写入失败不能变成成功的“跳过”，也不能损坏现有安装。
+    fakebin = root / "failing-copy-bin"
+    fakebin.mkdir()
+    copy_command = fakebin / "cp"
+    copy_command.write_text("#!/bin/sh\nexit 77\n", encoding="utf-8")
+    copy_command.chmod(0o755)
+    failure_env = dict(env, PATH=f"{fakebin}{os.pathsep}{env['PATH']}")
+    for command, destination, _ in commands:
+        before = entry_identity(destination / moved.name)
+        result = subprocess.run(command, cwd=repo, env=failure_env, text=True, capture_output=True, timeout=60)
+        if result.returncode == 0 or "[ERROR] 安装失败：" not in result.stderr or "总计：" in result.stdout:
+            fail(f"安装失败被误报为跳过或成功：{command}")
+        if entry_identity(destination / moved.name) != before:
+            fail(f"失败的安装损坏了已有入口：{destination}")
 
 
 def validate_installation(skills: list[Path]) -> None:
