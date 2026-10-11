@@ -7,13 +7,14 @@ import sys
 
 from lib.brief_loader import validate_brief_file
 from lib.mindmap import ordered_tree, validate_mindmap
+from lib.text_codec import encode_display_text
 
 SKILL_DIR = Path(__file__).resolve().parent.parent
 
 
 def generate(data: dict) -> str:
     style = (SKILL_DIR / "assets/templates/types/mindmap-style.puml").read_text(encoding="utf-8").rstrip()
-    lines = ["@startmindmap", style, f"title {data['title']}", ""]
+    lines = ["@startmindmap", style, f"title {encode_display_text(data['title'], protect_line_start=False)}", ""]
     colors = ("#DBEAFE", "#D1FAE5", "#FEF3C7", "#EDE9FE", "#FFE4E6", "#CFFAFE")
     branch_index, color = -1, "#E2E8F0"
     for node, depth, side in ordered_tree(data):
@@ -21,7 +22,7 @@ def generate(data: dict) -> str:
             branch_index += 1
             color = colors[branch_index % len(colors)]
         marks = ("-" if side == "left" else "+") * depth
-        label = node["label"].strip().replace("\n", r"\n")
+        label = encode_display_text(node["label"].strip(), protect_line_start=False)
         lines.append(f"{marks}[{color}] {label}")
     return "\n".join(lines + ["@endmindmap", ""])
 

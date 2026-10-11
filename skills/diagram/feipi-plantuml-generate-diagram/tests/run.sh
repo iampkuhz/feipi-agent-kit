@@ -62,6 +62,15 @@ else
   fail "时序 note 批量规划、换行与全宽兜底"
 fi
 
+# 通用文本 codec 和六图型字段覆盖均在真实渲染之前验证。
+for test in test_text_codec.py test_literal_profile_coverage.py; do
+  if python3 "$TEST_DIR/$test"; then
+    pass "$test"
+  else
+    fail "$test"
+  fi
+done
+
 # =============================================================================
 # Step 2: 样例文件存在
 # =============================================================================

@@ -7,6 +7,8 @@ import math
 import re
 import unicodedata
 
+from .text_codec import encode_display_text, validate_display_text
+
 
 # 均为显示列：中文通常占 2 列，ASCII 占 1 列。不是 SVG 像素。
 PARTICIPANT_GAP = 24
@@ -26,7 +28,7 @@ def wrap_text(text: str, width: int) -> list[str]:
     if width < 2:
         raise ValueError("可用宽度至少需要 2 个显示列")
     lines = []
-    for paragraph in text.replace("\\n", "\n").split("\n"):
+    for paragraph in text.split("\n"):
         line = ""
         # 合并组合附加符，避免把 e + 重音符拆到两行。
         units = []
@@ -119,14 +121,10 @@ def plan_diagram(diagram):
             text = note["text"]
             if not isinstance(text, str) or not text.strip():
                 raise ValueError("text 必须是非空纯文本")
-            text = text.replace("\r\n", "\n").replace("\r", "\n").replace("\\n", "\n")
-            # 不自动改写富文本、预处理或块终止符，避免生成破损源码。
-            if re.search(r"(?im)^\s*(?:end\s*note\b|[@!])", text):
-                raise ValueError("text 不能包含 note 终止符、预处理或图定界符")
-            if re.search(r"<[^>]+>|\[\[|\*\*|//|__|~~|\"\"", text):
-                raise ValueError("text 仅支持纯文本；富文本请保留人工排版")
-            if any(unicodedata.category(c).startswith("C") for c in text if c != "\n"):
-                raise ValueError("text 不支持控制字符或隐藏格式字符")
+            if "\r" in text:
+                raise ValueError("text 仅支持 LF 换行，不支持 CR")
+            if validate_display_text(text):
+                raise ValueError("text 不支持控制字符")
             low, high = sorted((x[note["from"]], x[note["to"]]))
             widths = {
                 "left": max(0, math.floor(low - left - NOTE_PADDING)),
@@ -147,9 +145,6 @@ def plan_diagram(diagram):
             else:
                 placement, reason = side, "more_side_space"
             lines = across_lines if placement == "across" else side_lines
-            # 自动折行也不能意外形成块终止符或预处理行。
-            if any(re.match(r"(?i)^\s*(?:end\s*note\b|[@!])", line) for line in lines):
-                raise ValueError("折行产生 PlantUML 控制行；请调整原文")
             results.append({
                 "id": note_id, "from": note["from"], "to": note["to"],
                 "placement": placement, "reason": reason,
@@ -157,7 +152,7 @@ def plan_diagram(diagram):
                 "side_line_count": len(side_lines) if side_lines is not None else None,
                 "across_line_count": len(across_lines) if across_lines is not None else None,
                 "line_count": len(lines), "lines": lines,
-                "puml": f"note {placement}\n" + "\n".join(lines) + "\nend note",
+                "puml": f"note {placement}\n" + "\n".join(encode_display_text(line) for line in lines) + "\nend note",
             })
         except (ValueError, TypeError) as exc:
             raise ValueError(f"notes[{index}]: {exc}") from exc

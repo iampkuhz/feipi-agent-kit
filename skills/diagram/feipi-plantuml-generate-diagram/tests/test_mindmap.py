@@ -20,6 +20,7 @@ from lib.profile_registry import resolve_profile
 from lib.profile_validators import validate_profile_semantics
 from lib.puml_analysis import compute_puml_metrics
 from generate_mindmap import generate
+from lib.text_codec import decode_display_text, encode_display_text
 
 EXAMPLE = SKILL / "assets/examples/mindmap"
 BRIEF = EXAMPLE / "mindmap-brief.example.yaml"
@@ -85,11 +86,29 @@ class MindmapTests(unittest.TestCase):
             with self.subTest(mutation=mutation):
                 self.assertTrue(validate_mindmap(data))
 
-    def test_plain_text_rejects_injected_markup(self):
-        for label in ("", " ", "<b>重点</b>", "**重点**", "!include x", "主题\\n伪指令", "条目\t控制", "~转义"):
+    def test_display_codec_round_trips_punctuation_without_rewriting_structure(self):
+        label = '__main__.py ** // ~~ -- == ^^ ,, "" <tag> [x] {x} ; : | \\n !include @enduml $x %x & <U+0041>'
+        self.assertEqual(decode_display_text(encode_display_text(label)), label)
+        self.data["nodes"][1]["label"] = label
+        source = generate(self.data)
+        self.assertIn("<U+005F>", source)
+        self.assertFalse(coverage_errors(self.data, source))
+        self.assertTrue(parse_mindmap(source.replace("<U+002A>", "*"))[1])
+
+    def test_display_codec_rejects_controls_and_preserves_source_controls(self):
+        for label in ("", " ", "条目\t控制", "bad\x00text", "bad\x85text", "bad\u2028text", "bad\ud800text"):
             self.data["nodes"][1]["label"] = label
             with self.subTest(label=label):
                 self.assertTrue(validate_mindmap(self.data))
+        self.assertEqual(decode_display_text("<U+000A>"), "<U+000A>")
+        self.assertEqual(decode_display_text(r"<U+005C>n"), r"\n")
+        for invalid_escape in ("<U+000A>", "<U+0009>", "<U+0085>", "<U+2028>", "<U+D800>", "<U+110000>"):
+            raw = f"@startmindmap\n+ 根\n++ {invalid_escape}\n@endmindmap\n"
+            self.assertTrue(parse_mindmap(raw)[1], invalid_escape)
+        self.data["nodes"][1]["label"] = "<U+000A>"
+        encoded_literal = generate(self.data)
+        self.assertIn("<U+003C>U<U+002B>000A<U+003E>", encoded_literal)
+        self.assertFalse(coverage_errors(self.data, encoded_literal))
 
     def test_missing_extra_wrong_parent_wrong_side(self):
         mutations = (

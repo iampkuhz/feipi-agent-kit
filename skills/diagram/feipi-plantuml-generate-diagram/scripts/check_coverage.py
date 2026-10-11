@@ -19,16 +19,19 @@ from lib.puml_analysis import (
     parse_objects,
     parse_relations,
 )
+from lib.text_codec import decode_display_text
 
 
 # ── Architecture 模式 ──────────────────────────────────────────
 
+PACKAGE_RE = re.compile(r'^[ \t]*package\s+"([^"]+)"(?:\s+as\s+[A-Za-z_][A-Za-z0-9_]*)?[^\n]*\{\s*$', re.I)
 ENTITY_RE = re.compile(
     r'^\s*(actor|component|database|queue|cloud|interface)\s+"([^"]+)"\s+as\s+([A-Za-z_][A-Za-z0-9_]*)\b'
 )
 
 
 def check_architecture_coverage(brief: dict, raw_text: str, normalized_text: str) -> list[str]:
+    del normalized_text
     errors: list[str] = []
     if "@startuml" not in raw_text or "@enduml" not in raw_text:
         errors.append("diagram 缺少 @startuml 或 @enduml")
@@ -37,18 +40,19 @@ def check_architecture_coverage(brief: dict, raw_text: str, normalized_text: str
     for line in raw_text.splitlines():
         match = ENTITY_RE.match(line)
         if match:
-            alias_to_name[match.group(3)] = match.group(2)
+            alias_to_name[match.group(3)] = decode_display_text(match.group(2))
 
     expected_components = brief.get("components", [])
     expected_layers = brief.get("layers", [])
     expected_flows = brief.get("flows", [])
     component_ids = {item.get("id") for item in expected_components if isinstance(item, dict)}
 
+    actual_layers = {decode_display_text(m.group(1)) for line in raw_text.splitlines() if (m := PACKAGE_RE.match(line))}
     for index, layer in enumerate(expected_layers):
         if not isinstance(layer, dict):
             continue
         layer_name = layer.get("name")
-        if isinstance(layer_name, str) and layer_name not in raw_text:
+        if isinstance(layer_name, str) and normalize_text(layer_name) not in {normalize_text(value) for value in actual_layers}:
             errors.append(f"layers[{index}].name 未落图: {layer_name}")
 
     for index, component in enumerate(expected_components):
@@ -62,14 +66,12 @@ def check_architecture_coverage(brief: dict, raw_text: str, normalized_text: str
             diagram_name = alias_to_name.get(comp_id)
             if diagram_name and normalize_text(diagram_name) != normalize_text(comp_name):
                 errors.append(f"components[{index}] 展示名与 brief 不一致: {comp_name}")
-            if normalize_text(comp_name) not in normalized_text:
-                errors.append(f"components[{index}].name 未落图: {comp_name}")
 
     extra_aliases = sorted(alias for alias in alias_to_name if alias not in component_ids)
     if extra_aliases:
         errors.append(f"存在 brief 未定义的额外组件 alias: {extra_aliases}")
 
-    lines = raw_text.splitlines()
+    relations = parse_relations(raw_text)
     for index, flow in enumerate(expected_flows):
         if not isinstance(flow, dict):
             continue
@@ -79,15 +81,18 @@ def check_architecture_coverage(brief: dict, raw_text: str, normalized_text: str
         description = flow.get("description")
         matched_line = False
         if all(isinstance(v, str) for v in (flow_id, from_id, to_id)):
-            for line in lines:
-                if from_id in line and to_id in line and flow_id in line:
-                    matched_line = True
-                    break
+            matched_line = any(
+                edge.source == from_id and edge.target == to_id and flow_id in edge.label
+                for edge in relations
+            )
         if not matched_line:
             errors.append(f"flows[{index}] 未找到包含 from/to/id 的连线: {flow_id}")
         if isinstance(flow_id, str) and flow_id not in raw_text:
             errors.append(f"flows[{index}].id 未落图: {flow_id}")
-        if isinstance(description, str) and normalize_text(description) not in normalized_text:
+        if isinstance(description, str) and not any(
+            edge.source == from_id and edge.target == to_id and normalize_text(description) in normalize_text(edge.label)
+            for edge in relations
+        ):
             errors.append(f"flows[{index}].description 未落图: {description}")
 
     return errors
@@ -154,6 +159,7 @@ def parse_diagram_messages(
             continue
         source_alias, target_alias = normalize_message_direction(left_alias, arrow, right_alias)
         message_id, description = label_match.groups()
+        description = decode_display_text(description)
         parsed.append({
             "from": source_alias, "to": target_alias,
             "id": message_id, "description": description,
@@ -163,6 +169,7 @@ def parse_diagram_messages(
 
 
 def check_sequence_coverage(brief: dict, raw_text: str, normalized_text: str) -> list[str]:
+    del normalized_text
     errors: list[str] = []
     if "@startuml" not in raw_text or "@enduml" not in raw_text:
         errors.append("diagram 缺少 @startuml 或 @enduml")
@@ -171,7 +178,7 @@ def check_sequence_coverage(brief: dict, raw_text: str, normalized_text: str) ->
     for line in raw_text.splitlines():
         match = PARTICIPANT_RE.match(line)
         if match:
-            alias_to_name[match.group(3)] = match.group(2)
+            alias_to_name[match.group(3)] = decode_display_text(match.group(2))
 
     expected_participants = brief.get("participants", [])
     expected_messages = brief.get("messages", [])
@@ -189,8 +196,6 @@ def check_sequence_coverage(brief: dict, raw_text: str, normalized_text: str) ->
             diagram_name = alias_to_name.get(comp_id)
             if diagram_name and normalize_text(diagram_name) != normalize_text(comp_name):
                 errors.append(f"participants[{index}] 展示名与 brief 不一致：{comp_name}")
-            if normalize_text(comp_name) not in normalized_text:
-                errors.append(f"participants[{index}].name 未落图：{comp_name}")
 
     extra_aliases = sorted(alias for alias in alias_to_name if alias not in participant_ids)
     if extra_aliases:
@@ -204,7 +209,8 @@ def check_sequence_coverage(brief: dict, raw_text: str, normalized_text: str) ->
                 continue
             group_name = group.get("name")
             group_participants = group.get("participants", [])
-            if isinstance(group_name, str) and f'box "{group_name}"' not in raw_text:
+            actual_boxes = {decode_display_text(m.group(1)) for line in raw_text.splitlines() if (m := re.match(r'^[ \t]*box\s+"([^"]+)"', line))}
+            if isinstance(group_name, str) and normalize_text(group_name) not in {normalize_text(value) for value in actual_boxes}:
                 errors.append(f"groups[{index}].name 未落图：{group_name}")
             for pidx, pid in enumerate(group_participants):
                 if isinstance(pid, str) and pid not in alias_to_name:
@@ -248,8 +254,6 @@ def check_sequence_coverage(brief: dict, raw_text: str, normalized_text: str) ->
                 errors.append(f"messages[{index}] 未找到完全匹配的连线：{msg_id}")
         if isinstance(msg_id, str) and msg_id not in raw_text:
             errors.append(f"messages[{index}].id 未落图：{msg_id}")
-        if isinstance(description, str) and normalize_text(description) not in normalized_text:
-            errors.append(f"messages[{index}].description 未落图：{description}")
         if isinstance(message_type, str) and all(isinstance(v, str) for v in (msg_id, from_id, to_id, description)):
             expected_signature = (from_id, to_id, msg_id, normalize_text(description))
             matching = [i for i in diagram_messages if (i["from"], i["to"], i["id"], normalize_text(i["description"])) == expected_signature]
@@ -283,13 +287,13 @@ def _structure_edges(raw_text: str) -> list[tuple[str, str, str]]:
 
 def _container_members(raw_text: str, container_keyword: str) -> dict[str, str]:
     open_re = re.compile(
-        rf'^\s*{container_keyword}\s+"[^"]+"\s+as\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{{\s*$'
+        rf'^\s*{container_keyword}\s+"([^"]+)"\s+as\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{{\s*$'
     )
     members: dict[str, str] = {}
     current: str | None = None
     for line in raw_text.splitlines():
         if match := open_re.match(line):
-            current = match.group(1)
+            current = match.group(2)
             continue
         if current and re.match(r"^\s*}\s*$", line):
             current = None
@@ -327,10 +331,12 @@ def _check_structure_coverage(
     if duplicate_aliases:
         errors.append(f"图中节点 alias 不允许重复：{duplicate_aliases}")
 
+    declarations_by_alias = {item.alias: item for item in parse_objects(raw_text)}
     for index, container in enumerate(containers):
         cid, name = container.get("id"), container.get("name")
-        pattern = rf'^\s*{container_keyword}\s+"{re.escape(str(name))}"\s+as\s+{re.escape(str(cid))}\b'
-        if not re.search(pattern, raw_text, re.MULTILINE):
+        declaration = declarations_by_alias.get(str(cid))
+        if (declaration is None or declaration.kind != container_keyword or not declaration.is_container
+                or normalize_text(declaration.name) != normalize_text(str(name))):
             errors.append(f"{container_key}[{index}] 未以容器 alias 落图：{cid}")
 
     for index, node in enumerate(nodes):
@@ -391,7 +397,7 @@ def check_activity_coverage(brief: dict, raw_text: str, normalized_text: str) ->
     diagram_edges: collections.Counter[tuple[str, str, str]] = collections.Counter()
     for declaration in parse_activities(raw_text):
         match = re.fullmatch(
-            r"(S[1-9][0-9]*(?:\.[1-9][0-9]*)?)\s+(.+)", declaration.label.strip()
+            r"(S[1-9][0-9]*(?:\.[1-9][0-9]*)?)\s+(.+)", declaration.label.strip(), re.S
         )
         if not match or not re.fullmatch(r"S[1-9][0-9]*(?:\.[1-9][0-9]*)?", declaration.alias):
             errors.append(
@@ -423,8 +429,9 @@ def check_activity_coverage(brief: dict, raw_text: str, normalized_text: str) ->
     extras = sorted(set(diagram_steps) - expected_ids)
     if extras:
         errors.append(f"存在 brief 未定义的额外步骤：{extras}")
+    actual_lanes = {decode_display_text(match.group(1)) for line in raw_text.splitlines() if (match := re.fullmatch(r"\s*\|(.+)\|\s*", line))}
     for lane in sorted({str(item.get("lane")) for item in expected_steps if item.get("lane")}):
-        if f"|{lane}|" not in raw_text:
+        if normalize_text(lane) not in {normalize_text(value) for value in actual_lanes}:
             errors.append(f"steps.lane 未落图：{lane}")
     layout = brief.get("layout", {})
     if isinstance(layout, dict) and layout.get("include_legend") is True:
@@ -449,7 +456,7 @@ def check_activity_coverage(brief: dict, raw_text: str, normalized_text: str) ->
 # ── 公共 ───────────────────────────────────────────────────────
 
 def normalize_text(text: str) -> str:
-    return re.sub(r"\s+", "", text.replace("\\n", ""))
+    return re.sub(r"\s+", "", text)
 
 
 def load_yaml(path: Path) -> Any:

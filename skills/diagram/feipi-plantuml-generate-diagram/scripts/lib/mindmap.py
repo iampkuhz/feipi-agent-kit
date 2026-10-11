@@ -7,17 +7,17 @@ from dataclasses import dataclass
 import re
 import unicodedata
 
+from .text_codec import decode_display_text, encode_display_text, validate_display_text
+
 
 def label_key(text: str) -> str:
-    return " ".join(text.replace(r"\n", " ").split())
+    return " ".join(text.replace("\n", " ").split())
 
 
 def label_errors(text: str) -> list[str]:
-    # 只接受纯文本和换行，避免内容成为 Creole、预处理器或节点语法。
-    if not text.strip() or any(c in text for c in "<>[]{}\\|~") or re.search(
-        r"[\x00-\x09\x0b-\x1f]|\*\*|//|__|~~|--|==|\^\^|,,|\"\"|^[\s]*[:;=@!]", text
-    ):
-        return ["标签须为非空纯文本；不支持标记、反斜杠或控制指令"]
+    # 字面标点由 text_codec 编码后才进入源码；控制字符和资源预算仍在这里拒绝。
+    if not text.strip() or validate_display_text(text):
+        return ["标签须为非空文本且不含控制字符"]
     if len(text.splitlines()) > 3 or sum(
         2 if unicodedata.east_asian_width(c) in "WF" else 1 for c in text
     ) > 96:
@@ -167,7 +167,14 @@ def parse_mindmap(raw: str) -> tuple[list[MindmapNode], list[str]]:
         depth = len(marks)
         node_side = side if syntax == "org" else ("left" if marks[0] == "-" else "right")
         label = re.sub(r"\s+<<[A-Za-z][A-Za-z0-9_]*>>$", "", label)
-        errors.extend(f"line {line_no}: {e}" for e in label_errors(label.replace(r"\n", "\n")))
+        source_label = label
+        label = decode_display_text(source_label)
+        try:
+            if source_label not in {encode_display_text(label, protect_line_start=False), encode_display_text(label)}:
+                errors.append(f"line {line_no}: 显示标点须使用 text_codec 编码，避免被 PlantUML 解释为标记或语法")
+        except ValueError:
+            pass
+        errors.extend(f"line {line_no}: {e}" for e in label_errors(label))
         parent = None
         if depth == 1:
             if root is not None:

@@ -20,7 +20,7 @@ PROFILES: dict[str, dict[str, Any]] = {
     },
     "architecture": {
         "profile": "architecture",
-        "profile_version": "1.1",
+        "profile_version": "1.2",
         "brief_schema": str(SKILL_DIR / "assets" / "validation" / "types" / "architecture-brief.schema.json"),
         "template": str(SKILL_DIR / "assets" / "templates" / "types" / "architecture-brief.yaml"),
         "coverage_mode": "architecture",
@@ -28,7 +28,7 @@ PROFILES: dict[str, dict[str, Any]] = {
     },
     "sequence": {
         "profile": "sequence",
-        "profile_version": "1.2",
+        "profile_version": "1.3",
         "brief_schema": str(SKILL_DIR / "assets" / "validation" / "types" / "sequence-brief.schema.json"),
         "template": str(SKILL_DIR / "assets" / "templates" / "types" / "sequence-brief.yaml"),
         "coverage_mode": "sequence",
@@ -36,7 +36,7 @@ PROFILES: dict[str, dict[str, Any]] = {
     },
     "component": {
         "profile": "component",
-        "profile_version": "1.1",
+        "profile_version": "1.2",
         "brief_schema": str(SKILL_DIR / "assets" / "validation" / "types" / "component-brief.schema.json"),
         "template": str(SKILL_DIR / "assets" / "templates" / "types" / "component-brief.yaml"),
         "coverage_mode": "component",
@@ -44,7 +44,7 @@ PROFILES: dict[str, dict[str, Any]] = {
     },
     "activity": {
         "profile": "activity",
-        "profile_version": "1.2",
+        "profile_version": "1.3",
         "brief_schema": str(SKILL_DIR / "assets" / "validation" / "types" / "activity-brief.schema.json"),
         "template": str(SKILL_DIR / "assets" / "templates" / "types" / "activity-brief.yaml"),
         "coverage_mode": "activity",
@@ -52,7 +52,7 @@ PROFILES: dict[str, dict[str, Any]] = {
     },
     "mindmap": {
         "profile": "mindmap",
-        "profile_version": "1.0",
+        "profile_version": "1.1",
         "brief_schema": str(SKILL_DIR / "assets/validation/types/mindmap-brief.schema.json"),
         "template": str(SKILL_DIR / "assets/templates/types/mindmap-brief.yaml"),
         "coverage_mode": "mindmap",
@@ -60,7 +60,7 @@ PROFILES: dict[str, dict[str, Any]] = {
     },
     "deployment": {
         "profile": "deployment",
-        "profile_version": "1.1",
+        "profile_version": "1.2",
         "brief_schema": str(SKILL_DIR / "assets" / "validation" / "types" / "deployment-brief.schema.json"),
         "template": str(SKILL_DIR / "assets" / "templates" / "types" / "deployment-brief.yaml"),
         "coverage_mode": "deployment",

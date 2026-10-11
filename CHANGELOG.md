@@ -1,5 +1,8 @@
 # 变更记录
 
+## 2026-10-10
+- feipi-plantuml-generate-diagram v10：统一文本转义与六图型覆盖校验
+
 ## 2026-09-28
 - feipi-video-read-url v7：补齐视频身份与聊天标题闭环
 

@@ -82,9 +82,22 @@ class SequenceNotesTests(unittest.TestCase):
         self.assertEqual(display_width("中Ae\u0301"), 4)
         self.assertEqual(wrap_text("Ae\u0301B", 2), ["Ae\u0301", "B"])
 
+    def test_special_display_text_is_encoded_and_block_terminator_is_rejected(self):
+        value = diagram(text='__main__.py ** // ~~ -- == ^^ ,, "" <tag> [x] {x} ; : | \\\\n !include @enduml $x %x & <U+0041>\nend note\nactor Foo')
+        planned = note(value)
+        self.assertIn("<U+005F>", planned["puml"])
+        self.assertIn("<U+0021>include", planned["puml"])
+        self.assertIn("<U+0065>nd note", planned["puml"])
+        self.assertIn("<U+0061>ctor Foo", planned["puml"])
+        safe_block_word = note(diagram(text="end note\nend title\n@enduml\n!include x"))
+        self.assertIn("<U+0065>nd note", safe_block_word["puml"])
+        self.assertIn("<U+0065>nd title", safe_block_word["puml"])
+        self.assertIn("<U+0040>enduml", safe_block_word["puml"])
+        self.assertIn("<U+0021>include", safe_block_word["puml"])
+
     def test_words_and_explicit_paragraphs(self):
         self.assertEqual(wrap_text("hello world", 7), ["hello", "world"])
-        self.assertEqual(wrap_text("一\\n二\n\n三", 4), ["一", "二", "", "三"])
+        self.assertEqual(wrap_text("一\\n二\n\n三", 4), ["一\\n", "二", "", "三"])
         self.assertEqual(wrap_text("abcdefghijkl", 5), ["abcde", "fghij", "kl"])
 
     def test_estimated_geometry_and_batch_isolation(self):
@@ -113,9 +126,8 @@ class SequenceNotesTests(unittest.TestCase):
                 plan_diagram(value)
 
     def test_invalid_notes(self):
-        for changes in [{"from": "missing"}, {"text": ""}, {"text": "end note\na -> b"},
-                        {"text": "!include foo"}, {"text": "**粗体**"}, {"text": "<b>粗体</b>"},
-                        {"text": "前\t后"}, {"text": None}, {"unknown": 1}]:
+        for changes in [{"from": "missing"}, {"text": ""}, {"text": "前\t后"},
+                        {"text": None}, {"unknown": 1}]:
             value = diagram()
             value["notes"][0].update(changes)
             with self.subTest(changes=changes), self.assertRaisesRegex(ValueError, r"notes\[0\]"):
@@ -162,7 +174,7 @@ class SequenceNotesTests(unittest.TestCase):
         self.assertEqual(planned["to"], data["messages"][1]["to"])
 
     def test_normal_brief_validation_rejects_invalid_note_and_geometry(self):
-        for value in ["", "end note", 42]:
+        for value in ["", 42]:
             data = load_yaml(SCRIPTS.parent / "assets/examples/sequence/sequence-brief.example.yaml")
             data["messages"][0]["note"] = value
             self.assertTrue(validate_profile_semantics("sequence", data)[0])
@@ -180,7 +192,8 @@ class SequenceNotesTests(unittest.TestCase):
         for planned, path in zip(result["diagrams"], paths):
             source = path.read_text()
             for planned_note in planned["notes"]:
-                self.assertIn(planned_note["puml"], source)
+                self.assertIn(planned_note["placement"], source)
+                self.assertIn("\n".join(planned_note["lines"]), source)
                 placements.add(planned_note["placement"])
         self.assertEqual(placements, {"left", "right", "across"})
 

@@ -54,7 +54,7 @@ python3 scripts/plan_sequence_notes.py \
 脚本复用原有 schema 和语义校验，自动提取参与者顺序与各消息中的 note。把结果中的 `puml` 紧贴到对应消息后（放在 activate、deactivate、分隔线或下一条消息之前），再走原有图包验证。输出 JSON 是中间计算结果，不是用户需要再维护的一份需求；脚本不会解析或覆盖原始 `.puml`。
 
 - `participants` 必须与图中从左到右的实际顺序一致，2–8 个；复用消息的 `from/to`，也支持自调用。每条消息最多一个 `note` 字符串，多段说明用 YAML `|` 保留换行。
-- `note` 支持中英文纯文本、标点、实际换行和字面量 `\n`；不自动处理 Creole/HTML、图片、控制字符或预处理内容。富文本不进入计算器，需另行人工排版。
+- `note` 支持中英文显示文本、标点和实际 LF 换行；字面反斜杠加 `n` 不解释为换行。Creole/HTML 和类似预处理指令的文字按 [文本 codec](literal-text.md) 转义后原样显示，不作为格式或可执行语法；控制字符、隐藏格式字符和非 LF 行分隔符拒绝。
 - 无坐标时按等距参与者估算（间隔 24 显示列、两端各 12 列），输出 `geometry_source: estimated`。这些值是排版启发式，不是 renderer 的默认值；长消息、不等距参与者、激活条和自调用回环可能需要实际空间。
 - 已有布局时，在同一 brief 的 `layout.note_geometry` 下可选填写 `left`、`right` 和各参与者的 `x`。必须完整提供坐标且按声明顺序严格递增，输出 `geometry_source: provided`。普通需求无需填写。
 

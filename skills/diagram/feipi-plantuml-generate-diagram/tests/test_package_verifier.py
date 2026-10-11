@@ -14,6 +14,7 @@ SKILL_DIR = TEST_DIR.parent
 SCRIPT_DIR = SKILL_DIR / "scripts"
 sys.path.insert(0, str(SCRIPT_DIR))
 
+from lib.profile_registry import resolve_profile
 from lib.puml_analysis import compute_puml_metrics
 from lib.package_verifier import verify_package_dir
 from lib.validation_result import compute_normalized_puml_sha256, compute_sha256
@@ -60,7 +61,7 @@ def build_package(base: Path) -> dict:
         "diagram_id": "D9",
         "diagram_type": "component",
         "profile": "component",
-        "profile_version": "1.1",
+        "profile_version": resolve_profile("component")["profile_version"],
         "brief_path": "brief.normalized.yaml",
         "diagram_path": "diagram.puml",
         "svg_path": "diagram.svg",

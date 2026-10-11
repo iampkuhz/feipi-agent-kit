@@ -390,7 +390,7 @@ BRIEF_LOCK_OUT="$OUT_DIR/.brief-lock.json"
 BRIEF_RULESET_SHA256=""
 if [[ "$IS_TYPED" == "true" ]]; then
   BRIEF_RULESET_SHA256="$(python3 - "$SCHEMA_FILE" "$LIB_DIR/profile_registry.py" \
-    "$LIB_DIR/brief_loader.py" "$LIB_DIR/validate_brief_cli.py" "$LIB_DIR/profile_validators.py" "$LIB_DIR/mindmap.py" <<'PY'
+    "$LIB_DIR/brief_loader.py" "$LIB_DIR/validate_brief_cli.py" "$LIB_DIR/profile_validators.py" "$LIB_DIR/mindmap.py" "$LIB_DIR/text_codec.py" <<'PY'
 import hashlib
 import sys
 from pathlib import Path

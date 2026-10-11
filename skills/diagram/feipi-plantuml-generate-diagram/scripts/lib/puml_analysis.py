@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import collections
 import re
+
+from .text_codec import decode_display_text
 from dataclasses import dataclass
 
 
@@ -111,7 +113,7 @@ def parse_objects(raw_text: str) -> list[ObjectDeclaration]:
             continue
         declarations.append(ObjectDeclaration(
             kind=kind.lower(),
-            name=name,
+            name=decode_display_text(name),
             alias=alias,
             is_container="{" in suffix,
             line_no=line_no,
@@ -166,13 +168,13 @@ def parse_activities(raw_text: str) -> list[ActivityDeclaration]:
     result: list[ActivityDeclaration] = []
     for line_no, line in _activity_content_lines(raw_text, []):
         if match := ACTIVITY_ANY_RE.match(line):
-            result.append(ActivityDeclaration(match.group(1), match.group(2), line_no, "declared"))
+            result.append(ActivityDeclaration(decode_display_text(match.group(1)), match.group(2), line_no, "declared"))
         elif match := ACTIVITY_UNALIASED_RE.match(line):
             result.append(ActivityDeclaration(
-                match.group(1), f"__unbound_activity_{line_no}", line_no, "declared",
+                decode_display_text(match.group(1)), f"__unbound_activity_{line_no}", line_no, "declared",
             ))
         elif match := ACTIVITY_COLON_RE.match(line):
-            label = match.group(1).strip()
+            label = decode_display_text(match.group(1).strip())
             id_match = re.match(r"^(S[1-9][0-9]*(?:\.[1-9][0-9]*)?)\b", label)
             alias = id_match.group(1) if id_match else f"__unbound_activity_{line_no}"
             result.append(ActivityDeclaration(label, alias, line_no, "colon"))
@@ -267,7 +269,7 @@ def parse_relations(raw_text: str) -> list[Relation]:
             # 左向箭头按视觉方向归一；度数不受方向影响，覆盖签名会受影响。
             if arrow.lstrip().startswith("<") and not arrow.rstrip().endswith(">"):
                 source, target = target, source
-            relations.append(Relation(source, target, (label or "").strip(), line_no))
+            relations.append(Relation(source, target, decode_display_text((label or "").strip()), line_no))
     return relations
 
 

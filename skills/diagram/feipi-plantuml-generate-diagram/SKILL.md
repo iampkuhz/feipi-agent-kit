@@ -33,6 +33,13 @@ python3 scripts/run_mindmap.py --brief brief.yaml --out-dir package
 4. `sequence` 默认 `interaction_mr`，专利流程使用 `process_s`。已有 mindmap 的定点修复也用该验证入口；不要重新运行生成器覆盖人工修改。
 5. 未变成功包显式使用 `--reuse-valid-package`；brief、diagram、父 brief、profile 或渲染合同变化时缓存失效。合同细节见 `references/package-contract.md`。
 
+## 显示文本与结构语法
+
+- brief 中的标题、名称、消息与 note 写原始文本，不预转义。文件名、路径、引号、括号和 Creole 标记都属于显示文本；ID、箭头、指令和样式仍按各 profile 的结构合同书写。
+- mindmap 生成器自动编码显示文本。其他图型手写源码时，先用 `scripts/encode_display_text.py` 编码显示字段，再放进对应标签或 note，不能编码或替换整份源码；使用方式见 `references/literal-text.md`。
+- 显示文本统一按 Unicode 字符转义；解析器先识别结构，再对显示字段做一次还原，与原始 brief 比较。换行与字面反斜杠区分，控制字符仍拒绝，长度与布局预算按实际显示文本计算。
+- 本规则覆盖当前六个已注册图型的显示字段；新图型或新语法上下文须先补 codec 接入与渲染回归，不因采用转义而宣称任意源码安全。
+
 ## 统一质量与失败边界
 
 - 输出至少包含 `diagram.puml`、`validation.json`；只有真实渲染成功才有可交付的 `diagram.svg`。mindmap 定界符为 `@startmindmap/@endmindmap`，其他现有图型为 `@startuml/@enduml`。
