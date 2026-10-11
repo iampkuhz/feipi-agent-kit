@@ -35,8 +35,8 @@ COUNTER_FIELDS = {
 
 def _validate_observation_contract(data: dict[str, Any]) -> list[str]:
     errors: list[str] = []
-    if data.get("render_contract_version") != "3":
-        errors.append("render_contract_version 必须为 3")
+    if data.get("render_contract_version") != "4":
+        errors.append("render_contract_version 必须为 4")
     timings = data.get("timings")
     last_timings = data.get("last_run_timings")
     counters = data.get("counters")
@@ -81,8 +81,8 @@ def _validate_observation_contract(data: dict[str, Any]) -> list[str]:
             errors.append("cache hit 的 last_run_timings.render_ms 必须为 0")
         if last_counters["render_http_requests"] != 0 or last_counters["render_rounds"] != 0:
             errors.append("cache hit 不得记录 renderer 请求或轮次")
-        if last_counters["cache_hits"] != 1 or last_counters["package_verifier_runs"] < 1:
-            errors.append("cache hit 必须记录一次命中和至少一次 verifier")
+        if last_counters["cache_hits"] != 1 or last_counters["package_verifier_runs"] < 2:
+            errors.append("cache hit 必须记录一次命中和至少两次 verifier")
     else:
         if last_counters["cache_hits"] != 0:
             errors.append("非 cache hit 的 last_run_counters.cache_hits 必须为 0")

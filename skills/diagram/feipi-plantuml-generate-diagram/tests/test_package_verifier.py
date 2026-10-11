@@ -56,7 +56,7 @@ def build_package(base: Path) -> dict:
     svg_path.write_text('<svg xmlns="http://www.w3.org/2000/svg"><text>fixture</text></svg>\n', encoding="utf-8")
     validation = {
         "schema_version": "1.2",
-        "render_contract_version": "3",
+        "render_contract_version": "4",
         "skill_name": "feipi-plantuml-generate-diagram",
         "diagram_id": "D9",
         "diagram_type": "component",
@@ -147,6 +147,17 @@ class PackageVerifierTests(unittest.TestCase):
                 data["last_run_counters"]["cache_hits"] = 1
             self.mutate(base, break_cache)
             self.assertTrue(any("cache hit" in item for item in verify_package_dir(base)))
+
+    def test_cache_requires_original_and_final_verifier_counts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            build_package(base)
+            def cache_with_one_verifier(data):
+                data["last_run_timings"] = dict(total_ms=1, render_ms=0, static_validation_ms=1, cache_hit=True)
+                data["last_run_counters"] = dict(render_http_requests=0, render_rounds=0,
+                    package_validation_runs=1, package_verifier_runs=1, cache_hits=1)
+            self.mutate(base, cache_with_one_verifier)
+            self.assertTrue(any("至少两次 verifier" in item for item in verify_package_dir(base)))
 
     def test_success_rejects_svg_text_without_svg_root(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

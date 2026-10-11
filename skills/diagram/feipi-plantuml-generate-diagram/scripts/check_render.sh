@@ -35,7 +35,7 @@ normalize_server_url() {
 }
 
 is_loopback_server_url() {
-  python3 - "$1" <<'PY'
+  "${PLANTUML_PYTHON:-python3}" - "$1" <<'PY'
 import sys
 from urllib.parse import urlparse
 
@@ -49,7 +49,7 @@ PY
 
 encode_plantuml_file() {
   local input_file="$1"
-  python3 - "$input_file" <<'PY'
+  "${PLANTUML_PYTHON:-python3}" - "$input_file" <<'PY'
 import sys
 import zlib
 from pathlib import Path
@@ -149,7 +149,7 @@ if ! command -v curl >/dev/null 2>&1; then
   exit 4
 fi
 
-if ! command -v python3 >/dev/null 2>&1; then
+if ! command -v "${PLANTUML_PYTHON:-python3}" >/dev/null 2>&1; then
   echo "缺少依赖: python3" >&2
   exit 4
 fi
@@ -214,18 +214,25 @@ for candidate in "${CANDIDATES[@]}"; do
   SVG_HEADERS="$(mktemp)"
   REQUEST_COUNT=$((REQUEST_COUNT + 1))
   CURL_EXIT=0
-  LC_ALL=C curl -sS --connect-timeout "$DEFAULT_CONNECT_TIMEOUT" --max-time "$TIMEOUT" -D "$SVG_HEADERS" -o "$REQUEST_SVG" -w '%{http_code}' "$candidate/svg/$ENCODED" >"$SVG_CODE" 2>"$SVG_ERR" || CURL_EXIT=$?
+  # 同一次请求收集 verbose 诊断，避免部分 curl 将系统 errno 隐藏成通用 curl 7。
+  LC_ALL=C curl -sS -v --connect-timeout "$DEFAULT_CONNECT_TIMEOUT" --max-time "$TIMEOUT" -D "$SVG_HEADERS" -o "$REQUEST_SVG" -w '%{http_code}' "$candidate/svg/$ENCODED" >"$SVG_CODE" 2>"$SVG_ERR" || CURL_EXIT=$?
   if [[ "$CURL_EXIT" -ne 0 ]]; then
-    LAST_ERROR="$(cat "$SVG_ERR")"
+    CURL_DIAGNOSTIC="$(cat "$SVG_ERR")"
+    LAST_ERROR="$(printf '%s\n' "$CURL_DIAGNOSTIC" | awk '/^curl:/{error=$0} END {print error}')"
+    [[ -n "$LAST_ERROR" ]] || LAST_ERROR="$CURL_DIAGNOSTIC"
+    # 每个连接失败都保留原始诊断及目标、curl/HTTP 证据，不用 curl 7 推断故障层。
+    echo "render_target=$candidate"
+    echo "render_curl_exit_code=$CURL_EXIT"
+    echo "render_http_status=$(cat "$SVG_CODE")"
+    echo "render_reason=$LAST_ERROR"
+    echo "render_curl_diagnostic=$CURL_DIAGNOSTIC"
     # 仅将连接阶段的明确权限错误归类为访问被拒绝；curl 7 本身不能证明沙箱限制。
     # 排除本地输出写入等错误，避免把文件权限问题误认成网络权限问题。
-    if [[ "$CURL_EXIT" -eq 7 ]] && printf '%s\n' "$LAST_ERROR" | grep -Eqi 'Operation not permitted|Permission denied'; then
+    if [[ "$CURL_EXIT" -eq 7 ]] && printf '%s\n' "$CURL_DIAGNOSTIC" | grep -Eqi 'Operation not permitted|Permission denied'; then
+      LAST_ERROR="$(printf '%s\n' "$CURL_DIAGNOSTIC" | awk 'tolower($0) ~ /operation not permitted|permission denied/ {print; exit}')"
       echo "render_result=skipped"
       echo "render_reason=$LAST_ERROR"
       echo "render_failure_kind=permission_denied"
-      echo "render_target=$candidate"
-      echo "render_curl_exit_code=$CURL_EXIT"
-      echo "render_http_status=$(cat "$SVG_CODE")"
       echo "render_http_requests=$REQUEST_COUNT"
       rm -f "$REQUEST_SVG" "$SVG_CODE" "$SVG_ERR" "$SVG_HEADERS"
       exit 5
@@ -235,9 +242,13 @@ for candidate in "${CANDIDATES[@]}"; do
   fi
 
   STATUS="$(cat "$SVG_CODE")"
+  echo "render_target=$candidate"
+  echo "render_curl_exit_code=$CURL_EXIT"
+  echo "render_http_status=$STATUS"
+  CURL_DIAGNOSTIC="$(cat "$SVG_ERR")"
   rm -f "$SVG_CODE" "$SVG_ERR"
   set +e
-  SVG_STATE="$(python3 "$SCRIPT_DIR/lib/svg_validation.py" "$REQUEST_SVG" 2>/dev/null)"
+  SVG_STATE="$("${PLANTUML_PYTHON:-python3}" "$SCRIPT_DIR/lib/svg_validation.py" "$REQUEST_SVG" 2>/dev/null)"
   SVG_CHECK_EXIT=$?
   set -e
   HAS_ERROR_HEADER=false
@@ -248,6 +259,7 @@ for candidate in "${CANDIDATES[@]}"; do
 
   if [[ "$SVG_CHECK_EXIT" -ne 1 && ("$HAS_ERROR_HEADER" == "true" || "$SVG_STATE" == "error") \
     && ("$STATUS" =~ ^2[0-9][0-9]$ || "$STATUS" == "400") ]]; then
+    echo "render_curl_diagnostic=$CURL_DIAGNOSTIC"
     echo "render_result=syntax_error"
     echo "render_http_requests=$REQUEST_COUNT"
     rm -f "$REQUEST_SVG"
@@ -255,6 +267,7 @@ for candidate in "${CANDIDATES[@]}"; do
   fi
   if [[ ! "$STATUS" =~ ^2[0-9][0-9]$ || "$SVG_STATE" != "valid" || "$HAS_SVG_CONTENT_TYPE" != "true" ]]; then
     LAST_ERROR="svg 响应无效，HTTP $STATUS"
+    echo "render_curl_diagnostic=$CURL_DIAGNOSTIC"
     rm -f "$REQUEST_SVG"
     continue
   fi

@@ -7,10 +7,21 @@
 3. typed profile 模式下必须执行对应的 brief 校验和覆盖校验。
 4. 渲染可用时必须产出 `diagram.svg`。
 5. 若 `render_result` 不为 `ok`、renderer 身份缺失或当前 SVG 不存在，`final_status` 必须为 `blocked`；不可复用旧 SVG。
-6. `scripts/validate_package.sh` 已内置 `scripts/verify_package.py`，会双向复核 v1.2 路径、hash、状态与实际 PUML metrics；不要再手工调用 verifier。
+6. `scripts/validate_package.sh` 保留 Shell 入口，内部由 Python 编排。写入冻结的观测后，内置 `scripts/verify_package.py` 双向复核最终 v1.2 路径、hash、状态、timing 与实际 PUML metrics；只有通过才输出 success，此后不改写图包。正常作图不要再手工调用 verifier；维护测试可独立复核最终文件。
 7. `max_render_attempts=2` 表示首次生成 1 次、针对性修复 1 次，不是 2 次重试；未修改的失败图不得重复渲染。
 8. `timings` / `counters` 保留最近一次完整生成数据，`last_run_timings` / `last_run_counters` 记录本次实际调用；上游应优先消费后者。命中复用时 `render_ms=0`、renderer 请求与轮次均为 0，并单独记录 cache hit，不得把首次生成的历史数据当作本次调用。
 9. 明确连接权限错误记录为 `blocked_reason=render_access_denied`、`failure_class=renderer`、`repairable=false`；`issues` 保留底层错误、目标地址和 curl/HTTP 诊断。它只说明访问被拒绝，不证明服务宕机或沙箱是唯一原因；本合同不增加提权或自动恢复。
+
+## 计时与最终复核
+
+- `render_contract_version=4` 固定以下范围；旧合同不命中缓存，不修补历史 timing/hash 使其通过。
+- 所有区间起止均由同一编排进程的 `time.monotonic_ns()` 采样，不比较不同进程的时钟原点，不依赖某个 Python 补丁版本。要求 Python 3.9 或更高；Shell 子脚本沿用编排器的 Python，允许通过 `PLANTUML_PYTHON` 显式选择解释器。
+- `total_ms` 从编排入口参数解析前开始，截止于报告物化前，覆盖输入身份、静态校验、快照及渲染证据检查。模块导入、最终报告物化（含 hash/metrics 计算、序列化与落盘）、最终 verifier 和 stdout 输出在截止点外；它不是整条命令的墙钟耗时。
+- `render_ms` 是整个 `check_render.sh` 子进程的耗时，包括启动、编码、curl SVG 请求、响应检查与文件移动；不称为纯 HTTP/SVG 请求时间。
+- `static_validation_ms = total_ms - render_ms` 表示计时区间内的其余工作，包括输入处理和进程开销。负数、非有限数或不满足加和关系的观测直接失败，不能用截断掩盖异常。
+- 完整生成先冻结 timing 与将要执行的最终 verifier 计数，再写报告并复核最终文件，verifier 计数为 1。失败将具体错误写入 stderr 与 `issues`，将报告标为 blocked，绝不输出 success。
+- 缓存先按原样复核旧报告，再只更新 `last_run_*`，最后复核最终文件，verifier 计数为 2；第一次复核计入本次 static，第二次复核在截止点外。`timings` / `counters` 历史生成数据保持原样。缓存原报告失败时保留具体诊断并回退完整验证，不能修正旧记录冒充命中。
+- 不把最终 verifier 耗时写回它所验证的报告，避免“写时间后需要再校验”的自引用循环。
 
 
 ## 工具缺陷与授权边界

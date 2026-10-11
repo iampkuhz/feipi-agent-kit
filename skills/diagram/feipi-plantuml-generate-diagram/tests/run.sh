@@ -371,6 +371,12 @@ else
   fail "renderer 单 SVG 请求回归"
 fi
 
+if python3 "$TEST_DIR/test_runtime_observation.py"; then
+  pass "单进程计时、缓存原记录与最终文件复核"
+else
+  fail "单进程计时、缓存原记录与最终文件复核"
+fi
+
 if python3 "$TEST_DIR/test_render_permissions.py"; then
   pass "renderer 连接权限识别与诊断传递"
 else
@@ -405,7 +411,7 @@ assert data["diagram_path"] == "diagram.puml"
 assert data["brief_sha256"] == data["artifacts"]["brief"]["sha256"]
 assert data["puml_sha256"] == data["artifacts"]["diagram"]["sha256"]
 assert data["metrics"] == {"node_count": 3, "edge_count": 2, "max_degree": 2}
-assert data["render_contract_version"] == "3"
+assert data["render_contract_version"] == "4"
 assert data["max_render_attempts"] == 2
 assert data["attempt_index"] == 1
 assert data["attempts_remaining"] == 2 - data["attempt_index"]
@@ -477,7 +483,7 @@ assert data["last_run_counters"] == {
     "render_http_requests": 0,
     "render_rounds": 0,
     "package_validation_runs": 1,
-    "package_verifier_runs": 1,
+    "package_verifier_runs": 2,
     "cache_hits": 1,
 }
 PY
@@ -494,6 +500,7 @@ fi
 MISSING_RENDER_ROOT="$(mktemp -d /tmp/plantuml-missing-render.XXXXXX)"
 mkdir -p "$MISSING_RENDER_ROOT/scripts" "$MISSING_RENDER_ROOT/out"
 cp "$RUNTIME_DIR/validate_package.sh" "$MISSING_RENDER_ROOT/scripts/validate_package.sh"
+cp "$RUNTIME_DIR/validate_package.py" "$MISSING_RENDER_ROOT/scripts/validate_package.py"
 cp -R "$RUNTIME_DIR/lib" "$MISSING_RENDER_ROOT/scripts/lib"
 printf '<svg>stale</svg>\n' > "$MISSING_RENDER_ROOT/out/diagram.svg"
 if bash "$MISSING_RENDER_ROOT/scripts/validate_package.sh" \

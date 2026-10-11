@@ -83,6 +83,9 @@ class CheckRenderTests(unittest.TestCase):
             fake_bin.mkdir()
             preflight = scripts / "preflight_renderer.sh"
             shutil.copy2(PREFLIGHT_RENDERER, preflight)
+            shutil.copy2(SCRIPT_DIR / "preflight_renderer.py", scripts)
+            (scripts / "lib").mkdir()
+            shutil.copy2(SCRIPT_DIR / "lib/runtime_observation.py", scripts / "lib")
             check_render = scripts / "check_render.sh"
             check_render.write_text(
                 """#!/usr/bin/env bash
@@ -358,7 +361,7 @@ exit \"$FAKE_PODMAN_EXIT\"
                 self.assertEqual(
                     {
                         "render_http_requests": 0, "render_rounds": 0,
-                        "package_validation_runs": 1, "package_verifier_runs": 1, "cache_hits": 1,
+                        "package_validation_runs": 1, "package_verifier_runs": 2, "cache_hits": 1,
                     },
                     data["last_run_counters"],
                 )

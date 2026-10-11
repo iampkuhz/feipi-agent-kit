@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import math
 from pathlib import Path, PurePosixPath
 import sys
 
@@ -18,7 +19,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Write validation.json")
     parser.add_argument("--output", required=True)
     parser.add_argument("--skill-name", default="feipi-plantuml-generate-diagram")
-    parser.add_argument("--render-contract-version", default="3")
+    parser.add_argument("--render-contract-version", default="4")
     parser.add_argument("--diagram-type", default="fallback")
     parser.add_argument("--profile", default="fallback")
     parser.add_argument("--diagram-path", default="")
@@ -89,10 +90,15 @@ def main() -> int:
                         parent_brief_path = str(candidate)
 
     timings = {
-        "total_ms": round(max(0.0, args.total_duration_ms), 3),
-        "render_ms": round(max(0.0, args.render_duration_ms), 3),
-        "static_validation_ms": round(max(0.0, args.static_validation_duration_ms), 3),
+        "total_ms": round(args.total_duration_ms, 3),
+        "render_ms": round(args.render_duration_ms, 3),
+        "static_validation_ms": round(args.static_validation_duration_ms, 3),
     }
+    raw_timings = (args.total_duration_ms, args.render_duration_ms, args.static_validation_duration_ms)
+    if any(not math.isfinite(value) or value < 0 for value in raw_timings):
+        parser.error("timing_observation_invalid: 计时必须是非负有限数")
+    if abs(raw_timings[0] - raw_timings[1] - raw_timings[2]) > 0.01:
+        parser.error("timing_observation_invalid: total 必须等于 render + static")
     counters = {
         "render_http_requests": max(0, args.render_http_requests),
         "render_rounds": max(0, args.render_rounds),
@@ -104,7 +110,7 @@ def main() -> int:
         line.strip()
         for line in args.issue_text.splitlines()
         if line.strip()
-    ][:20]
+    ]
     if args.blocked_reason and not issues:
         issues = [args.blocked_reason]
     over_budget = any(

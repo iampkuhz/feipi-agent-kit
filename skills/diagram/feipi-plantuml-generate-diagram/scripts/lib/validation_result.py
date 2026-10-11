@@ -14,7 +14,7 @@ from .svg_validation import is_success_svg
 @dataclass
 class ValidationResult:
     schema_version: str = "1.2"
-    render_contract_version: str = "3"
+    render_contract_version: str = "4"
     skill_name: str = "feipi-plantuml-generate-diagram"
     diagram_id: str = ""
     diagram_type: str = "fallback"

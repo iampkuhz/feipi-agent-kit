@@ -1,6 +1,7 @@
 # 变更记录
 
 ## 2026-10-11
+- feipi-plantuml-generate-diagram v11：修复计时闭环与只读预检诊断
 - feipi-patent-generate-innovation-disclosure：移除仓库维护与注册入口
 - feipi-skill-govern v6：清理已移除专利 skill 的示例引用
 

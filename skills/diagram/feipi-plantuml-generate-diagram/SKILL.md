@@ -28,7 +28,7 @@ python3 scripts/run_mindmap.py --brief brief.yaml --out-dir package
 ## 其他图型与已有图包
 
 1. 从 `assets/templates/types/` 选择对应 brief；图型边界与预算见 `references/diagram-type-profiles.md`。先完成 schema、语义和预算校验，输入失败不调用 renderer。
-2. 每批次执行一次 `scripts/preflight_renderer.sh`，后续图复用回执的 `renderer_url`。
+2. 每批次执行一次 `scripts/preflight_renderer.sh`，后续图复用回执的 `renderer_url`。只探测已存在服务时加 `--existing-only`，失败不启动 Podman、不复检；mindmap 入口也支持此选项。
 3. 按 profile 生成源码；`sequence` 含消息 note 时，将说明写入同一 brief 的 `messages[].note`，按 `references/sequence-notes.md` 调用 `scripts/plan_sequence_notes.py --brief <brief...>` 批量计算左右定位、按空间换行与下方全宽兜底。消息说明用紧跟箭头的 `note left/right`，不用 `note left/right of XX`；侧边至少 4 行且全宽至少少 3 行才改 `note across`。随后调用 `scripts/validate_package.sh --diagram-type <type> --brief <brief> --diagram <puml> --out-dir <package> --server-url <renderer_url>`。
 4. `sequence` 默认 `interaction_mr`，专利流程使用 `process_s`。已有 mindmap 的定点修复也用该验证入口；不要重新运行生成器覆盖人工修改。
 5. 未变成功包显式使用 `--reuse-valid-package`；brief、diagram、父 brief、profile 或渲染合同变化时缓存失效。合同细节见 `references/package-contract.md`。
@@ -43,9 +43,9 @@ python3 scripts/run_mindmap.py --brief brief.yaml --out-dir package
 ## 统一质量与失败边界
 
 - 输出至少包含 `diagram.puml`、`validation.json`；只有真实渲染成功才有可交付的 `diagram.svg`。mindmap 定界符为 `@startmindmap/@endmindmap`，其他现有图型为 `@startuml/@enduml`。
-- brief/schema、覆盖、布局、真实 SVG、artifact hash 与源码 metrics 的校验必须保留；`validate_package.sh` 内置 verifier，不重复手动调用。
+- brief/schema、覆盖、布局、真实 SVG、artifact hash 与源码 metrics 的校验必须保留；`validate_package.sh` 内置最终文件 verifier，成功后不再改写报告，正常作图不重复手动调用。计时范围与缓存双次复核见 `references/package-contract.md`。
 - 默认本地端口读取 `AGENT_PLANTUML_SERVER_PORT`，缺省 8199；显式 `--server-url` 也只接受 loopback。规则见 `references/render-rules.md`。
-- 预检首次不可用时，仅默认 8199 地址允许一次固定 Podman 启动并复检一次；仍不可用即 blocked。禁止继续启动、杀死、重启或排查 renderer/proxy 进程。
+- 默认预检首次不可用时，仅默认 8199 地址允许一次固定 Podman 启动并复检一次；`--existing-only` 禁止启动。仍不可用即 blocked，禁止继续启动、杀死、重启或排查 renderer/proxy 进程。
 - 明确的连接权限错误优先返回 `render_access_denied`，不启动 Podman、不复检。报告“访问被拒绝，可能受沙箱或系统权限限制”，不能断言服务未启动；普通连接失败或超时也不能直接断言沙箱限制。脚本不能自行提权，遵循宿主权限策略；详情见 `references/render-rules.md`。
 - 每图首次渲染一次，仅 syntax/coverage/layout 失败允许定点修复一次；总渲染上限两次。未修改失败图不重复运行，不通过更换目录重置计数。
 - brief/over_budget、renderer、contract/retry_limit 失败停止；视觉问题交给 reviewer，不自动进入渲染循环。

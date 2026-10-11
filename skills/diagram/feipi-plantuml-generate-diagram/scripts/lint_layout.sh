@@ -58,7 +58,7 @@ if [[ -z "$INPUT_FILE" || ! -f "$INPUT_FILE" ]]; then
 fi
 
 if [[ "$DIAGRAM_TYPE" == "mindmap" ]]; then
-  python3 - "$INPUT_FILE" "$SCRIPT_DIR" <<'PYMM'
+  "${PLANTUML_PYTHON:-python3}" - "$INPUT_FILE" "$SCRIPT_DIR" <<'PYMM'
 import sys
 from pathlib import Path
 sys.path.insert(0, sys.argv[2])
@@ -88,7 +88,7 @@ brief_value() {
     printf '%s\n' "$default"
     return 0
   fi
-  python3 - "$path" "$dotted" "$default" "$SCRIPT_DIR/lib" <<'PY'
+  "${PLANTUML_PYTHON:-python3}" - "$path" "$dotted" "$default" "$SCRIPT_DIR/lib" <<'PY'
 import sys
 from pathlib import Path
 sys.path.insert(0, sys.argv[4])
@@ -139,7 +139,7 @@ require_legend_if_configured() {
 }
 
 actual_metrics() {
-  python3 "$SCRIPT_DIR/lib/puml_metrics_cli.py" --type "$DIAGRAM_TYPE" "$INPUT_FILE"
+  "${PLANTUML_PYTHON:-python3}" "$SCRIPT_DIR/lib/puml_metrics_cli.py" --type "$DIAGRAM_TYPE" "$INPUT_FILE"
 }
 
 # =============================================================================
@@ -170,7 +170,7 @@ if [[ "$DIAGRAM_TYPE" == "architecture" ]]; then
   # Legend check
   INCLUDE_LEGEND="true"
   if [[ -n "$BRIEF_FILE" && -f "$BRIEF_FILE" ]]; then
-    INCLUDE_LEGEND="$(python3 -c "
+    INCLUDE_LEGEND="$("${PLANTUML_PYTHON:-python3}" -c "
 import yaml, sys
 try:
     with open('$BRIEF_FILE') as f:

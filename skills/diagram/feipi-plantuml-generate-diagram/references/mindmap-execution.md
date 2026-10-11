@@ -12,12 +12,12 @@ python3 scripts/run_mindmap.py --brief brief.yaml --out-dir package
 
 `diagram_id` 沿用单图 `D1` 最简；自定义允许 `technical-review` 这样的 slug，不允许下划线。`nodes.id` 与 parent 引用允许下划线。这两种 ID 不显示在图上。
 
-默认沿用 `AGENT_PLANTUML_SERVER_PORT`（缺省 8199）。已有服务使用不同基础地址时，可以增加唯一的地址覆盖参数 `--server-url <loopback-url>`，地址直接交给原 preflight，成功后只使用它返回的 `renderer_url`。不传 schema 路径、不手动推导产物路径。批次多图继续使用主入口的共享 preflight 流程。
+默认沿用 `AGENT_PLANTUML_SERVER_PORT`（缺省 8199）。已有服务使用不同基础地址时，可以增加地址覆盖参数 `--server-url <loopback-url>`；禁止启动服务时加 `--existing-only`。两者交给 preflight，成功后只使用返回的 `renderer_url`。不传 schema 路径、不手动推导产物路径。批次多图继续使用主入口的共享 preflight 流程。
 
 ## 依赖与平台
 
 - 支持现有 POSIX 运行环境：macOS、Linux，以及具备相同依赖的 WSL；不宣称支持原生 Windows shell。
-- 运行依赖：Python 3.10+、Bash、curl，以及 PyYAML 或 Ruby（沿用既有 YAML 加载方式）。它们必须在调用环境中可用。
+- 运行依赖：Python 3.9+、Bash、curl，以及 PyYAML 或 Ruby（沿用既有 YAML 加载方式）。它们必须在调用环境中可用；内部 Python 子脚本沿用入口解释器，不依赖全局 `python3` 指向相同版本。
 - PNG 预览固定使用 librsvg 的 `rsvg-convert`，不使用 macOS 专属 `qlmanage`，也不由模型尝试多种转换器。缺少该依赖时在 renderer 调用前返回 `missing_dependencies`，不自动安装。
 - 默认地址的服务尚未运行时，仍只有原 preflight 的一次固定 Podman 启动例外；Podman 不是已有 renderer 场景的强制依赖。自定义端口/地址不可用时不会启动默认端口容器。
 - 中文显示依赖 renderer 和本地预览环境的字体；实际查看 PNG 后判断。缺字不等于源码语法错误，不自动修改服务或字体配置。
@@ -32,7 +32,7 @@ stdout 只返回一份 JSON，退出码 0 表示执行及预览完成，1 表示
 
 `paths` 还可包含 brief、preflight、log；只列已经存在的文件。子命令完整输出写入 `run.log`；工作目录准备成功后，`run-result.json` 保存同一份摘要。准备或依赖失败时可能只有 stdout 回执。
 
-`stage` 为 prepare/dependencies/brief/preflight/generate/validate/preview/complete；优先看 `reason` 与至多三条 issues，必要时读取对应日志或回执。摘要不代替既有 v1.2 `validation.json`，前置失败不伪造图包成功合同。
+`stage` 为 prepare/dependencies/brief/preflight/generate/validate/preview/complete；优先看 `reason` 与 `issues`，连接和 verifier 错误不按行数截断，必要时读取对应日志或回执。摘要不代替既有 v1.2 `validation.json`，前置失败不伪造图包成功合同。
 
 预检或实际渲染识别到明确连接权限错误时，返回 `reason=render_access_denied`，`issues` 保留原始错误摘要。此时不启动 Podman、不增加重试或提权；完整诊断读取 preflight、validation 或 run.log。访问拒绝可能来自沙箱或系统权限，不能据此断言服务未启动。
 
