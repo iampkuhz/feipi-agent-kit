@@ -164,11 +164,22 @@ def validate_retired_entries(root: Path, link_root: Path, project: Path, env: di
         (["make", "install-project", f"PROJECT={project}"], project / ".agents/skills", False),
     )
 
-    def install(expect_success: bool = True) -> None:
-        for command, _, _ in commands:
+    def install(expect_success: bool = True) -> dict[Path, str]:
+        outputs = {}
+        for command, destination, _ in commands:
             result = subprocess.run(command, cwd=repo, env=env, text=True, capture_output=True, timeout=60)
             if (result.returncode == 0) != expect_success:
                 fail(f"同步清理验证失败：{command}\n{result.stdout[-1200:]}\n{result.stderr[-1200:]}")
+            if expect_success:
+                for message in ("目标目录：", "清理本仓库旧入口...", "清理结果：", "完成：安装"):
+                    if message not in result.stdout:
+                        fail(f"安装日志未输出到终端：{command}，缺少 {message}")
+                if re.search(r"^\d+ \d+$", result.stdout, re.MULTILINE):
+                    fail(f"内部安装计数泄漏到终端：{command}")
+            elif "清理本仓库旧入口..." in result.stdout:
+                fail(f"注册表无效时开始了清理：{command}")
+            outputs[destination] = result.stdout
+        return outputs
 
     current = create_skill("feipi-current")
     retired = create_skill("feipi-retired")
@@ -252,8 +263,20 @@ def validate_retired_entries(root: Path, link_root: Path, project: Path, env: di
             fail(f"注册表无效时改动了入口：{entry}")
 
     write_registry([moved, renamed])
-    for _ in range(2):
-        install()
+    for iteration in range(2):
+        outputs = install()
+        for destination, output in outputs.items():
+            expected = [entry for entry in removed if entry.parent == destination] if iteration == 0 else []
+            messages = [line for line in output.splitlines() if "已移除本仓库旧入口：" in line]
+            if len(messages) != len(expected) or any(
+                not any(line.endswith(f"/{entry.name}") for line in messages) for entry in expected
+            ):
+                fail(f"删除日志与实际清理不一致：{destination}")
+            if f"清理结果：移除 {len(expected)} 个本仓库旧入口" not in output:
+                fail(f"缺少清理结果日志：{destination}")
+            if not any("保留入口：" in line and "/feipi-unmarked-copy" in line
+                       and "无来源标记" in line for line in output.splitlines()):
+                fail(f"未说明纯实拷旧入口的保留原因：{destination}")
         for entry in removed:
             if os.path.lexists(entry):
                 fail(f"本仓库旧入口未清理：{entry}")

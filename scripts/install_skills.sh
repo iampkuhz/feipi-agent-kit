@@ -550,10 +550,16 @@ def belongs_to_repository(entry):
 
 
 cleaned = 0
+preserved = 0
 for entry in sorted(destination.iterdir()):
     if entry.name.startswith(".") or entry.name in active_names:
         continue
     if not belongs_to_repository(entry):
+        reason = "无法确认属于本仓库"
+        if entry.is_dir() and not entry.is_symlink() and not os.path.lexists(entry / marker_name):
+            reason = "无来源标记，内部链接不足以确认归属"
+        print(f"  保留入口：{entry}（{reason}）")
+        preserved += 1
         continue
     if entry.is_symlink():
         entry.unlink()
@@ -561,8 +567,7 @@ for entry in sorted(destination.iterdir()):
         shutil.rmtree(entry)
     print(f"  已移除本仓库旧入口：{entry}")
     cleaned += 1
-if cleaned:
-    print(f"共移除 {cleaned} 个本仓库旧入口")
+print(f"清理结果：移除 {cleaned} 个本仓库旧入口，保留 {preserved} 个其他来源或归属不明入口")
 PYEOF
 }
 
@@ -671,6 +676,8 @@ if [[ -n "$TARGET_DIR" ]]; then
   fi
 
   result="$(install_skills "copy" "$dest_root" "copy_dir" "安装到项目：$dest_root" "$_tmp_skills_collected")"
+  # 最后一行是内部计数，前面的安装与清理报告必须回显到终端。
+  printf '%s\n' "${result%$'\n'*}"
   installed="$(echo "$result" | tail -1 | cut -d' ' -f1)"
   skipped="$(echo "$result" | tail -1 | cut -d' ' -f2)"
   total_installed=$((total_installed + installed))
@@ -716,6 +723,7 @@ else
     else
       result="$(install_skills "link" "$dest_root" "link_item" "安装到 $dest_root" "$_tmp_skills_collected")"
     fi
+    printf '%s\n' "${result%$'\n'*}"
     installed="$(echo "$result" | tail -1 | cut -d' ' -f1)"
     skipped="$(echo "$result" | tail -1 | cut -d' ' -f2)"
     total_installed=$((total_installed + installed))
