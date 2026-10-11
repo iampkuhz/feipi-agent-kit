@@ -41,14 +41,10 @@ commands:
   readme: "commands/README.md"
 
 # ---------------------------------------------------------------------------
-# Skills — 全部 8 个已注册 skill
+# Skills — 全部 5 个已注册 skill
 # ---------------------------------------------------------------------------
 skills:
   # --- authoring layer ---
-  - name: "feipi-patent-generate-innovation-disclosure"
-    path: "skills/authoring/feipi-patent-generate-innovation-disclosure/SKILL.md"
-    layer: "authoring"
-    description: "专利创新交底书生成"
   - name: "feipi-skill-govern"
     path: "skills/authoring/feipi-skill-govern/SKILL.md"
     layer: "authoring"

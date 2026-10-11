@@ -14,7 +14,7 @@ usage() {
 
 示例:
   bash scripts/init_skill.sh video-read-youtube --layer integration
-  bash scripts/init_skill.sh patent-generate-innovation-disclosure --resources scripts,references,assets --layer authoring
+  bash scripts/init_skill.sh report-generate-brief --resources scripts,references,assets --layer authoring
   bash scripts/init_skill.sh video-read-youtube scripts,references /tmp/skills
 USAGE
 }

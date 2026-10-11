@@ -96,7 +96,7 @@ feipi-<domain>-<action>-<object...>
 - `feipi-plantuml-generate-diagram`
 - `feipi-dingtalk-send-webhook`
 - `feipi-openclaw-configure-runtime`
-- `feipi-patent-generate-innovation-disclosure`
+- `feipi-report-generate-brief`
 
 ## 禁止示例
 

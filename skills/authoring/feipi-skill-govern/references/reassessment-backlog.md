@@ -5,7 +5,6 @@
 ## 已完成的治理项（仅作追溯）
 
 - `feipi-dingtalk-send-webhook` - 已落地 `skills/integration/`，旧 action-first 命名已清理
-- `feipi-patent-generate-innovation-disclosure` - 已落地 `skills/authoring/`
 - `feipi-video-read-url` - 三个旧 video skill 已合并至 `skills/integration/`
 
 ## 当前待重审项

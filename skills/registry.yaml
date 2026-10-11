@@ -6,17 +6,6 @@ version: "0.1.0"
 
 skills:
   # --- authoring layer ---
-  - name: feipi-patent-generate-innovation-disclosure
-    path: skills/authoring/feipi-patent-generate-innovation-disclosure
-    layer: authoring
-    description: 专利创新交底书生成
-    clients: [claude, codex]
-    entry: SKILL.md
-    validation:
-      type: script
-      command: bash skills/authoring/feipi-patent-generate-innovation-disclosure/scripts/validate.sh
-    status: stable
-
   - name: feipi-skill-govern
     path: skills/authoring/feipi-skill-govern
     layer: authoring

@@ -1,5 +1,9 @@
 # 变更记录
 
+## 2026-10-11
+- feipi-patent-generate-innovation-disclosure：移除仓库维护与注册入口
+- feipi-skill-govern v6：清理已移除专利 skill 的示例引用
+
 ## 2026-10-10
 - feipi-plantuml-generate-diagram v10：统一文本转义与六图型覆盖校验
 
