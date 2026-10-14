@@ -3,6 +3,23 @@
   "skill": "feipi-plantuml-generate-diagram",
   "cases": [
     {
+      "id": "component-rendered-occlusion",
+      "prompt": "组件图有 6 个系统、10 条 E 编号关系。静态校验和 SVG 渲染成功，但复杂关系的箭头穿过 E2/E3 标签，请优化并验收。",
+      "expected": [
+        "组件图默认 polyline，保留 brief 的全部组件、关系和编号",
+        "从当前 SVG 取得 rendered_layout 的标签、连线和相交坐标",
+        "几何失败归 layout，在原包定点修复一次并保留渲染总次数",
+        "查看最终白底 PNG 的密集关系区域后交付",
+        "复用旧包前由 verifier 重算当前 SVG 几何"
+      ],
+      "forbidden": [
+        "仅凭静态校验、合法 SVG 或 renderer 成功声明无挡",
+        "删除关系、遮盖文字或换目录清零重试计数",
+        "将不可测量的文字或路径当作自动验收通过",
+        "把时序生命线当组件关系连线改造"
+      ]
+    },
+    {
       "id": "sequence-diagram",
       "prompt": "请根据这段接口调用过程生成一张 PlantUML 时序图",
       "expected": [

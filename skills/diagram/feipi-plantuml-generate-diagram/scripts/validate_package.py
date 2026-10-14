@@ -18,10 +18,11 @@ from lib.brief_loader import load_yaml
 from lib.profile_registry import resolve_profile
 from lib.runtime_observation import RunClock, atomic_json, receipt_fields
 from lib.svg_validation import is_success_svg
+from lib.rendered_layout import inspect_rendered_layout
 
 SCRIPTS = Path(__file__).resolve().parent
 LIB = SCRIPTS / "lib"
-RENDER_CONTRACT = "4"
+RENDER_CONTRACT = "5"
 MAX_ATTEMPTS = 2
 
 
@@ -288,6 +289,10 @@ class PackageRun:
             return self.blocked("render_evidence_missing", rendered.stdout)
         if not unchanged():
             return self.blocked("package_snapshot_changed", "渲染期间 package 副本发生变化")
+        layout = inspect_rendered_layout(self.svg)
+        if layout["status"] != "ok":
+            reason = "rendered_layout_failed" if layout["status"] == "failed" else "rendered_layout_review_required"
+            return self.blocked(reason, "\n".join(layout["issues"]))
         self.counters["package_verifier_runs"] += 1
         self.write("success")
         return self.final_verify(count_reserved=True)

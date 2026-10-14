@@ -19,7 +19,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Write validation.json")
     parser.add_argument("--output", required=True)
     parser.add_argument("--skill-name", default="feipi-plantuml-generate-diagram")
-    parser.add_argument("--render-contract-version", default="4")
+    parser.add_argument("--render-contract-version", default="5")
     parser.add_argument("--diagram-type", default="fallback")
     parser.add_argument("--profile", default="fallback")
     parser.add_argument("--diagram-path", default="")
@@ -126,6 +126,8 @@ def main() -> int:
         "brief_validation_failed": ("brief", False),
         "coverage_validation_failed": ("coverage", True),
         "layout_validation_failed": ("layout", True),
+        "rendered_layout_failed": ("layout", True),
+        "rendered_layout_review_required": ("visual_review", False),
         "render_syntax_error": ("syntax", True),
         "render_server_unavailable": ("renderer", False),
         "render_access_denied": ("renderer", False),

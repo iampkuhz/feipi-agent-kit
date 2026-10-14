@@ -1,5 +1,5 @@
-version: 11
+version: 12
 interface:
   display_name: "PlantUML 作图生成与校验"
-  short_description: "唯一 PlantUML 入口，支持思维导图自动布局、类型校验与图包输出。"
+  short_description: "唯一 PlantUML 入口，支持类型校验、组件图渲染遮挡检查与图包输出。"
   default_prompt: "使用 $feipi-plantuml-generate-diagram 生成并验证图包。mindmap 单图优先调用 run_mindmap.py，内部完成预检、生成、校验与预览，再查看图片并交付；其他图型沿用按 profile 的执行流程。"

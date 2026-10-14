@@ -1,0 +1,124 @@
+{
+  "diagram_id": "D1",
+  "diagram_type": "component",
+  "title": "复杂组件关系图",
+  "summary": "复现复杂组件图的关系线与标签遮挡。",
+  "view": "overview",
+  "groups": [
+    {
+      "id": "domain",
+      "name": "业务域",
+      "description": "系统归属"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "a",
+      "name": "入口系统",
+      "group": "domain",
+      "type": "system",
+      "description": "入口系统职责"
+    },
+    {
+      "id": "b",
+      "name": "编排系统",
+      "group": "domain",
+      "type": "system",
+      "description": "编排系统职责"
+    },
+    {
+      "id": "c",
+      "name": "校验系统",
+      "group": "domain",
+      "type": "system",
+      "description": "校验系统职责"
+    },
+    {
+      "id": "d",
+      "name": "缓存系统",
+      "group": "domain",
+      "type": "system",
+      "description": "缓存系统职责"
+    },
+    {
+      "id": "e",
+      "name": "存储系统",
+      "group": "domain",
+      "type": "system",
+      "description": "存储系统职责"
+    },
+    {
+      "id": "f",
+      "name": "审计系统",
+      "group": "domain",
+      "type": "system",
+      "description": "审计系统职责"
+    }
+  ],
+  "relations": [
+    {
+      "id": "E1",
+      "from": "a",
+      "to": "b",
+      "description": "组件关系1"
+    },
+    {
+      "id": "E2",
+      "from": "a",
+      "to": "c",
+      "description": "组件关系2"
+    },
+    {
+      "id": "E3",
+      "from": "b",
+      "to": "d",
+      "description": "组件关系3"
+    },
+    {
+      "id": "E4",
+      "from": "c",
+      "to": "d",
+      "description": "组件关系4"
+    },
+    {
+      "id": "E5",
+      "from": "b",
+      "to": "e",
+      "description": "组件关系5"
+    },
+    {
+      "id": "E6",
+      "from": "c",
+      "to": "f",
+      "description": "组件关系6"
+    },
+    {
+      "id": "E7",
+      "from": "d",
+      "to": "f",
+      "description": "组件关系7"
+    },
+    {
+      "id": "E8",
+      "from": "e",
+      "to": "f",
+      "description": "组件关系8"
+    },
+    {
+      "id": "E9",
+      "from": "a",
+      "to": "f",
+      "description": "组件关系9"
+    },
+    {
+      "id": "E10",
+      "from": "d",
+      "to": "e",
+      "description": "组件关系10"
+    }
+  ],
+  "layout": {
+    "direction": "top_to_bottom",
+    "include_legend": false
+  }
+}

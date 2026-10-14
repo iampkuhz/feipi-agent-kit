@@ -12,6 +12,7 @@ from typing import Any
 from .brief_loader import load_yaml
 from .puml_analysis import compute_puml_metrics
 from .svg_validation import is_success_svg
+from .rendered_layout import inspect_rendered_layout
 from .validation_result import compute_normalized_puml_sha256, compute_sha256
 
 
@@ -35,8 +36,8 @@ COUNTER_FIELDS = {
 
 def _validate_observation_contract(data: dict[str, Any]) -> list[str]:
     errors: list[str] = []
-    if data.get("render_contract_version") != "4":
-        errors.append("render_contract_version 必须为 4")
+    if data.get("render_contract_version") != "5":
+        errors.append("render_contract_version 必须为 5")
     timings = data.get("timings")
     last_timings = data.get("last_run_timings")
     counters = data.get("counters")
@@ -343,6 +344,12 @@ def verify_package_dir(package_dir: Path) -> list[str]:
         else:
             if not is_success_svg(resolved["svg"]):
                 errors.append("final_status=success 时 svg artifact 必须是合法且非错误的 SVG 根文档")
+            else:
+                layout = inspect_rendered_layout(resolved["svg"])
+                if data.get("rendered_layout") != layout:
+                    errors.append("rendered_layout 与当前 SVG 重算证据不一致")
+                if layout["status"] != "ok":
+                    errors.extend(["渲染遮挡验收未通过", *layout["issues"]])
         if data.get("blocked_reason"):
             errors.append("final_status=success 时 blocked_reason 必须为空")
         if typed:

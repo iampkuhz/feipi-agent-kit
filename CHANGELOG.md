@@ -1,5 +1,8 @@
 # 变更记录
 
+## 2026-10-14
+- feipi-plantuml-generate-diagram v12：补齐组件图渲染遮挡门禁与定点修复
+
 ## 2026-10-11
 - feipi-plantuml-generate-diagram v11：修复计时闭环与只读预检诊断
 - feipi-patent-generate-innovation-disclosure：移除仓库维护与注册入口

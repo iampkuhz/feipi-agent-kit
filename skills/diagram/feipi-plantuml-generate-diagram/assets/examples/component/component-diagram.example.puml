@@ -3,7 +3,7 @@ title 跨域凭据组件总览图
 top to bottom direction
 skinparam nodesep 30
 skinparam ranksep 60
-skinparam linetype ortho
+skinparam linetype polyline
 package "申请业务域" as request_domain {
   component "凭据申请系统" as request_system
 }

@@ -11,10 +11,11 @@
 7. `max_render_attempts=2` 表示首次生成 1 次、针对性修复 1 次，不是 2 次重试；未修改的失败图不得重复渲染。
 8. `timings` / `counters` 保留最近一次完整生成数据，`last_run_timings` / `last_run_counters` 记录本次实际调用；上游应优先消费后者。命中复用时 `render_ms=0`、renderer 请求与轮次均为 0，并单独记录 cache hit，不得把首次生成的历史数据当作本次调用。
 9. 明确连接权限错误记录为 `blocked_reason=render_access_denied`、`failure_class=renderer`、`repairable=false`；`issues` 保留底层错误、目标地址和 curl/HTTP 诊断。它只说明访问被拒绝，不证明服务宕机或沙箱是唯一原因；本合同不增加提权或自动恢复。
+10. 真实渲染后必须通过 `rendered_layout` 遮挡检查；success 报告的几何证据必须与当前 SVG 重算结果一致。连线穿字归可修复的 layout；无法检查归不可自动修复的 visual_review。规则与局限见 [rendered-layout.md](rendered-layout.md)。
 
 ## 计时与最终复核
 
-- `render_contract_version=4` 固定以下范围；旧合同不命中缓存，不修补历史 timing/hash 使其通过。
+- `render_contract_version=5` 增加渲染后遮挡门禁，并固定以下计时范围；旧合同不命中缓存，不修补历史 timing/hash 使其通过。
 - 所有区间起止均由同一编排进程的 `time.monotonic_ns()` 采样，不比较不同进程的时钟原点，不依赖某个 Python 补丁版本。要求 Python 3.9 或更高；Shell 子脚本沿用编排器的 Python，允许通过 `PLANTUML_PYTHON` 显式选择解释器。
 - `total_ms` 从编排入口参数解析前开始，截止于报告物化前，覆盖输入身份、静态校验、快照及渲染证据检查。模块导入、最终报告物化（含 hash/metrics 计算、序列化与落盘）、最终 verifier 和 stdout 输出在截止点外；它不是整条命令的墙钟耗时。
 - `render_ms` 是整个 `check_render.sh` 子进程的耗时，包括启动、编码、curl SVG 请求、响应检查与文件移动；不称为纯 HTTP/SVG 请求时间。

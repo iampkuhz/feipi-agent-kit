@@ -63,7 +63,7 @@ else
 fi
 
 # 通用文本 codec 和六图型字段覆盖均在真实渲染之前验证。
-for test in test_text_codec.py test_literal_profile_coverage.py; do
+for test in test_text_codec.py test_literal_profile_coverage.py test_rendered_layout.py; do
   if python3 "$TEST_DIR/$test"; then
     pass "$test"
   else
@@ -133,6 +133,12 @@ print(data["renderer_url"])
 PY
 )"
 readonly RENDERER_URL
+
+if python3 "$TEST_DIR/test_rendered_layout_integration.py" "$RENDERER_URL"; then
+  pass "复杂组件图渲染遮挡与同包修复闭环"
+else
+  fail "复杂组件图渲染遮挡与同包修复闭环"
+fi
 
 # =============================================================================
 # Step 3: Fallback 正向验证
@@ -411,7 +417,7 @@ assert data["diagram_path"] == "diagram.puml"
 assert data["brief_sha256"] == data["artifacts"]["brief"]["sha256"]
 assert data["puml_sha256"] == data["artifacts"]["diagram"]["sha256"]
 assert data["metrics"] == {"node_count": 3, "edge_count": 2, "max_degree": 2}
-assert data["render_contract_version"] == "4"
+assert data["render_contract_version"] == "5"
 assert data["max_render_attempts"] == 2
 assert data["attempt_index"] == 1
 assert data["attempts_remaining"] == 2 - data["attempt_index"]

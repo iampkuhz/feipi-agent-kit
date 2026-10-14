@@ -33,6 +33,13 @@ python3 scripts/run_mindmap.py --brief brief.yaml --out-dir package
 4. `sequence` 默认 `interaction_mr`，专利流程使用 `process_s`。已有 mindmap 的定点修复也用该验证入口；不要重新运行生成器覆盖人工修改。
 5. 未变成功包显式使用 `--reuse-valid-package`；brief、diagram、父 brief、profile 或渲染合同变化时缓存失效。合同细节见 `references/package-contract.md`。
 
+## 组件图连线与渲染遮挡
+
+- 组件图默认使用 `skinparam linetype polyline`；复杂多关系图不要盲用 `ortho`。边标签沿用空标签或 `E1...En`，详细语义留在 brief/图下说明；不能为消除遮挡删除关系或改写需求。
+- `validate_package.sh` 在真实 SVG 上检查关系线与所有可见文字区域，包括本线标签和其他组件标签。`rendered_layout.status=failed` 是布局失败，`issues` 给出标签、连线和相交坐标；在原包中定点调整方向、间距或路由后只允许一次修复渲染。
+- 无法可靠解析时为 `rendered_layout_review_required`，停止自动修复并交复核；不能将其当作无挡验收通过。检测边界与修复顺序见 `references/rendered-layout.md`。
+- 交付前将最终 SVG 转成白底 PNG（`rsvg-convert --background-color white --output diagram.png diagram.svg`），查看全图与密集连线处，确认文字可读、标签归属清楚。几何通过只代表确定性遮挡检查通过，不能代替视觉审阅。
+
 ## 显示文本与结构语法
 
 - brief 中的标题、名称、消息与 note 写原始文本，不预转义。文件名、路径、引号、括号和 Creole 标记都属于显示文本；ID、箭头、指令和样式仍按各 profile 的结构合同书写。
@@ -43,10 +50,10 @@ python3 scripts/run_mindmap.py --brief brief.yaml --out-dir package
 ## 统一质量与失败边界
 
 - 输出至少包含 `diagram.puml`、`validation.json`；只有真实渲染成功才有可交付的 `diagram.svg`。mindmap 定界符为 `@startmindmap/@endmindmap`，其他现有图型为 `@startuml/@enduml`。
-- brief/schema、覆盖、布局、真实 SVG、artifact hash 与源码 metrics 的校验必须保留；`validate_package.sh` 内置最终文件 verifier，成功后不再改写报告，正常作图不重复手动调用。计时范围与缓存双次复核见 `references/package-contract.md`。
+- brief/schema、覆盖、源码布局、渲染遮挡、真实 SVG、artifact hash 与源码 metrics 的校验必须保留；`validate_package.sh` 内置最终文件 verifier，成功后不再改写报告，正常作图不重复手动调用。计时范围与缓存双次复核见 `references/package-contract.md`。
 - 默认本地端口读取 `AGENT_PLANTUML_SERVER_PORT`，缺省 8199；显式 `--server-url` 也只接受 loopback。规则见 `references/render-rules.md`。
 - 默认预检首次不可用时，仅默认 8199 地址允许一次固定 Podman 启动并复检一次；`--existing-only` 禁止启动。仍不可用即 blocked，禁止继续启动、杀死、重启或排查 renderer/proxy 进程。
 - 明确的连接权限错误优先返回 `render_access_denied`，不启动 Podman、不复检。报告“访问被拒绝，可能受沙箱或系统权限限制”，不能断言服务未启动；普通连接失败或超时也不能直接断言沙箱限制。脚本不能自行提权，遵循宿主权限策略；详情见 `references/render-rules.md`。
 - 每图首次渲染一次，仅 syntax/coverage/layout 失败允许定点修复一次；总渲染上限两次。未修改失败图不重复运行，不通过更换目录重置计数。
-- brief/over_budget、renderer、contract/retry_limit 失败停止；视觉问题交给 reviewer，不自动进入渲染循环。
+- brief/over_budget、renderer、contract/retry_limit 失败停止；确定性渲染遮挡归 layout，其他视觉问题交给 reviewer，不自动进入渲染循环。
 - 静态校验与 renderer 冲突时转工具缺陷处理；维护与合同规则见 `references/package-contract.md`。

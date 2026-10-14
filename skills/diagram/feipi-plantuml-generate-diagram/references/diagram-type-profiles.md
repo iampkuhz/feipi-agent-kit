@@ -30,6 +30,7 @@
 - `parent_component_ref` 通过安全相对路径、overview brief hash、diagram id 与节点 id 共同绑定；细化图只能使用一个分组，不能仅凭非空字符串声称父组件
 - `overview` 顶层只允许业务域、独立系统与物理端点
 - 节点最多 8、可见关系最多 10、单节点连接度最多 4；边标签只允许为空或 `E1...En`
+- 默认 `skinparam linetype polyline`；真实 SVG 的关系线不得穿过文字区域，失败坐标与定点修复规则见 [rendered-layout.md](rendered-layout.md)
 
 ### activity（已注册）
 

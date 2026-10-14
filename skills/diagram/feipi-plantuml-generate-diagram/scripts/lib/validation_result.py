@@ -9,12 +9,13 @@ from dataclasses import dataclass, asdict, field
 from pathlib import Path
 
 from .svg_validation import is_success_svg
+from .rendered_layout import inspect_rendered_layout
 
 
 @dataclass
 class ValidationResult:
     schema_version: str = "1.2"
-    render_contract_version: str = "4"
+    render_contract_version: str = "5"
     skill_name: str = "feipi-plantuml-generate-diagram"
     diagram_id: str = ""
     diagram_type: str = "fallback"
@@ -26,6 +27,7 @@ class ValidationResult:
     brief_check: str = "skipped"
     coverage_check: str = "skipped"
     layout_check: str = "skipped"
+    rendered_layout: dict = field(default_factory=lambda: dict(status="skipped", text_count=0, connector_count=0, issues=[]))
     render_result: str = "pending"
     render_server: str = ""
     brief_sha256: str = ""
@@ -150,6 +152,8 @@ def write_validation_json(
     source_brief = result.brief_path
     source_diagram = result.diagram_path
     source_svg = result.svg_path
+    if result.render_result == "ok" and source_svg:
+        result.rendered_layout = inspect_rendered_layout(source_svg)
     source_parent_brief = result.parent_brief_path
     if source_brief and Path(source_brief).is_file():
         result.brief_sha256 = compute_sha256(source_brief)
@@ -199,6 +203,8 @@ def write_validation_json(
             invalid_success.append("svg_missing")
         elif not source_svg or not is_success_svg(source_svg):
             invalid_success.append("svg_invalid")
+        if result.rendered_layout["status"] != "ok":
+            invalid_success.append("rendered_layout_not_ok")
         if result.profile != "fallback":
             for field_name in ("brief_check", "coverage_check", "layout_check"):
                 if getattr(result, field_name) != "ok":

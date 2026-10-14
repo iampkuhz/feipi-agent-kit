@@ -17,6 +17,7 @@ sys.path.insert(0, str(SCRIPT_DIR))
 from lib.profile_registry import resolve_profile
 from lib.puml_analysis import compute_puml_metrics
 from lib.package_verifier import verify_package_dir
+from lib.rendered_layout import inspect_rendered_layout
 from lib.validation_result import compute_normalized_puml_sha256, compute_sha256
 
 
@@ -56,7 +57,8 @@ def build_package(base: Path) -> dict:
     svg_path.write_text('<svg xmlns="http://www.w3.org/2000/svg"><text>fixture</text></svg>\n', encoding="utf-8")
     validation = {
         "schema_version": "1.2",
-        "render_contract_version": "4",
+        "render_contract_version": "5",
+        "rendered_layout": inspect_rendered_layout(svg_path),
         "skill_name": "feipi-plantuml-generate-diagram",
         "diagram_id": "D9",
         "diagram_type": "component",

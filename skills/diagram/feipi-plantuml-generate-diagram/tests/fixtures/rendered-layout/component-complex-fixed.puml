@@ -1,0 +1,25 @@
+@startuml
+title 复杂组件关系图
+top to bottom direction
+skinparam linetype polyline
+skinparam nodesep 30
+skinparam ranksep 60
+package "业务域" as domain {
+component "入口系统" as a
+component "编排系统" as b
+component "校验系统" as c
+component "缓存系统" as d
+component "存储系统" as e
+component "审计系统" as f
+}
+a --> b : E1
+a --> c : E2
+b --> d : E3
+c --> d : E4
+b --> e : E5
+c --> f : E6
+d --> f : E7
+e --> f : E8
+a --> f : E9
+d --> e : E10
+@enduml
