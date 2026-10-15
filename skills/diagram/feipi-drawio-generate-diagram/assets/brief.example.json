@@ -1,0 +1,13 @@
+{
+  "title": "订单处理架构",
+  "diagram_type": "architecture",
+  "nodes": [
+    {"id": "client", "label": "客户端\n提交订单", "x": 40, "y": 80, "width": 180, "height": 90},
+    {"id": "api", "label": "订单服务\n校验与编排", "x": 340, "y": 80, "width": 180, "height": 90},
+    {"id": "db", "label": "订单数据库", "shape": "cylinder", "x": 640, "y": 80, "width": 180, "height": 90}
+  ],
+  "edges": [
+    {"id": "submit", "source": "client", "target": "api", "label": "HTTPS"},
+    {"id": "persist", "source": "api", "target": "db", "label": "写入"}
+  ]
+}

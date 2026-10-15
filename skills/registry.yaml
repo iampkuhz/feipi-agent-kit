@@ -27,6 +27,17 @@ skills:
     status: stable
 
   # --- diagram layer ---
+  - name: feipi-drawio-generate-diagram
+    path: skills/diagram/feipi-drawio-generate-diagram
+    layer: diagram
+    description: draw.io 可编辑图表、Podman 本地渲染与图包校验
+    clients: [claude, codex]
+    entry: SKILL.md
+    validation:
+      type: script
+      command: bash skills/diagram/feipi-drawio-generate-diagram/scripts/validate.sh
+    status: stable
+
   - name: feipi-plantuml-generate-diagram
     path: skills/diagram/feipi-plantuml-generate-diagram
     layer: diagram

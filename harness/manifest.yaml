@@ -41,7 +41,7 @@ commands:
   readme: "commands/README.md"
 
 # ---------------------------------------------------------------------------
-# Skills — 全部 5 个已注册 skill
+# Skills — 全部 6 个已注册 skill
 # ---------------------------------------------------------------------------
 skills:
   # --- authoring layer ---
@@ -54,6 +54,10 @@ skills:
     layer: "authoring"
     description: "技术汇报 PPT 单页重构"
   # --- diagram layer ---
+  - name: "feipi-drawio-generate-diagram"
+    path: "skills/diagram/feipi-drawio-generate-diagram/SKILL.md"
+    layer: "diagram"
+    description: "draw.io 本地作图与图包校验"
   - name: "feipi-plantuml-generate-diagram"
     path: "skills/diagram/feipi-plantuml-generate-diagram/SKILL.md"
     layer: "diagram"
@@ -77,7 +81,7 @@ workflows:
     description: "Skill 治理工作流（创建、审查、校验）"
   - name: "diagram-generate"
     path: "harness/workflows/diagram-generate.yaml"
-    description: "PlantUML 图表生成工作流"
+    description: "PlantUML / draw.io 图表生成工作流"
 
 # ---------------------------------------------------------------------------
 # Validation — harness 级一致性检查（由 scripts/harness/doctor.sh 执行）

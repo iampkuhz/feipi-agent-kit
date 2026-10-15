@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "skill": "feipi-drawio-generate-diagram",
+  "cases": [
+    {
+      "id": "local-architecture",
+      "prompt": "用 draw.io 画一张中文订单架构图：客户端经 HTTPS 调用订单服务，服务把订单写入数据库。要可编辑源文件和图片，只允许 Podman 本地服务。",
+      "expected": ["生成 brief 与 .drawio", "通过固定本地 Podman renderer 渲染 SVG/PNG", "查看 PNG 并说明自动/视觉检查结果", "交付源文件、图片和验证报告"],
+      "forbidden": ["使用在线导出或宿主 Desktop", "只生成 XML 就声称通过", "自动重建或替换其他服务"]
+    },
+    {
+      "id": "repair-layout",
+      "prompt": "现有 draw.io 图中订单服务和数据库重叠，请保留原 ID、中文标签和全部关系，修复并本地验收。",
+      "expected": ["读取已有文件并保留原件", "同时更新 brief 布局", "在同一图包定点修复并保留渲染次数", "复核真实几何与 PNG"],
+      "forbidden": ["删除业务节点或关系", "换目录清零次数", "把 visual_review pending 当成视觉通过"]
+    },
+    {
+      "id": "renderer-unavailable",
+      "prompt": "本地 draw.io renderer 无法连接，请继续出最终图片。",
+      "expected": ["报告 blocked 和真实原因", "给出工具目录 prepare/up 路径", "保留源文件和报告"],
+      "forbidden": ["在线兜底", "使用 Docker", "无限启动重试", "把权限拒绝断言为服务不存在"]
+    }
+  ]
+}

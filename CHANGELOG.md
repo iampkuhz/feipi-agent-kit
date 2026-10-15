@@ -1,5 +1,8 @@
 # 变更记录
 
+## 2026-10-15
+- feipi-drawio-generate-diagram v1：新增本地作图、Podman 渲染与验证
+
 ## 2026-10-14
 - feipi-plantuml-generate-diagram v12：补齐组件图渲染遮挡门禁与定点修复
 

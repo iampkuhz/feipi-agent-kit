@@ -1,0 +1,15 @@
+FROM docker.io/library/python:3.13-slim
+
+# Debian 的 Chromium 同时支持 amd64/arm64；中文字体随镜像安装。
+RUN apt-get -o Acquire::http::Timeout=30 -o Acquire::Retries=1 update \
+    && apt-get -o Acquire::http::Timeout=30 -o Acquire::Retries=1 install -y --no-install-recommends chromium fonts-noto-cjk ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir playwright==1.55.0
+WORKDIR /app
+COPY webapp/ /app/webapp/
+COPY server.py render.js /app/
+ENV PYTHONUNBUFFERED=1
+ENV XDG_CONFIG_HOME=/tmp/chromium-config XDG_CACHE_HOME=/tmp/chromium-cache
+USER 65534:65534
+EXPOSE 8080
+CMD ["python", "/app/server.py"]

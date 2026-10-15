@@ -1,31 +1,36 @@
-# Workflow: PlantUML Diagram Generation
-# PlantUML 图表生成工作流，统辖所有 diagram skill
+# Workflow: Diagram Generation
+# 按用户指定的图表格式选择入口。
 
 workflow:
   name: "diagram-generate"
   version: "0.1.0"
-  description: "PlantUML 图表生成工作流 — 路由到合适的 diagram skill"
+  description: "PlantUML / draw.io 图表生成工作流"
 
   # 触发条件
   triggers:
+    - "需要生成或修改 draw.io / diagrams.net / .drawio 图表时"
     - "需要生成 PlantUML 架构图时"
     - "需要生成 PlantUML 时序图时"
     - "需要生成其他 PlantUML 图表时"
 
   # 引用的 skill
   referenced_skills:
+    - name: "feipi-drawio-generate-diagram"
+      path: "skills/diagram/feipi-drawio-generate-diagram/SKILL.md"
+      role: "draw.io 入口"
     - name: "feipi-plantuml-generate-diagram"
       path: "skills/diagram/feipi-plantuml-generate-diagram/SKILL.md"
-      role: "唯一入口"
+      role: "PlantUML 入口"
 
   # 路由逻辑
   routing:
     default: "feipi-plantuml-generate-diagram"
+    drawio: "feipi-drawio-generate-diagram"
 
   # 校验步骤
   steps:
-    - name: "validate-plantuml-syntax"
-      description: "校验生成的 PlantUML 语法"
+    - name: "validate-diagram-package"
+      description: "由对应 skill 校验源文件、覆盖、布局与真实本地渲染产物"
       required: true
 
     - name: "check-template-usage"
@@ -35,6 +40,6 @@ workflow:
   # 输出
   outputs:
     - type: "diagram"
-      description: "生成的 PlantUML 文件路径"
+      description: "生成的 PlantUML 或 draw.io 源文件及渲染图路径"
     - type: "validation"
       description: "校验结果"

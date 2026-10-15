@@ -35,6 +35,7 @@ cp .env.example .env
 | LiteLLM | 本地 AI 模型网关，提供 OpenAI 兼容统一接口 | `make litellm-up` / `litellm-down` | [tools/gateway/litellm/](tools/gateway/litellm/) |
 | SearXNG | 私有化元搜索引擎 | `make searxng-up` / `searxng-down` | [tools/search/searxng/](tools/search/searxng/) |
 | Crawl4AI | 网页抓取与内容提取 | — | [tools/crawl/crawl4ai/](tools/crawl/crawl4ai/) |
+| draw.io | Podman 本地渲染与中文图表预览 | `bash tools/diagram/drawio/drawio.sh prepare` / `up` | [tools/diagram/drawio/](tools/diagram/drawio/) |
 
 ## Skills
 
@@ -43,6 +44,7 @@ cp .env.example .env
 | `feipi-skill-govern` | Skill 的创建、重构、自检与治理 |
 | `feipi-video-read-url` | 视频 URL 处理（YouTube / Bilibili） |
 | `feipi-plantuml-generate-diagram` | PlantUML 架构图、时序图、思维导图及通用作图唯一入口 |
+| `feipi-drawio-generate-diagram` | draw.io 可编辑图表、Podman 本地渲染与图包校验 |
 | `feipi-techreport-ppt-skill` | 技术报告 PPT 单页 |
 | `feipi-dingtalk-send-webhook` | 钉钉群机器人 webhook |
 
