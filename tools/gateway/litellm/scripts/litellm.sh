@@ -7,13 +7,17 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COMPOSE_DIR="$(dirname "$SCRIPT_DIR")"
 COMPOSE_FILE="$COMPOSE_DIR/compose/docker-compose.yml"
+# shellcheck source=../../../lib/podman.sh
+source "$COMPOSE_DIR/../../lib/podman.sh"
 
 cd "$COMPOSE_DIR"
 
 apply_defaults() {
   LITELLM_PORT="4000"
-  POSTGRES_DATA_DIR="/Users/zhehan/Documents/service-data/postgres"
-  CHATGPT_TOKEN_HOST_DIR="/Users/zhehan/Documents/service-data/litellm/chatgpt-tokens"
+  # 默认跟随当前用户；只提供一个可选数据根目录，子目录由服务自行推导。
+  agent_service_data_root
+  POSTGRES_DATA_DIR="$AGENT_SERVICE_DATA_DIR/postgres"
+  CHATGPT_TOKEN_HOST_DIR="$AGENT_SERVICE_DATA_DIR/litellm/chatgpt-tokens"
   export LITELLM_MASTER_KEY="${LITELLM_MASTER_KEY:-sk-litellm-local-dev}"
   export LITELLM_UPSTREAM_CODE_MODEL_OPENAI_NAME="${LITELLM_UPSTREAM_CODE_MODEL_OPENAI_NAME:-openai/qwen-plus}"
   export LITELLM_UPSTREAM_CODE_MODEL_OPENAI_BASE="${LITELLM_UPSTREAM_CODE_MODEL_OPENAI_BASE:-${BAILIAN_CODING_PLAN_OPENAI_BASE_URL:-${BAILIAN_OPENAI_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}}}"
@@ -205,10 +209,8 @@ compose() {
   if [[ -n "${LITELLM_COMPOSE_COMMAND:-}" ]]; then
     # shellcheck disable=SC2086
     $LITELLM_COMPOSE_COMMAND --env-file "$compose_env_file" -f "$COMPOSE_FILE" "$@"
-  elif command -v podman-compose >/dev/null 2>&1; then
-    podman-compose --env-file "$compose_env_file" -f "$COMPOSE_FILE" "$@"
   else
-    podman compose --env-file "$compose_env_file" -f "$COMPOSE_FILE" "$@"
+    podman_compose --env-file "$compose_env_file" -f "$COMPOSE_FILE" "$@"
   fi
 }
 
@@ -439,6 +441,15 @@ EOF
   echo "3. 用当前 LITELLM_MASTER_KEY 重新登录 Dashboard。"
   echo "4. 若刚改过 LITELLM_MASTER_KEY，先执行 ./scripts/litellm.sh restart 再重新登录。"
 }
+
+# 所有 Compose 操作先核对同一个本地引擎；只读和停止命令也不能落到远端。
+# 放在目录创建之前，检查失败时不产生本机数据。
+case "${1:-up}" in
+  up|start|down|stop|restart|restart-chatgpt|recreate|logs|status)
+    podman_require_runtime
+    agent_service_data_root
+    ;;
+esac
 
 case "${1:-up}" in
   print-chatgpt-env|chatgpt-env)

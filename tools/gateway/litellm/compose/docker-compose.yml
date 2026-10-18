@@ -23,7 +23,8 @@ services:
       - "127.0.0.1:5432:5432"
     volumes:
       - type: bind
-        source: /Users/zhehan/Documents/service-data/postgres
+        # 默认当前用户的本机数据目录；与启动脚本使用同一个可选覆盖项。
+        source: ${AGENT_SERVICE_DATA_DIR:-${HOME}/Documents/service-data}/postgres
         target: /var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U litellm"]
@@ -91,7 +92,7 @@ services:
       - ../config/config.yaml:/app/config.yaml:ro
       # ChatGPT OAuth token 持久化目录（宿主机 <-> 容器）
       - type: bind
-        source: /Users/zhehan/Documents/service-data/litellm/chatgpt-tokens
+        source: ${AGENT_SERVICE_DATA_DIR:-${HOME}/Documents/service-data}/litellm/chatgpt-tokens
         target: /app/chatgpt-tokens
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:4000/health/readiness', timeout=3).read()\""]

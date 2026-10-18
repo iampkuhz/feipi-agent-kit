@@ -5,15 +5,18 @@
 ## 快速开始
 
 ```bash
-# 1. 初始化
+# 1. 先由 Dotfiles 安装 Podman、podman-compose 与 Python，并准备本地 machine
+# 2. 只读检查（失败会返回非零，不再打印虚假的初始化完成）
 make setup
 
-# 2. 安装 Skills 到 Claude Code / Codex
+# 3. 安装 Skills 到 Claude Code / Codex
 make install-links
 
-# 3. 启动服务（按需）
+# 4. 启动服务（按需）
 make searxng-up          # SearXNG 搜索
 make litellm-up          # LiteLLM 模型网关
+make crawl4ai-up         # Crawl4AI（按需）
+make otel-up             # 本机 OTel 日志（按需）
 
 # 健康检查
 make doctor
@@ -26,7 +29,9 @@ cp .env.example .env
 # 按注释填入所需的 API Key 等变量
 ```
 
-仓库根目录 `.env.example` 是统一模板；各服务有独立 `env/` 目录可覆盖特定配置。
+仓库根目录 `.env.example` 只是参考模板，启动脚本不会自动 source。LiteLLM 沿用当前 shell 导出的变量；Crawl4AI 需要覆盖时使用忽略的服务级 `.env.local`；SearXNG 使用已追踪的 settings。
+
+新机只恢复配置、模板和启动入口，镜像重新拉取、缓存重建；详见 [新 Mac 服务重建](docs/setup-new-mac.md)，不依赖 NAS 或容器导出。
 
 ## 服务
 
@@ -34,7 +39,8 @@ cp .env.example .env
 |------|------|------|------|
 | LiteLLM | 本地 AI 模型网关，提供 OpenAI 兼容统一接口 | `make litellm-up` / `litellm-down` | [tools/gateway/litellm/](tools/gateway/litellm/) |
 | SearXNG | 私有化元搜索引擎 | `make searxng-up` / `searxng-down` | [tools/search/searxng/](tools/search/searxng/) |
-| Crawl4AI | 网页抓取与内容提取 | — | [tools/crawl/crawl4ai/](tools/crawl/crawl4ai/) |
+| Crawl4AI | 网页抓取与内容提取 | `make crawl4ai-up` / `crawl4ai-down` | [tools/crawl/crawl4ai/](tools/crawl/crawl4ai/) |
+| OTel | 本机日志采集与清洗 | `make otel-up` / `otel-down` | [tools/gateway/otel/](tools/gateway/otel/) |
 | draw.io | Podman 本地渲染与中文图表预览 | `bash tools/diagram/drawio/drawio.sh prepare` / `up` | [tools/diagram/drawio/](tools/diagram/drawio/) |
 
 ## Skills

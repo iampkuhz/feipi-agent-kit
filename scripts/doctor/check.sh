@@ -25,8 +25,7 @@ echo "---------------"
 if [[ -f "$REPO_ROOT/.env" ]]; then
     echo "✅ .env 存在"
 else
-    echo "⚠️  .env 不存在（建议从 .env.example 复制）"
-    ((WARNINGS++))
+    echo "ℹ️  根 .env 未创建（可选参考文件，服务脚本不自动加载）"
 fi
 
 # 检查关键环境变量
@@ -36,7 +35,7 @@ check_env_var() {
         echo "✅ $var 已设置"
     else
         echo "⚠️  $var 未设置"
-        ((WARNINGS++))
+        WARNINGS=$((WARNINGS + 1))
     fi
 }
 
@@ -52,22 +51,22 @@ echo "---------------"
 
 # SearXNG
 echo -n "SearXNG: "
-if curl -s --max-time 2 http://localhost:8873/healthz > /dev/null; then
+if curl --noproxy '*' -fsS --max-time 2 http://127.0.0.1:8873/healthz > /dev/null; then
     echo "✅ 运行中 (http://localhost:8873)"
 else
     echo "❌ 未运行"
     echo "   启动命令：make searxng-up"
-    ((ERRORS++))
+    ERRORS=$((ERRORS + 1))
 fi
 
 # LiteLLM
 echo -n "LiteLLM: "
-if curl -s --max-time 2 http://localhost:4000/health > /dev/null; then
+if curl --noproxy '*' -fsS --max-time 2 http://127.0.0.1:4000/health/readiness > /dev/null; then
     echo "✅ 运行中 (http://localhost:4000)"
 else
     echo "❌ 未运行"
     echo "   启动命令：make litellm-up"
-    ((ERRORS++))
+    ERRORS=$((ERRORS + 1))
 fi
 
 # ===== 检查目录结构 =====
@@ -83,7 +82,7 @@ check_dir() {
         echo "✅ $name: $dir"
     else
         echo "❌ $name 缺失：$dir"
-        ((ERRORS++))
+        ERRORS=$((ERRORS + 1))
     fi
 }
 
@@ -111,7 +110,7 @@ check_executable() {
         echo "✅ 可执行：$file"
     else
         echo "⚠️ 不可执行：$file"
-        ((WARNINGS++))
+        WARNINGS=$((WARNINGS + 1))
     fi
 }
 
@@ -146,7 +145,6 @@ echo "启动所有服务："
 echo "  make searxng-up"
 echo "  make litellm-up"
 echo ""
-echo "设置环境变量："
-echo "  cp .env.example .env"
-echo "  # 编辑 .env"
+echo "配置覆盖请按各服务文档；LiteLLM 读取导出的变量，Crawl4AI 使用本机 .env.local。"
+echo "新机重建步骤：docs/setup-new-mac.md"
 echo ""

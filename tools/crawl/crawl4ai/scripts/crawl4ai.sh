@@ -1,60 +1,34 @@
-#!/bin/bash
-# Crawl4AI 启动/停止脚本（占位）
-# 用法：./crawl4ai.sh [up|down|restart|logs|status]
-# 状态：⏳ 预留位置，待实现
-
-set -e
-
+#!/usr/bin/env bash
+# 从固定 Compose 定义管理本地服务；不安装软件、不导出容器。
+set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-COMPOSE_DIR="$(dirname "$SCRIPT_DIR")"
-COMPOSE_FILE="$COMPOSE_DIR/compose/docker-compose.yml"
+SERVICE_DIR="$(dirname "$SCRIPT_DIR")"
+# shellcheck source=../../../lib/podman.sh
+source "$SERVICE_DIR/../../lib/podman.sh"
+# 本地覆盖优先；不自动复制、source 或改写环境文件。
+if [[ -z "${CRAWL4AI_ENV_FILE:-}" ]]; then
+  if [[ -f "$SERVICE_DIR/env/.env.local" ]]; then
+    export CRAWL4AI_ENV_FILE="$SERVICE_DIR/env/.env.local"
+  else
+    export CRAWL4AI_ENV_FILE="$SERVICE_DIR/env/.env.example"
+  fi
+fi
 
-cd "$COMPOSE_DIR"
-
-echo "⏳ Crawl4AI 服务尚未实现"
-echo ""
-echo "计划功能："
-echo "  1. Crawl4AI 服务本体（宿主机运行，无需 Docker）"
-echo "  2. Playwright 浏览器依赖"
-echo "  3. 网页抓取和提取 API"
-echo ""
-echo "参考实现："
-echo "  - https://github.com/unclecode/crawl4ai"
-echo ""
-
-case "${1:-help}" in
-  up|start)
-    echo "Crawl4AI 暂未实现 Docker 化"
-    echo "请参考官方文档在宿主机安装："
-    echo "  pip install crawl4ai"
-    echo "  playwright install"
-    ;;
-
-  down|stop)
-    echo "Crawl4AI 未运行（暂未实现）"
-    ;;
-
-  restart)
-    echo "Crawl4AI 暂未实现"
-    ;;
-
-  logs)
-    echo "Crawl4AI 暂未实现"
-    ;;
-
-  status)
-    echo "Crawl4AI 状态：未实现"
-    ;;
-
-  *)
-    echo "用法：$0 {up|down|restart|logs|status}"
-    echo ""
-    echo "Crawl4AI 服务计划："
-    echo "  up      - 启动服务（暂未实现）"
-    echo "  down    - 停止服务（暂未实现）"
-    echo "  restart - 重启服务（暂未实现）"
-    echo "  logs    - 查看日志（暂未实现）"
-    echo "  status  - 查看状态（暂未实现）"
-    exit 1
-    ;;
+case "${1:-up}" in
+up | start | down | stop | restart | logs | status)
+  podman_require_runtime
+  case "${1:-up}" in
+  up | start) action=(up -d) ;;
+  down | stop) action=(down) ;;
+  restart) action=(restart) ;;
+  logs) action=(logs --tail 50) ;;
+  status) action=(ps) ;;
+  esac
+  # /dev/null 避免无意读取当前目录的 .env；服务级 env_file 仍按定义加载。
+  podman_compose --env-file /dev/null -f "$SERVICE_DIR/compose/docker-compose.yml" "${action[@]}"
+  ;;
+*)
+  echo '用法：crawl4ai.sh up|down|restart|logs|status' >&2
+  exit 2
+  ;;
 esac

@@ -4,7 +4,8 @@ services:
     container_name: otel-collector
     volumes:
       - ../config:/etc/otelcol:ro
-      - /Users/zhehan/Documents/service-data/otel:/data:rw
+      # 日志默认跟随当前用户，支持与 LiteLLM 共用的数据根目录覆盖。
+      - ${AGENT_SERVICE_DATA_DIR:-${HOME}/Documents/service-data}/otel:/data:rw
     ports:
       - "4317:4317"
       - "4318:4318"
@@ -12,10 +13,10 @@ services:
     restart: unless-stopped
 
   otel-cleaner:
-    image: python:3.13-slim
+    image: docker.io/library/python:3.13-slim
     container_name: otel-cleaner
     volumes:
-      - /Users/zhehan/Documents/service-data/otel:/data:rw
+      - ${AGENT_SERVICE_DATA_DIR:-${HOME}/Documents/service-data}/otel:/data:rw
       - ../scripts/clean-otel.py:/clean-otel.py:ro
     command: ["python3", "/clean-otel.py"]
     restart: unless-stopped

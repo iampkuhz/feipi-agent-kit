@@ -307,12 +307,14 @@ model_info:
 
 在 `~/.codex/config.toml` 中修改（或新增）以下配置。注意：`model`、`model_provider`、`model_catalog_json` 这些根级配置必须写在 `[model_providers.litellm-local]` 表之前。
 
+下方 `model_catalog_json` 是绝对路径占位符，请使用 `print-codex-config` 在当前机器输出的值；TOML 字符串不自动展开 `$HOME`。
+
 ```toml
 model = "gpt-5.5"
 model_provider = "litellm-local"
 model_reasoning_effort = "xhigh"
 service_tier = "priority"
-model_catalog_json = "/Users/zhehan/.codex/model-catalogs/litellm-local.json"
+model_catalog_json = "/绝对路径/.codex/model-catalogs/litellm-local.json"
 
 [features]
 fast_mode = true
@@ -349,7 +351,7 @@ export LITELLM_API_KEY_OPENAI=<LiteLLM Virtual Keys 中 key-for-openai 的 secre
 如果 ChatGPT 登录态失效，网关会自动重新触发 OAuth 授权流程。若出现异常，可手动清除 token 后重启：
 
 ```bash
-rm /Users/zhehan/Documents/service-data/litellm/chatgpt-tokens/auth.json
+rm "${AGENT_SERVICE_DATA_DIR:-$HOME/Documents/service-data}/litellm/chatgpt-tokens/auth.json"
 ./scripts/litellm.sh restart
 ```
 
@@ -376,16 +378,18 @@ rm /Users/zhehan/Documents/service-data/litellm/chatgpt-tokens/auth.json
 | `LITELLM_CONTAINER_HTTP_PROXY` / `LITELLM_CONTAINER_HTTPS_PROXY` | 容器访问外网的代理地址 | `http://host.containers.internal:7890` |
 | `POSTGRES_PASSWORD` | 沿用旧 PostgreSQL 数据库密码时才需要配置 | `litellm_password` |
 
-### 3.2 固定默认路径和默认 deployment
+### 3.2 可迁移的数据路径和默认 deployment
 
 | 项目 | 默认值 |
 |------|--------|
-| PostgreSQL 数据目录 | `/Users/zhehan/Documents/service-data/postgres` |
-| ChatGPT OAuth token 目录 | `/Users/zhehan/Documents/service-data/litellm/chatgpt-tokens` |
+| PostgreSQL 数据目录 | `$HOME/Documents/service-data/postgres` |
+| ChatGPT OAuth token 目录 | `$HOME/Documents/service-data/litellm/chatgpt-tokens` |
 | LiteLLM 镜像 | `docker.litellm.ai/berriai/litellm:v1.94.2` |
 | OpenAI 兼容逻辑模型 | `litellm-code-openai` |
 | Anthropic 兼容逻辑模型 | `litellm-code-anthropic` |
 | 本地补全逻辑模型 | `litellm-autocomplate-openai` |
+
+两项数据目录均由当前用户推导，可用一个 `AGENT_SERVICE_DATA_DIR` 覆盖共同根目录。macOS 先准备本地 Podman machine；新机步骤见 [重建说明](../../../docs/setup-new-mac.md)。本地凭据通过自己的安全渠道恢复或重新登录，不复制整个容器。
 
 这些逻辑模型名在 `compose/docker-compose.yml` 和 `config/config.yaml` 中维护，不要求写入 `~/.env`。如果只是切换百炼上游模型、base URL 或 API key，优先使用上面的环境变量覆盖，不需要修改 `config.yaml`。
 

@@ -24,3 +24,10 @@ tools/gateway/litellm/env/.env
 tools/gateway/litellm/**/*.log
 /tools/search/searxng/settings/settings.yml.new
 /output/*
+
+# Crawl4AI 的真实环境留在本机；新机只从不含秘密的 .env.example 开始。
+/tools/crawl/crawl4ai/env/.env
+/tools/crawl/crawl4ai/env/.env.local
+
+# 根环境文件可能包含本机密钥，仅保留 .env.example 模板。
+/.env

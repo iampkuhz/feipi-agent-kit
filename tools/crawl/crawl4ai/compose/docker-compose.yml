@@ -11,13 +11,15 @@ services:
     ports:
       - "11235:11235"
     env_file:
-      - ../env/.env
+      # 本地覆盖存在时由脚本选中；干净克隆默认使用不含秘密的模板。
+      - ${CRAWL4AI_ENV_FILE:-../env/.env.example}
     environment:
       NO_PROXY: 127.0.0.1,localhost,0.0.0.0,::1,host.containers.internal
       no_proxy: 127.0.0.1,localhost,0.0.0.0,::1,host.containers.internal
     volumes:
-      - /dev/shm:/dev/shm
       - ../config/config.yml:/app/config.yml:ro
+    # 使用容器自己的共享内存，不依赖宿主机 /dev/shm 路径。
+    shm_size: 1gb
     deploy:
       resources:
         limits:

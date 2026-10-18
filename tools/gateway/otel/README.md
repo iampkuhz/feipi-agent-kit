@@ -14,16 +14,17 @@ Claude Code ──(gRPC)──▶ OTel Collector ──▶ claude-code-otel.raw 
 
 ## 启动
 
+以下命令在仓库根执行；本机环境见 [新 Mac 重建](../../../docs/setup-new-mac.md)。
+
 ```bash
-cd tools/gateway/otel/compose
-podman compose up -d
+make otel-up
+make otel-status
 ```
 
 ## 停止
 
 ```bash
-cd tools/gateway/otel/compose
-podman compose down
+make otel-down
 ```
 
 ## Claude Code 环境变量
@@ -41,7 +42,7 @@ export OTEL_LOGS_EXPORT_INTERVAL=1000
 
 ## 落盘文件
 
-路径：`/Users/zhehan/Documents/service-data/otel/`
+默认路径：`$HOME/Documents/service-data/otel/`，跟随当前用户；可用 `AGENT_SERVICE_DATA_DIR` 改数据根目录。启动脚本自动创建目录，状态检查不创建。
 
 | 文件 | 说明 |
 |---|---|
@@ -51,7 +52,7 @@ export OTEL_LOGS_EXPORT_INTERVAL=1000
 日常只看 `claude-code-otel.jsonl`：
 
 ```bash
-cat /Users/zhehan/Documents/service-data/otel/claude-code-otel.jsonl
+cat "${AGENT_SERVICE_DATA_DIR:-$HOME/Documents/service-data}/otel/claude-code-otel.jsonl"
 ```
 
 ## 当前版本实际可用的事件（v2.1.92）
@@ -67,13 +68,13 @@ Claude Code v2.1.92 实际只输出以下两类 OTel log 事件：
 
 ```bash
 # 查看 api_request（model、tokens、cost、duration）
-grep 'api_request' /Users/zhehan/Documents/service-data/otel/claude-code-otel.jsonl | jq .
+grep 'api_request' "${AGENT_SERVICE_DATA_DIR:-$HOME/Documents/service-data}/otel/claude-code-otel.jsonl" | jq .
 
 # 查看 user_prompt
-grep 'user_prompt' /Users/zhehan/Documents/service-data/otel/claude-code-otel.jsonl | jq .
+grep 'user_prompt' "${AGENT_SERVICE_DATA_DIR:-$HOME/Documents/service-data}/otel/claude-code-otel.jsonl" | jq .
 
 # 按 model 过滤
-grep '"model"' /Users/zhehan/Documents/service-data/otel/claude-code-otel.jsonl | jq '.resourceLogs[0].scopeLogs[0].logRecords[0].attributes[] | select(.key=="model")'
+grep '"model"' "${AGENT_SERVICE_DATA_DIR:-$HOME/Documents/service-data}/otel/claude-code-otel.jsonl" | jq '.resourceLogs[0].scopeLogs[0].logRecords[0].attributes[] | select(.key=="model")'
 ```
 
 ## 如果需要完整的 request/response payload
@@ -90,5 +91,5 @@ OTel 方案当前无法满足。可考虑：
 ## 清空日志
 
 ```bash
-> /Users/zhehan/Documents/service-data/otel/claude-code-otel.jsonl
+> "${AGENT_SERVICE_DATA_DIR:-$HOME/Documents/service-data}/otel/claude-code-otel.jsonl"
 ```

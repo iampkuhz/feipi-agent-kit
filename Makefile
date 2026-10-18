@@ -18,12 +18,17 @@ RESOLVED_PROJECT := $(or $(PROJECT),$(DIR))
 # Services
 SEARXNG_DIR := tools/search/searxng
 LITELLM_DIR := tools/gateway/litellm
+CRAWL4AI_DIR := tools/crawl/crawl4ai
+OTEL_DIR := tools/gateway/otel
 
 .PHONY: help install install-links install-project
 .PHONY: searxng-up searxng-down searxng-restart searxng-logs
 .PHONY: litellm-up litellm-down litellm-restart litellm-logs
 .PHONY: searxng-mcp-run searxng-mcp-http searxng-mcp-test  # [已退役]
 .PHONY: doctor setup
+.PHONY: searxng-status litellm-status
+.PHONY: crawl4ai-up crawl4ai-down crawl4ai-restart crawl4ai-logs crawl4ai-status
+.PHONY: otel-up otel-down otel-restart otel-logs otel-status
 .PHONY: model-download
 .PHONY: harness-doctor validate-harness
 
@@ -57,7 +62,9 @@ help:
 	@echo "                         # 从 Hugging Face 下载模型"
 	@echo ""
 	@echo "===== 仓库维护 ====="
-	@echo "  make setup               # 初始化设置"
+	@echo "  make setup               # 只读检查 Podman、新机依赖与服务定义"
+	@echo "  make crawl4ai-up / down / restart / logs / status"
+	@echo "  make otel-up / down / restart / logs / status"
 	@echo "  make doctor              # 健康检查"
 	@echo ""
 	@echo "===== Harness 验证 ====="
@@ -84,44 +91,20 @@ install-project:
 	fi
 	@$(INSTALL_SCRIPT) $(if $(AGENT),--agent "$(AGENT)") --dir "$(RESOLVED_PROJECT)"
 
-# ===== SearXNG 服务 =====
+# ===== 本地服务：统一复用各服务脚本，不再绕到 Docker =====
 
-searxng-up:
-	@echo "🚀 启动 SearXNG..."
-	@cd $(SEARXNG_DIR) && docker compose -f compose/docker-compose.yml up -d
-	@echo "✅ SearXNG 已启动"
-	@echo "📌 访问地址：http://localhost:8873"
-	@echo "📌 健康检查：curl http://localhost:8873/healthz"
+searxng-up searxng-down searxng-restart searxng-logs searxng-status:
+	@bash "$(SEARXNG_DIR)/scripts/searxng.sh" "$(patsubst searxng-%,%,$@)"
 
-searxng-down:
-	@echo "🛑 停止 SearXNG..."
-	@cd $(SEARXNG_DIR) && docker compose -f compose/docker-compose.yml down
-	@echo "✅ SearXNG 已停止"
+litellm-up litellm-down litellm-restart litellm-logs litellm-status:
+	@bash "$(LITELLM_DIR)/scripts/litellm.sh" "$(patsubst litellm-%,%,$@)"
 
-searxng-restart:
-	@echo "🔄 重启 SearXNG..."
-	@cd $(SEARXNG_DIR) && docker compose -f compose/docker-compose.yml restart
-	@echo "✅ SearXNG 已重启"
+crawl4ai-up crawl4ai-down crawl4ai-restart crawl4ai-logs crawl4ai-status:
+	@bash "$(CRAWL4AI_DIR)/scripts/crawl4ai.sh" "$(patsubst crawl4ai-%,%,$@)"
 
-searxng-logs:
-	@cd $(SEARXNG_DIR) && docker compose -f compose/docker-compose.yml logs -f
-
-# ===== LiteLLM 服务 =====
-
-litellm-up:
-	@echo "🚀 启动 LiteLLM..."
-	@cd $(LITELLM_DIR) && ./scripts/litellm.sh up
-
-litellm-down:
-	@echo "🛑 停止 LiteLLM..."
-	@cd $(LITELLM_DIR) && ./scripts/litellm.sh down
-
-litellm-restart:
-	@echo "🔄 重启 LiteLLM..."
-	@cd $(LITELLM_DIR) && ./scripts/litellm.sh restart
-
-litellm-logs:
-	@cd $(LITELLM_DIR) && ./scripts/litellm.sh logs
+# OTel 的 restart 显式重建容器以应用配置，不清理本机日志。
+otel-up otel-down otel-restart otel-logs otel-status:
+	@bash "$(OTEL_DIR)/scripts/otel.sh" "$(patsubst otel-%,%,$@)"
 
 # SearXNG MCP 服务 [已退役]
 # tools/search/searxng-mcp/ 已于 2026-05 移除。以下 target 保留仅作提示。
@@ -138,24 +121,12 @@ searxng-mcp-test:
 
 # ===== 仓库维护 =====
 
+# 依赖和服务失败必须保留非零退出码，不能在失败后打印“初始化完成”。
 setup:
-	@echo "🔧 初始化设置..."
-	@./scripts/bootstrap/setup.sh 2>/dev/null || echo "⚠️  setup.sh 执行失败"
-	@echo "✅ 初始化完成"
+	@bash scripts/bootstrap/setup.sh
 
 doctor:
-	@echo "🏥 健康检查..."
-	@./scripts/doctor/check.sh 2>/dev/null || echo "⚠️  check.sh 执行失败"
-	@echo ""
-	@echo "===== 服务状态 ====="
-	@echo "SearXNG:"
-	@curl -s http://localhost:8873/healthz && echo "✅ 运行中" || echo "❌ 未运行"
-	@echo ""
-	@echo "LiteLLM:"
-	@curl -s http://localhost:4000/health > /dev/null && echo "✅ 运行中" || echo "❌ 未运行"
-	@echo ""
-	@echo "SearXNG MCP:"
-	@echo "  [已退役] SearXNG MCP 服务（tools/search/searxng-mcp/）已移除"
+	@bash scripts/doctor/check.sh
 
 # ===== 模型管理 =====
 

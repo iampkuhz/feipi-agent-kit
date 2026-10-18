@@ -35,9 +35,11 @@
 
 ### 前置条件
 
+先按 [新 Mac 服务重建](../../../docs/setup-new-mac.md) 准备本地 Podman。
+
 ```bash
-# 使用 Docker（推荐）
-docker pull unclecode/crawl4ai:latest
+# Podman 与 podman-compose 由 Dotfiles 安装，macOS 先准备本地 machine。
+# 在仓库根运行 make setup 做只读检查；详见 docs/setup-new-mac.md。
 ```
 
 ### 运行服务
@@ -46,12 +48,12 @@ docker pull unclecode/crawl4ai:latest
 # 进入服务目录
 cd tools/crawl/crawl4ai
 
-# 复制环境变量文件
-cp ../env/.env.example ../env/.env
+# 普通抓取可跳过此步；需要本机覆盖时才复制，不能覆盖已有配置。
+test -f env/.env.local || cp env/.env.example env/.env.local
 
 # 启动服务
-podman compose -f compose/docker-compose.yml up -d
-# 或 docker compose up -d
+bash scripts/crawl4ai.sh up
+# 仓库根也可执行 make crawl4ai-up；使用仓库固定镜像版本。
 ```
 
 说明：
@@ -60,7 +62,7 @@ podman compose -f compose/docker-compose.yml up -d
 - 该 compose 会自动挂载：
   - `config/config.yml` → `/app/config.yml`
 
-如果需要通过宿主机代理访问外网，请在 `env/.env` 中同时设置 `HTTP_PROXY`、`HTTPS_PROXY` 以及有效的 `NO_PROXY` / `no_proxy`。至少应包含 `127.0.0.1,localhost,0.0.0.0,::1,host.containers.internal`；否则 Crawl4AI 的 MCP handler 在容器内部回调 `/md`、`/crawl` 等本地接口时，可能会误走代理并返回 `502 Bad Gateway`，即使 GUI 页面仍能正常使用。
+如果需要通过宿主机代理访问外网，请在 `env/.env.local` 中同时设置 `HTTP_PROXY`、`HTTPS_PROXY` 以及有效的 `NO_PROXY` / `no_proxy`。至少应包含 `127.0.0.1,localhost,0.0.0.0,::1,host.containers.internal`；否则 Crawl4AI 的 MCP handler 在容器内部回调 `/md`、`/crawl` 等本地接口时，可能会误走代理并返回 `502 Bad Gateway`，即使 GUI 页面仍能正常使用。
 
 ### 验证服务
 
@@ -173,13 +175,16 @@ This domain is for use in documentation examples...
 ```bash
 cd tools/crawl/crawl4ai
 
+CRAWL4AI_VERIFY_ENV=env/.env.example
+if test -f env/.env.local; then CRAWL4AI_VERIFY_ENV=env/.env.local; fi
+
 podman run -d \
   --name crawl4ai-verify \
   -p 12235:11235 \
-  --env-file env/.env \
+  --env-file "$CRAWL4AI_VERIFY_ENV" \
   -e NO_PROXY=127.0.0.1,localhost,0.0.0.0,::1,host.containers.internal \
   -e no_proxy=127.0.0.1,localhost,0.0.0.0,::1,host.containers.internal \
-  -v /dev/shm:/dev/shm \
+  --shm-size 1gb \
   -v "$(pwd)/config/config.yml:/app/config.yml:ro" \
   docker.io/unclecode/crawl4ai:0.8.6
 
