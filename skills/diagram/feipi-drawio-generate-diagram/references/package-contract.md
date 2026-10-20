@@ -12,6 +12,8 @@
 
 状态为 `passed`、`failed` 或 `blocked`。`passed` 仅证明自动检查通过，`visual_review` 固定为 `pending`；Agent 必须实际查看 PNG 并在交付中说明视觉结论，不能自行把 JSON 改为已审。
 
+renderer 阻塞时 `renderer_error` 与独立预检共用诊断格式：`status`、`reason`，按错误包含 `code`、`command`、`exit_code`、`stderr`（最多 2000 字符）和 `next_steps`。预检阻塞保留源文件且不增加 `render_attempts`；环境准备完成后可在原目录继续。
+
 主入口没有外部 URL 或成功状态参数。客户端绕过环境代理、禁止重定向，验证本地 Podman 容器后才请求 renderer。请求前持久化次数，最多两次；服务故障不自动重试。只有 `stage=layout` 且源码发生修改允许一次修复。未变成功包可离线复用，文件变化/缺失或哈希不符即失败。
 
 自动门禁：

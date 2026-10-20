@@ -6,7 +6,8 @@ import pathlib, sys
 root = pathlib.Path(sys.argv[1])
 sys.path.insert(0, str(root / 'scripts'))
 from core import generate, inspect_source, read_json, validate_brief
-for name in ('SKILL.md', 'agents/openai.yaml', 'scripts/run_diagram.py', 'scripts/verify_package.py'):
+for name in ('SKILL.md', 'agents/openai.yaml', 'scripts/run_diagram.py', 'scripts/verify_package.py',
+             'scripts/renderer.py', 'scripts/preflight_renderer.py', 'scripts/prepare_renderer.py'):
     if not (root / name).is_file():
         raise SystemExit(f'缺少文件：{name}')
 brief = validate_brief(read_json(root / 'assets/brief.example.json'))

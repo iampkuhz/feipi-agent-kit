@@ -147,7 +147,7 @@ class DiagramTests(unittest.TestCase):
         with patch.dict(os.environ, {}, clear=True), patch.object(renderer, 'ensure_local'), \
              patch.object(renderer, 'podman', return_value=json.dumps([container])) as podman:
             with self.assertRaises(ValueError): renderer.preflight(True)
-            self.assertEqual(podman.call_count, 1)
+            self.assertFalse(any(call.args[0] == 'start' for call in podman.call_args_list))
 
 
 if __name__ == '__main__':

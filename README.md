@@ -41,7 +41,7 @@ cp .env.example .env
 | SearXNG | 私有化元搜索引擎 | `make searxng-up` / `searxng-down` | [tools/search/searxng/](tools/search/searxng/) |
 | Crawl4AI | 网页抓取与内容提取 | `make crawl4ai-up` / `crawl4ai-down` | [tools/crawl/crawl4ai/](tools/crawl/crawl4ai/) |
 | OTel | 本机日志采集与清洗 | `make otel-up` / `otel-down` | [tools/gateway/otel/](tools/gateway/otel/) |
-| draw.io | Podman 本地渲染与中文图表预览 | `bash tools/diagram/drawio/drawio.sh prepare` / `up` | [tools/diagram/drawio/](tools/diagram/drawio/) |
+| draw.io | Podman 本地渲染与中文图表预览 | `bash tools/diagram/drawio/drawio.sh ensure` | [tools/diagram/drawio/](tools/diagram/drawio/) |
 
 ## Skills
 

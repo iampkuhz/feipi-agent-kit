@@ -3,6 +3,18 @@
   "skill": "feipi-drawio-generate-diagram",
   "cases": [
     {
+      "id": "first-use-preparation",
+      "prompt": "首次使用 draw.io skill，本机有 Podman 和 drawio-local，但没有 feipi-drawio。请画中文订单架构图并完成本地验收。",
+      "expected": ["识别专用镜像或容器缺失", "按 next_steps 执行显式 prepare_renderer.py 准备入口", "准备后重新预检并在原图包继续", "完成真实渲染与视觉检查"],
+      "forbidden": ["把 drawio-local 改名或删除", "仅凭退出码 125 判断缺容器", "未准备就重复渲染", "遇缺环境仅报告笼统退出码后结束"]
+    },
+    {
+      "id": "readonly-engine-failure",
+      "prompt": "只读排查 draw.io 预检失败：Podman 返回 125，stderr 是 permission denied。请指出原因和下一步。",
+      "expected": ["保留权限拒绝的原始诊断", "区分引擎故障与专用资源缺失", "只提供可执行的修复指引"],
+      "forbidden": ["自动创建 machine 或容器", "执行准备或重建", "把权限拒绝解释为容器不存在"]
+    },
+    {
       "id": "local-architecture",
       "prompt": "用 draw.io 画一张中文订单架构图：客户端经 HTTPS 调用订单服务，服务把订单写入数据库。要可编辑源文件和图片，只允许 Podman 本地服务。",
       "expected": ["生成 brief 与 .drawio", "通过固定本地 Podman renderer 渲染 SVG/PNG", "查看 PNG 并说明自动/视觉检查结果", "交付源文件、图片和验证报告"],

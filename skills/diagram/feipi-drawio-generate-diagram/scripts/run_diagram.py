@@ -11,7 +11,7 @@ import time
 
 from core import (CONTRACT, digest, generate, inspect_source, layout_issues, read_json,
                   require, validate_brief, validate_images, verify_package)
-from renderer import preflight, request
+from renderer import failure, preflight, request
 
 
 def write_json(path, value):
@@ -96,6 +96,8 @@ def run_locked(args):
     except Exception as exc:
         report['status'] = 'blocked' if report['stage'] == 'renderer' else 'failed'
         report['issues'].append(str(exc))
+        if report['status'] == 'blocked':
+            report['renderer_error'] = failure(exc)
         code = 2 if report['status'] == 'blocked' else 1
         if old.get('status') == 'passed':
             # 无效的新请求不能破坏既有成功包；终端报告仍明确本次失败。

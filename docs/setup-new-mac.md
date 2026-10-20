@@ -25,7 +25,7 @@ make setup
 | Crawl4AI | `make crawl4ai-up` | `make crawl4ai-status` | `http://127.0.0.1:11235/health` |
 | LiteLLM + PostgreSQL | `make litellm-up` | `make litellm-status` | `http://127.0.0.1:4000/health/readiness` |
 | OTel collector/cleaner | `make otel-up` | `make otel-status` | 通过容器状态核对，接收端口 4317/4318 |
-| draw.io | `bash tools/diagram/drawio/drawio.sh prepare`，再 `up` | 同脚本 `status` | `http://127.0.0.1:8200/health` |
+| draw.io | `bash tools/diagram/drawio/drawio.sh ensure` | 同脚本 `status` | `http://127.0.0.1:8200/health` |
 
 前四项均可使用 `make <服务>-down/restart/logs`；日志入口最多显示最后 50 行（LiteLLM 保留其原有日志入口）。重建、重启与停止都是显式动作，检查失败不会自动停止其他服务。
 
