@@ -2,7 +2,7 @@
   "schema_version": 1,
   "case_id": "local-lexiflow-documentation-report",
   "status": "proposed",
-  "basis": "用户指定 lexiflow/docs；事实与既有协作要求来自原文快照，具体节选、参考稿及语义验收项待用户审核。",
+  "basis": "用户指定 lexiflow/docs；事实与既有协作要求来自原文快照，具体节选、参考稿及语义验收项由维护者拟定，行为验收由 AI 完成，不代表用户已逐项确认。",
   "must_include": [
     {
       "id": "LD-I01",

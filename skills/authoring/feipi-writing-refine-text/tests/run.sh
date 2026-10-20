@@ -111,5 +111,5 @@ for case in cases:
             for quote in check["source_quotes"]:
                 assert quote and quote in original, f"验收项原文锚点缺失：{check['id']}"
     document_count += 1
-print(f"包结构与 {len(cases)} 条用例完整性通过，含 {document_count} 组真实文档、{len(criterion_ids)} 项来源锚点；不代表改写质量或用户验收通过。")
+print(f"包结构与 {len(cases)} 条用例完整性通过，含 {document_count} 组真实文档、{len(criterion_ids)} 项来源锚点；语义质量另由 AI 对照原文验收。")
 PY
