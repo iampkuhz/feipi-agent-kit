@@ -1,6 +1,7 @@
 # 变更记录
 
 ## 2026-10-20
+- feipi-writing-refine-text v3：增加重点提炼与自然回复，按对话目的和关系选取信息，补充立场、承诺、共享背景及语气边界测试
 - feipi-writing-refine-text v2：先判断阅读任务与内容关系，由 AI 完成文本验收，补充保真、误报与交接回归
 - feipi-drawio-generate-diagram v3：准备下载低速检测、宿主代理功能验证与一次回退，初始化和构建超时请求用户确认
 

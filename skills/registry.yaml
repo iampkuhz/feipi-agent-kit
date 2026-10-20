@@ -29,7 +29,7 @@ skills:
   - name: feipi-writing-refine-text
     path: skills/authoring/feipi-writing-refine-text
     layer: authoring
-    description: 中文表达问题定位与精炼，交付优化稿和问题清单
+    description: 中文文稿精炼与问题诊断，从对话和要点提炼自然回复
     clients: [claude, codex]
     entry: SKILL.md
     validation: null

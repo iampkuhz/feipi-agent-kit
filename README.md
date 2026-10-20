@@ -52,7 +52,7 @@ cp .env.example .env
 | `feipi-plantuml-generate-diagram` | PlantUML 架构图、时序图、思维导图及通用作图唯一入口 |
 | `feipi-drawio-generate-diagram` | draw.io 可编辑图表、Podman 本地渲染与图包校验 |
 | `feipi-techreport-ppt-skill` | 技术报告 PPT 单页 |
-| [feipi-writing-refine-text](skills/authoring/feipi-writing-refine-text/SKILL.md) | 定位表达问题并精炼汇报等文本，按场景加载，交付优化稿与原文问题清单 |
+| [feipi-writing-refine-text](skills/authoring/feipi-writing-refine-text/SKILL.md) | 精炼汇报等文稿并交付问题清单，也从对话和要点提炼自然回复 |
 | `feipi-dingtalk-send-webhook` | 钉钉群机器人 webhook |
 
 ## 常用命令

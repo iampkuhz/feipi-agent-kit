@@ -2,14 +2,18 @@
 
 查阅日期：2026-10-16。以下公开 skill 用于设计比较；本 skill 的中文规则与示例独立编写，没有安装上游代码，也不要求运行时联网。链接指向可变化的上游文件，不作为固定版本声明。
 
+2026-10-20 为自然回复场景复查 blader/humanizer 与 Google Voice and tone；其余来源沿用上次记录。
+
 | 来源 | 本 skill 采用的思路 | 本地取舍 |
 |------|-------------------|----------|
 | [Anthropic Skill authoring best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices) | 入口负责导航，详细规则按任务加载；资源直接从入口可达；用实际执行验证。 | 场景与条件资源分别路由；不把最大行数当设计目标，也不把分文件本身当作渐进加载已经生效。 |
-| [Google Voice and tone](https://developers.google.com/style/tone) | 清晰有用优先，保留帮助理解的过渡，避免空泛措辞与机械句式。 | 按中文场景判断语气；不将英文写作风格或礼貌词规则一律套用到中文邮件。 |
-| [blader/humanizer](https://github.com/blader/humanizer/blob/main/SKILL.md) | 从段落与句子的作用识别冗余；检查改写是否增删事实；清理对话残留；保护代码与链接。 | 按用户要求交付正文与原文问题清单；不把某个词或标点单独视为必须删除的证据。 |
+| [Google Voice and tone](https://developers.google.com/style/tone) | 清晰有用优先，直接、友善而不过度口语化，避免空泛措辞与机械句式。 | 按中文场景与关系判断语气；不将技术文档的英文风格一律套用到私人聊天，也不删除必要礼貌。 |
+| [blader/humanizer](https://github.com/blader/humanizer/blob/main/SKILL.md) | 从句段作用识别冗余，检查改写事实；在线程回复中考虑读者已有上下文，优先给出决定及必要理由。 | 有草稿时交付正文与问题清单；不统一禁词或标点，不以增加虚构经历和反应制造人味。 |
 | [ai-zixun/humanizer-zh](https://github.com/ai-zixun/humanizer-zh/blob/main/SKILL.md) | 区分中文文本用途，处理机械结构和空泛判断，保留原意及判断强度。 | 不主动提议模仿作者；不统一禁用破折号；不自动把技术缩写替换为近似中文概念。 |
 | [nothing0here/humanizer-zh](https://github.com/nothing0here/humanizer-zh/blob/main/SKILL.md) | 关注职场黑话、无效连接及多场景语气。 | 仅参考问题分类；示例中的具体改写需要逐项核对原文，不能将“更具体”作为补造效果或事实的理由。 |
 
 本地重点来自用户需求：以内容单位及其阅读作用判定重复，按逻辑关系判定过渡，转换内部历史与问答，并检查核心解释是否足够。诊断与修复分开，保留原文问题及处理状态供主 Agent 复核。五个优化方向、交接方式与具体中文示例是本仓库针对需求的设计，不能视为上游原有能力或质量结论。
 
-这些来源提供编辑方法，不是文本作者身份的证据，也不构成 AI 检测准确率保证。本 skill 用信息保真和独立可读性评价改写结果。
+自然回复的本地设计按本轮沟通目的、共享背景、关系和真实立场选择信息。风格样稿只用于语气，不提供新事实；没有草稿也能根据用户要点拟稿，但不替用户编造答复意愿。由 AI 完成验收，不把上游读者反馈建议变为用户必做步骤。
+
+这些来源提供编辑方法，不是文本作者身份的证据，也不构成 AI 检测准确率保证。本 skill 用信息保真和任务适配评价改写；独立文稿检查独立可读性，对话回复检查接话效果与接收者可知的上下文。

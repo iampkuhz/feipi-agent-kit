@@ -1,5 +1,5 @@
-version: 2
+version: 3
 interface:
   display_name: "中文文本去废话"
-  short_description: "定位汇报等文稿的表达问题并精炼，交付优化稿与原文问题清单，保留必要解释。"
-  default_prompt: "用 $feipi-writing-refine-text 精炼这份汇报或讨论材料，先按阅读任务确定有效内容、依据和关系，再优化表达。由 AI 完成成稿与原文对照验收，交付优化正文及含原文位置、依据、修复状态和必要信息缺口的问题清单。"
+  short_description: "精炼汇报等文稿，诊断表达问题；也可根据对话和要点提炼自然回复，保留事实与立场。"
+  default_prompt: "用 $feipi-writing-refine-text 处理这份文稿或对话材料，先确定阅读或回应目的，再精炼内容与表达。由 AI 完成验收；有原稿时交付正文及问题清单，仅凭对话和要点拟回复时说明必要依据与缺口。明确只要正文时仅给可用文本。"
