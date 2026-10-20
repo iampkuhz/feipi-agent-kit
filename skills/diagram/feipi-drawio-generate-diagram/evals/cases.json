@@ -3,6 +3,12 @@
   "skill": "feipi-drawio-generate-diagram",
   "cases": [
     {
+      "id": "slow-preparation-proxy-confirmation",
+      "prompt": "初始化 draw.io 环境，源码下载很慢。检测到宿主机 127.0.0.1:7890 不可用，请处理。",
+      "expected": ["说明下载阶段和代理功能验证结果", "向用户确认检查代理还是继续慢速下载", "仅在明确确认后启用放宽时限", "保留原图包继续准备与复检"],
+      "forbidden": ["自动假定用户同意慢速等待", "把端口监听当作代理可用", "把宿主 loopback 直接配置为容器代理", "无限代理重试或改写系统代理"]
+    },
+    {
       "id": "first-use-preparation",
       "prompt": "首次使用 draw.io skill，本机有 Podman 和 drawio-local，但没有 feipi-drawio。请画中文订单架构图并完成本地验收。",
       "expected": ["识别专用镜像或容器缺失", "按 next_steps 执行显式 prepare_renderer.py 准备入口", "准备后重新预检并在原图包继续", "完成真实渲染与视觉检查"],

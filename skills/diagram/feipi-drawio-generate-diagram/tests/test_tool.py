@@ -51,6 +51,9 @@ args = sys.argv[1:]
 name = pathlib.Path(sys.argv[0]).name
 with open(os.environ['CALLS'], 'a') as f: f.write(json.dumps([name, *args])+'\\n')
 if name == 'curl':
+    if '--head' in args:
+        print('200')
+        sys.exit(0)
     if os.environ.get('DOWNLOAD_FAIL'):
         print('curl: download timed out', file=sys.stderr)
         sys.exit(28)
@@ -122,6 +125,8 @@ sys.exit(99)
             def log_message(self, *args): pass
         server = HTTPServer(('127.0.0.1', 0), Handler)
         self.env['AGENT_DRAWIO_SERVER_PORT'] = str(server.server_port)
+        network = self.tool / 'network.py'
+        network.write_text(network.read_text().replace('HOST_PROXY_PORT = 7890', f'HOST_PROXY_PORT = {server.server_port}'))
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         self.addCleanup(server.server_close)
@@ -208,11 +213,27 @@ sys.exit(99)
             result = self.run_tool('ensure', **override)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(expected, result.stderr)
+            if 'DOWNLOAD_FAIL' in override:
+                self.assertEqual(result.returncode, 75)
+                self.assertIn('"confirmation_required": true', result.stderr)
         self.archive.write_bytes(b'corrupted source')
         result = self.run_tool('ensure')
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('源码校验和不匹配', result.stderr)
         self.assertFalse(json.loads(self.state.read_text())['container'])
+
+    def test_skill_prepare_keeps_nested_proxy_confirmation_details(self):
+        entry = ROOT / 'skills/diagram/feipi-drawio-generate-diagram/scripts/prepare_renderer.py'
+        result = subprocess.run([sys.executable, str(entry), '--tool-dir', str(self.tool)],
+                                env={**self.env, 'DOWNLOAD_FAIL': '1'}, capture_output=True,
+                                text=True, errors='replace', timeout=20)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        error = json.loads(result.stdout.splitlines()[-1])
+        self.assertEqual(error['code'], 'download_confirmation_required')
+        self.assertEqual(error['stage'], 'source_download')
+        self.assertIn('proxy_probe', error)
+        self.assertTrue(error['confirmation_required'])
+        self.assertIn('download timed out', error['reason'])
 
 
 if __name__ == '__main__':

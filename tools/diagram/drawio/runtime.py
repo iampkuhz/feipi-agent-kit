@@ -11,6 +11,8 @@ import urllib.error
 import urllib.request
 from urllib.parse import urlsplit
 
+from network import allow_slow, confirmation
+
 ROOT = Path(__file__).resolve().parent
 IMAGE = 'localhost/feipi/drawio-renderer:1'
 CONTAINER = 'feipi-drawio'
@@ -57,6 +59,8 @@ def local_connection():
 
 
 def engine(prepare=False):
+    if prepare:
+        allow_slow()
     local_connection()
     try:
         podman('info')
@@ -66,7 +70,14 @@ def engine(prepare=False):
             raise
         machines = json.loads(podman('machine', 'list', '--format', 'json')) or []
         if not machines:
-            podman('machine', 'init', timeout=300)
+            limit = 600 if allow_slow() else 300
+            try:
+                podman('machine', 'init', timeout=limit)
+            except ToolError as exc:
+                if isinstance(exc.__cause__, subprocess.TimeoutExpired):
+                    raise confirmation('machine_init', f'Podman machine 初始化超过 {limit} 秒；下载或解压可能较慢，需确认后再处理已有初始化状态',
+                                       'https://quay.io/v2/') from exc
+                raise
             name = 'podman-machine-default'
         else:
             defaults = [m for m in machines if m.get('Default')]
@@ -147,7 +158,10 @@ def manage(action):
         if podman('image', 'exists', IMAGE, missing_ok=True) is None:
             result = subprocess.run(['bash', str(ROOT / 'drawio.sh'), 'prepare'])
             if result.returncode:
-                raise ToolError('镜像准备失败；上方保留下载/构建的原始错误', exit_code=result.returncode)
+                error = ToolError('镜像准备失败；上方保留下载/构建的原始错误', exit_code=result.returncode)
+                if result.returncode == 75:
+                    error.details.update(code='download_confirmation_required', confirmation_required=True)
+                raise error
     if action in ('up', 'ensure'):
         if c is None:
             if podman('image', 'exists', IMAGE, missing_ok=True) is None:
@@ -183,4 +197,4 @@ if __name__ == '__main__':
     except Exception as exc:
         print(json.dumps(getattr(exc, 'details', {'status': 'blocked', 'reason': str(exc)}),
                          ensure_ascii=False), file=sys.stderr)
-        sys.exit(2)
+        sys.exit(75 if getattr(exc, 'details', {}).get('confirmation_required') else 2)

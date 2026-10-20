@@ -30,9 +30,9 @@ done
 python3 "$ROOT/runtime.py" engine --prepare
 BUILD_DIR="$(mktemp -d "${TMPDIR:-/tmp}/feipi-drawio-build.XXXXXX")"
 trap 'rm -rf "$BUILD_DIR"' EXIT
-trap 'rc=$?; echo "draw.io 准备失败（exit $rc），请查看上方下载、校验或构建的具体错误。" >&2; exit "$rc"' ERR
-curl --fail --location --connect-timeout 10 --max-time 180 \
-  "https://codeload.github.com/jgraph/drawio/tar.gz/$REVISION" -o "$BUILD_DIR/drawio.tar.gz"
+trap 'rc=$?; echo "draw.io 准备失败（exit ${rc}），请查看上方下载、校验或构建的具体错误。" >&2; exit "$rc"' ERR
+python3 "$ROOT/network.py" download \
+  "https://codeload.github.com/jgraph/drawio/tar.gz/$REVISION" "$BUILD_DIR/drawio.tar.gz"
 python3 - "$BUILD_DIR/drawio.tar.gz" "$SHA256" <<'HASH'
 import hashlib, pathlib, sys
 if hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest() != sys.argv[2]:
@@ -41,11 +41,4 @@ HASH
 tar -xzf "$BUILD_DIR/drawio.tar.gz" -C "$BUILD_DIR" "drawio-$REVISION/src/main/webapp"
 mv "$BUILD_DIR/drawio-$REVISION/src/main/webapp" "$BUILD_DIR/webapp"
 cp "$ROOT/Containerfile" "$ROOT/server.py" "$ROOT/render.js" "$BUILD_DIR/"
-if [[ -n "${AGENT_DRAWIO_BUILD_PROXY:-}" ]]; then
-  podman build --build-arg "http_proxy=$AGENT_DRAWIO_BUILD_PROXY" \
-    --build-arg "https_proxy=$AGENT_DRAWIO_BUILD_PROXY" \
-    -t "$IMAGE" -f "$BUILD_DIR/Containerfile" "$BUILD_DIR"
-else
-  # macOS 自带 Bash 3.2 在 set -u 下不能展开空数组。
-  podman build -t "$IMAGE" -f "$BUILD_DIR/Containerfile" "$BUILD_DIR"
-fi
+python3 "$ROOT/network.py" build "$BUILD_DIR" "$IMAGE"

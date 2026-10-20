@@ -26,6 +26,8 @@ python3 scripts/run_diagram.py --brief brief.json --out-dir package
 5. 脚本执行输入/覆盖校验、Podman 本地预检、真实 SVG/PNG 渲染、渲染几何检查和独立产物复核。成功后查看 `package/diagram.png`，确认中文可读、语义完整、分组清楚和连线归属；自动报告的 `visual_review: pending` 不能当成视觉验收已完成。
 6. 交付 `.drawio`、SVG、PNG、`validation.json` 链接，说明自动校验及实际视觉复核结果。图包失败时保留报告和源文件，不能把旧图或仅有 XML 的结果当成渲染成功。
 
+准备返回 `download_confirmation_required` / `confirmation_required: true` 时，向用户说明具体阶段、慢速/超时原因及宿主代理探测结果，询问“检查或启用代理后重试”还是“继续慢速下载”。只有用户确认继续等待后，才设置 `AGENT_DRAWIO_ALLOW_SLOW_DOWNLOAD=1` 重试准备；不得自行替用户确认。源码低速会自动验证宿主 `127.0.0.1:7890` 并最多代理重试一次。虚拟机和构建阶段耗时不等同于下载速度，不能把宿主 loopback 代理直接当作容器内代理。
+
 ## 本地环境
 
 - 主机需要 Python 3.10+ 与 Podman；不使用 Docker CLI、宿主 draw.io Desktop、在线编辑器或远程导出服务。

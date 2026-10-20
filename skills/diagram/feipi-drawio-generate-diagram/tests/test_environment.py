@@ -22,6 +22,7 @@ import run_diagram
 import prepare_renderer
 
 spec = importlib.util.spec_from_file_location('drawio_runtime', SKILL.parents[2] / 'tools/diagram/drawio/runtime.py')
+sys.path.insert(0, str(SKILL.parents[2] / 'tools/diagram/drawio'))
 runtime = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(runtime)
 READY = {'status': 'ready', 'service': 'feipi-drawio', 'network': 'local-only', 'contract': 1}
@@ -176,7 +177,16 @@ class EnvironmentTests(unittest.TestCase):
             with self.assertRaises(renderer.RendererError) as caught: prepare_renderer.prepare()
             self.assertEqual(caught.exception.details['code'], 'preparation_timeout')
             self.assertEqual(kill.call_args.args[0], 12345)
-            launch.assert_called_once_with(['bash', str(runtime.ROOT / 'drawio.sh'), 'ensure'], start_new_session=True)
+            launch.assert_called_once_with(['bash', str(runtime.ROOT / 'drawio.sh'), 'ensure'], start_new_session=True,
+                                           stderr=subprocess.PIPE, text=True, errors='replace')
+        check.assert_not_called()
+
+    def test_preparation_passes_confirmation_request_to_agent(self):
+        with patch.object(prepare_renderer.subprocess, 'Popen') as launch, patch.object(prepare_renderer, 'preflight') as check:
+            launch.return_value.wait.return_value = 75
+            with self.assertRaises(renderer.RendererError) as caught: prepare_renderer.prepare()
+        self.assertEqual(caught.exception.details['code'], 'download_confirmation_required')
+        self.assertTrue(caught.exception.details['confirmation_required'])
         check.assert_not_called()
 
     def test_darwin_cold_machine_and_stopped_machine(self):

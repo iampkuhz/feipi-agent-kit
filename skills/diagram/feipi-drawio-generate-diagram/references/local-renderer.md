@@ -25,10 +25,19 @@ bash tools/diagram/drawio/drawio.sh ensure
 - macOS 尚无 Podman 时先 `brew install podman`；显式准备时仅在 machine 缺失或停止后初始化/启动。运行中的 machine 引擎故障保留原始诊断，不重新创建或切换连接。Linux 使用本地 rootless Podman。
 - `prepare` 下载固定 draw.io 源码并核对 SHA-256，在 Podman 中安装 Chromium、中文 Noto 字体和固定 Playwright 版本。无需宿主 Node、Java 或浏览器。
 - `AGENT_DRAWIO_SERVER_PORT` 默认 8200，取值 1024–65535；服务绑定 `127.0.0.1`。工具和 skill 必须使用相同端口。
-- 如虚拟机下载依赖需要本机代理，可仅对准备命令设置 `AGENT_DRAWIO_BUILD_PROXY=http://host.containers.internal:7890`。主机下载使用已有 HTTP 代理环境。不得把该代理用于渲染 HTTP 客户端。
+- 主机源码下载沿用已有 HTTP 代理环境；连续 30 秒低于 64 KiB/s 或达到 180 秒总时限后，检测宿主 `127.0.0.1:7890` 的 TCP 与目标站点 HTTP 通路，可用时显式通过该代理重试一次，并忽略本轮 `NO_PROXY`。不改写全局代理配置。代理不可用或重试失败返回 `download_confirmation_required`，保留原始原因。
+- machine 初始化最多 300 秒、镜像构建最多 600 秒；超时只表示该阶段耗时较长，可能含解压/安装，不冒充实测速率。会检测宿主代理并请求用户确认，不自动重复初始化或重建。`127.0.0.1` 在宿主、VM 和构建容器中含义不同；已验证容器可达的代理可仅对准备命令设置 `AGENT_DRAWIO_BUILD_PROXY=http://host.containers.internal:7890`。该代理仅用于构建依赖，不用于 `/health` 或 `/render`；基础镜像由引擎拉取，不保证受 build args 代理控制。
 - `prepare` 显式重建镜像；`up` 只创建/启动容器、不拉取镜像。`ensure` 按缺失状态组合准备和启动。同名容器镜像/标签/端口不符时立即拒绝，保留原容器；更新镜像后需用户安排旧容器替换，普通作图不自动升级环境。
 - `status` 检查健康，`logs` 查看最后 50 行，`down` 显式停止专用容器。缺少容器或服务失败时给出这条准备路径，不切换在线服务。
 
 预检返回 `blocked` 时：`image_missing` / `container_missing` 按 `next_steps` 准备；`podman_missing` 先安装依赖；`engine_unavailable` / `podman_failed` / `podman_timeout` 查看原始诊断，不能仅凭退出码 125 推断缺容器；`container_mismatch` / `connection_rejected` 先核实配置；`container_stopped` 表示只读预检拒绝启动；`health_unavailable` 查看容器日志；`health_contract_mismatch` 核实端口上的服务身份。普通作图最多启动已有容器一次，健康探测有界等待 30 秒，不重试 `/render`。
+
+网络阻塞时显示具体阶段和 `proxy_probe`，向用户确认后再继续。用户明确选择继续慢速下载后，可执行：
+
+```bash
+AGENT_DRAWIO_ALLOW_SLOW_DOWNLOAD=1 python3 scripts/prepare_renderer.py
+```
+
+该设置仅放宽本轮准备：取消源码低速限制，但源码单次仍最多 600 秒、machine 初始化 600 秒、构建 1200 秒；准备总时限从 1800 秒放宽为 3600 秒。未取得确认时不自动设置。machine 初始化超时后需先检查已有 machine 状态，不能删除后重来。
 
 [工具来源与准备说明](https://github.com/iampkuhz/feipi-agent-kit/tree/main/tools/diagram/drawio)。仅准备阶段访问软件发行源；源图仅提交本机 `/render`。服务用镜像内 draw.io `Graph` 实现渲染，不是自行拼装 SVG。

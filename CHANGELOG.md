@@ -1,5 +1,8 @@
 # 变更记录
 
+## 2026-10-20
+- feipi-drawio-generate-diagram v3：准备下载低速检测、宿主代理功能验证与一次回退，初始化和构建超时请求用户确认
+
 ## 2026-10-19
 - feipi-drawio-generate-diagram v2：补齐首次环境准备与复检、保留 Podman 具体错误、增加有界健康等待及环境回归
 
