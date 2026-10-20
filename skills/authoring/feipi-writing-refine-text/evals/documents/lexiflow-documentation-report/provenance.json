@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "source_kind": "local_document",
+  "source_project": "lexiflow",
+  "source_path": "docs/roadmap/master-plan/phase2/status.md",
+  "document_date": "2026-10-11",
+  "captured_at": "2026-10-16",
+  "source_tracked": true,
+  "source_commit": "ec9f3121a9535e675600a617efb10c6e1128297c",
+  "source_sha256": "75ccdbfa2cccb5e71dd0ea8a8aa037f1345d1a5dc4e191d0e0a6997330108d69",
+  "selection": {
+    "start_line": 46,
+    "end_line": 61,
+    "method": "verbatim_lines"
+  },
+  "input_file": "input.md",
+  "input_sha256": "dca57a0404215cb9834828d367035a0ae35ad2dda8cfdf1fb660661e756a2372",
+  "reference_file": "reference.md",
+  "reference_status": "proposed",
+  "confirmation_evidence": null,
+  "notes": [
+    "用户已指定使用 lexiflow/docs；具体节选与本次参考稿由维护者拟定，尚未经用户审核。",
+    "按所列文件提交及行范围保存快照，不证明原文事实在其他时点仍然成立。",
+    "源文档及其当前未提交改动均未修改；快照内相对链接保留原目标，仅作为文本，不要求在评估目录解析。"
+  ]
+}

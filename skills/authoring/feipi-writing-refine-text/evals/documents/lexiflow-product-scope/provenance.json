@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "source_kind": "local_document",
+  "source_project": "lexiflow",
+  "source_path": "docs/system/experience.md",
+  "document_date": "2026-10-10",
+  "captured_at": "2026-10-16",
+  "source_tracked": true,
+  "source_commit": "60e71ba77cf6e139337358be56d686590d2c974c",
+  "source_sha256": "3ef1d12a51bdb2db1c0684e81115b06cf87a003b34a7c72812627db065eff3bc",
+  "selection": {
+    "start_line": 1,
+    "end_line": 33,
+    "method": "verbatim_lines"
+  },
+  "input_file": "input.md",
+  "input_sha256": "3ef1d12a51bdb2db1c0684e81115b06cf87a003b34a7c72812627db065eff3bc",
+  "reference_file": "reference.md",
+  "reference_status": "proposed",
+  "confirmation_evidence": null,
+  "notes": [
+    "用户已指定使用 lexiflow/docs；具体节选与本次参考稿由维护者拟定，尚未经用户审核。",
+    "按所列文件提交及行范围保存快照，不证明原文事实在其他时点仍然成立。",
+    "源文档及其当前未提交改动均未修改；快照内相对链接保留原目标，仅作为文本，不要求在评估目录解析。"
+  ]
+}

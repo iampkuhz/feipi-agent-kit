@@ -26,6 +26,15 @@ skills:
     validation: null
     status: stable
 
+  - name: feipi-writing-refine-text
+    path: skills/authoring/feipi-writing-refine-text
+    layer: authoring
+    description: 中文表达问题定位与精炼，交付优化稿和问题清单
+    clients: [claude, codex]
+    entry: SKILL.md
+    validation: null
+    status: stable
+
   # --- diagram layer ---
   - name: feipi-drawio-generate-diagram
     path: skills/diagram/feipi-drawio-generate-diagram
