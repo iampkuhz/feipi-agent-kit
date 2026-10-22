@@ -38,6 +38,11 @@ def url_identity(url):
         match = re.search(r"/(BV[0-9A-Za-z]+|av[0-9]+)(?:/|$)", parsed.path)
         if match:
             video_id = match[1]
+    elif host in ("drvoice.cn", "www.drvoice.cn"):
+        platform = "DrVoice"
+        match = re.fullmatch(r"/v2/speaker/(\d+)/?", parsed.path)
+        if match:
+            video_id = match[1]
     else:
         platform = "视频"
     if not re.fullmatch(r"[A-Za-z0-9_-]+", video_id):
@@ -58,10 +63,21 @@ def resolve(url, raw_path, cache_path):
     identity = {"schema_version": 1, "input_url": url, "platform": platform,
                 "video_id": url_id, "video_title": "", "title_source": "unavailable"}
     cached = read_json(cache_path)
-    if (cached.get("input_url") == url and cached.get("title_source") == "yt_dlp"
+    if (cached.get("input_url") == url and cached.get("title_source") in ("yt_dlp", "drvoice_public_api")
             and clean(cached.get("video_title")) and clean(cached.get("video_id"))):
         identity.update(video_id=clean(cached["video_id"]),
-                        video_title=clean(cached["video_title"]), title_source="yt_dlp")
+                        video_title=clean(cached["video_title"]), title_source=cached["title_source"])
+        # 通用收尾会重写缓存，保留严道来源核对所需的摘要，避免把字段丢失误报为媒体变化。
+        media_hash = cached.get("media_reference_sha256", "")
+        path = urlsplit(url).path.rstrip("/")
+        matching_id = (url_id == identity["video_id"] if url_id else
+                       bool(re.fullmatch(r"/v2/article/\d+", path)) and
+                       bool(re.fullmatch("article-" + path.rsplit("/", 1)[1] + r"-video-[1-9]\d*",
+                                         identity["video_id"])))
+        if (platform == "DrVoice" and cached["title_source"] == "drvoice_public_api"
+                and matching_id and isinstance(media_hash, str)
+                and re.fullmatch(r"[0-9a-f]{64}", media_hash)):
+            identity["media_reference_sha256"] = media_hash
     try:
         lines = Path(raw_path).read_text(encoding="utf-8").splitlines() if raw_path != "-" else []
     except OSError:

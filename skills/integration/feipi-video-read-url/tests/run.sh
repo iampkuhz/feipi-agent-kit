@@ -1368,6 +1368,18 @@ else
   stub_fail_msg "video-identity-regressions" "视频身份与请求包回归失败"
 fi
 
+if python3 "$SCRIPT_DIR/test_drvoice_metadata.py"; then
+  stub_pass "drvoice-metadata-regressions"
+else
+  stub_fail_msg "drvoice-metadata-regressions" "严道身份、访问边界与清单回归失败"
+fi
+
+if python3 "$SCRIPT_DIR/test_cached_audio_recovery.py"; then
+  stub_pass "cached-audio-context-recovery"
+else
+  stub_fail_msg "cached-audio-context-recovery" "已归档音频复用与独立解码条件回归失败"
+fi
+
 echo "测试汇总: total=$TOTAL pass=$PASSED fail=$FAILED"
 if [[ "$FAILED" -ne 0 ]]; then
   exit 1

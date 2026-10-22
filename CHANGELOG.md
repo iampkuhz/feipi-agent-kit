@@ -8,6 +8,9 @@
 ## 2026-10-19
 - feipi-drawio-generate-diagram v2：补齐首次环境准备与复检、保留 Podman 具体错误、增加有界健康等待及环境回归
 
+## 2026-10-18
+- feipi-video-read-url v8：严道图文视频、身份摘要及转写兼容
+
 ## 2026-10-16
 - feipi-writing-refine-text v1：分离诊断与修复，交付问题清单，增加 LexiFlow 文档快照及保真、误报测试
 

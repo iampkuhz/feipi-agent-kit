@@ -64,6 +64,27 @@ class IdentityTests(unittest.TestCase):
         result = identity.resolve("https://b23.tv/unknown", "-", self.cache)
         self.assertTrue(result["suggested_thread_title"].startswith("Bilibili｜链接-"))
 
+    def test_drvoice_media_hash_survives_common_finish(self):
+        for url, video_id in [("https://www.drvoice.cn/v2/speaker/123", "123"),
+                              ("https://www.drvoice.cn/v2/article/456", "article-456-video-2")]:
+            with self.subTest(url=url):
+                self.cache.write_text(json.dumps(dict(input_url=url, video_id=video_id,
+                    video_title="临床讲座", title_source="drvoice_public_api",
+                    media_reference_sha256="a"*64, media_url="https://private.invalid/token")))
+                result = identity.resolve(url, "-", self.cache)
+                self.assertEqual(result["media_reference_sha256"], "a"*64)
+                self.assertNotIn("media_url", result)
+
+    def test_drvoice_media_hash_requires_matching_source(self):
+        url = "https://www.drvoice.cn/v2/article/456"
+        for changes in [dict(input_url=url+"?other=1"), dict(video_id="article-999-video-1"),
+                        dict(media_reference_sha256="invalid"), dict(title_source="yt_dlp")]:
+            cached = dict(input_url=url, video_id="article-456-video-1", video_title="临床讲座",
+                          title_source="drvoice_public_api", media_reference_sha256="b"*64)
+            cached.update(changes)
+            self.cache.write_text(json.dumps(cached))
+            self.assertNotIn("media_reference_sha256", identity.resolve(url, "-", self.cache))
+
     def test_atomic_write_and_no_shell_evaluation(self):
         self.resolve('真实标题 $(touch SHOULD_NOT_EXIST)')
         result = subprocess.run(["python3", str(HELPER), URL, str(self.raw), str(self.root)],

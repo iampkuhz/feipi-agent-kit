@@ -18,6 +18,7 @@ AUDIO_FILE="${1:-}"
 OUTPUT_PREFIX="${2:-}"
 LANGUAGE="${3:-zh}"
 REQUESTED_PROFILE="${4:-auto}"
+RECOVERY_NO_CONTEXT="${AGENT_VIDEO_RECOVERY_NO_CONTEXT:-0}"
 
 WHISPER_CPP_BIN_DEFAULT="/opt/homebrew/opt/whisper-cpp/bin/whisper-cli"
 WHISPER_MODEL_DIR_DEFAULT="$HOME/Library/Caches/whisper.cpp/models"
@@ -52,6 +53,11 @@ if [[ "$REQUESTED_PROFILE" != "auto" && "$REQUESTED_PROFILE" != "accurate" && "$
   echo "profile 仅支持 accurate|fast|auto，当前: $REQUESTED_PROFILE" >&2
   exit 1
 fi
+
+case "$RECOVERY_NO_CONTEXT" in
+  0|1) ;;
+  *) echo "AGENT_VIDEO_RECOVERY_NO_CONTEXT 仅支持 0|1" >&2; exit 1 ;;
+esac
 
 if [[ "$(uname -s)" != "Darwin" ]]; then
   echo "当前脚本仅支持 macOS（whisper.cpp + Metal/CPU）。" >&2
@@ -209,9 +215,7 @@ fi
 
 METAL_RESOURCES="$(resolve_metal_resources_dir || true)"
 if [[ -z "$METAL_RESOURCES" ]]; then
-  echo "未找到 whisper.cpp Metal 资源目录（share/whisper-cpp）。" >&2
-  echo "请确认 whisper-cpp 通过 Homebrew 正常安装。" >&2
-  exit 1
+  echo "未发现独立 Metal 资源目录，尝试当前 whisper.cpp 的内嵌资源；初始化失败仍按原规则回退 CPU。" >&2
 fi
 
 SRT_FILE="${OUTPUT_PREFIX}.srt"
@@ -239,6 +243,13 @@ WHISPER_ARGS=(
   -bo "$WHISPER_BEST_OF"
   -np
 )
+if [[ "$RECOVERY_NO_CONTEXT" == 1 ]]; then
+  # 只用于既有循环稿的独立对照，限制前段文字上下文，不改变模型或质量档位。
+  WHISPER_ARGS+=(-mc 0)
+  echo "text_context=disabled"
+else
+  echo "text_context=default"
+fi
 
 USED_DEVICE="metal"
 METAL_REASON=""
@@ -251,7 +262,11 @@ if metal_cache_is_fresh; then
 else
   METAL_LOG="$(mktemp "${TMPDIR:-/tmp}/whisper-metal-log.XXXXXX")"
   set +e
-  GGML_METAL_PATH_RESOURCES="$METAL_RESOURCES" "$WHISPER_CLI" "${WHISPER_ARGS[@]}" >"$METAL_LOG" 2>&1
+  if [[ -n "$METAL_RESOURCES" ]]; then
+    GGML_METAL_PATH_RESOURCES="$METAL_RESOURCES" "$WHISPER_CLI" "${WHISPER_ARGS[@]}" >"$METAL_LOG" 2>&1
+  else
+    "$WHISPER_CLI" "${WHISPER_ARGS[@]}" >"$METAL_LOG" 2>&1
+  fi
   RUN_CODE=$?
   set -e
   cat "$METAL_LOG"
