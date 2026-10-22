@@ -35,7 +35,7 @@ draw.io 已有独立的固定源码快照与构建流程，继续复用，不导
 
 - **SearXNG**：复用 Git 中的 settings 和固定镜像版本；启动脚本不自动加载根 `.env`。
 - **Crawl4AI**：干净克隆默认使用不含秘密的 `env/.env.example`；需要代理或模型密钥时复制为忽略的 `env/.env.local`。现有本机 `.env` 已原样保留为 `.env.local`，运行中容器未重建。特殊路径可用 `CRAWL4AI_ENV_FILE` 显式指定。
-- **LiteLLM**：既有上游密钥等继续由当前 shell 导出；新增 Token Plan 的 `BAILIAN_TOKEN_PLAN_API_KEY` 可放在根 `.env`，由 Compose 解析，不作为 shell 脚本执行。新机需要人工恢复必要凭据或重新授权；就绪探测不证明上游模型请求一定成功。
+- **LiteLLM**：只自动加载 `~/.env`，支持 Shell 赋值及变量引用；不读取项目 `.env`，也不复用已从文件删除的旧 shell 配置。`restart` 只重建 LiteLLM，首次搭建使用 `up`，需要重建整个服务栈时使用 `recreate`。新机需要人工恢复必要凭据或重新授权；就绪探测不证明上游模型请求一定成功。
 - **OTel**：日志默认重新生成，不作为迁移前置。
 
 默认本机数据位置：
@@ -47,10 +47,15 @@ $HOME/Documents/service-data/
 └── otel/                     # 可重新生成的日志
 ```
 
-需要更换位置时只设置一个根目录，脚本推导子目录：
+需要更换位置时只设置一个根目录，脚本推导子目录。LiteLLM 将下列变量写在 `~/.env`；OTel 仍读取当前 shell 中导出的值：
 
 ```bash
 export AGENT_SERVICE_DATA_DIR="$HOME/LocalServiceData"
+```
+
+保存后再启动服务；OTel 的终端需先加载该变量：
+
+```bash
 make litellm-up
 make otel-up
 ```

@@ -29,7 +29,7 @@ cp .env.example .env
 # 按注释填入所需的 API Key 等变量
 ```
 
-仓库根目录 `.env.example` 只是参考模板，启动脚本不会自动 source。LiteLLM 既有配置沿用当前 shell 导出的变量，新增 Token Plan 可在根 `.env` 配置，由 Compose 解析；Crawl4AI 需要覆盖时使用忽略的服务级 `.env.local`；SearXNG 使用已追踪的 settings。
+仓库根目录 `.env.example` 只是参考模板，启动脚本不会自动 source。LiteLLM 只自动加载 `~/.env`，不读取项目 `.env`；Crawl4AI 需要覆盖时使用忽略的服务级 `.env.local`；SearXNG 使用已追踪的 settings。
 
 新机只恢复配置、模板和启动入口，镜像重新拉取、缓存重建；详见 [新 Mac 服务重建](docs/setup-new-mac.md)，不依赖 NAS 或容器导出。
 

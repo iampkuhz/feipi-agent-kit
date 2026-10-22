@@ -12,7 +12,7 @@
 cd tools/gateway/litellm
 ```
 
-既有配置继续读取当前 shell 环境变量，需要覆盖时把变量放到自己的 `~/.env`，并确保 zsh 启动时已经加载。新增的百炼 Token Plan 配置可直接写在仓库根目录 `.env`，启动脚本会交给 Compose 解析。当前 shell 中同名的已导出变量优先；脚本为既有配置导出的默认值也优先于 `.env`。LiteLLM 目录和 `env/` 目录中的 `.env` 不会自动加载。
+所有 LiteLLM 配置只写入 `~/.env`。启动脚本每次直接加载该文件，支持 `VAR=value`、`export VAR=value` 和 `${OTHER_VAR}` 引用，无需重开终端。脚本会先清除继承的 LiteLLM、百炼、OMLX、数据库密码和数据目录配置，确保已删除的变量不会继续生效；文件不存在时使用内置默认值。项目内的 `.env` 和 `LITELLM_COMPOSE_ENV_FILE` 均不参与加载。
 
 ### 1.2 启动服务
 
@@ -39,10 +39,10 @@ curl -s http://localhost:4000/v1/models \
 
 | 接入 | 客户端模型名 | 上游凭证与地址 |
 |------|------|------|
-| 既有 Coding Plan | `litellm-code-openai` / `litellm-code-anthropic` | 沿用当前 shell 的 `LITELLM_UPSTREAM_CODE_MODEL_*`、`BAILIAN_CODING_PLAN_*` 配置 |
+| 既有 Coding Plan | `litellm-code-openai` / `litellm-code-anthropic` | 读取 `~/.env` 中的 `LITELLM_UPSTREAM_CODE_MODEL_*`、`BAILIAN_CODING_PLAN_*` 配置 |
 | 新增 Token Plan | `litellm-token-plan-deepseek` | 单独使用 `BAILIAN_TOKEN_PLAN_API_KEY` 和 Token Plan 专属端点 |
 
-在**仓库根目录** `.env` 填入以下变量（该文件已被 Git 忽略）：
+在 **`~/.env`** 填入以下变量：
 
 ```dotenv
 BAILIAN_TOKEN_PLAN_API_KEY=替换为你的TokenPlan专属Key
@@ -55,7 +55,7 @@ Token Plan 的端点与凭证按[百炼官方接入文档](https://help.aliyun.c
 
 填好 Key 后，在仓库根目录执行 `make litellm-restart`，让容器重新加载环境变量。如果客户端使用了限制模型范围的 Virtual Key，需要在 Dashboard 中允许 `litellm-token-plan-deepseek`；客户端仍使用自己的 LiteLLM Virtual Key，上游 Token Plan Key 只配置在网关中。
 
-如需明确指定其他 dotenv 文件，可导出 `LITELLM_COMPOSE_ENV_FILE=/绝对路径/.env`；设为 `/dev/null` 可禁用项目 `.env`。dotenv 仅由 Compose 解析，不作为 shell 脚本执行。
+配置来源固定为 `~/.env`，不提供其他文件路径覆盖。该文件使用 Shell 赋值语法，由脚本加载并导出；Compose 使用 `--env-file /dev/null`，防止再次加载项目或当前目录的 dotenv 文件。
 
 ---
 
@@ -80,7 +80,7 @@ Codex CLI
 
 Codex / Responses API 默认只走 ChatGPT 订阅，并按标准模型名严格转发：客户端请求 `gpt-5.5` 就调用 `chatgpt/gpt-5.5`，请求 `gpt-5.4` 就调用 `chatgpt/gpt-5.4`。因此 `~/.env` 不需要配置普通 OpenAI provider，也不需要配置 `LITELLM_UPSTREAM_CODEX_API_BASE`、`LITELLM_UPSTREAM_CODEX_API_KEY`、`LITELLM_CODEX_MODEL` 或 `LITELLM_UPSTREAM_CODEX_MODEL`。
 
-本地建议只配置网关管理 key 和客户端 private key。这里使用 `export`，保证 zsh 加载后子进程和 compose 都能拿到。
+本地建议只配置网关管理 key 和客户端 private key。网关脚本会自动导出这些变量；示例保留 `export`，方便终端客户端通过 zsh 加载使用。
 
 ```bash
 # ~/.env
@@ -126,7 +126,7 @@ litellm-autocomplate-openai
 
 这里的 `gpt-5.5`、`gpt-5.4` 等是 Codex 客户端看到和请求的模型名；LiteLLM 后端会把它们转发到同名 `chatgpt/...` 上游。如果 Virtual Key 没有允许 Codex 客户端实际选择的标准模型名，Codex CLI 会被 LiteLLM 拦截为 `key not allowed to access model`。
 
-保存后打开一个新的 zsh，或用你现有的 zsh 启动加载机制重新加载 `~/.env`。脚本不会主动读取任何仓库内 `.env` 文件。
+网关脚本每次自动加载 `~/.env`。终端客户端仍需通过自己的 zsh 启动加载机制获取客户端 Key；网关脚本不会读取任何仓库内 `.env` 文件。
 
 > 百炼和本地补全的逻辑模型名固定在 `config/config.yaml`。上游模型、base URL 和 API key 有默认值，也可以通过 `~/.env` 覆盖。
 
@@ -157,7 +157,7 @@ LiteLLM 的 `chatgpt/` provider 会打开 `https://auth.openai.com/codex/device`
 ./scripts/litellm.sh restart-chatgpt
 ```
 
-只执行 `up` 不一定会重建已存在的容器，环境变量可能不会生效。修改 `~/.env` 后需要打开新的 zsh，再执行 `restart-chatgpt`。
+修改 `~/.env` 后直接执行 `restart-chatgpt` 即可重新加载配置。`restart` 和 `restart-chatgpt` 使用 `--no-deps`，只重建 LiteLLM，不重建 PostgreSQL；它们要求数据库已经启动。首次搭建使用 `up`，需要重建整个服务栈时使用 `recreate`。
 
 启动脚本会自动创建 PostgreSQL 数据目录和 ChatGPT OAuth token 持久化目录。启用 `chatgpt/` provider 后，LiteLLM 可能会在启动阶段就触发 OAuth device flow；如果健康检查暂时没有 ready，先看日志并完成登录：
 
@@ -398,11 +398,10 @@ rm "${AGENT_SERVICE_DATA_DIR:-$HOME/Documents/service-data}/litellm/chatgpt-toke
 | `LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_NAME` | `litellm-code-anthropic` 的百炼 Anthropic 兼容上游模型 | `anthropic/qwen-plus` |
 | `LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_BASE` | `litellm-code-anthropic` 的百炼 Anthropic 兼容 base URL | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
 | `LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_KEY` | `litellm-code-anthropic` 的百炼 API key；脚本会优先复用 `BAILIAN_CODING_PLAN_API_KEY` 或 `BAILIAN_API_KEY` | `dummy-key` |
-| `BAILIAN_TOKEN_PLAN_API_KEY` | 新增 DeepSeek 的 Token Plan 专属 Key，可写入项目 `.env` | 无；未配置时不可调用 |
+| `BAILIAN_TOKEN_PLAN_API_KEY` | 新增 DeepSeek 的 Token Plan 专属 Key，写入 `~/.env` | 无；未配置时不可调用 |
 | `BAILIAN_TOKEN_PLAN_OPENAI_BASE_URL` | Token Plan OpenAI 兼容端点 | `https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1` |
 | `LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_NAME` | `litellm-token-plan-deepseek` 的上游模型 | `openai/deepseek-v4.1-flash-1017` |
 | `LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_BASE` / `LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_KEY` | 按需覆盖上述 Token Plan 地址 / Key，不读取 Coding Plan 变量 | 使用上述 Token Plan 配置 |
-| `LITELLM_COMPOSE_ENV_FILE` | 显式指定 Compose dotenv 文件 | 存在时读取仓库根 `.env`，否则 `/dev/null` |
 | `LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_NAME` | 本地补全 OpenAI 兼容上游模型 | `openai/qwen-turbo` |
 | `LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_BASE` | 本地补全 OpenAI 兼容 base URL | `http://host.containers.internal:11434/v1` |
 | `LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_KEY` | 本地补全 OpenAI 兼容 API key | `dummy-key` |
@@ -436,10 +435,10 @@ rm "${AGENT_SERVICE_DATA_DIR:-$HOME/Documents/service-data}/litellm/chatgpt-toke
 # 打印客户端 private key 的 ~/.env 配置模板
 ./scripts/litellm.sh print-client-env
 
-# 检查当前 shell 是否已有 ChatGPT 订阅所需变量
+# 检查 ~/.env 中的 ChatGPT 订阅配置
 ./scripts/litellm.sh check-chatgpt-env
 
-# 检查当前 shell 是否已有客户端 private key
+# 检查 ~/.env 中的客户端 private key
 ./scripts/litellm.sh check-client-env openai
 ./scripts/litellm.sh check-client-env anthropic
 
@@ -458,7 +457,7 @@ rm "${AGENT_SERVICE_DATA_DIR:-$HOME/Documents/service-data}/litellm/chatgpt-toke
 # 停止
 ./scripts/litellm.sh down
 
-# 重启（修改配置后使用）
+# 只重建 LiteLLM，保留已运行的 PostgreSQL（修改配置后使用）
 ./scripts/litellm.sh restart
 
 # 按 ChatGPT 订阅模式检查环境变量并重启
@@ -690,13 +689,12 @@ Unable to find token in cache or LiteLLM_VerificationTokenTable
 
 ### 6.11 `check-chatgpt-env` 报覆盖变量不合法
 
-`check-chatgpt-env` 只检查当前 shell；仓库根 `.env` 在执行 Compose 时加载。`LITELLM_CODEX_MODEL` 和 `LITELLM_UPSTREAM_CODEX_MODEL` 已不再参与 Codex 严格转发配置；如果当前 shell 仍设置了它们，`check-chatgpt-env` 会提示这些变量已被忽略。参考 `./scripts/litellm.sh print-chatgpt-env` 的输出修正后，打开一个新的 zsh 重试。
+`check-chatgpt-env` 会重新加载 `~/.env`。`LITELLM_CODEX_MODEL` 和 `LITELLM_UPSTREAM_CODEX_MODEL` 已不再参与 Codex 严格转发配置；若仍写在 `~/.env` 中，会提示被忽略，可直接删除。父进程中残留的这两个旧变量不会被复用。
 
-### 6.12 当前 shell 已设置变量，但 compose 仍像默认配置
+### 6.12 配置没有生效
 
-脚本显式选择仓库根 `.env`（不存在时使用 `/dev/null`），可用 `LITELLM_COMPOSE_ENV_FILE` 覆盖。Token Plan 配置可直接写入所选文件；既有配置仍以当前 shell 和脚本默认值为准。若从 shell 传值，确认变量已经 export，而不是只在 shell 里赋值：
+确认变量写在 `~/.env` 中，而不是项目 `.env` 或只在终端中 export。文件中的变量无需 export；脚本会自动导出，然后再补齐默认值。修改后执行：
 
 ```bash
-export LITELLM_MASTER_KEY=sk-...
-printenv LITELLM_MASTER_KEY
+./scripts/litellm.sh restart
 ```

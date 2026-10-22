@@ -40,8 +40,8 @@ curl -s "http://localhost:8873/search?q=test&format=json" | jq '.results | lengt
 ### 3. LiteLLM 服务验证
 
 ```bash
-# LiteLLM 既有配置读取当前 shell；Token Plan 可在仓库根 .env 配置，由 Compose 解析。
-# 如需覆盖既有配置，把变量配置到你自己的 ~/.env，并打开新的 zsh。
+# LiteLLM 只自动加载 ~/.env，不读取项目 .env 或复用旧 shell 配置。
+# 把变量配置到 ~/.env 后直接执行脚本即可，无需重开终端。
 
 # 启动服务
 make litellm-up

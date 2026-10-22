@@ -122,6 +122,7 @@ elif args == ['--version']:
         self.assertFalse(self.data.exists())
 
     def test_litellm_up_uses_current_home_and_custom_data_root(self):
+        (self.home / ".env").write_text(f'AGENT_SERVICE_DATA_DIR="{self.data}"\n')
         p = self.run_script("tools/gateway/litellm/scripts/litellm.sh", "up")
         self.assertEqual(p.returncode, 0, p.stderr)
         self.assertTrue((self.data / "postgres").is_dir())
@@ -135,8 +136,8 @@ elif args == ['--version']:
         self.assertTrue(any(row["args"][-1:] == ["ps"] for row in self.calls()))
 
     @unittest.skipUnless(shutil.which("docker-compose"), "Token Plan 隔离校验需要 docker-compose 客户端")
-    def test_litellm_token_plan_project_env_and_credential_isolation(self):
-        # 走真实启动脚本的默认值与 dotenv 选择，但将 up 替换成静态 config。
+    def test_litellm_only_loads_home_env_and_isolates_credentials(self):
+        # 走真实启动脚本，但将 up 替换成静态 config；项目文件和旧 shell 值都不能生效。
         root = self.base / "isolated repo"
         for relative in ["tools/gateway/litellm/scripts/litellm.sh", "tools/lib/podman.sh",
                          "tools/gateway/litellm/compose/docker-compose.yml"]:
@@ -155,9 +156,17 @@ sys.stderr.write(p.stderr)
 raise SystemExit(p.returncode)
 """)
         renderer.chmod(0o755)
+        (root / ".env").write_text("BAILIAN_TOKEN_PLAN_API_KEY=project-key\n")
+        (root / "other.env").write_text("BAILIAN_TOKEN_PLAN_API_KEY=other-file-key\n")
         env = dict(self.env, LITELLM_COMPOSE_COMMAND="render-compose",
-                   BAILIAN_CODING_PLAN_API_KEY="coding-test-key", BAILIAN_API_KEY="general-test-key",
-                   BAILIAN_CODING_PLAN_OPENAI_BASE_URL="https://coding.test/v1")
+                   BAILIAN_CODING_PLAN_API_KEY="stale-coding-key", BAILIAN_API_KEY="stale-general-key",
+                   LITELLM_UPSTREAM_CODE_MODEL_OPENAI_KEY="stale-code-key",
+                   BAILIAN_TOKEN_PLAN_API_KEY="stale-token-key",
+                   LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_KEY="stale-token-override-key",
+                   LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_NAME="openai/stale-model")
+        coding_env = ('BAILIAN_CODING_PLAN_API_KEY="coding-test-key"\n'
+                      'BAILIAN_CODING_PLAN_OPENAI_BASE_URL="https://coding.test/v1"\n'
+                      'LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_KEY=${BAILIAN_CODING_PLAN_API_KEY}\n')
         cases = [
             (None, {}, "dummy-key", "openai/deepseek-v4.1-flash-1017"),
             ("BAILIAN_TOKEN_PLAN_API_KEY=\n", {}, "dummy-key", "openai/deepseek-v4.1-flash-1017"),
@@ -165,14 +174,14 @@ raise SystemExit(p.returncode)
              "LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_NAME=openai/deepseek-v4.1-flash\n",
              {}, "token-file-key", "openai/deepseek-v4.1-flash"),
             ("BAILIAN_TOKEN_PLAN_API_KEY=token-file-key\n",
-             {"BAILIAN_TOKEN_PLAN_API_KEY": "token-shell-key"}, "token-shell-key", "openai/deepseek-v4.1-flash-1017"),
+             {"BAILIAN_TOKEN_PLAN_API_KEY": "token-shell-key"}, "token-file-key", "openai/deepseek-v4.1-flash-1017"),
             ("BAILIAN_TOKEN_PLAN_API_KEY=token-file-key\n",
-             {"LITELLM_COMPOSE_ENV_FILE": "/dev/null"}, "dummy-key", "openai/deepseek-v4.1-flash-1017"),
+             {"LITELLM_COMPOSE_ENV_FILE": str(root / "other.env")}, "token-file-key", "openai/deepseek-v4.1-flash-1017"),
         ]
         for index, (dotenv, overrides, expected_key, expected_model) in enumerate(cases):
             with self.subTest(case=index):
                 if dotenv is not None:
-                    (root / ".env").write_text(dotenv)
+                    (self.home / ".env").write_text(coding_env + dotenv)
                 p = self.run_script("tools/gateway/litellm/scripts/litellm.sh", "up",
                                     env=dict(env, **overrides), root=root)
                 self.assertEqual(p.returncode, 0, p.stderr)
@@ -181,9 +190,27 @@ raise SystemExit(p.returncode)
                 self.assertEqual(actual["LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_NAME"], expected_model)
                 self.assertEqual(actual["LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_BASE"],
                                  "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1")
-                self.assertEqual(actual["LITELLM_UPSTREAM_CODE_MODEL_OPENAI_KEY"], "coding-test-key")
-                self.assertEqual(actual["LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_KEY"], "coding-test-key")
-                self.assertEqual(actual["LITELLM_UPSTREAM_CODE_MODEL_OPENAI_BASE"], "https://coding.test/v1")
+                coding_key = "coding-test-key" if dotenv is not None else "dummy-key"
+                self.assertEqual(actual["LITELLM_UPSTREAM_CODE_MODEL_OPENAI_KEY"], coding_key)
+                self.assertEqual(actual["LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_KEY"], coding_key)
+                self.assertEqual(actual["LITELLM_UPSTREAM_CODE_MODEL_OPENAI_BASE"],
+                                 "https://coding.test/v1" if dotenv is not None
+                                 else "https://dashscope.aliyuncs.com/compatible-mode/v1")
+
+    def test_litellm_restart_only_recreates_proxy(self):
+        for command in ["restart", "restart-chatgpt"]:
+            with self.subTest(command=command):
+                p = self.run_script("tools/gateway/litellm/scripts/litellm.sh", command)
+                self.assertEqual(p.returncode, 0, p.stderr)
+                compose = [row for row in self.calls() if row["args"][:1] == ["compose"]][-1]
+                self.assertEqual(compose["args"][-5:],
+                                 ["up", "-d", "--no-deps", "--force-recreate", "litellm"])
+
+    def test_litellm_client_check_loads_home_env_without_export(self):
+        (self.home / ".env").write_text('LITELLM_API_KEY_OPENAI="openai-client-key"\n'
+                                       'LITELLM_API_KEY_ANTHROPIC="anthropic-client-key"\n')
+        p = self.run_script("tools/gateway/litellm/scripts/litellm.sh", "check-client-env")
+        self.assertEqual(p.returncode, 0, p.stderr)
 
     def test_litellm_stop_logs_and_status_reject_remote_connection(self):
         env = dict(self.env, TEST_CONNECTION="ssh://user@another-machine/run/podman.sock")

@@ -12,6 +12,25 @@ source "$COMPOSE_DIR/../../lib/podman.sh"
 
 cd "$COMPOSE_DIR"
 
+load_home_env() {
+  local env_name
+  # ~/.env 是唯一配置来源；删除文件中的变量后，不能继续使用父进程残留值。
+  for env_name in "${!BAILIAN_@}" "${!OMLX_@}" "${!LITELLM_@}" POSTGRES_PASSWORD AGENT_SERVICE_DATA_DIR; do
+    # 保留测试用的 Compose 命令替身，不属于服务配置。
+    [[ "$env_name" == LITELLM_COMPOSE_COMMAND ]] && continue
+    unset "$env_name"
+  done
+  if [[ -f "$HOME/.env" ]]; then
+    # 用户自己的 Shell 赋值文件，支持 VAR=value、export 和 ${OTHER_VAR} 引用。
+    set -a
+    # shellcheck source=/dev/null
+    source "$HOME/.env"
+    set +a
+  fi
+}
+
+load_home_env
+
 apply_defaults() {
   LITELLM_PORT="4000"
   # 默认跟随当前用户；只提供一个可选数据根目录，子目录由服务自行推导。
@@ -185,7 +204,7 @@ check_client_env() {
 
   if [[ "$failed" -ne 0 ]]; then
     echo
-    echo "请把下面配置放到 ~/.env，并打开一个新的 zsh 后重试："
+    echo "请把下面配置放到 ~/.env 后重试；脚本会自动重新加载："
     print_client_env
     exit 1
   fi
@@ -204,19 +223,12 @@ prepare_runtime() {
 }
 
 compose() {
-  local compose_env_file="${LITELLM_COMPOSE_ENV_FILE:-}"
-  if [[ -z "$compose_env_file" ]]; then
-    compose_env_file="$COMPOSE_DIR/../../../.env"
-    [[ -f "$compose_env_file" ]] || compose_env_file=/dev/null
-  fi
-  # 交由 Compose 解析 dotenv，不执行其中的 shell 代码。
-  # Token Plan 的默认值仅放在 Compose 中，避免 apply_defaults 覆盖项目 .env。
-
+  # ~/.env 已加载并导出；禁用 Compose 的额外 dotenv 加载。
   if [[ -n "${LITELLM_COMPOSE_COMMAND:-}" ]]; then
     # shellcheck disable=SC2086
-    $LITELLM_COMPOSE_COMMAND --env-file "$compose_env_file" -f "$COMPOSE_FILE" "$@"
+    $LITELLM_COMPOSE_COMMAND --env-file /dev/null -f "$COMPOSE_FILE" "$@"
   else
-    podman_compose --env-file "$compose_env_file" -f "$COMPOSE_FILE" "$@"
+    podman_compose --env-file /dev/null -f "$COMPOSE_FILE" "$@"
   fi
 }
 
@@ -515,16 +527,16 @@ case "${1:-up}" in
 
   restart)
     prepare_runtime
-    echo "🔄 重新创建 LiteLLM（应用镜像、配置和资源限制变更）..."
-    compose up -d --force-recreate litellm
+    echo "🔄 仅重新创建 LiteLLM（保留 PostgreSQL 容器）..."
+    compose up -d --no-deps --force-recreate litellm
     echo "✅ LiteLLM 已重新创建"
     ;;
 
   restart-chatgpt)
     check_chatgpt_env
     prepare_runtime
-    echo "🔄 重新创建 LiteLLM（ChatGPT 订阅模式）..."
-    compose up -d --force-recreate litellm
+    echo "🔄 仅重新创建 LiteLLM（ChatGPT 订阅模式，保留 PostgreSQL 容器）..."
+    compose up -d --no-deps --force-recreate litellm
     echo "✅ LiteLLM 已重新创建"
     ;;
 
