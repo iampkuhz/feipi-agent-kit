@@ -62,6 +62,10 @@ services:
       LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_NAME: ${LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_NAME:-anthropic/qwen-plus}
       LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_BASE: ${LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_BASE:-https://dashscope.aliyuncs.com/compatible-mode/v1}
       LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_KEY: ${LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_KEY:-dummy-key}
+      # 百炼 Token Plan：由 Compose 读取项目 .env，不回退到 Coding Plan / 通用百炼 Key。
+      LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_NAME: ${LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_NAME:-openai/deepseek-v4.1-flash-1017}
+      LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_BASE: ${LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_BASE:-${BAILIAN_TOKEN_PLAN_OPENAI_BASE_URL:-https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1}}
+      LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_KEY: ${LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_KEY:-${BAILIAN_TOKEN_PLAN_API_KEY:-dummy-key}}
       # 本地补全模型
       LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_NAME: ${LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_NAME:-openai/qwen-turbo}
       LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_BASE: ${LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_BASE:-http://host.containers.internal:11434/v1}
@@ -74,8 +78,8 @@ services:
       http_proxy: ${LITELLM_CONTAINER_HTTP_PROXY-http://host.containers.internal:7890}
       https_proxy: ${LITELLM_CONTAINER_HTTPS_PROXY-http://host.containers.internal:7890}
       # DashScope 直连稳定；经本机代理可能在 CONNECT 后重置 TLS 握手。
-      NO_PROXY: 127.0.0.1,localhost,litellm-db,postgres,host.containers.internal,dashscope.aliyuncs.com,.dashscope.aliyuncs.com
-      no_proxy: 127.0.0.1,localhost,litellm-db,postgres,host.containers.internal,dashscope.aliyuncs.com,.dashscope.aliyuncs.com
+      NO_PROXY: 127.0.0.1,localhost,litellm-db,postgres,host.containers.internal,dashscope.aliyuncs.com,.dashscope.aliyuncs.com,token-plan.cn-beijing.maas.aliyuncs.com
+      no_proxy: 127.0.0.1,localhost,litellm-db,postgres,host.containers.internal,dashscope.aliyuncs.com,.dashscope.aliyuncs.com,token-plan.cn-beijing.maas.aliyuncs.com
       # ChatGPT Subscription OAuth token 持久化
       CHATGPT_TOKEN_DIR: /app/chatgpt-tokens
       # Podman Compose 不保证 container_name 自动成为可解析别名，

@@ -17,6 +17,13 @@ model_list:
       api_base: os.environ/LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_BASE
       api_key: os.environ/LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_KEY
 
+  - model_name: litellm-token-plan-deepseek
+    litellm_params:
+      # 百炼 Token Plan 独立入口，不复用 Coding Plan 的端点或凭证。
+      model: os.environ/LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_NAME
+      api_base: os.environ/LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_BASE
+      api_key: os.environ/LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_KEY
+
   - model_name: litellm-autocomplate-openai
     litellm_params:
       # 本地 OMLX 端点

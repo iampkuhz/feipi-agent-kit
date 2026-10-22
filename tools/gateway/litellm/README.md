@@ -12,7 +12,7 @@
 cd tools/gateway/litellm
 ```
 
-脚本只读取当前 shell 环境变量，不读取仓库根目录、LiteLLM 目录或 `env/` 目录下的 `.env` 文件。默认配置可直接启动；需要覆盖配置时，把变量放到你自己的 `~/.env`，并确保 zsh 启动时已经加载。
+既有配置继续读取当前 shell 环境变量，需要覆盖时把变量放到自己的 `~/.env`，并确保 zsh 启动时已经加载。新增的百炼 Token Plan 配置可直接写在仓库根目录 `.env`，启动脚本会交给 Compose 解析。当前 shell 中同名的已导出变量优先；脚本为既有配置导出的默认值也优先于 `.env`。LiteLLM 目录和 `env/` 目录中的 `.env` 不会自动加载。
 
 ### 1.2 启动服务
 
@@ -30,6 +30,32 @@ curl -s http://localhost:4000/health/readiness
 curl -s http://localhost:4000/v1/models \
   -H "Authorization: Bearer ${LITELLM_MASTER_KEY:-sk-litellm-local-dev}" | jq .
 ```
+
+---
+
+### 1.4 新增 DeepSeek（百炼 Token Plan）
+
+客户端模型名为 `litellm-token-plan-deepseek`，默认上游为 `deepseek-v4.1-flash-1017`。两个套餐分开配置：
+
+| 接入 | 客户端模型名 | 上游凭证与地址 |
+|------|------|------|
+| 既有 Coding Plan | `litellm-code-openai` / `litellm-code-anthropic` | 沿用当前 shell 的 `LITELLM_UPSTREAM_CODE_MODEL_*`、`BAILIAN_CODING_PLAN_*` 配置 |
+| 新增 Token Plan | `litellm-token-plan-deepseek` | 单独使用 `BAILIAN_TOKEN_PLAN_API_KEY` 和 Token Plan 专属端点 |
+
+在**仓库根目录** `.env` 填入以下变量（该文件已被 Git 忽略）：
+
+```dotenv
+BAILIAN_TOKEN_PLAN_API_KEY=替换为你的TokenPlan专属Key
+# 以下默认值已内置，仅在需要覆盖时取消注释。
+# LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_NAME=openai/deepseek-v4.1-flash-1017
+# BAILIAN_TOKEN_PLAN_OPENAI_BASE_URL=https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1
+```
+
+Token Plan 的端点与凭证按[百炼官方接入文档](https://help.aliyun.com/zh/model-studio/token-plan-personal-quick-start)配置，模型 ID 见[支持的模型](https://help.aliyun.com/zh/model-studio/token-plan-personal-overview)。该入口不会回退使用 `BAILIAN_CODING_PLAN_API_KEY`、`BAILIAN_API_KEY` 或 Coding Plan 的地址；未填 Key 时保留模型入口，但无法成功调用。
+
+填好 Key 后，在仓库根目录执行 `make litellm-restart`，让容器重新加载环境变量。如果客户端使用了限制模型范围的 Virtual Key，需要在 Dashboard 中允许 `litellm-token-plan-deepseek`；客户端仍使用自己的 LiteLLM Virtual Key，上游 Token Plan Key 只配置在网关中。
+
+如需明确指定其他 dotenv 文件，可导出 `LITELLM_COMPOSE_ENV_FILE=/绝对路径/.env`；设为 `/dev/null` 可禁用项目 `.env`。dotenv 仅由 Compose 解析，不作为 shell 脚本执行。
 
 ---
 
@@ -372,6 +398,11 @@ rm "${AGENT_SERVICE_DATA_DIR:-$HOME/Documents/service-data}/litellm/chatgpt-toke
 | `LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_NAME` | `litellm-code-anthropic` 的百炼 Anthropic 兼容上游模型 | `anthropic/qwen-plus` |
 | `LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_BASE` | `litellm-code-anthropic` 的百炼 Anthropic 兼容 base URL | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
 | `LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_KEY` | `litellm-code-anthropic` 的百炼 API key；脚本会优先复用 `BAILIAN_CODING_PLAN_API_KEY` 或 `BAILIAN_API_KEY` | `dummy-key` |
+| `BAILIAN_TOKEN_PLAN_API_KEY` | 新增 DeepSeek 的 Token Plan 专属 Key，可写入项目 `.env` | 无；未配置时不可调用 |
+| `BAILIAN_TOKEN_PLAN_OPENAI_BASE_URL` | Token Plan OpenAI 兼容端点 | `https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1` |
+| `LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_NAME` | `litellm-token-plan-deepseek` 的上游模型 | `openai/deepseek-v4.1-flash-1017` |
+| `LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_BASE` / `LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_KEY` | 按需覆盖上述 Token Plan 地址 / Key，不读取 Coding Plan 变量 | 使用上述 Token Plan 配置 |
+| `LITELLM_COMPOSE_ENV_FILE` | 显式指定 Compose dotenv 文件 | 存在时读取仓库根 `.env`，否则 `/dev/null` |
 | `LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_NAME` | 本地补全 OpenAI 兼容上游模型 | `openai/qwen-turbo` |
 | `LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_BASE` | 本地补全 OpenAI 兼容 base URL | `http://host.containers.internal:11434/v1` |
 | `LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_KEY` | 本地补全 OpenAI 兼容 API key | `dummy-key` |
@@ -387,6 +418,7 @@ rm "${AGENT_SERVICE_DATA_DIR:-$HOME/Documents/service-data}/litellm/chatgpt-toke
 | LiteLLM 镜像 | `docker.litellm.ai/berriai/litellm:v1.94.2` |
 | OpenAI 兼容逻辑模型 | `litellm-code-openai` |
 | Anthropic 兼容逻辑模型 | `litellm-code-anthropic` |
+| Token Plan DeepSeek 逻辑模型 | `litellm-token-plan-deepseek` |
 | 本地补全逻辑模型 | `litellm-autocomplate-openai` |
 
 两项数据目录均由当前用户推导，可用一个 `AGENT_SERVICE_DATA_DIR` 覆盖共同根目录。macOS 先准备本地 Podman machine；新机步骤见 [重建说明](../../../docs/setup-new-mac.md)。本地凭据通过自己的安全渠道恢复或重新登录，不复制整个容器。
@@ -658,11 +690,11 @@ Unable to find token in cache or LiteLLM_VerificationTokenTable
 
 ### 6.11 `check-chatgpt-env` 报覆盖变量不合法
 
-脚本不会读取仓库内 `.env` 文件。`LITELLM_CODEX_MODEL` 和 `LITELLM_UPSTREAM_CODEX_MODEL` 已不再参与 Codex 严格转发配置；如果当前 shell 仍设置了它们，`check-chatgpt-env` 会提示这些变量已被忽略。参考 `./scripts/litellm.sh print-chatgpt-env` 的输出修正后，打开一个新的 zsh 重试。
+`check-chatgpt-env` 只检查当前 shell；仓库根 `.env` 在执行 Compose 时加载。`LITELLM_CODEX_MODEL` 和 `LITELLM_UPSTREAM_CODEX_MODEL` 已不再参与 Codex 严格转发配置；如果当前 shell 仍设置了它们，`check-chatgpt-env` 会提示这些变量已被忽略。参考 `./scripts/litellm.sh print-chatgpt-env` 的输出修正后，打开一个新的 zsh 重试。
 
 ### 6.12 当前 shell 已设置变量，但 compose 仍像默认配置
 
-脚本会传入 `--env-file /dev/null`，避免 compose 自动读取本地 `.env`。确认变量已经 export，而不是只在 shell 里赋值：
+脚本显式选择仓库根 `.env`（不存在时使用 `/dev/null`），可用 `LITELLM_COMPOSE_ENV_FILE` 覆盖。Token Plan 配置可直接写入所选文件；既有配置仍以当前 shell 和脚本默认值为准。若从 shell 传值，确认变量已经 export，而不是只在 shell 里赋值：
 
 ```bash
 export LITELLM_MASTER_KEY=sk-...

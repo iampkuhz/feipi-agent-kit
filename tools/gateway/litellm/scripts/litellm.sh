@@ -204,7 +204,13 @@ prepare_runtime() {
 }
 
 compose() {
-  local compose_env_file="${LITELLM_COMPOSE_ENV_FILE:-/dev/null}"
+  local compose_env_file="${LITELLM_COMPOSE_ENV_FILE:-}"
+  if [[ -z "$compose_env_file" ]]; then
+    compose_env_file="$COMPOSE_DIR/../../../.env"
+    [[ -f "$compose_env_file" ]] || compose_env_file=/dev/null
+  fi
+  # 交由 Compose 解析 dotenv，不执行其中的 shell 代码。
+  # Token Plan 的默认值仅放在 Compose 中，避免 apply_defaults 覆盖项目 .env。
 
   if [[ -n "${LITELLM_COMPOSE_COMMAND:-}" ]]; then
     # shellcheck disable=SC2086

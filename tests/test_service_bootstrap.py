@@ -134,6 +134,57 @@ elif args == ['--version']:
         self.assertFalse(self.data.exists())
         self.assertTrue(any(row["args"][-1:] == ["ps"] for row in self.calls()))
 
+    @unittest.skipUnless(shutil.which("docker-compose"), "Token Plan 隔离校验需要 docker-compose 客户端")
+    def test_litellm_token_plan_project_env_and_credential_isolation(self):
+        # 走真实启动脚本的默认值与 dotenv 选择，但将 up 替换成静态 config。
+        root = self.base / "isolated repo"
+        for relative in ["tools/gateway/litellm/scripts/litellm.sh", "tools/lib/podman.sh",
+                         "tools/gateway/litellm/compose/docker-compose.yml"]:
+            dest = root / relative
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ROOT / relative, dest)
+        output = self.base / "compose.json"
+        renderer = self.bin / "render-compose"
+        renderer.write_text(f"""#!{sys.executable}
+import pathlib, subprocess, sys
+args = sys.argv[1:sys.argv.index('-f') + 2]
+p = subprocess.run([{shutil.which('docker-compose')!r}, *args, 'config', '--format', 'json'],
+                   capture_output=True, text=True, timeout=15)
+pathlib.Path({str(output)!r}).write_text(p.stdout)
+sys.stderr.write(p.stderr)
+raise SystemExit(p.returncode)
+""")
+        renderer.chmod(0o755)
+        env = dict(self.env, LITELLM_COMPOSE_COMMAND="render-compose",
+                   BAILIAN_CODING_PLAN_API_KEY="coding-test-key", BAILIAN_API_KEY="general-test-key",
+                   BAILIAN_CODING_PLAN_OPENAI_BASE_URL="https://coding.test/v1")
+        cases = [
+            (None, {}, "dummy-key", "openai/deepseek-v4.1-flash-1017"),
+            ("BAILIAN_TOKEN_PLAN_API_KEY=\n", {}, "dummy-key", "openai/deepseek-v4.1-flash-1017"),
+            ("BAILIAN_TOKEN_PLAN_API_KEY=token-file-key\n"
+             "LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_NAME=openai/deepseek-v4.1-flash\n",
+             {}, "token-file-key", "openai/deepseek-v4.1-flash"),
+            ("BAILIAN_TOKEN_PLAN_API_KEY=token-file-key\n",
+             {"BAILIAN_TOKEN_PLAN_API_KEY": "token-shell-key"}, "token-shell-key", "openai/deepseek-v4.1-flash-1017"),
+            ("BAILIAN_TOKEN_PLAN_API_KEY=token-file-key\n",
+             {"LITELLM_COMPOSE_ENV_FILE": "/dev/null"}, "dummy-key", "openai/deepseek-v4.1-flash-1017"),
+        ]
+        for index, (dotenv, overrides, expected_key, expected_model) in enumerate(cases):
+            with self.subTest(case=index):
+                if dotenv is not None:
+                    (root / ".env").write_text(dotenv)
+                p = self.run_script("tools/gateway/litellm/scripts/litellm.sh", "up",
+                                    env=dict(env, **overrides), root=root)
+                self.assertEqual(p.returncode, 0, p.stderr)
+                actual = json.loads(output.read_text())["services"]["litellm"]["environment"]
+                self.assertEqual(actual["LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_KEY"], expected_key)
+                self.assertEqual(actual["LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_NAME"], expected_model)
+                self.assertEqual(actual["LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_BASE"],
+                                 "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1")
+                self.assertEqual(actual["LITELLM_UPSTREAM_CODE_MODEL_OPENAI_KEY"], "coding-test-key")
+                self.assertEqual(actual["LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_KEY"], "coding-test-key")
+                self.assertEqual(actual["LITELLM_UPSTREAM_CODE_MODEL_OPENAI_BASE"], "https://coding.test/v1")
+
     def test_litellm_stop_logs_and_status_reject_remote_connection(self):
         env = dict(self.env, TEST_CONNECTION="ssh://user@another-machine/run/podman.sock")
         for command in ["down", "logs", "status"]:
