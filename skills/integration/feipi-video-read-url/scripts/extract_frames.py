@@ -139,7 +139,7 @@ def main():
     if args.base_dir:
         base = Path(args.base_dir).resolve()
         m = copy.deepcopy(validate(base))
-        if args.url not in (m["original_url"], m["canonical_url"]):
+        if args.url not in ("-", m["original_url"], m["canonical_url"]):
             raise ValueError("base_source_url_mismatch")
         if m["content_type"] not in ("video", "video_note") or not args.times:
             raise ValueError("base_video_and_explicit_times_required")
@@ -149,7 +149,9 @@ def main():
             dest = safe_path(root, item["path"])
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(safe_path(base, item["path"]), dest)
-    extract_frames(args.url, root, m, Path(__file__).resolve().parent,
+    # 补帧直接读取已验证清单中的原始访问 URL，避免宿主复制日志脱敏后的签名参数。
+    source_url = m["original_url"] if args.base_dir else args.url
+    extract_frames(source_url, root, m, Path(__file__).resolve().parent,
                    times=args.times.split(",") if args.times else None)
     if not args.base_dir:
         channel(m, "source", "complete")

@@ -89,6 +89,25 @@ class SummaryReviewTests(unittest.TestCase):
         self.assertEqual(m["channels"]["frames"]["sampling"]["previous_sampling"]["strategy"], "uniform")
         self.assertEqual(m["artifacts"][1]["read_status"], "read")
 
+    def test_base_copy_uses_saved_url_without_host_copying_signature(self):
+        m = json.loads(self.manifest.read_text())
+        m["original_url"] += "?xsec_token=actual-public-signature"
+        self.manifest.write_text(json.dumps(m))
+        output = self.root / "new-extraction"
+        before = (self.root / "asr.txt").read_bytes()
+        with patch.object(sys, "argv", ["extract_frames.py", "-", str(output), "--base-dir", str(self.root), "--times", "145"]), patch.object(frames, "extract_frames") as extract:
+            frames.main()
+        self.assertEqual(extract.call_args.args[0], m["original_url"])
+        self.assertEqual((output / "asr.txt").read_bytes(), before)
+        self.assertEqual((self.root / "asr.txt").read_bytes(), before)
+
+    def test_wrong_base_source_fails_before_creating_output(self):
+        output = self.root / "new-extraction"
+        with patch.object(sys, "argv", ["extract_frames.py", "https://wrong.invalid/", str(output), "--base-dir", str(self.root), "--times", "145"]):
+            with self.assertRaisesRegex(ValueError, "base_source_url_mismatch"):
+                frames.main()
+        self.assertFalse(output.exists())
+
 
 if __name__ == "__main__":
     unittest.main()
