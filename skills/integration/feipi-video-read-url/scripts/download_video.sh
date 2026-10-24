@@ -34,7 +34,11 @@ detect_source() {
     echo "drvoice"
     return 0
   fi
-  echo "不支持的视频来源: $url（支持 YouTube / Bilibili / 严道单讲或文章视频）" >&2
+  if [[ "$url" =~ ^https?://(www\.)?(xiaohongshu\.com|xhslink\.com|xhslink\.cn)(/|$) ]]; then
+    echo "xiaohongshu"
+    return 0
+  fi
+  echo "不支持的视频来源: $url（支持 YouTube / Bilibili / 小红书 / 严道单讲或文章视频）" >&2
   return 1
 }
 
@@ -47,6 +51,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE="$(detect_source "$URL")"
 
 case "$SOURCE" in
+  xiaohongshu)
+    TARGET_SCRIPT="$SCRIPT_DIR/download_xiaohongshu.sh"
+    ;;
   drvoice)
     TARGET_SCRIPT="$SCRIPT_DIR/download_drvoice.sh"
     ;;

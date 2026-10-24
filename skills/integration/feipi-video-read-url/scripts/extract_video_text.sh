@@ -184,7 +184,11 @@ detect_source() {
     echo "drvoice"
     return 0
   fi
-  echo "不支持的视频来源: $url（支持 YouTube / Bilibili / 严道单讲或文章视频）" >&2
+  if [[ "$url" =~ ^https?://(www\.)?(xiaohongshu\.com|xhslink\.com|xhslink\.cn)(/|$) ]]; then
+    echo "xiaohongshu"
+    return 0
+  fi
+  echo "不支持的视频来源: $url（支持 YouTube / Bilibili / 小红书 / 严道单讲或文章视频）" >&2
   return 1
 }
 
@@ -318,6 +322,8 @@ resolve_url_key() {
     key="$(extract_youtube_key "$url" || true)"
   elif [[ "$source" == "bilibili" ]]; then
     key="$(extract_bilibili_key "$url" || true)"
+  elif [[ "$source" == "xiaohongshu" ]]; then
+    key="$(printf '%s' "$url" | sed -nE 's#^https?://(www\.)?xiaohongshu\.com/(explore|discovery/item)/([0-9a-f]{24})([/?].*)?$#\3#p')"
   elif [[ "$source" == "drvoice" ]]; then
     key="${url%/}"
     key="${key##*/}"
@@ -343,6 +349,9 @@ URL_KEY="$(resolve_url_key "$SOURCE" "$URL")"
 RUN_DIR="$OUT_ROOT_DIR/${SOURCE}-${URL_KEY}"
 
 case "$SOURCE" in
+  xiaohongshu)
+    SOURCE_SCRIPT="$SCRIPT_DIR/download_xiaohongshu.sh"
+    ;;
   drvoice)
     SOURCE_SCRIPT="$SCRIPT_DIR/download_drvoice.sh"
     ;;
@@ -400,7 +409,7 @@ rm -f "$NETWORK_CACHE_FILE"
 LONG_VIDEO_FLAG="0"
 DURATION_SEC=""
 ESTIMATED_RISK="low"
-if [[ "$SOURCE" != drvoice && ( "$MODE" == "whisper" || "$MODE" == "auto" ) ]]; then
+if [[ "$SOURCE" != drvoice && "$SOURCE" != xiaohongshu && ( "$MODE" == "whisper" || "$MODE" == "auto" ) ]]; then
   set +e
   DURATION_RAW="$("$YT_DLP_BIN" --socket-timeout 5 --skip-download --no-playlist --print "%(duration)s" "$URL" 2>/dev/null | head -n1)"
   set -e

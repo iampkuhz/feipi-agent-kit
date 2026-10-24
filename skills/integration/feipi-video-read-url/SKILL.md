@@ -1,6 +1,6 @@
 ---
 name: feipi-video-read-url
-description: 用于按用户意图处理视频网站 URL（如 YouTube、Bilibili），覆盖下载、音视频提取、字幕转写、摘要和背景扩展；在用户提供视频 URL 需要处理时触发。若用户处理的是本地文件或非视频 URL，不要误用本 skill。
+description: 用于按用户意图处理视频网站 URL（如 YouTube、Bilibili、小红书及分享短链），覆盖下载、音视频提取、字幕转写、摘要和背景扩展；在用户提供视频 URL 需要处理时触发。若用户处理的是本地文件或非视频 URL，不要误用本 skill。
 ---
 
 [//]: # (# 视频 URL 读取与总结（中文）)
@@ -24,7 +24,7 @@ description: 用于按用户意图处理视频网站 URL（如 YouTube、Bilibil
 - `background-only`：只交付上下文背景，不强制先给摘要。
 
 3. 站点扩展
-- 当前统一入口已覆盖 YouTube、Bilibili、严道医声网单讲（`/v2/speaker/<编号>`）及文章内视频（`/v2/article/<编号>`）。
+- 当前统一入口已覆盖 YouTube、Bilibili、小红书视频笔记及分享短链、严道医声网单讲（`/v2/speaker/<编号>`）及文章内视频（`/v2/article/<编号>`）。
 - 后续新增站点时，只在当前 skill 内新增来源适配脚本，不再新建平行 skill。
 
 ## 适用场景
@@ -160,6 +160,8 @@ description: 用于按用户意图处理视频网站 URL（如 YouTube、Bilibil
 1. 当前来源
 - YouTube：由 `scripts/download_youtube.sh` 适配。
 - Bilibili：由 `scripts/download_bilibili.sh` 适配。
+- 小红书：由 `scripts/download_xiaohongshu.sh` 适配；支持 `xiaohongshu.com/explore/<笔记ID>`、`/discovery/item/<笔记ID>`、`xhslink.com` 与 `xhslink.cn` 分享短链。保留分享参数，默认匿名提取；遇登录、验证码、图文笔记或无法读取媒体时明确失败，不把笔记文案当成视频转写。详见 `references/sources.md`。
+- 严道医声网：由 `scripts/download_drvoice.sh` 适配。
 
 2. 统一入口
 - 用户态统一入口：`scripts/download_video.sh` 与 `scripts/extract_video_text.sh`。
@@ -230,7 +232,7 @@ description: 用于按用户意图处理视频网站 URL（如 YouTube、Bilibil
 ## 工作流（Explore -> Plan -> Implement -> Verify）
 
 1. Explore
-- `scripts/download_video.sh` 与 `scripts/extract_video_text.sh` 内部识别来源（当前为 YouTube/Bilibili）。
+- `scripts/download_video.sh` 与 `scripts/extract_video_text.sh` 内部识别 YouTube、Bilibili、小红书与严道来源。
 - `scripts/install_deps.sh --check` 或 `scripts/extract_video_text.sh --check-deps` 校验依赖与自动选档结果；安装检查与真实执行共用 yt-dlp 候选解析器。字幕转换依赖 Python 3 标准库，由安装入口统一检查。
 - 先判断用户意图属于直接读取还是总结模式。
 - 再判断背景阶段是否明确要求“相关新闻/最新进展”；未明确时默认 `--news off`。

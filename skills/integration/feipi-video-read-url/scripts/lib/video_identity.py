@@ -38,6 +38,13 @@ def url_identity(url):
         match = re.search(r"/(BV[0-9A-Za-z]+|av[0-9]+)(?:/|$)", parsed.path)
         if match:
             video_id = match[1]
+    elif host in ("xiaohongshu.com", "www.xiaohongshu.com", "xhslink.com", "www.xhslink.com",
+                  "xhslink.cn", "www.xhslink.cn"):
+        platform = "小红书"
+        if host in ("xiaohongshu.com", "www.xiaohongshu.com"):
+            match = re.fullmatch(r"/(?:explore|discovery/item)/([0-9a-f]{24})/?", parsed.path)
+            if match:
+                video_id = match[1]
     elif host in ("drvoice.cn", "www.drvoice.cn"):
         platform = "DrVoice"
         match = re.fullmatch(r"/v2/speaker/(\d+)/?", parsed.path)

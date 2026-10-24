@@ -63,6 +63,15 @@
 5. whisper.cpp 模型发布（large-v3 q5_0）
    - https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-q5_0.bin
 
+## 小红书视频笔记适配
+
+- `scripts/download_xiaohongshu.sh` 复用本 skill 的 yt-dlp 下载、字幕转换和 whisper.cpp 链路；`scripts/lib/xiaohongshu_url.py` 解析分享短链。仍通过 `download_video.sh` 或 `extract_video_text.sh` 调用。
+- 接受 `https://www.xiaohongshu.com/explore/<24位笔记ID>`、`/discovery/item/<24位笔记ID>`，以及 `xhslink.com`、`xhslink.cn`（含 `/o/`）短链；从分享文案中取出 URL 传入即可。完整保留 `xsec_token` 等查询参数，不截掉分享凭据，不在日志打印解析后的直链。
+- 短链仅跟随小红书和分享域名，遇笔记地址即交给 yt-dlp；旧 HTTP 目标规范化为同站 HTTPS。跳往登录页、其他站点或不支持的页面时停止并输出诊断。网络超时有界，不调用第三方解析服务。
+- 由 yt-dlp 的 XiaoHongShu 提取器读取站点提供的媒体与标题；支持 `dryrun/video/audio/subtitle/whisper`。默认匿名访问，不自动读取浏览器 Cookie。登录、验证码、内容失效或图文笔记可能导致失败，应查看 `logs/xiaohongshu-<mode>.log`，不能直接归因为没有字幕。
+- `auto + fast` 优先独立字幕，无可用字幕时回退内置 whisper.cpp。只有真实带时间戳文本可用于摘要，标题、笔记描述、标签、评论和画面硬字幕均不作为完整语音转写。短链输出目录使用原链接指纹，`video_identity.json` 保存站点真实笔记 ID、原标题和原始输入链接。
+- 上游实现：[yt-dlp XiaoHongShu 提取器](https://github.com/yt-dlp/yt-dlp/blob/master/yt_dlp/extractor/xiaohongshu.py)。站点策略会变化；适配成功不保证所有笔记匿名可读。
+
 ## 严道单讲适配
 
 - `scripts/download_drvoice.sh` 与 `scripts/lib/drvoice_metadata.py`：公开详情接口核验单讲身份、未加密历史回放，使用同一内置转写引擎。支持 dryrun/video/audio/subtitle/whisper；无字幕返回明确诊断。

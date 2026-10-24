@@ -1368,6 +1368,12 @@ else
   stub_fail_msg "video-identity-regressions" "视频身份与请求包回归失败"
 fi
 
+if python3 "$SCRIPT_DIR/test_xiaohongshu.py"; then
+  stub_pass "xiaohongshu-regressions"
+else
+  stub_fail_msg "xiaohongshu-regressions" "小红书短链、身份与统一提取回归失败"
+fi
+
 if python3 "$SCRIPT_DIR/test_drvoice_metadata.py"; then
   stub_pass "drvoice-metadata-regressions"
 else
