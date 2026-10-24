@@ -70,3 +70,5 @@ JSON 为 `[{"source_artifact_id":"image-001","ocr_text":"…","observation":"…
 ## 可选的正常浏览器取证输入（兼容 v1）
 
 匿名访问受限、已有正常浏览器会话能显示笔记时，宿主可读取可见 DOM/轮播图与实际页面资源，并保存最小取证 JSON 后传 `extract_note.py URL OUTPUT_DIR --rendered-note INPUT_JSON`；不导出 Cookie 或登录凭据。输出 schema、字段与退出码不变。source artifact 增加 provenance=browser_dom。输入包详见笔记 skill 的 references/rendered-note.md；脚本校验原链接、source_url 和 noteId 一致。匿名失败目录与浏览器成功目录分开保留。
+
+可选 `--quality fast|accurate` 复用既有转写档位，默认 fast；不改变 v1 的输出字段和默认字幕优先行为。accurate 沿用既有语音优先的高质量策略。

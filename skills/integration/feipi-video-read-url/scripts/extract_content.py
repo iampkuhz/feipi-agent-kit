@@ -15,7 +15,7 @@ from content_manifest import (artifact, channel, diagnostic, finish, new_manifes
 from extract_frames import extract_frames
 
 
-def collect_video(url, root, manifest, times=None, media_info=None):
+def collect_video(url, root, manifest, times=None, media_info=None, quality="fast"):
     info = media_info
     try:
         info = info or resolve_media(url, SCRIPTS, root)
@@ -36,7 +36,7 @@ def collect_video(url, root, manifest, times=None, media_info=None):
     # 只准独立音频流；平台只有合流视频时不下载原片来换取语音。
     log = root / "text-extraction.log"
     code, output = run_logged(["bash", str(SCRIPTS / "extract_video_text.sh"), url,
-                              str(root / "text"), "auto", "--instruction", "提取视频原文", "--quality", "fast"],
+                              str(root / "text"), "auto", "--instruction", "提取视频原文", "--quality", quality],
                              log, timeout=1800)
     (root / "text-entrypoint.txt").write_bytes(output)
     fields = dict(line.split("=", 1) for line in output.decode(errors="replace").splitlines() if "=" in line)
@@ -48,7 +48,8 @@ def collect_video(url, root, manifest, times=None, media_info=None):
         anchor = {"type": "time_range", "start_seconds": 0,
                   "end_seconds": info.get("duration") if info else None, "timestamps": "inline"}
         artifact(manifest, root, kind, kind, target, anchor, source_url=manifest["canonical_url"])
-        channel(manifest, kind, "complete", provenance="whisper.cpp" if kind == "asr" else "platform_subtitles")
+        channel(manifest, kind, "complete", provenance="whisper.cpp" if kind == "asr" else "platform_subtitles",
+                requested_quality=quality)
         if kind == "asr":
             channel(manifest, "subtitles", "unavailable", "subtitles_unavailable_used_asr")
     else:
@@ -70,6 +71,7 @@ def main():
     parser.add_argument("url")
     parser.add_argument("output_dir")
     parser.add_argument("--frame-times", help="逗号分隔的抽帧秒数；默认均匀6帧")
+    parser.add_argument("--quality", choices=("fast", "accurate"), default="fast", help="复用既有转写档位；默认fast")
     args = parser.parse_args()
     if platform(args.url) == "xiaohongshu":
         # 图文/视频判断、文案证据和登录诊断均复用笔记入口。
@@ -77,7 +79,7 @@ def main():
         if not entry.is_file():
             parser.error("小红书请同时安装 feipi-xiaohongshu-read-note")
         import subprocess
-        command = [sys.executable, str(entry), args.url, args.output_dir]
+        command = [sys.executable, str(entry), args.url, args.output_dir, "--quality", args.quality]
         if args.frame_times:
             command += ["--frame-times", args.frame_times]
         return subprocess.call(command)
@@ -85,7 +87,7 @@ def main():
         parser.error("通用 manifest 入口当前支持 YouTube/Bilibili/小红书；其他既有来源继续使用原入口")
     root = prepare_output(args.output_dir)
     manifest = new_manifest(args.url, platform(args.url), "video")
-    collect_video(args.url, root, manifest, args.frame_times.split(",") if args.frame_times else None)
+    collect_video(args.url, root, manifest, args.frame_times.split(",") if args.frame_times else None, quality=args.quality)
     code = finish(manifest, root)
     print(f"manifest_path={root / 'extraction_manifest.json'}\nstatus={manifest['status']}")
     return code

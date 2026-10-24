@@ -29,13 +29,13 @@ description: 用于按用户意图处理视频网站 URL（如 YouTube、Bilibil
 
 ## 通用内容取证（调用方集成）
 
-处理需要保留文字与画面证据的请求时，使用可运行入口：
+处理需要保留文字与画面证据的请求或此类调用方集成（如 Housing）时，使用可运行入口；既有纯文字/字幕摘要继续使用原流程：
 
 ```bash
 python3 <本 skill>/scripts/extract_content.py '<URL>' '<OUTPUT_DIR>'
 ```
 
-该入口支持 YouTube、Bilibili、小红书；小红书自动交给同级 `feipi-xiaohongshu-read-note` 判断图文/视频。默认字幕优先、内置 whisper.cpp fast 回退，并通过 ffmpeg 远程输入端 seek 均匀抽6帧。仅获取独立音频与按需画面；不下载完整原视频，合流视频不能作为 ASR 回退。其他既有来源及用户明确下载需求继续使用原入口。
+该入口支持 YouTube、Bilibili、小红书；小红书自动交给同级 `feipi-xiaohongshu-read-note` 判断图文/视频。默认字幕优先、内置 whisper.cpp fast 回退，并通过 ffmpeg 远程输入端 seek 均匀抽6帧。仅获取独立音频与按需画面；不下载完整原视频，合流视频不能作为 ASR 回退。可用 `--quality accurate` 保留高质量转写档位。其他既有来源、用户明确只要文字或明确下载需求继续使用原入口。
 
 调用方必须指定独立输出目录，不得写入 skill 安装目录。结果为 `extraction_manifest.json`（`schema=feipi-content-extraction-v1`），包含来源、正文/字幕/ASR、图片/帧及 OCR/视觉观察独立清单。退出码 0=complete、2=partial、1=failed/blocked；先读 manifest 判断已有证据。字段、读图登记、失败边界及安装依赖见 [通用提取合同](references/content-extraction.md)。
 
@@ -148,7 +148,7 @@ python3 <本 skill>/scripts/extract_content.py '<URL>' '<OUTPUT_DIR>'
 - 明确要求”相关新闻/最新进展/现状”时，才允许补充时效性材料，并在来源中写清日期。
 
 8. 单命令执行契约（强制）
-- 执行方只运行一个阻塞式入口命令（`extract_video_text.sh` 或 `download_video.sh`），等待命令退出。
+- 执行方只运行一个阻塞式入口命令（画面取证用 `extract_content.py`，文字摘要或下载用 `extract_video_text.sh` / `download_video.sh`），等待命令退出。
 - 禁止额外启动 `Wait for whisper srt completion`、`tail -f`、轮询 `.srt` 或其他产物文件、重复后台 monitor。
 - 脚本标准输出已包含 `run_dir`、`mode`、`text_path`、`log_dir`、`whisper_profile`、`duration_sec`、`long_video`、`estimated_risk` 等字段，执行方可据此判断完成状态。
 - 长视频保护：whisper 模式会输出 `duration_sec`、`long_video` 和 `estimated_risk`，执行方可据此预估耗时，不做交互式确认。用户显式传 `accurate` 仍可按设计执行。
@@ -180,7 +180,7 @@ python3 <本 skill>/scripts/extract_content.py '<URL>' '<OUTPUT_DIR>'
 - 严道医声网：由 `scripts/download_drvoice.sh` 适配。
 
 2. 统一入口
-- 用户态统一入口：`scripts/download_video.sh` 与 `scripts/extract_video_text.sh`。
+- 文字摘要与下载入口为 `scripts/extract_video_text.sh`、`scripts/download_video.sh`；需要画面证据时使用 `scripts/extract_content.py`。取证入口内部复用文字入口，不重复启动转写。
 - 当前 skill 内部允许保留站点适配脚本，但这些脚本不再作为独立 skill 对外暴露。
 
 3. 后续新增站点的约束
@@ -264,7 +264,7 @@ python3 <本 skill>/scripts/extract_content.py '<URL>' '<OUTPUT_DIR>'
 
 2. Plan
 - 直接读取模式：确定 `dryrun / video / audio / subtitle / whisper`。
-- 总结模式：根据用户指令选择质量档位，再经 `scripts/extract_video_text.sh` 获取带时间戳文本。
+- 总结模式：根据用户指令选择质量档位，再经 `scripts/extract_video_text.sh` 获取带时间戳文本；需要画面证据或调用方明确要求文字＋关键帧时，经 `scripts/extract_content.py` 获取两类证据，高质量需求传 `--quality accurate`。
 - `summary`：只生成摘要请求包并交付摘要结果。
 - `expand`：先交付摘要，再生成背景请求包并继续交付背景分析。
 - `background-only`：直接生成背景请求包并交付上下文背景，不强制先展示摘要。
@@ -272,7 +272,7 @@ python3 <本 skill>/scripts/extract_content.py '<URL>' '<OUTPUT_DIR>'
 3. Implement
 - 获取入口返回的视频身份后，按“视频身份与聊天标题”规则更新当前聊天；生成请求包时传入真实标题，模板优先读取同目录且 URL 匹配的 `video_identity.json`。
 - 直接读取模式：使用 `scripts/download_video.sh` 执行。
-- `summary`：使用 `scripts/render_summary_prompt.sh` 生成 `summary_request.md`，并只产出 `summary_result.md`。
+- `summary`：使用 `scripts/render_summary_prompt.sh` 生成 `summary_request.md`，并只产出 `summary_result.md`。采用取证入口时，还须实际读取 manifest 中的图片/帧并登记 OCR/视觉观察，将画面作为独立证据；缺少转写时只能明确交付已读画面的部分摘要。
 - `expand`：先生成并交付 `summary_result.md`，再使用 `scripts/render_background_prompt.sh --mode expand` 生成 `background_request.md`，继续产出 `background_result.md`。
 - `background-only`：直接使用 `scripts/render_background_prompt.sh --mode background-only` 生成 `background_request.md`；若没有现成摘要，第三个参数传 `-`。
 - 只有在用户明确要求相关新闻或最新进展时，背景脚本才传 `--news on`；其他情况保持 `--news off`。
@@ -281,7 +281,7 @@ python3 <本 skill>/scripts/extract_content.py '<URL>' '<OUTPUT_DIR>'
 - 直接读取模式：
   - `dryrun` 成功返回标题或 ID，且不生成媒体文件。
   - `video` / `audio` / `subtitle` / `whisper` 至少生成对应产物。
-- 摘要请求包包含 `<TRANSCRIPT_START>` 与 `<TRANSCRIPT_END>`。
+- 使用文本摘要请求包时包含 `<TRANSCRIPT_START>` 与 `<TRANSCRIPT_END>`；取证摘要还必须核对 manifest 的完成状态、已读图号/时间点与独立来源。
 - 摘要请求包包含反套话约束、列表结构约束与时间锚点约束。
 - 摘要请求包明确“当前只做摘要，不扩展背景/影响/相关新闻”。
 - `expand` 请求包明确要求输出 `## 相关影响和背景分析`。

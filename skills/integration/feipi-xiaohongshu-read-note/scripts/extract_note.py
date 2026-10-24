@@ -126,7 +126,7 @@ def published_at(value):
     return value if isinstance(value, str) and value else None
 
 
-def extract(url, root, times=None, rendered=None):
+def extract(url, root, times=None, rendered=None, quality="fast"):
     from content_manifest import (artifact, channel, finish, new_manifest, visual_pending, write_json)
     from xiaohongshu_url import resolve, SourceError, NOTE_PATH
     from extract_content import collect_video
@@ -208,7 +208,7 @@ def extract(url, root, times=None, rendered=None):
         visual_pending(m)
         finish(m, root)
         if m["content_type"] == "video_note":
-            collect_video(access_url, root, m, times, media_info=media_info)
+            collect_video(access_url, root, m, times, media_info=media_info, quality=quality)
         elif m["content_type"] == "unknown":
             channel(m, "source", "partial", "unsupported_note_type")
     except (SourceError, FetchError, ValueError) as e:
@@ -228,12 +228,13 @@ def main():
     p.add_argument("--video-skill", help="已安装 feipi-video-read-url 目录；默认同级目录")
     p.add_argument("--frame-times", help="视频按指定秒数抽帧，逗号分隔")
     p.add_argument("--rendered-note", help="宿主通过已有浏览器会话保存的可见 DOM 取证 JSON；不含凭据")
+    p.add_argument("--quality", choices=("fast", "accurate"), default="fast", help="视频转写档位；默认fast")
     a = p.parse_args()
     load_video_skill(a.video_skill)
     from content_manifest import prepare_output, MANIFEST
     root = prepare_output(a.output_dir)
     rendered = json.loads(Path(a.rendered_note).read_text(encoding="utf-8")) if a.rendered_note else None
-    code, m = extract(a.url, root, a.frame_times.split(",") if a.frame_times else None, rendered=rendered)
+    code, m = extract(a.url, root, a.frame_times.split(",") if a.frame_times else None, rendered=rendered, quality=a.quality)
     print(f"manifest_path={root / MANIFEST}\nstatus={m['status']}")
     return code
 
