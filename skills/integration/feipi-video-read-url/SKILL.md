@@ -43,6 +43,8 @@ python3 <本 skill>/scripts/extract_content.py '<URL>' '<OUTPUT_DIR>'
 
 摘要、关键词由宿主基于实际正文、转写与读过的图片生成，并分别标注来源；脚本不生成伪摘要。模糊品牌/数字/尺寸保留不确定，笔记文案、标题、封面或搜索结果都不能冒充视频转写。
 
+生成摘要前必须按 [摘要覆盖复核](references/summary-coverage.md) 清点主题和子主题；比较、建议、理由、适用条件分别保留。技术名词转写不清或说明卡片遗漏时按段落补帧，不能把均匀6帧当作充分覆盖。集成摘要同时生成 `summary_coverage.json`，执行 `scripts/review_summary.py MANIFEST SUMMARY COVERAGE`，通过后交给调用方；该校验只证明引用可追溯，语义完整性依赖实际阅读复核。纯文字摘要同样逐项清点与反向复核，不为凑短摘要删除决策内容。
+
 ## 适用场景
 
 1. 用户给出视频 URL，希望先验证链接是否可读、可下载或可转写。

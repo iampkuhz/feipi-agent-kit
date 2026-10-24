@@ -26,6 +26,7 @@ python3 <本 skill>/scripts/extract_note.py '<URL>' '<OUTPUT_DIR>'
 3. 对每张实际读取的图片/帧分别写 `source_artifact_id`、`ocr_text`、`observation`、`uncertainties`。模糊品牌、数字、尺寸明确保留不确定；没读到文字使用空字符串，不推断不存在文字。视频封面标为 video_cover，不视为视频帧。
 4. 将 JSON 数组交给视频 skill 的 `scripts/record_observations.py '<OUTPUT_DIR>' '<JSON_FILE>'`，将 OCR 和视觉观察分别登记；未读图片保持 pending。
 5. 宿主模型仅根据 body/subtitles/asr 和实际读取的图片/帧生成摘要、关键词，分别标注文案、语音、图号/时间点；不得用搜索摘要补齐。可写调用方目录 `summary.md`、`keywords.json`，无需把内容带回 skill。
+6. 先读同级 `feipi-video-read-url` 的 `SKILL.md`，按其中“摘要覆盖复核”指引清点全文及每张图的主题/子主题，逐项保留比较、建议、理由、代价和适用条件；生成 `summary_coverage.json`，调用该视频 skill 中的摘要复核脚本（`review_summary.py MANIFEST SUMMARY COVERAGE`）。图片保存和提取 complete 不代表摘要充分；无法确认的内容在摘要明确待核验。校验只检查引用可追溯，不能替代实际语义复核。
 
 ## 状态与交付
 

@@ -65,6 +65,8 @@ JSON 为 `[{"source_artifact_id":"image-001","ocr_text":"…","observation":"…
 
 ## 安装依赖
 
+提取完成不表示摘要充分。摘要集成另按 [摘要覆盖复核](summary-coverage.md) 清点子主题、保留比较与选择依据；宿主生成覆盖清单，`scripts/review_summary.py` 校验实际来源和摘要片段。追加画面可用 `extract_frames.py URL NEW_DIR --base-dir OLD_DIR --times '142,145,150'`，复制既有证据到新目录后补帧，不重新转写或覆盖旧目录。
+
 两个 skill 作为同一 Git ref 的同级目录安装；笔记入口通过 sibling 位置发现视频 skill，也可用 `--video-skill <PATH>` 指定。运行 Python 3.9+ 标准库，视频另需要现有 yt-dlp/ffmpeg/whisper.cpp；tests/evals 不安装。
 
 ## 可选的正常浏览器取证输入（兼容 v1）

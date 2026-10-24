@@ -2,6 +2,7 @@
 """远程输入端 seek 抽帧。仅允许 Range 媒体或 HLS；不缓存完整原视频。"""
 
 import argparse
+import copy
 from pathlib import Path
 import re
 import shutil
@@ -11,7 +12,8 @@ from urllib.request import Request, urlopen
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 from content_manifest import (artifact, channel, finite_seconds, new_manifest, prepare_output,
-                              resolve_media, run_logged, visual_pending, finish, write_json)
+                              resolve_media, run_logged, visual_pending, finish, write_json, safe_path)
+from validate_extraction import validate
 
 
 def frame_times(duration, requested=None, count=6):
@@ -74,6 +76,9 @@ def ffmpeg_args(media, headers, second, path):
 
 
 def extract_frames(url, root, manifest, scripts, info=None, times=None, count=6):
+    previous = [a for a in manifest["artifacts"] if a["kind"] == "frame"]
+    start = max([int(a["id"].replace("frame-", "", 1)) for a in previous] or [0])
+    previous_sampling = manifest["channels"]["frames"].get("sampling") if previous else None
     failures, saved = [], []
     sampling = {"strategy": "explicit" if times is not None else "uniform",
                 "requested_times_seconds": [], "range_seconds": None,
@@ -93,7 +98,7 @@ def extract_frames(url, root, manifest, scripts, info=None, times=None, count=6)
         sampling["transport"] = check_seekable(media, headers)
         dest = root / "frames"
         dest.mkdir(exist_ok=True)
-        for i, second in enumerate(sample, 1):
+        for i, second in enumerate(sample, start + 1):
             path = dest / f"{i:03d}-{second:.3f}s.jpg"
             code, _ = run_logged(ffmpeg_args(media, headers, second, path),
                                   dest / f"{i:03d}.log", timeout=45)
@@ -114,6 +119,11 @@ def extract_frames(url, root, manifest, scripts, info=None, times=None, count=6)
     except (ValueError, OSError) as error:
         reason = str(error) if isinstance(error, ValueError) else "frame_stream_request_failed"
         channel(manifest, "frames", "unavailable", reason, sampling=sampling)
+    if previous_sampling:
+        sampling["previous_sampling"] = previous_sampling
+        sampling["coverage"] = "sampled_only"
+        if manifest["channels"]["frames"]["status"] == "unavailable":
+            manifest["channels"]["frames"]["status"] = "partial"
     visual_pending(manifest)
     return saved
 
@@ -123,12 +133,26 @@ def main():
     parser.add_argument("url")
     parser.add_argument("output_dir")
     parser.add_argument("--times", help="逗号分隔的秒数，最多24个；省略则均匀抽6帧")
+    parser.add_argument("--base-dir", help="已验证的同一来源提取目录；复制其证据到新目录后补帧，不重新转写")
     args = parser.parse_args()
-    root = prepare_output(args.output_dir)
     m = new_manifest(args.url, content_type="video")
+    if args.base_dir:
+        base = Path(args.base_dir).resolve()
+        m = copy.deepcopy(validate(base))
+        if args.url not in (m["original_url"], m["canonical_url"]):
+            raise ValueError("base_source_url_mismatch")
+        if m["content_type"] not in ("video", "video_note") or not args.times:
+            raise ValueError("base_video_and_explicit_times_required")
+    root = prepare_output(args.output_dir)
+    if args.base_dir:
+        for item in m["artifacts"]:
+            dest = safe_path(root, item["path"])
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(safe_path(base, item["path"]), dest)
     extract_frames(args.url, root, m, Path(__file__).resolve().parent,
                    times=args.times.split(",") if args.times else None)
-    channel(m, "source", "complete")
+    if not args.base_dir:
+        channel(m, "source", "complete")
     code = finish(m, root)
     print(f"manifest_path={root / 'extraction_manifest.json'}\nstatus={m['status']}")
     return code
