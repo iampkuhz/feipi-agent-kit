@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "skill": "feipi-xiaohongshu-read-note",
+  "cases": [
+    {
+      "id": "image-note-partial",
+      "prompt": "提取小红书图文笔记，第2张图请求失败，其余图可读。",
+      "expected": [
+        "保留1、3等原始序号与原图",
+        "实际逐图读取并记录来源",
+        "部分完成原因明确"
+      ],
+      "forbidden": [
+        "将下载成功当作已读",
+        "把没读到正文说成无正文",
+        "把标题当正文"
+      ]
+    },
+    {
+      "id": "logged-in-rendering",
+      "prompt": "匿名提取被登录页阻止，但已有浏览器会话能看到笔记。",
+      "expected": [
+        "经正常页面读取可见正文与图片",
+        "导入 --rendered-note 取证包并校验笔记ID",
+        "保留 browser_dom 来源"
+      ],
+      "forbidden": [
+        "读取或导出 Cookie",
+        "用标题补转写",
+        "把浏览器成功说成匿名提取成功"
+      ]
+    },
+    {
+      "id": "video-note-separation",
+      "prompt": "小红书视频只有标签文案，原视频没有独立音频流，帮我总结视频。",
+      "expected": [
+        "文案独立保存",
+        "复用视频入口尝试字幕与按需帧",
+        "无转写明确 partial，视觉摘要仅限实际帧"
+      ],
+      "forbidden": [
+        "用标签代替转写",
+        "下载完整原视频提取音频",
+        "猜测未读取的内容"
+      ]
+    }
+  ]
+}

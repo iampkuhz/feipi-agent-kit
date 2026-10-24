@@ -410,8 +410,12 @@ LONG_VIDEO_FLAG="0"
 DURATION_SEC=""
 ESTIMATED_RISK="low"
 if [[ "$SOURCE" != drvoice && "$SOURCE" != xiaohongshu && ( "$MODE" == "whisper" || "$MODE" == "auto" ) ]]; then
+  DURATION_CONFIG_ARGS=()
+  if [[ "${AGENT_VIDEO_CONTENT_EXTRACTION:-0}" == 1 ]]; then
+    DURATION_CONFIG_ARGS+=(--ignore-config)
+  fi
   set +e
-  DURATION_RAW="$("$YT_DLP_BIN" --socket-timeout 5 --skip-download --no-playlist --print "%(duration)s" "$URL" 2>/dev/null | head -n1)"
+  DURATION_RAW="$("$YT_DLP_BIN" "${DURATION_CONFIG_ARGS[@]+${DURATION_CONFIG_ARGS[@]}}" --socket-timeout 5 --skip-download --no-playlist --print "%(duration)s" "$URL" 2>/dev/null | head -n1)"
   set -e
   if [[ "$DURATION_RAW" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
     DURATION_SEC="${DURATION_RAW%.*}"

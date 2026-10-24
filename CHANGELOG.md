@@ -1,7 +1,8 @@
 # 变更记录
 
 ## 2026-10-24
-- feipi-video-read-url v9：支持小红书短链提取与视频总结
+- feipi-video-read-url v9：支持小红书与关键帧分层取证
+- feipi-xiaohongshu-read-note v1：新增笔记原文与顺序原图提取
 
 ## 2026-10-20
 - feipi-writing-refine-text v3：增加重点提炼与自然回复，按对话目的和关系选取信息，补充立场、承诺、共享背景及语气边界测试

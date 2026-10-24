@@ -48,7 +48,8 @@ cp .env.example .env
 | Skill | 用途 |
 |-------|------|
 | `feipi-skill-govern` | Skill 的创建、重构、自检与治理 |
-| `feipi-video-read-url` | 视频 URL 处理（YouTube / Bilibili / 小红书 / 严道单讲及文章视频） |
+| `feipi-video-read-url` | 视频 URL 处理、按需关键帧与通用 extraction manifest |
+| `feipi-xiaohongshu-read-note` | 小红书图文/视频笔记、顺序原图与独立来源证据提取（依赖同级视频 skill） |
 | `feipi-plantuml-generate-diagram` | PlantUML 架构图、时序图、思维导图及通用作图唯一入口 |
 | `feipi-drawio-generate-diagram` | draw.io 可编辑图表、Podman 本地渲染与图包校验 |
 | `feipi-techreport-ppt-skill` | 技术报告 PPT 单页 |

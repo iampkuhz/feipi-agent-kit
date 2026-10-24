@@ -191,6 +191,9 @@ yt_common_init() {
     --restrict-filenames
     --output "$out_dir/%(title).200B [%(id)s].%(ext)s"
   )
+  if [[ "${AGENT_VIDEO_CONTENT_EXTRACTION:-0}" == 1 ]]; then
+    YT_COMMON_ARGS+=(--ignore-config)
+  fi
 
   # 与原请求一起采集最小身份信息，不增加网络请求或改变下载模式。
   YT_IDENTITY_RAW=""
@@ -336,9 +339,13 @@ yt_common_mode_audio() {
 
 yt_common_mode_whisper_audio() {
   local url="$1"
+  local audio_format="bestaudio[abr<=96]/bestaudio/best"
+  if [[ "${AGENT_VIDEO_CONTENT_EXTRACTION:-0}" == 1 ]]; then
+    audio_format="bestaudio[abr<=96]/bestaudio"
+  fi
   # 转写优先速度：优先拉取中低码率音频，减小下载与后续转写耗时。
   yt_common_run_with_success_log \
-    --format "bestaudio[abr<=96]/bestaudio/best" \
+    --format "$audio_format" \
     --extract-audio \
     --audio-format mp3 \
     --audio-quality 7 \
@@ -353,6 +360,9 @@ yt_common_mode_whisper_audio_with_format_fallback() {
     "bestaudio[abr<=96]/bestaudio"
     "18"
   )
+  if [[ "${AGENT_VIDEO_CONTENT_EXTRACTION:-0}" == 1 ]]; then
+    format_variants=("bestaudio[abr<=96]/bestaudio")
+  fi
   local format_var log_file
 
   for format_var in "${format_variants[@]}"; do

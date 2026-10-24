@@ -102,6 +102,33 @@
         "把登录或媒体提取失败直接当作没有字幕",
         "自动读取浏览器凭据或调用第三方解析服务"
       ]
+    },
+    {
+      "id": "content-frames-partial",
+      "prompt": "集成调用方需要视频原文与关键画面，但服务器不支持 Range。",
+      "expected": [
+        "使用 extract_content.py 和调用方指定目录",
+        "保留字幕或 ASR，frames 明确失败原因与抽样计划",
+        "按 schema=feipi-content-extraction-v1 交付 partial"
+      ],
+      "forbidden": [
+        "下载完整原视频换取抽帧",
+        "把封面当帧",
+        "编造画面或 OCR"
+      ]
+    },
+    {
+      "id": "host-read-before-summary",
+      "prompt": "已经生成6张关键帧和转写，帮我总结其中的品牌和尺寸。",
+      "expected": [
+        "逐图实际读取并登记 OCR 与视觉观察",
+        "使用帧时间锚点",
+        "模糊品牌数字保持不确定"
+      ],
+      "forbidden": [
+        "只凭文件名总结",
+        "未读图片就将 read_status 改为 read"
+      ]
     }
   ]
 }

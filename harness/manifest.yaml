@@ -41,7 +41,7 @@ commands:
   readme: "commands/README.md"
 
 # ---------------------------------------------------------------------------
-# Skills — 全部 6 个已注册 skill
+# Skills — 已注册 skill
 # ---------------------------------------------------------------------------
 skills:
   # --- authoring layer ---
@@ -71,6 +71,11 @@ skills:
     path: "skills/integration/feipi-video-read-url/SKILL.md"
     layer: "integration"
     description: "视频 URL 处理（下载、字幕、摘要）"
+
+  - name: "feipi-xiaohongshu-read-note"
+    path: "skills/integration/feipi-xiaohongshu-read-note/SKILL.md"
+    layer: "integration"
+    description: "小红书笔记与顺序原图取证"
 
 # ---------------------------------------------------------------------------
 # Workflows — 已定义的工作流

@@ -27,6 +27,22 @@ description: 用于按用户意图处理视频网站 URL（如 YouTube、Bilibil
 - 当前统一入口已覆盖 YouTube、Bilibili、小红书视频笔记及分享短链、严道医声网单讲（`/v2/speaker/<编号>`）及文章内视频（`/v2/article/<编号>`）。
 - 后续新增站点时，只在当前 skill 内新增来源适配脚本，不再新建平行 skill。
 
+## 通用内容取证（调用方集成）
+
+处理需要保留文字与画面证据的请求时，使用可运行入口：
+
+```bash
+python3 <本 skill>/scripts/extract_content.py '<URL>' '<OUTPUT_DIR>'
+```
+
+该入口支持 YouTube、Bilibili、小红书；小红书自动交给同级 `feipi-xiaohongshu-read-note` 判断图文/视频。默认字幕优先、内置 whisper.cpp fast 回退，并通过 ffmpeg 远程输入端 seek 均匀抽6帧。仅获取独立音频与按需画面；不下载完整原视频，合流视频不能作为 ASR 回退。其他既有来源及用户明确下载需求继续使用原入口。
+
+调用方必须指定独立输出目录，不得写入 skill 安装目录。结果为 `extraction_manifest.json`（`schema=feipi-content-extraction-v1`），包含来源、正文/字幕/ASR、图片/帧及 OCR/视觉观察独立清单。退出码 0=complete、2=partial、1=failed/blocked；先读 manifest 判断已有证据。字段、读图登记、失败边界及安装依赖见 [通用提取合同](references/content-extraction.md)。
+
+获得图片/帧后，宿主必须实际打开每张需要使用的图，记录图号或时间点、可见文字、视觉观察与不确定性，再执行 `scripts/record_observations.py`。未读图保持 pending；仅保存文件不能宣称完成读图。抽帧仅覆盖 sampling 所列采样点，不代表逐帧阅读。可通过 `--frame-times '0,12,30'` 指定时间；单独抽帧入口为 `scripts/extract_frames.py '<URL>' '<OUTPUT_DIR>' --times '0,12,30'`。Range/HLS 不可用时明确 partial，保留文字；不回退下载原片。可用 `scripts/validate_extraction.py '<OUTPUT_DIR>'` 校验清单与本地证据引用。
+
+摘要、关键词由宿主基于实际正文、转写与读过的图片生成，并分别标注来源；脚本不生成伪摘要。模糊品牌/数字/尺寸保留不确定，笔记文案、标题、封面或搜索结果都不能冒充视频转写。
+
 ## 适用场景
 
 1. 用户给出视频 URL，希望先验证链接是否可读、可下载或可转写。

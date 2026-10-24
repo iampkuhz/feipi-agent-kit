@@ -1,0 +1,199 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:feipi:content-extraction:v1",
+  "title": "Feipi 内容提取清单 v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "version",
+    "platform",
+    "content_id",
+    "original_url",
+    "canonical_url",
+    "content_type",
+    "status",
+    "reasons",
+    "metadata",
+    "channels",
+    "artifacts"
+  ],
+  "properties": {
+    "schema": {
+      "const": "feipi-content-extraction-v1"
+    },
+    "version": {
+      "const": 1
+    },
+    "platform": {
+      "type": "string"
+    },
+    "content_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "original_url": {
+      "type": "string"
+    },
+    "canonical_url": {
+      "type": "string"
+    },
+    "content_type": {
+      "enum": [
+        "image_note",
+        "video_note",
+        "video",
+        "unknown"
+      ]
+    },
+    "status": {
+      "enum": [
+        "complete",
+        "partial",
+        "blocked",
+        "failed"
+      ]
+    },
+    "reasons": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "channels": {
+      "type": "object",
+      "required": [
+        "source",
+        "body",
+        "subtitles",
+        "asr",
+        "images",
+        "frames",
+        "ocr",
+        "visual_observation"
+      ],
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/channel"
+        },
+        "body": {
+          "$ref": "#/$defs/channel"
+        },
+        "subtitles": {
+          "$ref": "#/$defs/channel"
+        },
+        "asr": {
+          "$ref": "#/$defs/channel"
+        },
+        "images": {
+          "$ref": "#/$defs/channel"
+        },
+        "frames": {
+          "$ref": "#/$defs/channel"
+        },
+        "ocr": {
+          "$ref": "#/$defs/channel"
+        },
+        "visual_observation": {
+          "$ref": "#/$defs/channel"
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "path",
+          "source_url",
+          "anchor",
+          "read_status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9_-]+$"
+          },
+          "kind": {
+            "enum": [
+              "source",
+              "body",
+              "subtitles",
+              "asr",
+              "image",
+              "frame",
+              "ocr",
+              "visual_observation"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "anchor": {
+            "type": "object",
+            "required": [
+              "type"
+            ]
+          },
+          "read_status": {
+            "enum": [
+              "extracted",
+              "pending",
+              "read"
+            ]
+          },
+          "source_artifact_id": {
+            "type": "string"
+          },
+          "provenance": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "channel": {
+      "type": "object",
+      "required": [
+        "status",
+        "reasons"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "complete",
+            "partial",
+            "blocked",
+            "failed",
+            "pending",
+            "not_applicable",
+            "unavailable"
+          ]
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "sampling": {
+          "type": "object"
+        }
+      }
+    }
+  }
+}

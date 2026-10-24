@@ -80,3 +80,14 @@ skills:
       type: script
       command: bash skills/integration/feipi-video-read-url/scripts/validate.sh
     status: compatibility
+
+  - name: feipi-xiaohongshu-read-note
+    path: skills/integration/feipi-xiaohongshu-read-note
+    layer: integration
+    description: 小红书图文与视频笔记、原图和独立来源证据提取
+    clients: [claude, codex]
+    entry: SKILL.md
+    validation:
+      type: script
+      command: bash skills/integration/feipi-xiaohongshu-read-note/scripts/validate.sh
+    status: stable
