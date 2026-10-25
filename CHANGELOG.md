@@ -1,7 +1,7 @@
 # 变更记录
 
 ## 2026-10-25
-- feipi-video-read-url v10：补帧复核与摘要逐项覆盖验收
+- feipi-video-read-url v10：通用补帧与覆盖复核，分离领域策略
 - feipi-xiaohongshu-read-note v2：补齐图文摘要逐项复核
 
 ## 2026-10-24

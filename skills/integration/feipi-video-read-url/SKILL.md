@@ -29,7 +29,7 @@ description: 用于按用户意图处理视频网站 URL（如 YouTube、Bilibil
 
 ## 通用内容取证（调用方集成）
 
-处理需要保留文字与画面证据的请求或此类调用方集成（如 Housing）时，使用可运行入口；既有纯文字/字幕摘要继续使用原流程：
+处理需要保留文字与画面证据的请求或调用方集成时，使用可运行入口；既有纯文字/字幕摘要继续使用原流程：
 
 ```bash
 python3 <本 skill>/scripts/extract_content.py '<URL>' '<OUTPUT_DIR>'
@@ -43,7 +43,9 @@ python3 <本 skill>/scripts/extract_content.py '<URL>' '<OUTPUT_DIR>'
 
 摘要、关键词由宿主基于实际正文、转写与读过的图片生成，并分别标注来源；脚本不生成伪摘要。模糊品牌/数字/尺寸保留不确定，笔记文案、标题、封面或搜索结果都不能冒充视频转写。
 
-生成摘要前必须按 [摘要覆盖复核](references/summary-coverage.md) 清点主题和子主题；比较、建议、理由、适用条件分别保留。技术名词转写不清或说明卡片遗漏时按段落补帧，不能把均匀6帧当作充分覆盖。集成摘要同时生成 `summary_coverage.json`，执行 `scripts/review_summary.py MANIFEST SUMMARY COVERAGE`，通过后交给调用方；该校验只证明引用可追溯，语义完整性依赖实际阅读复核。纯文字摘要同样逐项清点与反向复核，不为凑短摘要删除决策内容。
+生成摘要前必须按 [摘要覆盖复核](references/summary-coverage.md) 清点主题和子主题；来源涉及比较或建议时，分别保留选项、理由和适用条件。专名转写不清或关键画面遗漏时按段落补帧，不能把均匀6帧当作充分覆盖。集成摘要同时生成 `summary_coverage.json`，执行 `scripts/review_summary.py MANIFEST SUMMARY COVERAGE`，通过后交给调用方；该校验只证明引用可追溯，语义完整性依赖实际阅读复核。纯文字摘要同样逐项清点与反向复核，不为凑短摘要删除重要细节。
+
+本 skill 负责通用提取与来源限定的细致分析，根据内容类型保留相应细节；来源包含比较时才展开比较信息，不强制所有视频使用同一种模板。领域关注点、专用字段、记录与检索流程由调用方 skill 管理，不在本 skill 内写入具体业务项目规则。
 
 ## 适用场景
 

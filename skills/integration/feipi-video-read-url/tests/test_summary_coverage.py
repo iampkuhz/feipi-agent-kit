@@ -22,7 +22,7 @@ class SummaryReviewTests(unittest.TestCase):
         self.manifest = self.root / "extraction_manifest.json"
         self.summary = self.root / "summary.md"
         self.coverage = self.root / "summary_coverage.json"
-        self.source = "建议PUR封边。用胶量少、胶线细、封边较牢。价格比EVA略高，需要专业设备。"
+        self.source = "建议方案A。操作步骤少、执行时间短。需要额外工具，仅在具备工具时适用。"
         m = cm.new_manifest("https://example.invalid/video", "bilibili", "video")
         text = self.root / "asr.txt"
         text.write_text(self.source)
@@ -35,9 +35,9 @@ class SummaryReviewTests(unittest.TestCase):
                      "units": [{"id": str(i), "topic": title, "category": category,
                                 "evidence": [{"artifact_id": "asr", "quote": quote}], "summary_quote": quote}
                                for i, (title, category, quote) in enumerate([
-                                   ("建议", "recommendation", "建议PUR封边"),
-                                   ("理由", "reason", "用胶量少、胶线细、封边较牢"),
-                                   ("代价与条件", "condition", "价格比EVA略高，需要专业设备")])]}
+                                   ("建议", "recommendation", "建议方案A"),
+                                   ("理由", "reason", "操作步骤少、执行时间短"),
+                                   ("代价与条件", "condition", "需要额外工具，仅在具备工具时适用")])]}
 
     def check(self):
         self.coverage.write_text(json.dumps(self.rows, ensure_ascii=False))
@@ -47,16 +47,16 @@ class SummaryReviewTests(unittest.TestCase):
         result = self.check()
         self.assertEqual(result["unit_count"], 3)
         self.assertEqual(result["semantic_review"], "host_declared")
-        self.summary.write_text(self.source + "\n待核验现场条件。")
+        self.summary.write_text(self.source + "\n待核验使用条件。")
         self.assertNotEqual(result["summary_sha256"], self.check()["summary_sha256"])
 
     def test_short_recommendation_loses_reason_and_condition(self):
-        self.summary.write_text("建议PUR封边。")
+        self.summary.write_text("建议方案A。")
         with self.assertRaisesRegex(ValueError, "summary_unit_missing:1"):
             self.check()
 
     def test_fake_source_quote_is_rejected(self):
-        self.rows["units"][0]["evidence"][0]["quote"] = "防火等级已经认证"
+        self.rows["units"][0]["evidence"][0]["quote"] = "已在全部环境验证通过"
         with self.assertRaisesRegex(ValueError, "summary_evidence_not_in_source"):
             self.check()
 
