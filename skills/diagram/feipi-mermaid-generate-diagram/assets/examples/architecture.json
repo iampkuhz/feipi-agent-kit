@@ -1,0 +1,58 @@
+{
+  "diagram_id": "D1",
+  "diagram_type": "architecture",
+  "title": "订单平台架构",
+  "summary": "订单平台架构：展示完整边界和关键关系",
+  "layout": {
+    "direction": "TB",
+    "spacing": 60
+  },
+  "groups": [
+    {
+      "id": "access",
+      "label": "接入层"
+    },
+    {
+      "id": "business",
+      "label": "业务层"
+    },
+    {
+      "id": "storage",
+      "label": "数据层"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "web",
+      "label": "用户界面",
+      "group": "access",
+      "kind": "system"
+    },
+    {
+      "id": "api",
+      "label": "订单服务",
+      "group": "business",
+      "kind": "system"
+    },
+    {
+      "id": "db",
+      "label": "订单数据库",
+      "group": "storage",
+      "kind": "database"
+    }
+  ],
+  "edges": [
+    {
+      "id": "E1",
+      "from": "web",
+      "to": "api",
+      "description": "提交订单"
+    },
+    {
+      "id": "E2",
+      "from": "api",
+      "to": "db",
+      "description": "持久化订单"
+    }
+  ]
+}

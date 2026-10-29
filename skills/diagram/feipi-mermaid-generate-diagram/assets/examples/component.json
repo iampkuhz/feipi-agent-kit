@@ -1,0 +1,51 @@
+{
+  "diagram_id": "D1",
+  "diagram_type": "component",
+  "title": "订单平台组件",
+  "summary": "订单平台组件：展示完整边界和关键关系",
+  "layout": {
+    "direction": "TB",
+    "spacing": 60
+  },
+  "view": "overview",
+  "groups": [
+    {
+      "id": "platform",
+      "label": "交易平台"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "orders",
+      "label": "订单系统",
+      "group": "platform",
+      "kind": "system"
+    },
+    {
+      "id": "payments",
+      "label": "支付系统",
+      "group": "platform",
+      "kind": "system"
+    },
+    {
+      "id": "terminal",
+      "label": "收银终端",
+      "group": "platform",
+      "kind": "endpoint"
+    }
+  ],
+  "edges": [
+    {
+      "id": "E1",
+      "from": "terminal",
+      "to": "orders",
+      "description": "创建订单"
+    },
+    {
+      "id": "E2",
+      "from": "orders",
+      "to": "payments",
+      "description": "申请付款"
+    }
+  ]
+}

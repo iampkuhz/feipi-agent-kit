@@ -58,6 +58,17 @@ skills:
       command: bash skills/diagram/feipi-plantuml-generate-diagram/scripts/validate.sh
     status: stable
 
+  - name: feipi-mermaid-generate-diagram
+    path: skills/diagram/feipi-mermaid-generate-diagram
+    layer: diagram
+    description: Mermaid 六类图、通用语法与本地图包验收
+    clients: [claude, codex]
+    entry: SKILL.md
+    validation:
+      type: script
+      command: bash skills/diagram/feipi-mermaid-generate-diagram/scripts/validate.sh
+    status: stable
+
   # --- integration layer ---
   - name: feipi-dingtalk-send-webhook
     path: skills/integration/feipi-dingtalk-send-webhook

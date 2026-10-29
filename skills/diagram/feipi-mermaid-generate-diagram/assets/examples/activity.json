@@ -1,0 +1,84 @@
+{
+  "diagram_id": "D1",
+  "diagram_type": "activity",
+  "title": "订单校验流程",
+  "summary": "订单校验流程：展示完整边界和关键关系",
+  "layout": {
+    "direction": "TB",
+    "spacing": 60
+  },
+  "nodes": [
+    {
+      "id": "S1",
+      "label": "开始",
+      "kind": "start"
+    },
+    {
+      "id": "S2",
+      "label": "接收订单",
+      "kind": "action"
+    },
+    {
+      "id": "S3",
+      "label": "库存充足？",
+      "kind": "decision"
+    },
+    {
+      "id": "S4",
+      "label": "创建订单",
+      "kind": "action"
+    },
+    {
+      "id": "S5",
+      "label": "返回失败",
+      "kind": "stop"
+    },
+    {
+      "id": "S6",
+      "label": "返回成功",
+      "kind": "stop"
+    }
+  ],
+  "edges": [
+    {
+      "id": "E1",
+      "from": "S1",
+      "to": "S2",
+      "description": "进入接收"
+    },
+    {
+      "id": "E2",
+      "from": "S2",
+      "to": "S3",
+      "description": "校验库存"
+    },
+    {
+      "id": "E3",
+      "from": "S3",
+      "to": "S4",
+      "description": "库存充足",
+      "label": "是"
+    },
+    {
+      "id": "E4",
+      "from": "S3",
+      "to": "S5",
+      "description": "库存不足",
+      "label": "否"
+    },
+    {
+      "id": "E5",
+      "from": "S4",
+      "to": "S6",
+      "description": "完成"
+    }
+  ],
+  "narrative_step_ids": [
+    "S1",
+    "S2",
+    "S3",
+    "S4",
+    "S5",
+    "S6"
+  ]
+}

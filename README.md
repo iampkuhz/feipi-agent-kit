@@ -50,6 +50,7 @@ cp .env.example .env
 | `feipi-skill-govern` | Skill 的创建、重构、自检与治理 |
 | `feipi-video-read-url` | 视频 URL 取证、通用细致分析与覆盖复核；领域流程由调用方维护 |
 | `feipi-xiaohongshu-read-note` | 小红书图文/视频笔记、顺序原图与独立来源证据提取（依赖同级视频 skill） |
+| `feipi-mermaid-generate-diagram` | Mermaid 六类图、通用语法与本地渲染验收 |
 | `feipi-plantuml-generate-diagram` | PlantUML 架构图、时序图、思维导图及通用作图唯一入口 |
 | `feipi-drawio-generate-diagram` | draw.io 可编辑图表、Podman 本地渲染与图包校验 |
 | `feipi-techreport-ppt-skill` | 技术报告 PPT 单页 |

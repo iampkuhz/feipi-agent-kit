@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "skill": "feipi-mermaid-generate-diagram",
+  "cases": [
+    {
+      "id": "architecture-package",
+      "prompt": "用 Mermaid 画订单平台：接入层界面调用业务层订单服务，服务写数据层数据库，全部验收后交付。",
+      "expected": [
+        "选择 architecture，保留三层与两条关系",
+        "真实 SVG/PNG、关系说明与 validation.json",
+        "查看图片后记录视觉结论"
+      ],
+      "forbidden": [
+        "只交付代码块",
+        "未查看图片就填 pass"
+      ]
+    },
+    {
+      "id": "explicit-engine",
+      "prompt": "用 PlantUML 画订单时序图。",
+      "expected": [
+        "路由到 PlantUML skill"
+      ],
+      "forbidden": [
+        "擅自改用 Mermaid"
+      ]
+    },
+    {
+      "id": "literal-labels",
+      "prompt": "用 Mermaid 画标签包含中文、引号、<tag>、C:\\目录和 # 的组件图。",
+      "expected": [
+        "brief 保存原文",
+        "源码转义与渲染可见文字一致",
+        "检查最终 PNG"
+      ],
+      "forbidden": [
+        "输出编码字符串作为标签",
+        "为消除语法错误删去符号"
+      ]
+    },
+    {
+      "id": "mindmap-direction",
+      "prompt": "请用 Mermaid 原生 mindmap 画均衡布局的项目规划思维导图。",
+      "expected": [
+        "balanced 产生原生 mindmap",
+        "验收树结构和中文"
+      ],
+      "forbidden": [
+        "悄悄用向右的 flowchart 冒充原生 mindmap"
+      ]
+    },
+    {
+      "id": "activity-stop",
+      "prompt": "订单库存不足立即失败结束，充足才创建订单并返回成功。",
+      "expected": [
+        "分支由显式条件边表达",
+        "提前终止分支不连到后续步骤"
+      ],
+      "forbidden": [
+        "按步骤文本邻接误连失败到成功"
+      ]
+    },
+    {
+      "id": "component-detail",
+      "prompt": "展开已有订单组件的内部模块，沿用给定 overview brief。",
+      "expected": [
+        "验证父图 hash、diagram_id、node_id",
+        "图包保存父图证据"
+      ],
+      "forbidden": [
+        "只填父组件名称就声称绑定完成"
+      ]
+    },
+    {
+      "id": "fallback-class",
+      "prompt": "使用 Mermaid classDiagram 展示订单和付款类，标出订单的 submit 方法。",
+      "expected": [
+        "保留 class diagram_type",
+        "真实渲染和 expected_text",
+        "人工复核关系与方法，记录 semantic_review"
+      ],
+      "forbidden": [
+        "将文字匹配当作类图语义验证",
+        "无法解析就声称全部通过"
+      ]
+    },
+    {
+      "id": "failure-boundary",
+      "prompt": "浏览器预检失败，请交付已生成的图。",
+      "expected": [
+        "报告 renderer 失败",
+        "保留源码，说明图片不可交付"
+      ],
+      "forbidden": [
+        "上传在线渲染器",
+        "虚报视觉通过",
+        "循环重启或更换目录清空次数"
+      ]
+    },
+    {
+      "id": "reuse",
+      "prompt": "这个已经验收的图完全没变，请复用图包。",
+      "expected": [
+        "显式 --reuse",
+        "重核 hash 和合同",
+        "本次 render_calls 为0"
+      ],
+      "forbidden": [
+        "把历史渲染次数算成本次",
+        "篡改 hash 使损坏包过关"
+      ]
+    }
+  ]
+}

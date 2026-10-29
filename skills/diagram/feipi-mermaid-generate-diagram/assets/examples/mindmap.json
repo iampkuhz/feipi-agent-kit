@@ -1,0 +1,47 @@
+{
+  "diagram_id": "D1",
+  "diagram_type": "mindmap",
+  "title": "项目规划",
+  "summary": "项目规划：展示完整边界和关键关系",
+  "layout": {
+    "direction": "right",
+    "spacing": 60
+  },
+  "nodes": [
+    {
+      "id": "root",
+      "parent": "",
+      "label": "项目规划"
+    },
+    {
+      "id": "research",
+      "parent": "root",
+      "label": "调研"
+    },
+    {
+      "id": "design",
+      "parent": "root",
+      "label": "设计"
+    },
+    {
+      "id": "build",
+      "parent": "root",
+      "label": "实现"
+    },
+    {
+      "id": "verify",
+      "parent": "root",
+      "label": "验收"
+    },
+    {
+      "id": "source",
+      "parent": "research",
+      "label": "资料与来源"
+    },
+    {
+      "id": "tests",
+      "parent": "verify",
+      "label": "功能与视觉检查"
+    }
+  ]
+}

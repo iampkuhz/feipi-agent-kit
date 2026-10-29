@@ -62,6 +62,10 @@ skills:
     path: "skills/diagram/feipi-plantuml-generate-diagram/SKILL.md"
     layer: "diagram"
     description: "PlantUML 作图唯一入口"
+  - name: "feipi-mermaid-generate-diagram"
+    path: "skills/diagram/feipi-mermaid-generate-diagram/SKILL.md"
+    layer: "diagram"
+    description: "Mermaid 六类图与通用图包验收"
   # --- integration layer ---
   - name: "feipi-dingtalk-send-webhook"
     path: "skills/integration/feipi-dingtalk-send-webhook/SKILL.md"
@@ -86,7 +90,7 @@ workflows:
     description: "Skill 治理工作流（创建、审查、校验）"
   - name: "diagram-generate"
     path: "harness/workflows/diagram-generate.yaml"
-    description: "PlantUML / draw.io 图表生成工作流"
+    description: "PlantUML / Mermaid / draw.io 图表生成工作流"
 
 # ---------------------------------------------------------------------------
 # Validation — harness 级一致性检查（由 scripts/harness/doctor.sh 执行）

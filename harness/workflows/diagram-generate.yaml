@@ -4,10 +4,11 @@
 workflow:
   name: "diagram-generate"
   version: "0.1.0"
-  description: "PlantUML / draw.io 图表生成工作流"
+  description: "PlantUML / Mermaid / draw.io 图表生成工作流"
 
   # 触发条件
   triggers:
+    - "需要生成或修改 Mermaid / .mmd 图表时"
     - "需要生成或修改 draw.io / diagrams.net / .drawio 图表时"
     - "需要生成 PlantUML 架构图时"
     - "需要生成 PlantUML 时序图时"
@@ -15,6 +16,9 @@ workflow:
 
   # 引用的 skill
   referenced_skills:
+    - name: "feipi-mermaid-generate-diagram"
+      path: "skills/diagram/feipi-mermaid-generate-diagram/SKILL.md"
+      role: "Mermaid 入口"
     - name: "feipi-drawio-generate-diagram"
       path: "skills/diagram/feipi-drawio-generate-diagram/SKILL.md"
       role: "draw.io 入口"
@@ -25,6 +29,7 @@ workflow:
   # 路由逻辑
   routing:
     default: "feipi-plantuml-generate-diagram"
+    mermaid: "feipi-mermaid-generate-diagram"
     drawio: "feipi-drawio-generate-diagram"
 
   # 校验步骤
@@ -40,6 +45,6 @@ workflow:
   # 输出
   outputs:
     - type: "diagram"
-      description: "生成的 PlantUML 或 draw.io 源文件及渲染图路径"
+      description: "生成的 PlantUML、Mermaid 或 draw.io 源文件及渲染图路径"
     - type: "validation"
       description: "校验结果"

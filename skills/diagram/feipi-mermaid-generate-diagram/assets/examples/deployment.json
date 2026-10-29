@@ -1,0 +1,86 @@
+{
+  "diagram_id": "D1",
+  "diagram_type": "deployment",
+  "title": "离线签名部署",
+  "summary": "离线签名部署：展示完整边界和关键关系",
+  "layout": {
+    "direction": "TB",
+    "spacing": 60
+  },
+  "groups": [
+    {
+      "id": "online",
+      "label": "在线区"
+    },
+    {
+      "id": "offline",
+      "label": "离线安全区"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "api",
+      "label": "业务服务",
+      "group": "online",
+      "kind": "system",
+      "mode": "online",
+      "network_id": "business",
+      "chain_id": "chain_a"
+    },
+    {
+      "id": "usb",
+      "label": "人工摆渡",
+      "group": "offline",
+      "kind": "human_transfer",
+      "mode": "offline",
+      "network_id": "isolated",
+      "chain_id": "chain_a"
+    },
+    {
+      "id": "device",
+      "label": "签名端点",
+      "group": "offline",
+      "kind": "endpoint",
+      "mode": "offline",
+      "network_id": "isolated",
+      "chain_id": "chain_a"
+    },
+    {
+      "id": "hsm",
+      "label": "硬件安全模块",
+      "group": "offline",
+      "kind": "hsm",
+      "mode": "offline",
+      "network_id": "isolated",
+      "chain_id": "chain_a"
+    }
+  ],
+  "edges": [
+    {
+      "id": "E1",
+      "from": "api",
+      "to": "usb",
+      "description": "由人员携带请求"
+    },
+    {
+      "id": "E2",
+      "from": "usb",
+      "to": "device",
+      "description": "导入签名请求"
+    },
+    {
+      "id": "E3",
+      "from": "device",
+      "to": "hsm",
+      "description": "执行密钥签名"
+    }
+  ],
+  "boundary_triggers": {
+    "cross_network": true,
+    "cross_chain": false,
+    "online_offline": true,
+    "hsm": true,
+    "manual_transfer": true,
+    "manual_handoff": false
+  }
+}

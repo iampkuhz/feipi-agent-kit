@@ -79,6 +79,9 @@ def validate_source_layout(skills: list[Path]) -> None:
                 if relative_parts[0] in {"tests", "evals", "node_modules", ".git"} \
                         or "__pycache__" in relative_parts:
                     continue
+                # npm 锁文件记录第三方包的 workspace 元数据，不是 skill 的运行指令。
+                if runtime_file.name == "package-lock.json":
+                    continue
                 text = runtime_file.read_text(encoding="utf-8", errors="replace")
                 if DEVELOPMENT_REF.search(text):
                     fail(f"普通 skill 的运行内容引用开发目录：{runtime_file.relative_to(REPO_ROOT)}")

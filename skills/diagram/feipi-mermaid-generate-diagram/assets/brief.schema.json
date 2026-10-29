@@ -1,0 +1,1125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Mermaid diagram brief",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "diagram_id": {
+          "type": "string",
+          "pattern": "^(D[1-9][0-9]*|[a-z][a-z0-9-]*)$"
+        },
+        "diagram_type": {
+          "type": "string",
+          "enum": [
+            "architecture"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "group": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "system",
+                  "domain",
+                  "endpoint",
+                  "module",
+                  "database"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "group",
+              "kind"
+            ]
+          },
+          "minItems": 3,
+          "maxItems": 12
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^E[1-9][0-9]*$"
+              },
+              "from": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+              },
+              "to": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              }
+            },
+            "required": [
+              "id",
+              "from",
+              "to",
+              "description"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 16
+        },
+        "layout": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "direction": {
+              "type": "string",
+              "enum": [
+                "TB"
+              ]
+            },
+            "spacing": {
+              "type": "integer",
+              "minimum": 30,
+              "maximum": 160
+            }
+          },
+          "required": [
+            "direction"
+          ]
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              }
+            },
+            "required": [
+              "id",
+              "label"
+            ]
+          },
+          "minItems": 3,
+          "maxItems": 6
+        }
+      },
+      "required": [
+        "diagram_id",
+        "diagram_type",
+        "title",
+        "summary",
+        "nodes",
+        "edges",
+        "layout",
+        "groups"
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "diagram_id": {
+          "type": "string",
+          "pattern": "^(D[1-9][0-9]*|[a-z][a-z0-9-]*)$"
+        },
+        "diagram_type": {
+          "type": "string",
+          "enum": [
+            "component"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "group": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "system",
+                  "domain",
+                  "endpoint",
+                  "module",
+                  "database"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "group",
+              "kind"
+            ]
+          },
+          "minItems": 2,
+          "maxItems": 8
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^E[1-9][0-9]*$"
+              },
+              "from": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+              },
+              "to": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              }
+            },
+            "required": [
+              "id",
+              "from",
+              "to",
+              "description"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 10
+        },
+        "layout": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "direction": {
+              "type": "string",
+              "enum": [
+                "TB",
+                "LR",
+                "RL"
+              ]
+            },
+            "spacing": {
+              "type": "integer",
+              "minimum": 30,
+              "maximum": 160
+            }
+          },
+          "required": [
+            "direction"
+          ]
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              }
+            },
+            "required": [
+              "id",
+              "label"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 6
+        },
+        "view": {
+          "type": "string",
+          "enum": [
+            "overview",
+            "module_detail"
+          ]
+        },
+        "parent_ref": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "diagram_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "node_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+            }
+          },
+          "required": [
+            "path",
+            "sha256",
+            "diagram_id",
+            "node_id"
+          ]
+        }
+      },
+      "required": [
+        "diagram_id",
+        "diagram_type",
+        "title",
+        "summary",
+        "nodes",
+        "edges",
+        "layout",
+        "groups",
+        "view"
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "diagram_id": {
+          "type": "string",
+          "pattern": "^(D[1-9][0-9]*|[a-z][a-z0-9-]*)$"
+        },
+        "diagram_type": {
+          "type": "string",
+          "enum": [
+            "deployment"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "group": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "system",
+                  "endpoint",
+                  "hsm",
+                  "human_transfer",
+                  "human_handoff",
+                  "database",
+                  "network_device"
+                ]
+              },
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "online",
+                  "offline",
+                  "hybrid"
+                ]
+              },
+              "network_id": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+              },
+              "chain_id": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "group",
+              "kind",
+              "mode",
+              "network_id",
+              "chain_id"
+            ]
+          },
+          "minItems": 2,
+          "maxItems": 8
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^E[1-9][0-9]*$"
+              },
+              "from": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+              },
+              "to": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              }
+            },
+            "required": [
+              "id",
+              "from",
+              "to",
+              "description"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 10
+        },
+        "layout": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "direction": {
+              "type": "string",
+              "enum": [
+                "TB",
+                "LR",
+                "RL"
+              ]
+            },
+            "spacing": {
+              "type": "integer",
+              "minimum": 30,
+              "maximum": 160
+            }
+          },
+          "required": [
+            "direction"
+          ]
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              }
+            },
+            "required": [
+              "id",
+              "label"
+            ]
+          },
+          "minItems": 2,
+          "maxItems": 8
+        },
+        "boundary_triggers": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "cross_network": {
+              "type": "boolean"
+            },
+            "cross_chain": {
+              "type": "boolean"
+            },
+            "online_offline": {
+              "type": "boolean"
+            },
+            "hsm": {
+              "type": "boolean"
+            },
+            "manual_transfer": {
+              "type": "boolean"
+            },
+            "manual_handoff": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "cross_network",
+            "cross_chain",
+            "online_offline",
+            "hsm",
+            "manual_transfer",
+            "manual_handoff"
+          ]
+        }
+      },
+      "required": [
+        "diagram_id",
+        "diagram_type",
+        "title",
+        "summary",
+        "nodes",
+        "edges",
+        "layout",
+        "groups",
+        "boundary_triggers"
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "diagram_id": {
+          "type": "string",
+          "pattern": "^(D[1-9][0-9]*|[a-z][a-z0-9-]*)$"
+        },
+        "diagram_type": {
+          "type": "string",
+          "enum": [
+            "activity"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^S[1-9][0-9]*(\\.[1-9][0-9]*)?$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "start",
+                  "action",
+                  "decision",
+                  "stop"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "kind"
+            ]
+          },
+          "minItems": 5,
+          "maxItems": 14
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+              },
+              "from": {
+                "type": "string",
+                "pattern": "^S[1-9][0-9]*(\\.[1-9][0-9]*)?$"
+              },
+              "to": {
+                "type": "string",
+                "pattern": "^S[1-9][0-9]*(\\.[1-9][0-9]*)?$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              }
+            },
+            "required": [
+              "id",
+              "from",
+              "to",
+              "description"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 24
+        },
+        "layout": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "direction": {
+              "type": "string",
+              "enum": [
+                "TB",
+                "LR",
+                "RL"
+              ]
+            },
+            "spacing": {
+              "type": "integer",
+              "minimum": 30,
+              "maximum": 160
+            }
+          },
+          "required": [
+            "direction"
+          ]
+        },
+        "narrative_step_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^S[1-9][0-9]*(\\.[1-9][0-9]*)?$"
+          },
+          "minItems": 5,
+          "maxItems": 14
+        }
+      },
+      "required": [
+        "diagram_id",
+        "diagram_type",
+        "title",
+        "summary",
+        "nodes",
+        "edges",
+        "layout",
+        "narrative_step_ids"
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "diagram_id": {
+          "type": "string",
+          "pattern": "^(D[1-9][0-9]*|[a-z][a-z0-9-]*)$"
+        },
+        "diagram_type": {
+          "type": "string",
+          "enum": [
+            "mindmap"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+              },
+              "parent": {
+                "type": "string",
+                "pattern": "^([A-Za-z][A-Za-z0-9_]*)?$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              }
+            },
+            "required": [
+              "id",
+              "parent",
+              "label"
+            ]
+          },
+          "minItems": 2,
+          "maxItems": 32
+        },
+        "layout": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "direction": {
+              "type": "string",
+              "enum": [
+                "right",
+                "left",
+                "balanced"
+              ]
+            },
+            "spacing": {
+              "type": "integer",
+              "minimum": 30,
+              "maximum": 160
+            }
+          },
+          "required": [
+            "direction"
+          ]
+        }
+      },
+      "required": [
+        "diagram_id",
+        "diagram_type",
+        "title",
+        "summary",
+        "nodes",
+        "layout"
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "diagram_id": {
+          "type": "string",
+          "pattern": "^(D[1-9][0-9]*|[a-z][a-z0-9-]*)$"
+        },
+        "diagram_type": {
+          "type": "string",
+          "enum": [
+            "sequence"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "participants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "group": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+              }
+            },
+            "required": [
+              "id",
+              "label"
+            ]
+          },
+          "minItems": 2,
+          "maxItems": 8
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "from": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+              },
+              "to": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "arrow": {
+                "type": "string",
+                "enum": [
+                  "->>",
+                  "-->>",
+                  "->",
+                  "-->",
+                  "-x",
+                  "--x"
+                ]
+              },
+              "note": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              }
+            },
+            "required": [
+              "id",
+              "from",
+              "to",
+              "label"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 20
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              }
+            },
+            "required": [
+              "id",
+              "label"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 5
+        },
+        "numbering": {
+          "type": "string",
+          "enum": [
+            "interaction_mr",
+            "process_s"
+          ]
+        },
+        "blocks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "alt",
+                  "opt",
+                  "loop",
+                  "critical"
+                ]
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "start": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "end": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "else_at": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "else_label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              }
+            },
+            "required": [
+              "kind",
+              "label",
+              "start",
+              "end"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 5
+        },
+        "layout": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "direction": {
+              "type": "string",
+              "enum": [
+                "TB",
+                "LR",
+                "RL"
+              ]
+            },
+            "spacing": {
+              "type": "integer",
+              "minimum": 30,
+              "maximum": 160
+            }
+          },
+          "required": [
+            "direction"
+          ]
+        }
+      },
+      "required": [
+        "diagram_id",
+        "diagram_type",
+        "title",
+        "summary",
+        "participants",
+        "messages",
+        "layout"
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "diagram_id": {
+          "type": "string",
+          "pattern": "^(D[1-9][0-9]*|[a-z][a-z0-9-]*)$"
+        },
+        "diagram_type": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]*$",
+          "not": {
+            "enum": [
+              "architecture",
+              "component",
+              "deployment",
+              "activity",
+              "mindmap",
+              "sequence"
+            ]
+          }
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "syntax": {
+          "type": "string",
+          "enum": [
+            "flowchart",
+            "graph",
+            "sequenceDiagram",
+            "mindmap",
+            "classDiagram",
+            "stateDiagram-v2",
+            "erDiagram",
+            "gantt",
+            "pie",
+            "journey",
+            "gitGraph",
+            "quadrantChart",
+            "requirementDiagram",
+            "timeline",
+            "sankey-beta",
+            "xychart-beta",
+            "block-beta",
+            "packet-beta",
+            "kanban",
+            "architecture-beta",
+            "C4Context",
+            "C4Container",
+            "C4Component",
+            "C4Deployment",
+            "radar-beta",
+            "treemap-beta"
+          ]
+        },
+        "expected_text": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "minItems": 1,
+          "maxItems": 50
+        },
+        "layout": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "direction": {
+              "type": "string",
+              "enum": [
+                "TB",
+                "LR",
+                "RL"
+              ]
+            },
+            "spacing": {
+              "type": "integer",
+              "minimum": 30,
+              "maximum": 160
+            }
+          },
+          "required": [
+            "direction"
+          ]
+        }
+      },
+      "required": [
+        "diagram_id",
+        "diagram_type",
+        "title",
+        "summary",
+        "syntax",
+        "expected_text",
+        "layout"
+      ]
+    }
+  ]
+}

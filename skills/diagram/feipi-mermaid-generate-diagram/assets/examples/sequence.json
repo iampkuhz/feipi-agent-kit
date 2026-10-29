@@ -1,0 +1,79 @@
+{
+  "diagram_id": "D1",
+  "diagram_type": "sequence",
+  "title": "订单交互",
+  "summary": "订单交互：展示完整边界和关键关系",
+  "layout": {
+    "direction": "TB",
+    "spacing": 60
+  },
+  "numbering": "interaction_mr",
+  "groups": [
+    {
+      "id": "backend",
+      "label": "后端服务"
+    }
+  ],
+  "participants": [
+    {
+      "id": "User",
+      "label": "用户"
+    },
+    {
+      "id": "Order",
+      "label": "订单服务",
+      "group": "backend"
+    },
+    {
+      "id": "Stock",
+      "label": "库存服务",
+      "group": "backend"
+    }
+  ],
+  "messages": [
+    {
+      "id": "M1",
+      "from": "User",
+      "to": "Order",
+      "label": "提交订单",
+      "note": "保留请求编号，用于后续查询"
+    },
+    {
+      "id": "M2",
+      "from": "Order",
+      "to": "Stock",
+      "label": "检查库存"
+    },
+    {
+      "id": "R1",
+      "from": "Stock",
+      "to": "Order",
+      "label": "库存充足",
+      "arrow": "-->>"
+    },
+    {
+      "id": "R2",
+      "from": "Order",
+      "to": "User",
+      "label": "订单已创建",
+      "arrow": "-->>"
+    },
+    {
+      "id": "R3",
+      "from": "Order",
+      "to": "User",
+      "label": "库存不足",
+      "arrow": "-->>"
+    }
+  ],
+  "blocks": [
+    {
+      "kind": "alt",
+      "label": "库存充足",
+      "start": 3,
+      "end": 5,
+      "else_at": 5,
+      "else_label": "库存不足"
+    }
+  ]
+}

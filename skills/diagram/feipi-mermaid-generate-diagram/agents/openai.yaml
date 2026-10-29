@@ -1,0 +1,7 @@
+version: 1
+interface:
+  display_name: "Mermaid 作图与验收"
+  short_description: "生成、修改并校验 Mermaid 六类图及通用图；其他格式用对应入口"
+  default_prompt: "使用 $feipi-mermaid-generate-diagram 根据需求生成 Mermaid 图包，完成真实渲染与视觉验收；其他格式使用对应入口。"
+policy:
+  allow_implicit_invocation: true

@@ -1,5 +1,8 @@
 # 变更记录
 
+## 2026-10-29
+- feipi-mermaid-generate-diagram v1：新增六类图生成与本地图包验收
+
 ## 2026-10-28
 - feipi-video-read-url v13：分层摘要、逐项风险检查与字幕编号选帧
 - feipi-xiaohongshu-read-note v3：视频分支同步字幕驱动的有限选帧
