@@ -35,15 +35,15 @@ description: 用于按用户意图处理视频网站 URL（如 YouTube、Bilibil
 python3 <本 skill>/scripts/extract_content.py '<URL>' '<OUTPUT_DIR>'
 ```
 
-该入口支持 YouTube、Bilibili、小红书；小红书自动交给同级 `feipi-xiaohongshu-read-note` 判断图文/视频。默认字幕优先、内置 whisper.cpp fast 回退，并通过 ffmpeg 远程输入端 seek 均匀抽6帧。仅获取独立音频与按需画面；不下载完整原视频，合流视频不能作为 ASR 回退。可用 `--quality accurate` 保留高质量转写档位。其他既有来源、用户明确只要文字或明确下载需求继续使用原入口。
+该入口支持 YouTube、Bilibili、小红书；小红书自动交给同级 `feipi-xiaohongshu-read-note` 判断图文/视频。默认字幕优先、内置 whisper.cpp fast 回退，并通过 ffmpeg 远程输入端 seek 只截首帧。仅获取独立音频与按需画面；不下载完整原视频，合流视频不能作为 ASR 回退。可用 `--quality accurate` 保留高质量转写档位。其他既有来源、用户明确只要文字或明确下载需求继续使用原入口。
 
 调用方必须指定独立输出目录，不得写入 skill 安装目录。结果为 `extraction_manifest.json`（`schema=feipi-content-extraction-v1`），包含来源、正文/字幕/ASR、图片/帧及 OCR/视觉观察独立清单。退出码 0=complete、2=partial、1=failed/blocked；先读 manifest 判断已有证据。字段、读图登记、失败边界及安装依赖见 [通用提取合同](references/content-extraction.md)。
 
-获得图片/帧后，宿主必须实际打开每张需要使用的图，记录图号或时间点、可见文字、视觉观察与不确定性，再执行 `scripts/record_observations.py`。未读图保持 pending；仅保存文件不能宣称完成读图。抽帧仅覆盖 sampling 所列采样点，不代表逐帧阅读。可通过 `--frame-times '0,12,30'` 指定时间；单独抽帧入口为 `scripts/extract_frames.py '<URL>' '<OUTPUT_DIR>' --times '0,12,30'`。Range/HLS 不可用时明确 partial，保留文字；不回退下载原片。可用 `scripts/validate_extraction.py '<OUTPUT_DIR>'` 校验清单与本地证据引用。
+获得图片/帧后，宿主必须实际打开每张需要使用的图，记录图号或时间点、可见文字、视觉观察与不确定性，再执行 `scripts/record_observations.py`。未读图保持 pending；仅保存文件不能宣称完成读图。抽帧仅覆盖 sampling 所列采样点，不代表逐帧阅读。额外时间点必须按 [字幕选帧规则](references/frame-selection.md) 由 AI 读完整字幕后选择 0–5 帧，通过 frame_plan.py prepare/build 从字幕编号生成 frame_plan.json；包含首帧累计最多 6 帧。Range/HLS 不可用时明确 partial，保留文字；不回退下载原片。可用 `scripts/validate_extraction.py '<OUTPUT_DIR>'` 校验清单与本地证据引用。
 
 摘要、关键词由宿主基于实际正文、转写与读过的图片生成，并分别标注来源；脚本不生成伪摘要。模糊品牌/数字/尺寸保留不确定，笔记文案、标题、封面或搜索结果都不能冒充视频转写。
 
-生成摘要前必须按 [摘要覆盖复核](references/summary-coverage.md) 清点主题和子主题；来源涉及比较或建议时，分别保留选项、理由和适用条件。专名转写不清或关键画面遗漏时按段落补帧，不能把均匀6帧当作充分覆盖。集成摘要同时生成 `summary_coverage.json`，执行 `scripts/review_summary.py MANIFEST SUMMARY COVERAGE`，通过后交给调用方；该校验只证明引用可追溯，语义完整性依赖实际阅读复核。纯文字摘要同样逐项清点与反向复核，不为凑短摘要删除重要细节。
+生成摘要前必须按 [摘要覆盖复核](references/summary-coverage.md) 清点主题和子主题；来源涉及比较或建议时，分别保留选项、理由和适用条件。专名转写不清或字幕提示图示时按字幕计划选帧，最多追加 5 帧；也可以 0 帧，达到上限仍不清楚则保留待核验。集成摘要使用[分层摘要与编号证据](references/summary-packet.md)：prepare 后从生成的模板填写v2草稿，以既有条目ID选重点，按来源保留编号，用列表、比较表和就近疑点引用块分层；完成六项风险复核后，由 build 或调用方 finalize 生成正文、清单及报告，通过后交给调用方；该校验只证明引用可追溯，语义完整性依赖实际阅读复核。纯文字摘要同样逐项清点与反向复核，不为凑短摘要删除重要细节。
 
 本 skill 负责通用提取与来源限定的细致分析，根据内容类型保留相应细节；来源包含比较时才展开比较信息，不强制所有视频使用同一种模板。领域关注点、专用字段、记录与检索流程由调用方 skill 管理，不在本 skill 内写入具体业务项目规则。
 
@@ -169,9 +169,9 @@ python3 <本 skill>/scripts/extract_content.py '<URL>' '<OUTPUT_DIR>'
 
 10. 最终输出结构约束（强制）
 - 摘要结果 `summary_result.md` 的顶层标题必须且仅包含：`## 摘要概述`、`## 来源状态`、`## 附件`
-- `## 摘要概述` 第一段必须是总述（先总后分），后续可按视频类型使用三级标题组织（如核心内容、论证结构、操作步骤、嘉宾观点等）
+- `## 摘要概述` 先总后分：v2 使用从已审核条目选出的“先看重点”，不另写无依据概述；后续按来源主题使用三级标题组织。历史纯文字模板可使用总述段。
 - `## 来源状态` 必须显式输出文本来源、完整性、时间戳状态、外部资料使用状态、主要风险
-- `## 附件` 必须包含原始视频 URL 和转写文本路径
+- `## 附件` 必须包含原始视频 URL；本地成套交付时可附实际可访问的转写路径，Telegram 单独发送的摘要不得列出接收方拿不到的相对文件路径。
 - 不同 video_type 的差异放在 `## 摘要概述` 内部的三级标题中，不改变顶层结构
 - 默认总结视频不主动扩展背景，不主动搜索新闻
 

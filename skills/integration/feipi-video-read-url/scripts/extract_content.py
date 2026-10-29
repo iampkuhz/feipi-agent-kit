@@ -70,7 +70,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("url")
     parser.add_argument("output_dir")
-    parser.add_argument("--frame-times", help="逗号分隔的抽帧秒数；默认均匀6帧")
+    parser.add_argument("--frame-times", help="仅兼容首帧0；提取后用字幕选帧计划追加0至5帧")
     parser.add_argument("--quality", choices=("fast", "accurate"), default="fast", help="复用既有转写档位；默认fast")
     args = parser.parse_args()
     if platform(args.url) == "xiaohongshu":

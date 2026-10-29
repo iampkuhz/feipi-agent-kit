@@ -13,7 +13,7 @@ description: 读取小红书图文或视频笔记及分享短链，保存正文�
 python3 <本 skill>/scripts/extract_note.py '<URL>' '<OUTPUT_DIR>'
 ```
 
-安装路径不同可传 `--video-skill '<feipi-video-read-url 目录>'`。视频默认字幕优先、whisper.cpp fast 回退、均匀抽取6个关键帧；需要复查具体画面可传 `--frame-times '0,12,30'`（秒，最多24个）。高质量转写可传 `--quality accurate`。完整视频从不作为提取回退，只有独立音频流才能转写；只有合流视频而无独立音频时明确保留部分结果。结果写入非空目录或 skill 安装目录会被拒绝。
+安装路径不同可传 `--video-skill '<feipi-video-read-url 目录>'`。视频默认字幕优先、whisper.cpp fast 回退、只截首帧；额外截图按同级视频 skill 的 references/frame-selection.md，由 AI 阅读全部字幕后提交 0–5 个时间点及字幕依据，使用 --plan 追加，累计最多首帧加5帧。高质量转写可传 `--quality accurate`。完整视频从不作为提取回退，只有独立音频流才能转写；只有合流视频而无独立音频时明确保留部分结果。结果写入非空目录或 skill 安装目录会被拒绝。
 
 脚本 stdout 返回 `manifest_path` 和 `status`。退出码 0=complete、2=partial、1=failed/blocked。即使返回非零也先读取 manifest；错误参数、目录不可写或缺少视频 skill 时可能尚无 manifest。输出合同由同级 `feipi-video-read-url` 中的 `content-extraction.md` 提供；路径也可由 `--video-skill` 确认。
 

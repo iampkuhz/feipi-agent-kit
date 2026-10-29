@@ -1,5 +1,11 @@
 # 变更记录
 
+## 2026-10-28
+- feipi-video-read-url v13：分层摘要、逐项风险检查与字幕编号选帧
+- feipi-xiaohongshu-read-note v3：视频分支同步字幕驱动的有限选帧
+- feipi-video-read-url v12：首帧与字幕驱动的0–5帧决策、累计预算门禁
+- feipi-video-read-url v11：编号证据生成摘要，批量报告引用错误
+
 ## 2026-10-25
 - feipi-video-read-url v10：通用补帧与覆盖复核，分离领域策略
 - feipi-xiaohongshu-read-note v2：补齐图文摘要逐项复核

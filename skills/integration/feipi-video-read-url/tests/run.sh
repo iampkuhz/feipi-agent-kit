@@ -1374,6 +1374,12 @@ else
   stub_fail_msg "summary-coverage-regressions" "摘要决策内容引用与补帧回归失败"
 fi
 
+if python3 "$SCRIPT_DIR/test_frame_plan.py"; then
+  stub_pass "frame-plan-regressions"
+else
+  stub_fail_msg "frame-plan-regressions" "字幕选帧与累计预算回归失败"
+fi
+
 if python3 "$SCRIPT_DIR/test_content_extraction.py"; then
   stub_pass "content-extraction-regressions"
 else
@@ -1396,6 +1402,12 @@ if python3 "$SCRIPT_DIR/test_cached_audio_recovery.py"; then
   stub_pass "cached-audio-context-recovery"
 else
   stub_fail_msg "cached-audio-context-recovery" "已归档音频复用与独立解码条件回归失败"
+fi
+
+if python3 "$SCRIPT_DIR/test_summary_layout.py"; then
+  stub_pass "editorial-layout-regressions"
+else
+  stub_fail_msg "editorial-layout-regressions" "分层摘要及来源编号选帧回归失败"
 fi
 
 echo "测试汇总: total=$TOTAL pass=$PASSED fail=$FAILED"

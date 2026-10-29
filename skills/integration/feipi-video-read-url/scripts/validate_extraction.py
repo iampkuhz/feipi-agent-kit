@@ -45,6 +45,8 @@ def validate(root):
             source = sources.get(a.get("source_artifact_id"), {})
             if source.get("kind") not in ("image", "frame") or source.get("anchor") != a["anchor"]:
                 raise ValueError("invalid_observation_reference")
+    from frame_plan import check_policy
+    check_policy(m)
     return m
 
 

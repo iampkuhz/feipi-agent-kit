@@ -12,6 +12,7 @@ sys.path[:0] = [str(SCRIPTS), str(SCRIPTS / "lib")]
 import content_manifest as cm
 import extract_frames as frames
 from review_summary import review
+from summary_packet import build, prepare
 
 
 class SummaryReviewTests(unittest.TestCase):
@@ -60,6 +61,54 @@ class SummaryReviewTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "summary_evidence_not_in_source"):
             self.check()
 
+    def test_reports_all_mismatches_in_one_pass(self):
+        self.summary.write_text("完全不同的摘要文本")
+        self.rows["units"][2]["evidence"][0]["quote"] = "虚构的来源片段"
+        with self.assertRaises(ValueError) as failure:
+            self.check()
+        self.assertIn("summary_unit_missing:0", str(failure.exception))
+        self.assertIn("summary_unit_missing:2", str(failure.exception))
+        self.assertIn("summary_evidence_not_in_source:2", str(failure.exception))
+
+    def draft(self):
+        packet = prepare(self.root)
+        value = {"schema": "feipi-summary-draft-v1", "source_digest": packet["source_digest"],
+                 "reviewed_artifact_ids": ["asr"], "semantic_review": "all_units_checked",
+                 "overview": "作者比较方案及执行条件。", "sections": [{"title": "方案取舍", "items": [
+                     {"id": "choice", "category": "condition", "text": '选择 **方案A**，保留 "工具" 条件及 20 分钟间隔。',
+                      "evidence": ["asr:0001"]}]}]}
+        path = self.root / "draft.json"
+        path.write_text(json.dumps(value, ensure_ascii=False))
+        return path, value
+
+    def test_packet_build_preserves_quotes_and_markdown_without_manual_copy(self):
+        path, value = self.draft()
+        result = build(self.root, path)
+        self.assertEqual(result["status"], "traceability_checked")
+        coverage = json.loads(self.coverage.read_text())
+        self.assertEqual(coverage["units"][0]["summary_quote"], value["sections"][0]["items"][0]["text"])
+        self.assertEqual(coverage["units"][0]["evidence"][0]["quote"], self.source)
+        self.assertEqual(review(self.manifest, self.summary, self.coverage)["unit_count"], 1)
+
+    def test_packet_rejects_stale_evidence_and_preserves_previous_summary(self):
+        path, _ = self.draft()
+        build(self.root, path)
+        before = self.summary.read_bytes()
+        (self.root / "asr.txt").write_text("来源内容已经改变，旧编号不得沿用。")
+        with self.assertRaisesRegex(ValueError, "source_changed"):
+            build(self.root, path)
+        self.assertEqual(self.summary.read_bytes(), before)
+
+    def test_packet_rejects_invented_reference_and_missing_review(self):
+        path, value = self.draft()
+        value["semantic_review"] = "pending"
+        value["sections"][0]["items"][0]["evidence"] = ["asr:9999"]
+        path.write_text(json.dumps(value))
+        with self.assertRaises(ValueError) as failure:
+            build(self.root, path)
+        self.assertIn("host_semantic_review_required", str(failure.exception))
+        self.assertIn("unknown_evidence_id:choice", str(failure.exception))
+
     def test_unreviewed_content_file_is_rejected(self):
         self.rows["reviewed_artifact_ids"] = []
         with self.assertRaisesRegex(ValueError, "all_content_artifacts"):
@@ -69,6 +118,16 @@ class SummaryReviewTests(unittest.TestCase):
         self.rows["summary_review"] = "pending"
         with self.assertRaisesRegex(ValueError, "host_semantic_review_required"):
             self.check()
+
+    def frame_plan(self, manifest, second=None):
+        from frame_plan import source_hashes
+        rows = []
+        if second is not None:
+            text = "[00:02:20] " + (self.root / "asr.txt").read_text()
+            (self.root / "asr.txt").write_text(text)
+            manifest["metadata"]["duration_seconds"] = 200
+            rows = [{"seconds": second, "title": "术语核验", "reason": "核对字幕提示", "evidence": {"artifact_id": "asr", "quote": text}}]
+        return {"schema": "feipi-frame-plan-v1", "transcript_sha256": source_hashes(self.root, manifest), "decision": "阅读全文后选择", "frames": rows}
 
     def test_additional_frames_preserve_read_old_frames(self):
         m = json.loads(self.manifest.read_text())
@@ -83,19 +142,21 @@ class SummaryReviewTests(unittest.TestCase):
             return 0, b""
         info = {"duration": 200, "url": "https://example.invalid/media.mp4", "vcodec": "h264", "ext": "mp4"}
         with patch.object(frames.shutil, "which", return_value="ffmpeg"), patch.object(frames, "check_seekable", return_value="http_range"), patch.object(frames, "run_logged", side_effect=fake_run):
-            frames.extract_frames(m["original_url"], self.root, m, SCRIPTS, info=info, times=[145])
+            frames.extract_frames(m["original_url"], self.root, m, SCRIPTS, info=info, plan=self.frame_plan(m, 145))
         self.assertEqual(old.read_bytes(), b"old-frame")
         self.assertEqual([a["id"] for a in m["artifacts"] if a["kind"] == "frame"], ["frame-001", "frame-002"])
-        self.assertEqual(m["channels"]["frames"]["sampling"]["previous_sampling"]["strategy"], "uniform")
+        self.assertEqual(m["channels"]["frames"]["sampling"]["strategy"], "opening_plus_transcript_v1")
         self.assertEqual(m["artifacts"][1]["read_status"], "read")
 
     def test_base_copy_uses_saved_url_without_host_copying_signature(self):
         m = json.loads(self.manifest.read_text())
         m["original_url"] += "?xsec_token=actual-public-signature"
         self.manifest.write_text(json.dumps(m))
+        plan_path = self.root / "plan.json"
+        plan_path.write_text(json.dumps(self.frame_plan(m)))
         output = self.root / "new-extraction"
         before = (self.root / "asr.txt").read_bytes()
-        with patch.object(sys, "argv", ["extract_frames.py", "-", str(output), "--base-dir", str(self.root), "--times", "145"]), patch.object(frames, "extract_frames") as extract:
+        with patch.object(sys, "argv", ["extract_frames.py", "-", str(output), "--base-dir", str(self.root), "--plan", str(plan_path)]), patch.object(frames, "extract_frames") as extract:
             frames.main()
         self.assertEqual(extract.call_args.args[0], m["original_url"])
         self.assertEqual((output / "asr.txt").read_bytes(), before)

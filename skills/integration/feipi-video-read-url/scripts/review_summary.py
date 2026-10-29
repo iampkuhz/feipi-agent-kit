@@ -43,24 +43,30 @@ def review(manifest_path, summary_path, coverage_path):
     units, ids = coverage.get("units"), set()
     if not isinstance(units, list) or not units:
         raise ValueError("summary_units_required")
+    errors = []
     for unit in units:
         if not isinstance(unit, dict) or not isinstance(unit.get("id"), str) or not unit["id"].strip() or unit["id"] in ids:
-            raise ValueError("invalid_summary_unit_id")
+            errors.append("invalid_summary_unit_id")
+            continue
         ids.add(unit["id"])
         if not isinstance(unit.get("topic"), str) or not unit["topic"].strip() or unit.get("category") not in CATEGORIES:
-            raise ValueError("invalid_summary_unit")
+            errors.append("invalid_summary_unit:" + unit["id"])
         quote = unit.get("summary_quote")
         if not isinstance(quote, str) or len(quote.strip()) < 4 or quote not in summary:
-            raise ValueError("summary_unit_missing:" + unit["id"])
+            errors.append("summary_unit_missing:" + unit["id"])
         evidence = unit.get("evidence")
         if not isinstance(evidence, list) or not evidence:
-            raise ValueError("summary_unit_evidence_required:" + unit["id"])
+            errors.append("summary_unit_evidence_required:" + unit["id"])
+            continue
         for item in evidence:
             if not isinstance(item, dict):
-                raise ValueError("invalid_summary_evidence")
+                errors.append("invalid_summary_evidence:" + unit["id"])
+                continue
             source, excerpt = item.get("artifact_id"), item.get("quote")
             if source not in texts or not isinstance(excerpt, str) or len(excerpt.strip()) < 4 or excerpt not in texts[source]:
-                raise ValueError("summary_evidence_not_in_source:" + unit["id"])
+                errors.append("summary_evidence_not_in_source:" + unit["id"])
+    if errors:
+        raise ValueError("\n".join(errors))
     return {"schema": "feipi-summary-review-v1", "status": "traceability_checked",
             "semantic_review": "host_declared", "unit_count": len(units),
             "manifest_sha256": hashlib.sha256(manifest_path.read_bytes()).hexdigest(),

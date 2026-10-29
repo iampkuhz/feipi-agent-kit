@@ -3,6 +3,7 @@
 
 import argparse
 import copy
+import json
 from pathlib import Path
 import re
 import shutil
@@ -14,20 +15,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 from content_manifest import (artifact, channel, finite_seconds, new_manifest, prepare_output,
                               resolve_media, run_logged, visual_pending, finish, write_json, safe_path)
 from validate_extraction import validate
+from frame_plan import POLICY, validate_plan
 
 
-def frame_times(duration, requested=None, count=6):
-    if requested is not None:
-        values = sorted(set(finite_seconds(v) for v in requested))
-        if not values or len(values) > 24:
-            raise ValueError("frame_count_out_of_range")
-        if duration and any(t >= duration for t in values):
-            raise ValueError("timestamp_outside_duration")
-        return values
-    if not duration:
-        return [0.0]
-    # 均匀覆盖，避开视频尾部；短片不重复采样。
-    return sorted(set(round(duration * i / count, 3) for i in range(count)))
+def frame_times(duration, requested=None):
+    values = sorted(set(finite_seconds(v) for v in (requested if requested is not None else [0])))
+    if len([t for t in values if t > 0]) > 5:
+        raise ValueError("at_most_five_extra_frames")
+    if duration and any(t >= duration for t in values):
+        raise ValueError("timestamp_outside_duration")
+    return sorted(set([0.0] + values))
 
 
 def media_candidate(info):
@@ -75,55 +72,67 @@ def ffmpeg_args(media, headers, second, path):
     return args
 
 
-def extract_frames(url, root, manifest, scripts, info=None, times=None, count=6):
+def extract_frames(url, root, manifest, scripts, info=None, times=None, plan=None):
+    # 在发起媒体请求前拒绝无字幕依据的补帧和超预算请求。
+    if times is not None and any(finite_seconds(t) != 0 for t in times):
+        raise ValueError("use_transcript_frame_plan_instead_of_raw_times")
+    selected = validate_plan(root, manifest, plan) if plan is not None else []
     previous = [a for a in manifest["artifacts"] if a["kind"] == "frame"]
+    old = manifest["channels"]["frames"].get("sampling", {})
+    previous_times = {a["anchor"]["seconds"] for a in previous}
+    if len(previous_times - {0}) > 5:
+        raise ValueError("legacy_frames_exceed_budget_start_new_extraction")
+    requested = frame_times(manifest.get("metadata", {}).get("duration_seconds"), [r["seconds"] for r in selected])
+    sample = [t for t in requested if t not in previous_times]
     start = max([int(a["id"].replace("frame-", "", 1)) for a in previous] or [0])
-    previous_sampling = manifest["channels"]["frames"].get("sampling") if previous else None
     failures, saved = [], []
-    sampling = {"strategy": "explicit" if times is not None else "uniform",
-                "requested_times_seconds": [], "range_seconds": None,
-                "coverage": "sampled_only", "failures": failures}
+    attempted = set(old.get("attempted_extra_times_seconds", [])) | (previous_times - {0})
+    attempted.update(t for t in sample if t > 0)
+    if len(attempted) > 5:
+        raise ValueError("cumulative_extra_frame_budget_exceeded")
+    choices = {r["seconds"]: r for r in old.get("selections", [])}
+    choices.update({r["seconds"]: r for r in selected})
+    sampling = {"strategy": POLICY, "requested_times_seconds": requested,
+                "range_seconds": old.get("range_seconds"), "coverage": "sampled_only",
+                "max_extra_frames": 5, "attempted_extra_times_seconds": sorted(attempted),
+                "selection_status": "decided" if plan is not None else old.get("selection_status", "pending"),
+                "decision": plan["decision"] if plan is not None else old.get("decision"),
+                "selections": list(choices.values()), "failures": failures}
+    if plan is not None:
+        sampling["transcript_sha256"] = plan["transcript_sha256"]
     try:
-        if not shutil.which("ffmpeg"):
-            raise ValueError("ffmpeg_unavailable")
-        info = info or resolve_media(url, scripts, root)
-        duration = finite_seconds(info["duration"]) if info.get("duration") else None
-        sampling["range_seconds"] = [0, duration]
-        sample = frame_times(duration, times, count)
-        sampling["requested_times_seconds"] = sample
-        if not duration:
-            sampling["limitation"] = "duration_unknown_only_opening_sample"
-        media = media_candidate(info)
-        headers = request_headers(info, media)
-        sampling["transport"] = check_seekable(media, headers)
-        dest = root / "frames"
-        dest.mkdir(exist_ok=True)
-        for i, second in enumerate(sample, start + 1):
-            path = dest / f"{i:03d}-{second:.3f}s.jpg"
-            code, _ = run_logged(ffmpeg_args(media, headers, second, path),
-                                  dest / f"{i:03d}.log", timeout=45)
-            if code or not path.is_file() or path.stat().st_size == 0:
-                path.unlink(missing_ok=True)
-                failures.append({"seconds": second,
-                                 "reason": "frame_decode_timeout" if code == 124 else "frame_decode_failed",
-                                 "exit_code": code, "log_path": f"frames/{i:03d}.log"})
-                continue
-            artifact(manifest, root, f"frame-{i:03d}", "frame", path,
-                     {"type": "time", "seconds": second}, source_url=manifest["canonical_url"])
-            saved.append(second)
-        status = "complete" if not failures and duration else "partial" if saved else "unavailable"
-        reasons = (["frame_sampling_incomplete"] if failures else [])
-        if not duration:
-            reasons.append("duration_unknown")
+        duration = manifest.get("metadata", {}).get("duration_seconds")
+        if sample:
+            if not shutil.which("ffmpeg"):
+                raise ValueError("ffmpeg_unavailable")
+            info = info or resolve_media(url, scripts, root)
+            duration = finite_seconds(info["duration"]) if info.get("duration") else duration
+            sample = [t for t in frame_times(duration, requested) if t not in previous_times]
+            sampling["range_seconds"] = [0, duration]
+            media = media_candidate(info)
+            headers = request_headers(info, media)
+            sampling["transport"] = check_seekable(media, headers)
+            dest = root / "frames"
+            dest.mkdir(exist_ok=True)
+            for i, second in enumerate(sample, start + 1):
+                path = dest / f"{i:03d}-{second:.3f}s.jpg"
+                code, _ = run_logged(ffmpeg_args(media, headers, second, path), dest / f"{i:03d}.log", timeout=45)
+                if code or not path.is_file() or path.stat().st_size == 0:
+                    path.unlink(missing_ok=True)
+                    failures.append({"seconds": second, "reason": "frame_decode_timeout" if code == 124 else "frame_decode_failed",
+                                     "exit_code": code, "log_path": f"frames/{i:03d}.log"})
+                    continue
+                artifact(manifest, root, f"frame-{i:03d}", "frame", path,
+                         {"type": "time", "seconds": second}, source_url=manifest["canonical_url"])
+                saved.append(second)
+        # 累计失败点仍未取得图片时，不能因零新增调用而悄悄变为完成。
+        missing = ({0} | attempted) - previous_times - set(saved)
+        status = "complete" if not missing and duration else "partial" if (saved or previous) else "unavailable"
+        reasons = (["frame_sampling_incomplete"] if missing else []) + ([] if duration else ["duration_unknown"])
         channel(manifest, "frames", status, *reasons, sampling=sampling)
     except (ValueError, OSError) as error:
         reason = str(error) if isinstance(error, ValueError) else "frame_stream_request_failed"
-        channel(manifest, "frames", "unavailable", reason, sampling=sampling)
-    if previous_sampling:
-        sampling["previous_sampling"] = previous_sampling
-        sampling["coverage"] = "sampled_only"
-        if manifest["channels"]["frames"]["status"] == "unavailable":
-            manifest["channels"]["frames"]["status"] = "partial"
+        channel(manifest, "frames", "partial" if previous else "unavailable", reason, sampling=sampling)
     visual_pending(manifest)
     return saved
 
@@ -132,7 +141,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("url")
     parser.add_argument("output_dir")
-    parser.add_argument("--times", help="逗号分隔的秒数，最多24个；省略则均匀抽6帧")
+    parser.add_argument("--times", help="仅兼容首帧0；额外帧必须使用 --plan")
+    parser.add_argument("--plan", help="字幕依据、选帧理由与0至5个额外时间点的JSON")
     parser.add_argument("--base-dir", help="已验证的同一来源提取目录；复制其证据到新目录后补帧，不重新转写")
     args = parser.parse_args()
     m = new_manifest(args.url, content_type="video")
@@ -141,8 +151,13 @@ def main():
         m = copy.deepcopy(validate(base))
         if args.url not in ("-", m["original_url"], m["canonical_url"]):
             raise ValueError("base_source_url_mismatch")
-        if m["content_type"] not in ("video", "video_note") or not args.times:
-            raise ValueError("base_video_and_explicit_times_required")
+        if m["content_type"] not in ("video", "video_note") or not args.plan:
+            raise ValueError("base_video_and_transcript_plan_required")
+    plan = json.loads(Path(args.plan).read_text()) if args.plan else None
+    if plan is not None and not args.base_dir:
+        raise ValueError("frame_plan_requires_base_transcript")
+    if plan is not None:
+        validate_plan(base, m, plan)
     root = prepare_output(args.output_dir)
     if args.base_dir:
         for item in m["artifacts"]:
@@ -152,7 +167,7 @@ def main():
     # 补帧直接读取已验证清单中的原始访问 URL，避免宿主复制日志脱敏后的签名参数。
     source_url = m["original_url"] if args.base_dir else args.url
     extract_frames(source_url, root, m, Path(__file__).resolve().parent,
-                   times=args.times.split(",") if args.times else None)
+                   times=args.times.split(",") if args.times else None, plan=plan)
     if not args.base_dir:
         channel(m, "source", "complete")
     code = finish(m, root)

@@ -112,6 +112,9 @@ for required_file in \
   "$TARGET_DIR/scripts/download_youtube.sh" \
   "$TARGET_DIR/scripts/download_bilibili.sh" \
   "$TARGET_DIR/scripts/extract_video_text.sh" \
+  "$TARGET_DIR/scripts/summary_layout.py" \
+  "$TARGET_DIR/scripts/summary_packet.py" \
+  "$TARGET_DIR/scripts/frame_plan.py" \
   "$TARGET_DIR/scripts/render_summary_prompt.sh" \
   "$TARGET_DIR/scripts/render_background_prompt.sh" \
   "$TARGET_DIR/scripts/install_deps.sh" \
