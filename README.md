@@ -63,7 +63,10 @@ cp .env.example .env
 make help                      # 查看所有可用命令
 make setup                     # 初始化
 make install-links             # 安装 Skills
+make install-links VERBOSE=1   # 展开跳过与保留明细（默认仅显示变更及汇总）
 make searxng-up / down / restart / logs
 make litellm-up / down / restart / logs
 make doctor                    # 健康检查
 ```
+
+安装输出区分新增、更新、跳过、清理和警告，终端自动启用颜色与粗体；`COLOR=never` 禁用样式，`COLOR=always` 强制启用，非空 `NO_COLOR` 优先禁用。更多选项见 [操作手册](docs/agent-handbook.md#skills-管理)。

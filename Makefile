@@ -10,7 +10,10 @@ SHELL := /bin/bash
 AGENT ?=
 PROJECT ?=
 DIR ?=
+VERBOSE ?= 0
+COLOR ?= auto
 INSTALL_SCRIPT := ./scripts/install_skills.sh
+INSTALL_OUTPUT_FLAGS = $(if $(filter 1,$(VERBOSE)),--verbose) --color "$(COLOR)"
 
 # 解析路径
 RESOLVED_PROJECT := $(or $(PROJECT),$(DIR))
@@ -41,6 +44,7 @@ help:
 	@echo "  make install-links [AGENT=codex|qwen|qoder|claudecode|openclaw]"
 	@echo "  make install-project PROJECT=/path/to/project [AGENT=...]"
 	@echo "  make install [AGENT=...] [PROJECT=/path/to/project|DIR=/path/to/project]"
+	@echo "  输出选项：VERBOSE=1 查看跳过明细；COLOR=auto|always|never 控制颜色"
 	@echo ""
 	@echo "===== 服务管理 ====="
 	@echo "  make searxng-up          # 启动 SearXNG 搜索引擎"
@@ -76,20 +80,20 @@ help:
 
 install:
 ifeq ($(strip $(RESOLVED_PROJECT)),)
-	@$(MAKE) install-links AGENT="$(AGENT)"
+	@$(MAKE) --no-print-directory install-links AGENT="$(AGENT)"
 else
-	@$(MAKE) install-project AGENT="$(AGENT)" PROJECT="$(RESOLVED_PROJECT)"
+	@$(MAKE) --no-print-directory install-project AGENT="$(AGENT)" PROJECT="$(RESOLVED_PROJECT)"
 endif
 
 install-links:
-	@$(INSTALL_SCRIPT) $(if $(AGENT),--agent "$(AGENT)")
+	@$(INSTALL_SCRIPT) $(if $(AGENT),--agent "$(AGENT)") $(INSTALL_OUTPUT_FLAGS)
 
 install-project:
 	@if [[ -z "$(RESOLVED_PROJECT)" ]]; then \
 		echo "缺少 PROJECT=/path/to/project（兼容旧参数：DIR=/path/to/project）" >&2; \
 		exit 1; \
 	fi
-	@$(INSTALL_SCRIPT) $(if $(AGENT),--agent "$(AGENT)") --dir "$(RESOLVED_PROJECT)"
+	@$(INSTALL_SCRIPT) $(if $(AGENT),--agent "$(AGENT)") --dir "$(RESOLVED_PROJECT)" $(INSTALL_OUTPUT_FLAGS)
 
 # ===== 本地服务：统一复用各服务脚本，不再绕到 Docker =====
 

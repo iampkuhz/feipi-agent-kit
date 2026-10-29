@@ -36,15 +36,73 @@ INSTALL_SOURCE_MARKER=".feipi-agent-kit-source"
 
 AGENT_NAME=""
 TARGET_DIR=""
+VERBOSE=false
+COLOR_MODE=auto
+
+# 在实际输出的文件描述符上判断 TTY，重定向的 stdout/stderr 不混入 ANSI。
+color_enabled() {
+  [[ -z "${NO_COLOR:-}" ]] && { [[ "$COLOR_MODE" == always ]] || {
+    [[ "$COLOR_MODE" == auto && -t 1 && "${TERM:-dumb}" != dumb ]]
+  }; }
+}
+
+styled() {
+  if color_enabled; then
+    printf '\033[%sm%s\033[0m' "$1" "$2"
+  else
+    printf '%s' "$2"
+  fi
+}
+
+status_line() {
+  local status="$1" label style
+  shift
+  case "$status" in
+    installed) label=新增; style='1;32' ;;
+    updated) label=更新; style='1;34' ;;
+    skipped) label=跳过; style=2 ;;
+    warning) label=警告; style='1;33' ;;
+    failed) label=失败; style='1;31' ;;
+    passed) label=通过; style=32 ;;
+    info) label=提示; style=36 ;;
+  esac
+  printf '  '
+  styled "$style" "[$label]"
+  printf ' %s\n' "$*"
+}
+
+heading() {
+  printf '\n'
+  styled '1;36' "$1"
+  printf '\n'
+}
+
+print_counts() {
+  local installed_style=2 updated_style=2 warning_style=2
+  if [[ "$2" -gt 0 ]]; then installed_style='1;32'; fi
+  if [[ "$3" -gt 0 ]]; then updated_style='1;34'; fi
+  if [[ "$5" -gt 0 ]]; then warning_style='1;33'; fi
+  styled 1 "$1"
+  styled "$installed_style" "新增 $2"
+  printf ' · '
+  styled "$updated_style" "更新 $3"
+  printf ' · '
+  styled 2 "跳过 $4"
+  printf ' · '
+  styled "$warning_style" "警告 $5"
+  printf '\n'
+}
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -h|--help)
-      echo "用法: $0 [--agent <name>] [--dir <path>]"
+      echo "用法: $0 [--agent <name>] [--dir <path>] [--verbose] [--color auto|always|never]"
       echo ""
       echo "选项:"
       echo "  --agent <name>  指定 agent 类型（codex | qwen | qoder | claudecode | openclaw）"
       echo "  --dir <path>    指定目标路径"
+      echo "  --verbose       显示逐项跳过、保留原因和验证详情"
+      echo "  --color <mode>  auto（默认，按终端检测）| always | never；NO_COLOR 非空时禁用样式"
       echo ""
       echo "安装前自动验证："
       echo "  1. 运行 registry 校验（validate_registry.py）"
@@ -61,7 +119,7 @@ while [[ $# -gt 0 ]]; do
     --agent)
       shift
       if [[ $# -eq 0 ]]; then
-        echo "--agent 缺少参数。" >&2
+        status_line failed "--agent 缺少参数。" >&2
         exit 1
       fi
       AGENT_NAME="$1"
@@ -69,17 +127,32 @@ while [[ $# -gt 0 ]]; do
     --dir)
       shift
       if [[ $# -eq 0 ]]; then
-        echo "--dir 缺少参数。" >&2
+        status_line failed "--dir 缺少参数。" >&2
         exit 1
       fi
       TARGET_DIR="$1"
       ;;
+    --verbose)
+      VERBOSE=true
+      ;;
+    --color)
+      shift
+      if [[ $# -eq 0 ]]; then
+        status_line failed "--color 缺少参数（auto | always | never）" >&2
+        exit 1
+      fi
+      COLOR_MODE="$1"
+      case "$COLOR_MODE" in
+        auto|always|never) ;;
+        *) status_line failed "无效颜色模式：${COLOR_MODE}（auto | always | never）" >&2; exit 1 ;;
+      esac
+      ;;
     -*)
-      echo "未知参数：$1" >&2
+      status_line failed "未知参数：$1" >&2
       exit 1
       ;;
     *)
-      echo "多余参数：$1" >&2
+      status_line failed "多余参数：$1" >&2
       exit 1
       ;;
   esac
@@ -87,7 +160,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ ! -d "$SRC_ROOT" ]]; then
-  echo "未找到 skills 目录：$SRC_ROOT" >&2
+  status_line failed "未找到 skills 目录：$SRC_ROOT" >&2
   exit 1
 fi
 
@@ -167,8 +240,9 @@ find_existing_agents() {
 collect_shared_roots() {
   local root_name=""
 
-  rg -o --no-filename '\$REPO_ROOT/[A-Za-z0-9._/-]+' "$SRC_ROOT" -g '*.sh' \
-    -g '!**/tests/**' -g '!**/evals/**' 2>/dev/null \
+  # rg 的 1 表示无匹配，是合法的空依赖列表；真正的扫描错误继续上抛。
+  { rg -o --no-filename '\$REPO_ROOT/[A-Za-z0-9._/-]+' "$SRC_ROOT" -g '*.sh' \
+      -g '!**/tests/**' -g '!**/evals/**' || [[ "$?" -eq 1 ]]; } \
     | sed -E 's#^\$REPO_ROOT/##' \
     | cut -d'/' -f1 \
     | sort -u \
@@ -223,13 +297,16 @@ except OSError as error:
 PYEOF
 }
 
-# 安装函数返回 0 表示有更新，2 表示跳过，其他状态表示失败。
+# 返回 0 表示新增/更新，2 表示跳过，其他状态表示失败；ITEM_STATUS 区分结果。
 finish_staged_install() {
-  local staging="$1" dest="$2" label="$3" detail="$4"
+  local staging="$1" dest="$2" label="$3"
   local comparison_status
   if installation_trees_equal "$staging" "$dest"; then
     rm -rf "$staging" || return 1
-    echo "  内容未变，跳过：$label"
+    ITEM_STATUS=skipped
+    if [[ "$VERBOSE" == true ]]; then
+      status_line skipped "${label}（内容未变）"
+    fi
     return 2
   else
     comparison_status=$?
@@ -239,11 +316,13 @@ finish_staged_install() {
     fi
   fi
 
+  ITEM_STATUS=installed
   if [[ -e "$dest" || -L "$dest" ]]; then
+    ITEM_STATUS=updated
     rm -rf "$dest" || return 1
   fi
   mv "$staging" "$dest" || return 1
-  echo "  已安装：${label}${detail}"
+  status_line "$ITEM_STATUS" "$label"
   return 0
 }
 
@@ -271,10 +350,12 @@ link_item() {
     done < <(find "$src" -mindepth 1 -maxdepth 1 -print0)
     printf '%s\n' "$src" > "$staging/$INSTALL_SOURCE_MARKER" || { rm -rf "$staging"; return 1; }
 
-    finish_staged_install "$staging" "$dest" "$label" "（入口实拷，已排除 tests/evals）"
+    finish_staged_install "$staging" "$dest" "$label"
     return $?
   fi
 
+  ITEM_STATUS=installed
+  local detail=""
   if [[ -L "$dest" ]]; then
     local current_target
     current_target="$(readlink "$dest")"
@@ -286,7 +367,10 @@ link_item() {
     fi
 
     if [[ "$current_target" == "$src" ]] && [[ "$is_broken" == false ]]; then
-      echo "  已存在，跳过：$label"
+      ITEM_STATUS=skipped
+      if [[ "$VERBOSE" == true ]]; then
+        status_line skipped "${label}（链接未变）"
+      fi
       return 2
     fi
 
@@ -294,16 +378,19 @@ link_item() {
     # 1. 软链接已失效（目标不存在）
     # 2. 软链接指向其他路径
     rm -f "$dest" || return 1
+    ITEM_STATUS=updated
+    detail="（修正链接目标）"
     if [[ "$is_broken" == true ]]; then
-      echo "  已移除失效软链接：$label"
+      detail="（修复失效链接）"
     fi
   elif [[ -e "$dest" ]]; then
-    echo "  警告：目标已存在且非软链接，跳过：$dest" >&2
+    ITEM_STATUS=warning
+    status_line warning "${label}（目标已存在且非软链接，跳过：${dest}）" >&2
     return 2
   fi
 
   ln -s "$src" "$dest" || return 1
-  echo "  已安装：$label"
+  status_line "$ITEM_STATUS" "$label$detail"
   return 0
 }
 
@@ -324,13 +411,13 @@ copy_dir() {
       cp -R -p "$entry" "$staging/$name" || { rm -rf "$staging"; return 1; }
     done < <(find "$src" -mindepth 1 -maxdepth 1 -print0)
     printf '%s\n' "$src" > "$staging/$INSTALL_SOURCE_MARKER" || { rm -rf "$staging"; return 1; }
-    finish_staged_install "$staging" "$dest" "$label" "（已排除 tests/evals）"
+    finish_staged_install "$staging" "$dest" "$label"
   else
     local staging
     staging="$(mktemp -d "${dest}.tmp.XXXXXX")" || return 1
     rmdir "$staging" || return 1
     cp -R -p "$src" "$staging" || return 1
-    finish_staged_install "$staging" "$dest" "$label" ""
+    finish_staged_install "$staging" "$dest" "$label"
   fi
 }
 
@@ -400,17 +487,20 @@ collect_all_skills() {
 # ===== 注册表验证与解析 =====
 
 validate_registry() {
-  echo "=== 注册表验证 ==="
+  heading "Skills 安装 · 预检查"
   local validator="$REPO_ROOT/scripts/harness/validate_registry.py"
   if [[ ! -f "$validator" ]]; then
-    echo "  [ERROR] 注册表验证脚本不存在：$validator" >&2
+    status_line failed "注册表验证脚本不存在：$validator" >&2
     return 1
   fi
-  if ! python3 "$validator"; then
-    echo ""
-    echo "[ERROR] 注册表验证失败，已中止安装。" >&2
-    echo "请先修复 skills/registry.yaml 中的问题，再重试安装。" >&2
+  local validation_output
+  if ! validation_output="$(python3 "$validator" 2>&1)"; then
+    printf '%s\n' "$validation_output" >&2
+    status_line failed "注册表验证失败，已中止安装；请先修复 skills/registry.yaml。" >&2
     return 1
+  fi
+  if [[ "$VERBOSE" == true || "$validation_output" == *'[WARN'* ]]; then
+    printf '%s\n' "$validation_output"
   fi
   return 0
 }
@@ -419,7 +509,7 @@ parse_registry_skills() {
   local reg_file="$REPO_ROOT/skills/registry.yaml"
 
   if [[ ! -f "$reg_file" ]]; then
-    echo "[ERROR] 注册表文件不存在：$reg_file" >&2
+    status_line failed "注册表文件不存在：$reg_file" >&2
     return 1
   fi
 
@@ -455,12 +545,12 @@ validate_registry_consistency() {
   local collected_file="$2"
 
   if [[ ! -f "$registry_file" ]] || [[ ! -s "$registry_file" ]]; then
-    echo "[ERROR] 无法读取注册表中的技能列表" >&2
+    status_line failed "无法读取注册表中的技能列表" >&2
     return 1
   fi
 
   if [[ ! -f "$collected_file" ]] || [[ ! -s "$collected_file" ]]; then
-    echo "[ERROR] 无法读取文件系统扫描的技能列表" >&2
+    status_line failed "无法读取文件系统扫描的技能列表" >&2
     return 1
   fi
 
@@ -479,7 +569,7 @@ validate_registry_consistency() {
   local ok=true
 
   if [[ -n "$missing_in_registry" ]]; then
-    echo "[ERROR] 以下技能存在于文件系统但未注册于 skills/registry.yaml：" >&2
+    status_line failed "以下技能存在于文件系统但未注册于 skills/registry.yaml：" >&2
     while IFS= read -r p; do
       echo "  - $p" >&2
     done <<< "$missing_in_registry"
@@ -487,7 +577,7 @@ validate_registry_consistency() {
   fi
 
   if [[ -n "$missing_in_fs" ]]; then
-    echo "[ERROR] 以下技能注册于 registry.yaml 但文件系统中不存在：" >&2
+    status_line failed "以下技能注册于 registry.yaml 但文件系统中不存在：" >&2
     while IFS= read -r p; do
       echo "  - $p" >&2
     done <<< "$missing_in_fs"
@@ -496,8 +586,7 @@ validate_registry_consistency() {
 
   if [[ "$ok" == false ]]; then
     echo ""
-    echo "[ERROR] 注册表与文件系统不一致，已中止安装。" >&2
-    echo "请同步 skills/registry.yaml 与 skills/ 目录，再重试安装。" >&2
+    status_line failed "注册表与文件系统不一致，已中止安装；请同步 skills/registry.yaml 与 skills/ 目录。" >&2
     return 1
   fi
 
@@ -523,17 +612,12 @@ if ! validate_registry_consistency "$_tmp_skills_registry" "$_tmp_skills_collect
   exit 1
 fi
 
-echo ""
-
-# ===== 安装前展示技能列表 =====
+# ===== 安装前汇总；明细随实际结果输出，避免重复技能清单 =====
 _skill_count="$(wc -l < "$_tmp_skills_collected" | tr -d ' ')"
-echo "将安装以下 ${_skill_count} 个技能："
-while IFS= read -r skill_path; do
-  [[ -z "$skill_path" ]] && continue
-  _skill_name="$(basename "$skill_path")"
-  echo "  - ${_skill_name}  (${skill_path})"
-done < "$_tmp_skills_collected"
-echo ""
+status_line passed "注册表及目录一致 · ${_skill_count} 个技能"
+if [[ "$VERBOSE" == false ]]; then
+  status_line info "仅显示变更和警告；逐项跳过/保留原因：VERBOSE=1（脚本：--verbose）"
+fi
 
 # ===== 开始安装 =====
 
@@ -545,7 +629,10 @@ cleanup_retired_skills() {
   # Python 按链接所在目录解析相对路径，即使源码已经删除也能判断归属。
   local repository_origin
   repository_origin="$(git -C "$REPO_ROOT" config --get remote.origin.url 2>/dev/null || true)"
-  python3 - "$SRC_ROOT" "$dest_root" "$INSTALL_SOURCE_MARKER" "$repository_origin" "$@" <<'PYEOF'
+  local use_color=false
+  if color_enabled; then use_color=true; fi
+  FEIPI_INSTALL_VERBOSE="$VERBOSE" FEIPI_INSTALL_COLOR="$use_color" \
+    python3 - "$SRC_ROOT" "$dest_root" "$INSTALL_SOURCE_MARKER" "$repository_origin" "$@" <<'PYEOF'
 import json
 import os
 from pathlib import Path
@@ -649,6 +736,13 @@ def belongs_to_repository(entry):
     )
 
 
+def report(label, text, style):
+    badge = f"[{label}]"
+    if os.environ["FEIPI_INSTALL_COLOR"] == "true":
+        badge = f"\033[{style}m{badge}\033[0m"
+    print(f"  {badge} {text}", flush=True)
+
+
 cleaned = 0
 preserved = 0
 for entry in sorted(destination.iterdir()):
@@ -660,17 +754,41 @@ for entry in sorted(destination.iterdir()):
             reason = "OpenClaw 来源不属于本仓库或记录无效"
         elif entry.is_dir() and not entry.is_symlink() and not os.path.lexists(entry / marker_name):
             reason = "无来源标记，内部链接不足以确认归属"
-        print(f"  保留入口：{entry}（{reason}）")
+        if os.environ["FEIPI_INSTALL_VERBOSE"] == "true":
+            report("保留", f"{entry}（{reason}）", "2")
         preserved += 1
         continue
     if entry.is_symlink():
         entry.unlink()
     else:
         shutil.rmtree(entry)
-    print(f"  已移除本仓库旧入口：{entry}")
+    report("清理", f"已移除本仓库旧入口：{entry}", "1;33")
     cleaned += 1
-print(f"清理结果：移除 {cleaned} 个本仓库旧入口，保留 {preserved} 个其他来源或归属不明入口")
+report("清理", f"移除 {cleaned} · 保留 {preserved}（其他来源或归属未确认）", "2")
 PYEOF
+}
+
+# 在当前 shell 中计数、即时输出，失败时也保留已经发生的变更日志。
+install_entry() {
+  local install_func="$1" src="$2" dest="$3" label="$4" status=0
+  ITEM_STATUS=""
+  "$install_func" "$src" "$dest" "$label" || status=$?
+  if [[ "$status" -ne 0 && "$status" -ne 2 ]]; then
+    status_line failed "安装失败：$dest" >&2
+    return 1
+  fi
+  case "$ITEM_STATUS" in
+    installed)
+      installed=$((installed + 1)); total_installed=$((total_installed + 1)) ;;
+    updated)
+      updated=$((updated + 1)); total_updated=$((total_updated + 1)) ;;
+    skipped|warning)
+      skipped=$((skipped + 1)); total_skipped=$((total_skipped + 1))
+      if [[ "$ITEM_STATUS" == warning ]]; then
+        warnings=$((warnings + 1)); total_warnings=$((total_warnings + 1))
+      fi ;;
+    *) status_line failed "缺少安装结果：$dest" >&2; return 1 ;;
+  esac
 }
 
 install_skills() {
@@ -680,11 +798,19 @@ install_skills() {
   local label="$4"
   local skills_file="${5:-}"
 
-  echo "=== $label ==="
-  echo "源目录：$SRC_ROOT"
-  echo "目标目录：$dest_root"
+  heading "$label"
+  printf '  目标：%s\n' "$dest_root"
+  if [[ "$mode" == link ]]; then
+    printf '  模式：入口实拷、运行目录链接；排除 tests/evals\n'
+  else
+    printf '  模式：实拷；排除 tests/evals\n'
+  fi
+  if [[ "$VERBOSE" == true ]]; then printf '  源目录：%s\n' "$SRC_ROOT"; fi
 
-  mkdir -p "$dest_root"
+  if ! mkdir -p "$dest_root"; then
+    status_line failed "无法创建目标目录：$dest_root" >&2
+    return 1
+  fi
 
   # 收集所有技能（递归扫描，平铺输出）
   # 如果提供了预收集的列表（用于注册表校验），直接使用
@@ -699,36 +825,31 @@ install_skills() {
     done < <(collect_all_skills "$SRC_ROOT")
   fi
 
-  echo "发现 ${#skill_paths[@]} 个技能"
-
-  echo "清理本仓库旧入口..."
-  cleanup_retired_skills "$dest_root" "${skill_paths[@]}" || return 1
+  if ! cleanup_retired_skills "$dest_root" "${skill_paths[@]}"; then
+    status_line failed "清理旧入口失败：$dest_root" >&2
+    return 1
+  fi
 
   local installed=0
+  local updated=0
   local skipped=0
+  local warnings=0
 
   for src in "${skill_paths[@]}"; do
     local name
     name="$(basename "$src")"
     local dest="$dest_root/$name"
-    if $install_func "$src" "$dest" "$name"; then
-      installed=$((installed + 1))
-    else
-      local status=$?
-      if [[ "$status" -eq 2 ]]; then
-        skipped=$((skipped + 1))
-      else
-        echo "[ERROR] 安装失败：$dest" >&2
-        return 1
-      fi
-    fi
+    install_entry "$install_func" "$src" "$dest" "$name" || return 1
   done
 
   local dest_base
   dest_base="$(cd "$dest_root/.." && pwd)"
 
   local shared_roots_text
-  shared_roots_text="$(collect_shared_roots)"
+  if ! shared_roots_text="$(collect_shared_roots)"; then
+    status_line failed "无法扫描共享路径：$SRC_ROOT" >&2
+    return 1
+  fi
   if [[ -n "$shared_roots_text" ]]; then
     while IFS= read -r root_name; do
       [[ -z "$root_name" ]] && continue
@@ -740,35 +861,29 @@ install_skills() {
       fi
 
       if [[ ! -e "$src" ]]; then
-        echo "  警告：共享路径不存在，跳过：$src" >&2
+        status_line warning "共享路径不存在，跳过：$src" >&2
         skipped=$((skipped + 1))
+        total_skipped=$((total_skipped + 1))
+        warnings=$((warnings + 1))
+        total_warnings=$((total_warnings + 1))
         continue
       fi
 
-      if $install_func "$src" "$dest" "$root_name"; then
-        installed=$((installed + 1))
-      else
-        local status=$?
-        if [[ "$status" -eq 2 ]]; then
-          skipped=$((skipped + 1))
-        else
-          echo "[ERROR] 安装共享路径失败：$dest" >&2
-          return 1
-        fi
-      fi
+      install_entry "$install_func" "$src" "$dest" "共享/$root_name" || return 1
     done <<< "$shared_roots_text"
   fi
 
-  echo "完成：安装 ${installed}，跳过 ${skipped}"
-  echo "$installed $skipped"
+  print_counts "  小计：" "$installed" "$updated" "$skipped" "$warnings"
 }
 
 total_installed=0
+total_updated=0
 total_skipped=0
+total_warnings=0
 
 if [[ -n "$TARGET_DIR" ]]; then
   if [[ ! -d "$TARGET_DIR" ]]; then
-    echo "项目路径不存在或不是目录：$TARGET_DIR" >&2
+    status_line failed "项目路径不存在或不是目录：$TARGET_DIR" >&2
     exit 1
   fi
 
@@ -777,32 +892,26 @@ if [[ -n "$TARGET_DIR" ]]; then
 
   if [[ -z "$dest_root" ]]; then
     if [[ -n "$AGENT_NAME" ]]; then
-      echo "未知 AGENT: ${AGENT_NAME}（支持 codex | qwen | qoder | claudecode | openclaw）" >&2
+      status_line failed "未知 AGENT: ${AGENT_NAME}（支持 codex | qwen | qoder | claudecode | openclaw）" >&2
     else
-      echo "无法确定目标目录" >&2
+      status_line failed "无法确定目标目录" >&2
     fi
     exit 1
   fi
 
   if [[ "$dest_root" != "$project_root"/* ]]; then
-    echo "目标路径不在项目目录内，已拒绝：$dest_root" >&2
+    status_line failed "目标路径不在项目目录内，已拒绝：$dest_root" >&2
     exit 1
   fi
 
-  result="$(install_skills "copy" "$dest_root" "copy_dir" "安装到项目：$dest_root" "$_tmp_skills_collected")"
-  # 最后一行是内部计数，前面的安装与清理报告必须回显到终端。
-  printf '%s\n' "${result%$'\n'*}"
-  installed="$(echo "$result" | tail -1 | cut -d' ' -f1)"
-  skipped="$(echo "$result" | tail -1 | cut -d' ' -f2)"
-  total_installed=$((total_installed + installed))
-  total_skipped=$((total_skipped + skipped))
+  install_skills "copy" "$dest_root" "copy_dir" "项目 · ${AGENT_NAME:-agents}" "$_tmp_skills_collected"
 else
   declare -a target_agents=()
 
   if [[ -n "$AGENT_NAME" ]]; then
     dest="$(get_user_dest_root "$AGENT_NAME")"
     if [[ -z "$dest" ]]; then
-      echo "未知 AGENT: ${AGENT_NAME}（支持 codex | qwen | qoder | claudecode | openclaw）" >&2
+      status_line failed "未知 AGENT: ${AGENT_NAME}（支持 codex | qwen | qoder | claudecode | openclaw）" >&2
       exit 1
     fi
     mkdir -p "$(dirname "$dest")"
@@ -813,14 +922,14 @@ else
       dest="$(get_user_dest_root "")"
       mkdir -p "$(dirname "$dest")"
       target_agents+=(":$dest")
-      echo "未发现任何 agent 目标目录，使用默认：$dest"
+      status_line info "未发现 agent 目录，使用默认：$dest"
     else
       for agent in $existing; do
         dest="$(get_user_dest_root "$agent")"
         mkdir -p "$(dirname "$dest")"
         target_agents+=("$agent:$dest")
       done
-      echo "检测到已存在的 agent 目录：$existing"
+      status_line info "安装目标：$existing"
     fi
   fi
 
@@ -831,20 +940,17 @@ else
     # OpenClaw 安全策略拒绝 realpath 超出根目录的软链接，
     # 因此对 openclaw 使用实拷而非软链接
     if [[ "$agent" == "openclaw" ]]; then
-      result="$(install_skills "copy" "$dest_root" "copy_dir" "安装到 ${agent} -> ${dest_root} [实拷]" "$_tmp_skills_collected")"
+      install_skills "copy" "$dest_root" "copy_dir" "$agent" "$_tmp_skills_collected"
     elif [[ -n "$agent" ]]; then
-      result="$(install_skills "link" "$dest_root" "link_item" "安装到 $agent -> $dest_root" "$_tmp_skills_collected")"
+      install_skills "link" "$dest_root" "link_item" "$agent" "$_tmp_skills_collected"
     else
-      result="$(install_skills "link" "$dest_root" "link_item" "安装到 $dest_root" "$_tmp_skills_collected")"
+      install_skills "link" "$dest_root" "link_item" "agents" "$_tmp_skills_collected"
     fi
-    printf '%s\n' "${result%$'\n'*}"
-    installed="$(echo "$result" | tail -1 | cut -d' ' -f1)"
-    skipped="$(echo "$result" | tail -1 | cut -d' ' -f2)"
-    total_installed=$((total_installed + installed))
-    total_skipped=$((total_skipped + skipped))
   done
 fi
 
 echo ""
-echo "========================================"
-echo "总计：安装/更新 ${total_installed}，跳过 ${total_skipped}"
+print_counts "总计：" "$total_installed" "$total_updated" "$total_skipped" "$total_warnings"
+if [[ "$total_warnings" -gt 0 ]]; then
+  status_line warning "有 ${total_warnings} 项因警告跳过，请查看上方原因。"
+fi

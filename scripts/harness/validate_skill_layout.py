@@ -185,27 +185,28 @@ def validate_retired_entries(root: Path, link_root: Path, project: Path, env: di
         (["make", "install-links", "AGENT=openclaw"], openclaw_home / "skills", False),
     )
 
-    def install(expect_success: bool = True) -> dict[Path, str]:
+    def install(expect_success: bool = True, verbose: bool = False) -> dict[Path, str]:
         outputs = {}
         for command, destination, _ in commands:
-            result = subprocess.run(command, cwd=repo, env=env, text=True, capture_output=True, timeout=60)
+            result = subprocess.run([*command, "COLOR=never", f"VERBOSE={int(verbose)}"],
+                                    cwd=repo, env=env, text=True, capture_output=True, timeout=60)
             if (result.returncode == 0) != expect_success:
                 fail(f"同步清理验证失败：{command}\n{result.stdout[-1200:]}\n{result.stderr[-1200:]}")
             if expect_success:
-                for message in ("目标目录：", "清理本仓库旧入口...", "清理结果：", "完成：安装"):
+                for message in ("目标：", "[清理] 移除", "小计：新增", "总计：新增"):
                     if message not in result.stdout:
                         fail(f"安装日志未输出到终端：{command}，缺少 {message}")
                 if re.search(r"^\d+ \d+$", result.stdout, re.MULTILINE):
                     fail(f"内部安装计数泄漏到终端：{command}")
-            elif "清理本仓库旧入口..." in result.stdout:
+            elif "[清理]" in result.stdout:
                 fail(f"注册表无效时开始了清理：{command}")
             outputs[destination] = result.stdout
         return outputs
 
-    def assert_counts(outputs: dict[Path, str], updates: dict[Path, int], total: int) -> None:
+    def assert_counts(outputs: dict[Path, str], changes: dict[Path, int], total: int, added: int = 0) -> None:
         for destination, output in outputs.items():
-            count = updates.get(destination, 0)
-            if f"总计：安装/更新 {count}，跳过 {total - count}" not in output:
+            count = changes.get(destination, 0)
+            if f"总计：新增 {added} · 更新 {count - added} · 跳过 {total - count} · 警告 0" not in output:
                 fail(f"重复安装或跳过计数不正确：{destination}\n{output[-1000:]}")
 
     current = create_skill("feipi-current")
@@ -220,7 +221,7 @@ def validate_retired_entries(root: Path, link_root: Path, project: Path, env: di
         )
     write_registry([current, retired, marker_only])
     outputs = install()
-    assert_counts(outputs, {dest: 4 for _, dest, _ in commands}, total=4)
+    assert_counts(outputs, {dest: 4 for _, dest, _ in commands}, total=4, added=4)
     for _, destination, _ in commands:
         if os.path.lexists(destination.parent / development_shared.name):
             fail(f"开发脚本依赖泄漏到共享安装：{destination}")
@@ -395,8 +396,9 @@ def validate_retired_entries(root: Path, link_root: Path, project: Path, env: di
 
     write_registry([moved, renamed])
     for iteration in range(2):
-        outputs = install()
-        assert_counts(outputs, {dest: 2 for _, dest, _ in commands} if iteration == 0 else {}, total=3)
+        outputs = install(verbose=True)
+        assert_counts(outputs, {dest: 2 for _, dest, _ in commands} if iteration == 0 else {},
+                      total=3, added=1 if iteration == 0 else 0)
         for destination, output in outputs.items():
             expected = [entry for entry in removed if entry.parent == destination] if iteration == 0 else []
             messages = [line for line in output.splitlines() if "已移除本仓库旧入口：" in line]
@@ -404,9 +406,9 @@ def validate_retired_entries(root: Path, link_root: Path, project: Path, env: di
                 not any(line.endswith(f"/{entry.name}") for line in messages) for entry in expected
             ):
                 fail(f"删除日志与实际清理不一致：{destination}")
-            if f"清理结果：移除 {len(expected)} 个本仓库旧入口" not in output:
+            if f"[清理] 移除 {len(expected)} · 保留" not in output:
                 fail(f"缺少清理结果日志：{destination}")
-            if not any("保留入口：" in line and "/feipi-unmarked-copy" in line
+            if not any("[保留]" in line and "/feipi-unmarked-copy" in line
                        and "无来源标记" in line for line in output.splitlines()):
                 fail(f"未说明纯实拷旧入口的保留原因：{destination}")
         for entry in removed:
@@ -435,7 +437,7 @@ def validate_retired_entries(root: Path, link_root: Path, project: Path, env: di
     for command, destination, _ in commands:
         before = entry_identity(destination / moved.name)
         result = subprocess.run(command, cwd=repo, env=failure_env, text=True, capture_output=True, timeout=60)
-        if result.returncode == 0 or "[ERROR] 安装失败：" not in result.stderr or "总计：" in result.stdout:
+        if result.returncode == 0 or "[失败] 安装失败：" not in result.stderr or "总计：" in result.stdout:
             fail(f"安装失败被误报为跳过或成功：{command}")
         if entry_identity(destination / moved.name) != before:
             fail(f"失败的安装损坏了已有入口：{destination}")
