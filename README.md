@@ -48,6 +48,7 @@ cp .env.example .env
 | Skill | 用途 |
 |-------|------|
 | `feipi-skill-govern` | Skill 的创建、重构、自检与治理 |
+| `feipi-multica-manage-tasks` | Multica 任务记录、静默进展、明确派发、跨工具交接与持久验收 |
 | `feipi-video-read-url` | 视频 URL 取证、通用细致分析与覆盖复核；领域流程由调用方维护 |
 | `feipi-xiaohongshu-read-note` | 小红书图文/视频笔记、顺序原图与独立来源证据提取（依赖同级视频 skill） |
 | `feipi-mermaid-generate-diagram` | Mermaid 六类图、通用语法与本地渲染验收 |

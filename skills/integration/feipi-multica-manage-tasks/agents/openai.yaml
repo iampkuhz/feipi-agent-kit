@@ -1,0 +1,5 @@
+version: 1
+interface:
+  display_name: "Multica 任务协作"
+  short_description: "记录、查询和静默回写 Multica 任务，明确派发、跨工具交接并提交持久验收证据。"
+  default_prompt: "请使用 $feipi-multica-manage-tasks，先区分记录与启动执行，复用 multica-work 和 multica-task，核对 Issue、机器、runtime、目录及项目规则。后台缺任务认证时停止；进度用 /note，真正交接用正常回复并保留触发评论 parent。复用固定 request-id，失败先查已有运行，不自动重复派发。交付产物、实际验证结果及未验证事项。"

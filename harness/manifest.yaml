@@ -67,6 +67,10 @@ skills:
     layer: "diagram"
     description: "Mermaid 六类图与通用图包验收"
   # --- integration layer ---
+  - name: "feipi-multica-manage-tasks"
+    path: "skills/integration/feipi-multica-manage-tasks/SKILL.md"
+    layer: "integration"
+    description: "Multica 任务记录、派发、交接与验收"
   - name: "feipi-dingtalk-send-webhook"
     path: "skills/integration/feipi-dingtalk-send-webhook/SKILL.md"
     layer: "integration"

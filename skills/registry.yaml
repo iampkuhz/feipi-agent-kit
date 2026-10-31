@@ -70,6 +70,15 @@ skills:
     status: stable
 
   # --- integration layer ---
+  - name: feipi-multica-manage-tasks
+    path: skills/integration/feipi-multica-manage-tasks
+    layer: integration
+    description: Multica 任务记录、派发、交接与验收
+    clients: [codex, qoder, openclaw]
+    entry: SKILL.md
+    validation: null
+    status: stable
+
   - name: feipi-dingtalk-send-webhook
     path: skills/integration/feipi-dingtalk-send-webhook
     layer: integration
