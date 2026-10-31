@@ -2,7 +2,7 @@
 # 仓库级包装命令：
 # - `make install-links`：过滤安装到用户级 agent 目录（入口实拷、运行目录链接）
 # - `make install-project PROJECT=/path/to/project`：拷贝安装到项目目录
-# - `make install`：兼容旧入口；未传项目路径时等价于 `install-links`
+# - `make install`：日常实拷；研发链接用 `make install-links`
 # - `make <service>-up`：启动服务
 # - `make <service>-down`：停止服务
 
@@ -38,7 +38,7 @@ OTEL_DIR := tools/gateway/otel
 # ===== 主帮助 =====
 
 help:
-	@echo "Feipi Agent Kit - 可用命令"
+	@echo "Feipi 工作台：./workbench（日常） / ./develop（研发）"
 	@echo ""
 	@echo "===== Skills 管理 ====="
 	@echo "  make install-links [AGENT=codex|qwen|qoder|claudecode|openclaw]"
@@ -80,12 +80,13 @@ help:
 
 install:
 ifeq ($(strip $(RESOLVED_PROJECT)),)
-	@$(MAKE) --no-print-directory install-links AGENT="$(AGENT)"
+	@$(INSTALL_SCRIPT) --copy $(if $(AGENT),--agent "$(AGENT)") $(INSTALL_OUTPUT_FLAGS)
 else
 	@$(MAKE) --no-print-directory install-project AGENT="$(AGENT)" PROJECT="$(RESOLVED_PROJECT)"
 endif
 
 install-links:
+	@echo "显式源码调试：后续源码修改会影响已链接技能；恢复日常用 ./workbench apply skills。"
 	@$(INSTALL_SCRIPT) $(if $(AGENT),--agent "$(AGENT)") $(INSTALL_OUTPUT_FLAGS)
 
 install-project:
@@ -98,17 +99,17 @@ install-project:
 # ===== 本地服务：统一复用各服务脚本，不再绕到 Docker =====
 
 searxng-up searxng-down searxng-restart searxng-logs searxng-status:
-	@bash "$(SEARXNG_DIR)/scripts/searxng.sh" "$(patsubst searxng-%,%,$@)"
+	@./workbench service searxng "$(patsubst searxng-%,%,$@)"
 
 litellm-up litellm-down litellm-restart litellm-logs litellm-status:
-	@bash "$(LITELLM_DIR)/scripts/litellm.sh" "$(patsubst litellm-%,%,$@)"
+	@./workbench service litellm "$(patsubst litellm-%,%,$@)"
 
 crawl4ai-up crawl4ai-down crawl4ai-restart crawl4ai-logs crawl4ai-status:
-	@bash "$(CRAWL4AI_DIR)/scripts/crawl4ai.sh" "$(patsubst crawl4ai-%,%,$@)"
+	@./workbench service crawl4ai "$(patsubst crawl4ai-%,%,$@)"
 
 # OTel 的 restart 显式重建容器以应用配置，不清理本机日志。
 otel-up otel-down otel-restart otel-logs otel-status:
-	@bash "$(OTEL_DIR)/scripts/otel.sh" "$(patsubst otel-%,%,$@)"
+	@./workbench service otel "$(patsubst otel-%,%,$@)"
 
 # SearXNG MCP 服务 [已退役]
 # tools/search/searxng-mcp/ 已于 2026-05 移除。以下 target 保留仅作提示。
@@ -130,7 +131,7 @@ setup:
 	@bash scripts/bootstrap/setup.sh
 
 doctor:
-	@bash scripts/doctor/check.sh
+	@./workbench doctor
 
 # ===== 模型管理 =====
 

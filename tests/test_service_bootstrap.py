@@ -71,6 +71,8 @@ elif args == ['--version']:
         self.assertNotIn("检查通过", p.stdout)
 
     def test_make_searxng_uses_podman_wrapper(self):
+        installed = self.run_script("workbench", "apply", "services")
+        self.assertEqual(installed.returncode, 0, installed.stderr)
         p = subprocess.run(["/usr/bin/make", "searxng-up"], cwd=ROOT, env=self.env,
                            capture_output=True, text=True, timeout=20)
         self.assertEqual(p.returncode, 0, p.stderr)

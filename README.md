@@ -1,32 +1,37 @@
 # Feipi Agent Kit
 
-> Agent 工具链和服务管理平台。为 Claude Code / Codex 等 AI 编码助手提供可复用的 Skills、工具服务和行为规则。
+> 统一个人工作台：Mac 配置、Skills 与工具服务、Multica、OpenClaw、OpenClash。沿用本仓库 Git；源码集中维护，日常环境显式应用。
 
-## 快速开始
+## 两个入口
 
 ```bash
-# 1. 先由 Dotfiles 安装 Podman、podman-compose 与 Python，并准备本地 machine
-# 2. 只读检查（失败会返回非零，不再打印虚假的初始化完成）
-make setup
+./workbench                         # 日常菜单说明；不安装、不启动
+./workbench doctor                  # 缺项、配置漂移、运行来源与服务状态
+./workbench plan mac                # 查看具体受管文件与目标
+./workbench diff mac                # 本机 ↔ 仓库；原文差异保存在私有目录
+./workbench capture mac --select zsh/.zshrc  # 选定本机文件收回源码
+./workbench apply mac               # 备份后发布运行副本
 
-# 3. 安装 Skills 到 Claude Code / Codex
-make install-links
-
-# 4. 启动服务（按需）
-make searxng-up          # SearXNG 搜索
-make litellm-up          # LiteLLM 模型网关
-make crawl4ai-up         # Crawl4AI（按需）
-make otel-up             # 本机 OTel 日志（按需）
-
-# 健康检查
-make doctor
+./develop mac path                 # 定位组件源码
+./develop mac test                 # 组件回归
+./develop mac run -- bash bootstrap/check.sh  # 显式运行源码命令
+# 修改后再次 diff / apply，才进入日常环境
 ```
+
+组件为 `mac / skills / services / multica / openclaw / openclash`。完整顺序、双向同步及失败续接见 [工作台使用与恢复](docs/workbench.md)；本次实际结果见 [切换验收](docs/workbench-validation.md)，来源与研究取舍见 [实施记录](docs/workbench-plan.md)。
+
+Mac、Skills 和服务定义默认使用实拷运行副本；Multica 继续使用现有发布目录；OpenClaw 继续使用原私有状态目录。源码调试使用 `./develop <组件> run -- <命令>`；Skills 如需链接使用 `./develop skills link`，结束后 `./workbench apply skills` 恢复实拷。
+
+新增组件放在 `components/`；既有 `skills / tools / rules / runtimes` 职责不变，不移动已有 Skill 路径。
 
 ## 环境配置
 
 ```bash
-cp .env.example .env
-# 按注释填入所需的 API Key 等变量
+# 秘密保留在 ~/.env 所指向的本机私有 vault
+./workbench private check
+./workbench private backup openclaw
+./workbench private backup multica
+./workbench private backup openclash
 ```
 
 仓库根目录 `.env.example` 只是参考模板，启动脚本不会自动 source。LiteLLM 只自动加载 `~/.env`，不读取项目 `.env`；Crawl4AI 需要覆盖时使用忽略的服务级 `.env.local`；SearXNG 使用已追踪的 settings。
@@ -62,9 +67,9 @@ cp .env.example .env
 
 ```bash
 make help                      # 查看所有可用命令
-make setup                     # 初始化
-make install-links             # 安装 Skills
-make install-links VERBOSE=1   # 展开跳过与保留明细（默认仅显示变更及汇总）
+make setup                     # 只读检查服务依赖
+./workbench apply skills       # 备份后实拷安装 Skills
+make install VERBOSE=1         # 兼容实拷安装入口；install-links 仅用于源码调试
 make searxng-up / down / restart / logs
 make litellm-up / down / restart / logs
 make doctor                    # 健康检查

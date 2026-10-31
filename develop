@@ -1,0 +1,5 @@
+#!/bin/bash
+# 研发入口：只测试或显式运行源码；不隐式应用到日常环境。
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec python3 "$ROOT/scripts/workbench/develop.py" "$@"

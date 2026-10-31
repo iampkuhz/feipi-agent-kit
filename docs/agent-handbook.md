@@ -1,18 +1,18 @@
 # Agent 操作手册
 
-> 常用命令、服务管理、故障排查的完整参考。
+> 日常总入口是 `./workbench`，研发入口是 `./develop`，参见 [工作台使用与恢复](workbench.md)。下文保留底层命令参考。
 
 ## Skills 管理
 
 ```bash
-# 安装 skills（入口实拷、运行目录链接，排除 tests/evals）
-make install-links
+# 日常安装 Skills（备份后实拷，排除 tests/evals）
+./workbench apply skills
 
 # 查看逐项跳过/保留原因、注册表验证详情
-make install-links VERBOSE=1
+make install VERBOSE=1
 
 # 强制彩色（如支持 ANSI 的日志查看器）；纯文本使用 COLOR=never
-make install-links COLOR=always
+make install COLOR=always
 
 # 安装到项目目录
 make install-project PROJECT=/path/to/project
@@ -27,7 +27,9 @@ bash skills/authoring/feipi-skill-govern/scripts/validate.sh <skill-path>
 bash <skill-path>/tests/run.sh
 ```
 
-再次运行 `make install-links` 会按当前技能列表同步清理本仓库因源码删除、改名或退役留下的旧入口。请先同步 `skills/registry.yaml`；注册表校验失败时不会安装或清理。
+再次运行安装命令 会按当前技能列表同步清理本仓库因源码删除、改名或退役留下的旧入口。请先同步 `skills/registry.yaml`；注册表校验失败时不会安装或清理。
+
+仅源码调试使用 `./develop skills link`；返回日常环境用 `./workbench apply skills`。
 
 安装器在每个 skill 目录写入 `.feipi-agent-kit-source` 来源标记，链接与实拷模式均适用。旧版未标记的安装通过指向本仓库的顶层链接，或指向同一源码 skill 的内部资源链接识别；相对链接按所在目录解析。清理时保留其他来源的 skill（包括失效链接）。
 
@@ -114,4 +116,4 @@ make searxng-restart     # 重启
 
 1. 检查安装：`ls ~/.claude/skills/`
 2. 检查入口文件权限和运行目录链接
-3. 重新安装：`make install-links`
+3. 重新安装：`./workbench apply skills`

@@ -1,0 +1,5 @@
+#!/bin/bash
+# 日常入口始终从此仓库找到实现，不依赖调用者的当前目录。
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec python3 "$ROOT/scripts/workbench/main.py" "$@"

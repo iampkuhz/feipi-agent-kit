@@ -1,6 +1,6 @@
 # Feipi Agent Kit
 
-AI 工程助手仓库。职责：skills / tools / rules / commands 的创建、更新与验证。
+统一个人工作台与 AI 工程助手仓库。日常入口 `./workbench`，研发入口 `./develop`；组件与私有边界见 `AGENTS.md` 和 `docs/workbench.md`。
 
 ## 强约束
 

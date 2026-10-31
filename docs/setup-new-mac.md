@@ -1,11 +1,11 @@
 # 新 Mac：从配置重建本地服务
 
-本仓库保存服务定义；Podman、podman-compose、Python 3.10+ 等机器依赖由 Dotfiles 安装。不复制旧机容器、镜像、Podman 虚拟机或缓存，不需要 NAS。
+本仓库保存服务定义；Podman、podman-compose、Python 3.10+ 等机器依赖由本仓库 `components/mac` 安装。不复制旧机容器、镜像、Podman 虚拟机或缓存，不需要 NAS。
 
 ## 首次准备
 
 ```bash
-# 先完成 Dotfiles 初始化，再进入本仓库。
+# 在本仓库执行 ./workbench install mac，再准备 Podman。
 # macOS 仅首次且尚无 machine 时执行 init；已有 machine 不要重复创建。
 podman machine list
 podman machine init
@@ -13,6 +13,7 @@ podman machine start
 
 # 只检查依赖、默认本地连接和服务定义，不安装或启动任何服务。
 make setup
+./workbench apply services
 ```
 
 已有运行中的 Podman machine 时跳过 init/start。连接不是本机时脚本报错，不接管远端环境；缺 provider 时安装 `podman-compose`，不要求 Docker Desktop。
@@ -68,6 +69,7 @@ make otel-up
 
 ```bash
 make setup
+./workbench apply services
 make doctor
 python3 -m unittest discover -s tests -p test_service_bootstrap.py -v
 ```

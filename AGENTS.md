@@ -1,6 +1,6 @@
 # Feipi Agent Kit
 
-AI 工程助手仓库。职责：skills / tools / rules / commands 的创建、更新与验证。
+个人工作台与 AI 工程助手仓库。日常入口 `./workbench`，研发入口 `./develop`。既有 skills / tools / rules / commands 职责保留；Mac、Multica、OpenClaw、OpenClash 集成在 `components/`。
 
 ## 强约束
 
@@ -27,6 +27,13 @@ Agent 启动后按以下顺序加载规则：
 2. 可验证：必要验证已执行并反馈结果
 3. 文档同步：代码和文档同步更新
 4. 规范一致：遵循 `rules/` 和 AGENTS.md
+
+## 运行与私有边界
+
+- 研发修改不自动进入日常环境；经 `workbench diff/capture/apply` 显式发布，先备份。
+- 不把旧独立仓库重新作为运行来源；来源记录见 `docs/workbench-plan.md`。
+- 私有数据原位保留，恢复遵守 `docs/workbench.md`；数据库停写或使用原生一致性导出。
+- 回收只接受白名单配置；记忆、会话、密钥、登录态、订阅、备份不得进入 Git。
 
 ## 用户个人配置
 

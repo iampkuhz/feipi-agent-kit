@@ -38,6 +38,7 @@ AGENT_NAME=""
 TARGET_DIR=""
 VERBOSE=false
 COLOR_MODE=auto
+COPY_USER=false
 
 # 在实际输出的文件描述符上判断 TTY，重定向的 stdout/stderr 不混入 ANSI。
 color_enabled() {
@@ -101,6 +102,7 @@ while [[ $# -gt 0 ]]; do
       echo "选项:"
       echo "  --agent <name>  指定 agent 类型（codex | qwen | qoder | claudecode | openclaw）"
       echo "  --dir <path>    指定目标路径"
+      echo "  --copy          用户级安装也使用实拷（日常工作台默认）；不随源码编辑变化"
       echo "  --verbose       显示逐项跳过、保留原因和验证详情"
       echo "  --color <mode>  auto（默认，按终端检测）| always | never；NO_COLOR 非空时禁用样式"
       echo ""
@@ -134,6 +136,9 @@ while [[ $# -gt 0 ]]; do
       ;;
     --verbose)
       VERBOSE=true
+      ;;
+    --copy)
+      COPY_USER=true
       ;;
     --color)
       shift
@@ -939,7 +944,7 @@ else
 
     # OpenClaw 安全策略拒绝 realpath 超出根目录的软链接，
     # 因此对 openclaw 使用实拷而非软链接
-    if [[ "$agent" == "openclaw" ]]; then
+    if [[ "$agent" == "openclaw" || "$COPY_USER" == true ]]; then
       install_skills "copy" "$dest_root" "copy_dir" "$agent" "$_tmp_skills_collected"
     elif [[ -n "$agent" ]]; then
       install_skills "link" "$dest_root" "link_item" "$agent" "$_tmp_skills_collected"
