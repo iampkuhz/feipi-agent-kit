@@ -1,0 +1,6 @@
+{
+  "openclash": "0.48.011",
+  "kernel": "alpha-oix-bf37525",
+  "architecture": "linux-amd64",
+  "note": "当前机器验收基线；不自动升级内核或插件，不把二进制/GeoIP/订阅纳入 Git。"
+}

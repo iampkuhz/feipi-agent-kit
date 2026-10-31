@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "name": "feipi-techreport-ppt-skill",
+  "homepage": "https://github.com/iampkuhz/feipi-agent-kit/tree/main/skills/authoring/feipi-techreport-ppt-skill",
+  "source": {
+    "type": "git-subdirectory",
+    "repository": "https://github.com/iampkuhz/feipi-agent-kit.git",
+    "ref": "main",
+    "path": "skills/authoring/feipi-techreport-ppt-skill"
+  },
+  "setup": {
+    "npmInstall": true
+  }
+}

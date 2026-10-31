@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "name": "feipi-housing-capture-inbox",
+  "source": {
+    "type": "git-subdirectory",
+    "repository": "/Users/zhehan/Documents/life/2028.装修/home-renovation-playbook-2028",
+    "ref": "main",
+    "path": ".agents/skills/feipi-housing-capture-inbox"
+  },
+  "setup": {
+    "useLocalWorkingTree": true
+  }
+}

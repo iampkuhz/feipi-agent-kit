@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "name": "feipi-video-read-url",
+  "homepage": "https://github.com/iampkuhz/feipi-agent-kit/tree/main/skills/integration/feipi-video-read-url",
+  "source": {
+    "type": "git-subdirectory",
+    "repository": "/Users/zhehan/Documents/tools/llm/feipi-agent-kit",
+    "ref": "main",
+    "path": "skills/integration/feipi-video-read-url"
+  },
+  "setup": {
+    "useLocalWorkingTree": true
+  }
+}

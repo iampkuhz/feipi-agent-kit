@@ -1,0 +1,25 @@
+# 复制为 Brewfile.local 后按需取消注释；本文件不是旧机已安装软件快照。
+# Java 项目需要 JDK 时二选一：固定 JDK 或自行安装 SDKMAN 管理多个版本。
+# brew "openjdk@21"
+# Python 多版本与 Ruby 仅在项目确实需要时启用，基础 Python 已由共享清单提供。
+# brew "pyenv"
+# brew "rbenv"
+# 日常命令行：按实际习惯选择，避免自动恢复旧机的全部工具。
+# brew "ripgrep"
+# brew "tmux"
+# brew "tree"
+# PostgreSQL 客户端；无需为 psql 安装完整数据库服务。
+# brew "libpq"
+# 文档处理：分别提供 PDF 文本提取、图渲染与 OCR。
+# brew "poppler"
+# brew "graphviz"
+# brew "tesseract"
+# GUI 按个人使用选择；容器默认走 Podman，仅在项目依赖 Docker Desktop 时安装。
+# cask "docker-desktop"
+# cask "iterm2"
+# cask "visual-studio-code"
+# 键盘映射与窗口管理；应用安装后仍需在系统设置中授权。
+# cask "karabiner-elements"
+# cask "rectangle"
+# iTerm2 当前使用 JetBrains Mono Nerd Font Mono；只保存字体包名，不复制字体文件。
+# cask "font-jetbrains-mono-nerd-font"

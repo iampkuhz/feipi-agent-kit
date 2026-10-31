@@ -1,0 +1,57 @@
+# Local secrets and machine/editor state
+.env
+.DS_Store
+.idea/
+.vscode/
+.claude/
+.qoder/
+/.mcp.json
+
+# OpenClaw-generated config recovery files
+openclaw.json.bak*
+openclaw.json.last-good
+openclaw.json.rejected.*
+exec-approvals.json
+update-check.json*
+
+# Generated dependencies and caches
+**/node_modules/
+**/__pycache__/
+*.pyc
+
+# OpenClaw runtime state must stay under ~/.openclaw, never in this Git repo
+/.openclaw/
+/agents/
+/browser/
+/cache/
+/canvas/
+/completions/
+/credentials/
+/cron/
+/delivery-queue/
+/devices/
+/extensions/
+/flows/
+/identity/
+/logs/
+/media/
+/memory/
+/npm/
+/openclaw-weixin/
+/plugin-skills/
+/plugins/
+/sandboxes/
+/service-env/
+/sessions/
+/skill-workshop/
+/skills/
+/state/
+/tasks/
+/telegram/
+/workspace/
+/workspace-attestations/
+
+# Local backups and temporary files
+/backups/
+/tmp/
+*.tar.gz

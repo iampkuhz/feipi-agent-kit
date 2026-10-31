@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "target": "~/.openclaw/workspace",
+  "files": [
+    "AGENTS.md",
+    "SOUL.md",
+    "USER.md",
+    "IDENTITY.md",
+    "avatars/104.png"
+  ]
+}

@@ -1,0 +1,22 @@
+#!/bin/bash
+set -euo pipefail
+multica_entry="${BASH_SOURCE[0]}"
+while [[ -L "$multica_entry" ]]; do
+  multica_entry_target="$(readlink "$multica_entry")"
+  if [[ "$multica_entry_target" == /* ]]; then
+    multica_entry="$multica_entry_target"
+  else
+    multica_entry="$(dirname "$multica_entry")/$multica_entry_target"
+  fi
+done
+multica_ops_root="$(cd "$(dirname "$multica_entry")/.." && pwd)"
+if [[ "${1:-}" == config && " ${*:2} " != *" --quiet "* && " ${*:2} " != *" --images "* && " ${*:2} " != *" --services "* ]]; then
+  echo 'Use config --quiet, --images, or --services; expanded config contains secrets.' >&2
+  exit 2
+fi
+exec env -i PATH="$PATH" HOME="$HOME" TMPDIR="${TMPDIR:-/tmp}" \
+  DOCKER_HOST="${DOCKER_HOST:-unix:///var/run/docker.sock}" \
+  docker --config "$HOME/.config/multica-selfhost/docker-public" compose --project-name multica \
+  --env-file "$HOME/.config/multica-selfhost/server.env" \
+  -f "$HOME/.local/share/multica/server/docker-compose.selfhost.yml" \
+  -f "$multica_ops_root/config/compose.pinned.yml" "$@"

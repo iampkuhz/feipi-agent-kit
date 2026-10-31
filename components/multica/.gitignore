@@ -1,0 +1,12 @@
+.DS_Store
+__pycache__/
+.env
+.env.*
+!.env.example
+*.log
+*.dump
+*.sql
+*.tar
+*.tgz
+state/
+backups/

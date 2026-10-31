@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "name": "feipi-skill-govern",
+  "homepage": "https://github.com/iampkuhz/feipi-agent-kit/tree/main/skills/authoring/feipi-skill-govern",
+  "source": {
+    "type": "git-subdirectory",
+    "repository": "https://github.com/iampkuhz/feipi-agent-kit.git",
+    "ref": "main",
+    "path": "skills/authoring/feipi-skill-govern"
+  }
+}

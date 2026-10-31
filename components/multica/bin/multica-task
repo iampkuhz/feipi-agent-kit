@@ -1,0 +1,18 @@
+#!/bin/bash
+set -euo pipefail
+# 任务上下文必须完整；不能因环境被过滤而退回个人身份。
+cli="${MULTICA_CLI_BIN:-$HOME/.local/bin/multica}"
+if [[ -n "${MULTICA_TOKEN:-}${MULTICA_TASK_ID:-}${MULTICA_AGENT_ID:-}${MULTICA_WORKSPACE_ID:-}${MULTICA_TASK_CONFIG_ROOT:-}" ]]; then
+  for name in MULTICA_TOKEN MULTICA_TASK_ID MULTICA_AGENT_ID MULTICA_WORKSPACE_ID MULTICA_SERVER_URL; do
+    if [[ -z "${!name:-}" ]]; then
+      printf 'Multica 任务认证不完整：缺少 %s；拒绝使用个人身份。\n' "$name" >&2
+      exit 78
+    fi
+  done
+  if [[ "$MULTICA_TOKEN" != mat_* ]]; then
+    echo "Multica 后台入口只接受任务凭据；未输出凭据。" >&2
+    exit 78
+  fi
+  exec "$cli" "$@"
+fi
+exec "$cli" --profile "${MULTICA_PERSONAL_PROFILE:-personal}" "$@"

@@ -1,0 +1,30 @@
+# macOS 与编辑器本机状态
+.DS_Store
+/.idea/
+/.claude/settings.local.json
+
+# 临时处理产物统一放入 tmp；不按 JSON/音视频后缀全仓忽略真实配置。
+/tmp/
+
+# 单机依赖清单与 Bundle 自动生成的机器状态；共享声明仍保留在 Brewfile。
+/Brewfile.local
+/Brewfile.lock.json
+
+# 本地密钥与认证状态；仅允许无密钥的示例文件进入仓库。
+.env
+.env.*
+!.env.demo
+!.env.example
+*.pem
+*.key
+*.p12
+/qwen/.qwen/oauth_creds.json
+/qwen/.qwen/credentials.json
+
+# 依赖、缓存与日志可重建，不属于配置源；lazy-lock.json 必须可追踪。
+node_modules/
+__pycache__/
+.venv/
+*.pyc
+*.log
+/neovim/.config/nvim/.cache/

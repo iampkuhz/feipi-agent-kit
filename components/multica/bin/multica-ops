@@ -1,0 +1,4 @@
+#!/bin/bash
+set -euo pipefail
+root="$HOME/.local/share/multica/ops"
+exec /usr/bin/python3 "$root/scripts/adapt.py" "$@"

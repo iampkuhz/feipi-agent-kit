@@ -1,0 +1,163 @@
+#!/usr/bin/env zsh
+# zsh 配置健康检查脚本
+# 用法：zsh zsh/bin/doctor-zsh-config
+# 功能：检查 compinit、plugins、theme、spaceship 重复加载等常见问题
+set -u
+
+# 定位仓库根目录：zsh/bin/doctor-zsh-config → 上三级
+ROOT="${0:A:h:h:h}"
+ZSH_DIR="$ROOT/zsh"
+
+if [[ ! -d "$ZSH_DIR" ]]; then
+  echo "ERROR: 无法定位 zsh 配置目录，ROOT=$ROOT"
+  exit 1
+fi
+
+# 在 zsh 配置目录中 grep，排除本脚本自身，避免误报
+_cfg_grep() {
+  grep -Rn --exclude='*doctor-zsh-config' "$@" "$ZSH_DIR" 2>/dev/null || true
+}
+
+# 过滤 grep 结果中的注释行（格式：filename:linenum:content）
+# content 以 # 开头的视为注释
+_filter_comments() {
+  grep -v '^[^:]*:[0-9]*:[[:space:]]*#' || true
+}
+
+echo "== zsh config doctor =="
+echo "ROOT=$ROOT"
+echo "SHELL=${SHELL:-unknown}"
+echo "ZSH_VERSION=${ZSH_VERSION:-not-zsh}"
+echo
+
+# 1. 配置文件列表
+echo "== files =="
+find "$ZSH_DIR" -maxdepth 3 -type f | sort
+echo
+
+# 2. 手动 compinit 检查
+echo "== manual compinit =="
+# 排除注释行
+_manual_compinit=$(_cfg_grep '^[[:space:]]*autoload[[:space:]].*compinit\|^[[:space:]]*compinit[[:space:]>]' \
+  | _filter_comments || true)
+if [[ -n "$_manual_compinit" ]]; then
+  # profile 模式（ZSH_STARTUP_PROFILE=1）内的 compinit 使用 autoload + compinit -C
+  # 正常模式下不应有 compinit（由 oh-my-zsh 统一初始化）
+  # 检查方法：如果 autoload 和 compinit -C 来自同一文件的相邻行号，视为 profile 模式
+  _autoload_lines=$(echo "$_manual_compinit" | grep 'autoload.*compinit' || true)
+  _compinit_c_lines=$(echo "$_manual_compinit" | grep 'compinit -C' || true)
+  _other_compinit=$(echo "$_manual_compinit" | grep -v 'autoload.*compinit' | grep -v 'compinit -C' || true)
+
+  if [[ -n "$_other_compinit" ]]; then
+    echo "WARNING: 发现正常模式下的手动 compinit（可能导致 bad file descriptor）："
+    echo "$_other_compinit"
+  fi
+  if [[ -n "$_autoload_lines" ]]; then
+    echo "INFO: 以下 autoload/compinit 仅在 ZSH_STARTUP_PROFILE=1 时执行（性能分析模式）："
+    echo "$_autoload_lines"
+    [[ -n "$_compinit_c_lines" ]] && echo "$_compinit_c_lines"
+  fi
+else
+  echo "OK: no manual compinit found"
+fi
+echo
+
+# 3. autocomplete 插件状态
+echo "== autocomplete plugins =="
+echo "--- zsh-autocomplete ---"
+_grep_ac=$(_cfg_grep 'zsh-autocomplete')
+if [[ -z "$_grep_ac" ]]; then
+  echo "OK: zsh-autocomplete 未出现在配置中"
+else
+  # 检查是否有未被注释的活跃引用
+  _active_ac=$(echo "$_grep_ac" | _filter_comments)
+  if [[ -z "$_active_ac" ]]; then
+    echo "OK: zsh-autocomplete 已被注释/禁用"
+  else
+    echo "OK: zsh-autocomplete 已启用"
+    echo "$_active_ac"
+  fi
+fi
+echo "--- zsh-autosuggestions ---"
+_grep_as=$(_cfg_grep 'zsh-autosuggestions')
+_active_as=$(echo "$_grep_as" | _filter_comments)
+if [[ -n "$_active_as" ]]; then
+  echo "OK: zsh-autosuggestions 已启用"
+else
+  echo "INFO: zsh-autosuggestions 未启用"
+fi
+echo "--- fast-syntax-highlighting ---"
+_grep_fsh=$(_cfg_grep 'fast-syntax-highlighting')
+_active_fsh=$(echo "$_grep_fsh" | _filter_comments)
+if [[ -n "$_active_fsh" ]]; then
+  echo "OK: fast-syntax-highlighting 已启用"
+else
+  echo "INFO: fast-syntax-highlighting 未启用"
+fi
+echo
+
+# 4. 主题和 spaceship 检查
+echo "== theme & spaceship =="
+_grep_theme=$(_cfg_grep 'ZSH_THEME')
+if [[ -n "$_grep_theme" ]]; then
+  echo "ZSH_THEME 设置："
+  echo "$_grep_theme"
+else
+  echo "INFO: 未设置 ZSH_THEME"
+fi
+
+echo "--- spaceship 加载线索 ---"
+_grep_ship=$(_cfg_grep 'spaceship\|prompt spaceship\|promptinit')
+if [[ -z "$_grep_ship" ]]; then
+  echo "OK: 未发现 spaceship 相关引用"
+else
+  # 排除注释行，统计活跃引用
+  _active_ship=$(echo "$_grep_ship" | _filter_comments)
+  if [[ -z "$_active_ship" ]]; then
+    echo "OK: spaceship 引用均为注释"
+  else
+    # 只统计真正加载 spaceship 的行（ZSH_THEME="spaceship"、source spaceship、prompt spaceship）
+    _load_ship=$(echo "$_active_ship" | grep -i 'ZSH_THEME=.*spaceship\|source.*spaceship\|prompt.*spaceship\|promptinit' || true)
+    _load_count=$(echo "$_load_ship" | grep -c . || true)
+    if [[ -z "$_load_ship" || "$_load_count" -eq 0 ]]; then
+      echo "OK: 未发现 spaceship 实际加载语句"
+    elif [[ "$_load_count" -eq 1 ]]; then
+      echo "OK: spaceship 仅加载一次"
+    else
+      echo "WARNING: spaceship 可能存在重复加载（$_load_count 处）："
+      echo "$_load_ship"
+    fi
+    echo "详细线索（含注释）："
+    echo "$_grep_ship"
+  fi
+fi
+echo
+
+# 5. FUNCNEST 检查
+echo "== FUNCNEST =="
+_grep_funcnest=$(_cfg_grep 'FUNCNEST')
+_active_funcnest=$(echo "$_grep_funcnest" | _filter_comments)
+if [[ -n "$_active_funcnest" ]]; then
+  echo "OK: FUNCNEST 已设置"
+  echo "$_active_funcnest"
+else
+  echo "WARNING: 未设置 FUNCNEST，递归异常时可能导致 zsh crash"
+fi
+echo
+
+# 6. zcompdump 文件
+echo "== zcompdump =="
+ls -la "$HOME"/.zcompdump* 2>/dev/null || echo "No ~/.zcompdump* files"
+echo
+
+# 7. 建议操作
+echo "== recommended reload =="
+echo "rm -f ~/.zcompdump* && exec zsh -l"
+echo
+
+# 清理
+unset -f _cfg_grep
+unset _manual_compinit _normal_compinit _profile_compinit
+unset _grep_ac _active_ac _grep_as _active_as _grep_fsh _active_fsh
+unset _grep_theme _grep_ship _active_ship _load_ship _load_count
+unset _grep_funcnest _active_funcnest

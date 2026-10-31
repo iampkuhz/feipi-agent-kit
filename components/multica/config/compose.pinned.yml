@@ -1,0 +1,14 @@
+# 与官方 v0.6.3 docker-compose.selfhost.yml 合并，不独立启动。
+# 2026-10-19 经 GHCR / Docker Hub 匿名 manifest 请求核实，均含 arm64/amd64。
+# 数据库索引来自官方 Compose 使用的 pgvector/pgvector:pg17。
+services:
+  postgres:
+    image: pgvector/pgvector@sha256:ac08538c6f8b9904c33c8224c5e5706dbe760aca29db1d096972b4052c22a75d
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be generated before deployment}
+  backend:
+    image: ghcr.io/multica-ai/multica-backend@sha256:728aa58f67e70114c43cc2d3dd1ad17b7eeec5cdc10cfa8c216411a2be16fa52
+    environment:
+      MULTICA_VCS_SECRET_KEY: ${MULTICA_VCS_SECRET_KEY:?MULTICA_VCS_SECRET_KEY must be generated before deployment}
+  frontend:
+    image: ghcr.io/multica-ai/multica-web@sha256:7e4ef6105a90353112be85a9fd0fce9e9c52e072ab2d32d373b5199a00e8c693

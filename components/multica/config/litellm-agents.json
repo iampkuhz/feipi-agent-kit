@@ -1,0 +1,14 @@
+{
+  "provider": "litellm",
+  "agents": [
+    {
+      "id": "litellm-coder",
+      "name": "LiteLLM Coder",
+      "model": "litellm-code-openai",
+      "description": "本地 LiteLLM 编码入口；负责代码修改、测试与交付。",
+      "input": ["text", "image"],
+      "contextWindow": 128000,
+      "maxTokens": 8192
+    }
+  ]
+}

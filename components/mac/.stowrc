@@ -1,0 +1,9 @@
+--target=~
+--ignore=\.DS_Store
+--ignore=^index$
+--ignore=^dev_data$
+--ignore=^logs$
+--ignore=^sessions$
+--ignore=\.sqlite
+--ignore=\.sqlite-(wal|shm)$
+--verbose

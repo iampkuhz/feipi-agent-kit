@@ -1,0 +1,11 @@
+#!/bin/bash
+set -euo pipefail
+export OPENCLAW_STATE_DIR="$(/usr/bin/python3 -c 'import json,os,pathlib; p=pathlib.Path(os.environ.get("MULTICA_MACHINE_CONFIG",str(pathlib.Path.home()/".config/multica-selfhost/machine.json"))); print(pathlib.Path(json.loads(p.read_text())["openclaw_state"]).expanduser())')"
+set -a
+source "$OPENCLAW_STATE_DIR/.env"
+set +a
+if [[ -z "${MULTICA_TOKEN:-}" || -z "${OPENCLAW_CONFIG_PATH:-}" ]]; then
+  export OPENCLAW_CONFIG_PATH="$OPENCLAW_STATE_DIR/openclaw.json"
+fi
+openclaw_binary="$(/usr/bin/python3 -c 'import json,os,pathlib; p=pathlib.Path(os.environ.get("MULTICA_MACHINE_CONFIG",str(pathlib.Path.home()/".config/multica-selfhost/machine.json"))); print(pathlib.Path(json.loads(p.read_text())["commands"]["openclaw"]).expanduser())')"
+exec "$openclaw_binary" "$@"

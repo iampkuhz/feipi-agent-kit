@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "name": "feipi-plantuml-generate-diagram",
+  "homepage": "https://github.com/iampkuhz/feipi-agent-kit/tree/main/skills/diagram/feipi-plantuml-generate-diagram",
+  "source": {
+    "type": "git-subdirectory",
+    "repository": "https://github.com/iampkuhz/feipi-agent-kit.git",
+    "ref": "main",
+    "path": "skills/diagram/feipi-plantuml-generate-diagram"
+  }
+}

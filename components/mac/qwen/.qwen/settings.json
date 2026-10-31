@@ -1,0 +1,34 @@
+{
+  "modelProviders": {
+    "openai": [
+      {
+        "id": "qwen3.5-plus",
+        "name": "[Bailian Coding Plan] qwen3.5-plus",
+        "baseUrl": "https://coding.dashscope.aliyuncs.com/v1",
+        "envKey": "BAILIAN_CODING_PLAN_API_KEY",
+        "generationConfig": {
+          "extra_body": {
+            "enable_thinking": true
+          },
+          "contextWindowSize": 1000000
+        }
+      },
+      {
+        "id": "qwen3-coder-plus",
+        "name": "[Bailian Coding Plan] qwen3-coder-plus",
+        "baseUrl": "https://coding.dashscope.aliyuncs.com/v1",
+        "envKey": "BAILIAN_CODING_PLAN_API_KEY",
+        "generationConfig": {
+          "contextWindowSize": 1000000
+        }
+      }
+    ]
+  },
+  "security": {
+    "auth": {}
+  },
+  "model": {
+    "name": "qwen3.5-plus"
+  },
+  "$version": 4
+}

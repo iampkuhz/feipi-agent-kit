@@ -1,0 +1,281 @@
+{
+  "browser": {
+    "ssrfPolicy": {
+      "dangerouslyAllowPrivateNetwork": false,
+      "allowedHostnames": [
+        "www.xiaohongshu.com",
+        "xiaohongshu.com",
+        "xhslink.com",
+        "xhslink.cn"
+      ]
+    },
+    "defaultProfile": "openclaw"
+  },
+  "models": {
+    "providers": {
+      "qwen": {
+        "baseUrl": "${LITELLM_BASE_URL}",
+        "apiKey": {
+          "source": "env",
+          "provider": "default",
+          "id": "LITELLM_API_KEY_OPENAI"
+        },
+        "api": "openai-completions",
+        "authHeader": true,
+        "models": [
+          {
+            "id": "${LITELLM_CODE_MODEL_OPENAI}",
+            "name": "${LITELLM_CODE_MODEL_OPENAI}",
+            "api": "openai-completions",
+            "reasoning": true,
+            "input": [
+              "text",
+              "image"
+            ],
+            "contextWindow": 1000000,
+            "maxTokens": 65536,
+            "compat": {
+              "maxTokensField": "max_tokens",
+              "thinkingFormat": "openai"
+            }
+          }
+        ]
+      },
+      "openai": {
+        "request": {
+          "proxy": {
+            "mode": "env-proxy"
+          }
+        }
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "qwen/${LITELLM_CODE_MODEL_OPENAI}"
+      },
+      "imageModel": {
+        "primary": "qwen/${LITELLM_CODE_MODEL_OPENAI}"
+      },
+      "mediaModels": {
+        "image": {
+          "primary": "google/gemini-3-pro-image-preview"
+        }
+      },
+      "compaction": {
+        "mode": "safeguard"
+      },
+      "heartbeat": {
+        "every": "0m"
+      }
+    },
+    "entries": {
+      "main": {
+        "identity": {
+          "name": "feipi_claw",
+          "theme": "AI 助手",
+          "emoji": "👾",
+          "avatar": "avatars/104.png"
+        },
+        "model": {
+          "fallbacks": []
+        }
+      }
+    }
+  },
+  "commands": {
+    "ownerAllowFrom": [
+      "telegram:7026716907"
+    ]
+  },
+  "tools": {
+    "sessions": {
+      "visibility": "tree"
+    },
+    "agentToAgent": {
+      "enabled": false
+    },
+    "media": {
+      "models": [
+        {
+          "type": "cli",
+          "command": "${HOME}/.openclaw/scripts/transcribe-audio-whispercpp-openclaw.sh",
+          "args": [
+            "{{AttachmentPath}}",
+            "zh",
+            "accurate"
+          ],
+          "capabilities": [
+            "audio"
+          ]
+        }
+      ],
+      "audio": {
+        "enabled": true,
+        "echoTranscript": true,
+        "echoFormat": "【语音转写】{transcript}",
+        "scope": {
+          "default": "deny",
+          "rules": [
+            {
+              "action": "allow",
+              "match": {
+                "chatType": "direct"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "loopDetection": {
+      "enabled": true
+    }
+  },
+  "channels": {
+    "openclaw-weixin": {
+      "enabled": true,
+      "accounts": {
+        "b9df004066eb-im-bot": {
+          "name": "hanzhe"
+        },
+        "d6f4e2d274b8-im-bot": {
+          "name": "xuzan"
+        },
+        "e109d090d2ac-im-bot": {
+          "name": "yanxiaojuan"
+        }
+      }
+    },
+    "telegram": {
+      "enabled": true,
+      "commands": {
+        "nativeSkills": false
+      },
+      "dmPolicy": "allowlist",
+      "botToken": {
+        "source": "env",
+        "provider": "default",
+        "id": "OPENCLAW_TG_BOT_TOKEN"
+      },
+      "allowFrom": [
+        "7026716907",
+        "8793908445"
+      ],
+      "groupPolicy": "disabled",
+      "dmHistoryLimit": 12,
+      "streaming": {
+        "mode": "partial"
+      },
+      "proxy": "${CLASH_PROXY}",
+      "reactionNotifications": "off",
+      "reactionLevel": "off",
+      "customCommands": [
+        {
+          "command": "housing",
+          "description": "记录、提取或查找住宅装修信息"
+        },
+        {
+          "command": "growth",
+          "description": "记录孩子成长日记或按日期查询素材"
+        }
+      ],
+      "direct": {
+        "7026716907": {
+          "systemPrompt": "将 /housing 视为住宅与装修素材命令。必须使用 $feipi-housing-capture-inbox 并先调用其 scripts/housing_tool.py receive 分流完整原消息：查找、重新提取、复核不得作为新收件。链接收件先保存用户原话和原链接到目标资料库 00-Inbox/YYYY-MM，然后默认在本轮继续自动提取，无须用户额外要求总结。小红书笔记使用 $feipi-xiaohongshu-read-note；B站或YouTube视频使用 $feipi-video-read-url 的 extract_content.py。实际读取字幕/语音及图片或关键帧，按图号/时间点登记 OCR 和视觉观察，再生成来源限定的摘要与关键词，按 skill 的编号证据协议，通过 housing_tool.py finalize 构建、复核并补回同一条记录；原文和图片证据只导入该资料库 40-Assets/housing-<记录ID>/。不下载完整原视频；无法按需抽帧、登录或提取失败时保留原始收件并登记实际缺失，不编造摘要，不覆盖已有成功结果。该命令不得修改正式目录，不得执行 git add、git commit 或 git push；按脚本 reply_text 交付摘要预览、实际状态、路径及未提交 Git；Telegram 用当前会话 message 工具确认交付，不把未发送草稿当作已展示，不声称不存在的后台任务。成长日记由 feipi-growth-diary 接入插件处理普通收件、补充和语音确认。插件未接管且用户明确要求复杂成长素材查询、整理或本地导入时，使用 $feipi-growth-record-diary；规则入口 /Users/zhehan/Documents/life/child-growth-diary/AGENTS.md。不要重复归档插件已经处理的消息，不把 AI 观察当成用户原话或亲属身份，不猜日期和地点。其他消息按原有规则处理。"
+        }
+      }
+    },
+    "modelByChannel": {
+      "telegram": {
+        "7026716907": "openai/gpt-6-astra"
+      }
+    }
+  },
+  "gateway": {
+    "mode": "local",
+    "auth": {
+      "token": {
+        "source": "env",
+        "provider": "default",
+        "id": "OPENCLAW_GATEWAY_TOKEN"
+      }
+    }
+  },
+  "session": {
+    "dmScope": "per-account-channel-peer"
+  },
+  "skills": {
+    "allowBundled": [
+      "diagram-maker",
+      "github",
+      "healthcheck",
+      "meme-maker",
+      "node-connect",
+      "node-inspect-debugger",
+      "notion",
+      "obsidian",
+      "openai-whisper",
+      "peekaboo",
+      "python-debugpy",
+      "spike",
+      "taskflow",
+      "taskflow-inbox-triage",
+      "video-frames",
+      "weather"
+    ]
+  },
+  "plugins": {
+    "entries": {
+      "openclaw-weixin": {
+        "enabled": true
+      },
+      "telegram": {
+        "enabled": true
+      },
+      "qwen": {
+        "enabled": true
+      },
+      "browser": {
+        "enabled": true
+      },
+      "google": {
+        "enabled": true
+      },
+      "feipi-growth-diary": {
+        "enabled": true,
+        "hooks": {
+          "allowConversationAccess": true,
+          "timeouts": {
+            "before_dispatch": 90000
+          }
+        },
+        "config": {
+          "libraryRoot": "/Users/zhehan/Documents/life/child-growth-diary",
+          "allowedSenderIds": [
+            "7026716907"
+          ],
+          "imageModel": "qwen/${LITELLM_CODE_MODEL_OPENAI}"
+        }
+      }
+    },
+    "load": {
+      "paths": [
+        "${HOME}/.openclaw/skills/feipi-growth-record-diary/scripts/openclaw-plugin"
+      ]
+    }
+  },
+  "mcp": {
+    "servers": {
+      "fastmcp-gateway": {
+        "enabled": false,
+        "url": "http://127.0.0.1:18080/mcp",
+        "transport": "streamable-http"
+      },
+      "crawl4ai": {
+        "url": "http://127.0.0.1:11235/mcp/sse",
+        "transport": "sse"
+      }
+    }
+  }
+}

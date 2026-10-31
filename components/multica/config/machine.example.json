@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "role": "primary",
+  "profile": "personal",
+  "workspace_id": "REPLACE",
+  "daemon_id": "REPLACE",
+  "device_name": "Mac-mini",
+  "server_url": "http://localhost:8080",
+  "app_url": "http://localhost:3000",
+  "workspaces_root": "~/multica_workspaces",
+  "runtimes": {},
+  "agents": {},
+  "projects": {},
+  "agent_kit": "~/Documents/tools/llm/feipi-agent-kit",
+  "openclaw_source": "~/Documents/tools/llm/feipi-agent-kit/components/openclaw/openclaw.json",
+  "openclaw_state": "~/.local/share/multica/openclaw-state",
+  "litellm_readiness_url": "http://localhost:4000/health/readiness",
+  "startup": {
+    "podman_machine": "podman-machine-default",
+    "podman_containers": [
+      "litellm-db-podman",
+      "litellm-proxy-podman"
+    ]
+  },
+  "commands": {
+    "multica": "~/.local/bin/multica",
+    "codex": "/opt/homebrew/bin/codex",
+    "qoder": "~/.local/bin/qodercli",
+    "openclaw": "/opt/homebrew/bin/openclaw"
+  }
+}

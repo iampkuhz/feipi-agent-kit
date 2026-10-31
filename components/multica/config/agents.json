@@ -1,0 +1,93 @@
+{
+  "schema": 1,
+  "compatibility": {
+    "multica": "0.6.3",
+    "codex": "0.162.1",
+    "qoder": "1.1.54",
+    "openclaw-isolated": "2026.9.2"
+  },
+  "agents": [
+    {
+      "key": "codex-builder",
+      "name": "Codex Builder",
+      "runtime": "codex",
+      "model": "gpt-6.1-sol",
+      "thinking_level": "high",
+      "max_concurrent_tasks": 1,
+      "instructions": "config/instructions/codex-builder.md"
+    },
+    {
+      "key": "openclaw-assistant",
+      "name": "OpenClaw Assistant",
+      "runtime": "openclaw-isolated",
+      "model": "main",
+      "thinking_level": "",
+      "max_concurrent_tasks": 1,
+      "instructions": "config/instructions/openclaw-assistant.md",
+      "runtime_config": {
+        "mode": "local"
+      }
+    },
+    {
+      "key": "litellm-coder",
+      "name": "LiteLLM Coder",
+      "runtime": "openclaw-isolated",
+      "model": "litellm-coder",
+      "thinking_level": "",
+      "max_concurrent_tasks": 1,
+      "instructions": "config/instructions/litellm-coder.md",
+      "runtime_config": {
+        "mode": "local"
+      }
+    },
+    {
+      "key": "coordinator",
+      "name": "Codex Coordinator",
+      "runtime": "codex",
+      "model": "gpt-6.1-sol",
+      "thinking_level": "xhigh",
+      "max_concurrent_tasks": 1,
+      "instructions": "config/instructions/coordinator.md"
+    },
+    {
+      "key": "validator",
+      "name": "Codex Validator",
+      "runtime": "codex",
+      "model": "gpt-6-luna",
+      "thinking_level": "medium",
+      "max_concurrent_tasks": 1,
+      "instructions": "config/instructions/validator.md"
+    },
+    {
+      "key": "reviewer",
+      "name": "Codex Reviewer",
+      "runtime": "codex",
+      "model": "gpt-6-luna",
+      "thinking_level": "medium",
+      "max_concurrent_tasks": 1,
+      "instructions": "config/instructions/reviewer.md"
+    },
+    {
+      "key": "qoder-worker",
+      "name": "Qoder Worker",
+      "runtime": "qoder",
+      "model": "",
+      "thinking_level": "",
+      "max_concurrent_tasks": 1,
+      "instructions": "config/instructions/qoder-worker.md",
+      "create": true
+    }
+  ],
+  "projects": [
+    "lexiflow",
+    "asd"
+  ],
+  "skill": {
+    "name": "feipi-multica-manage-tasks",
+    "path": "skills/integration/feipi-multica-manage-tasks"
+  },
+  "skill_checks": [
+    "skills/integration/feipi-multica-manage-tasks",
+    "skills/integration/feipi-video-read-url"
+  ]
+}

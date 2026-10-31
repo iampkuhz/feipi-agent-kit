@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "name": "feipi-patent-generate-innovation-disclosure",
+  "homepage": "https://github.com/iampkuhz/feipi-agent-kit/tree/main/skills/authoring/feipi-patent-generate-innovation-disclosure",
+  "source": {
+    "type": "git-subdirectory",
+    "repository": "https://github.com/iampkuhz/feipi-agent-kit.git",
+    "ref": "main",
+    "path": "skills/authoring/feipi-patent-generate-innovation-disclosure"
+  }
+}
