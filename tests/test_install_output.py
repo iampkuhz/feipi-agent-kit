@@ -93,6 +93,25 @@ class InstallOutputTests(unittest.TestCase):
         self.assert_counts(verbose.stdout, skipped=3)
         self.assertTrue(foreign.is_dir())
 
+    def test_source_marker_is_stable_across_umask_in_copy_and_link_modes(self):
+        for target in ['install', 'install-links']:
+            with self.subTest(target=target):
+                if self.codex.exists():
+                    shutil.rmtree(self.codex)
+                marker = self.codex / 'skills/feipi-one/.feipi-agent-kit-source'
+                for mask in [0o077, 0o022]:
+                    result = subprocess.run(['make', target, 'AGENT=codex'], cwd=self.repo,
+                                            env=self.env, text=True, capture_output=True, timeout=30,
+                                            umask=mask)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    if mask == 0o077:
+                        previous = marker.stat()
+                    else:
+                        self.assert_counts(result.stdout, skipped=3)
+                        self.assertEqual((previous.st_ino, previous.st_mtime_ns),
+                                         (marker.stat().st_ino, marker.stat().st_mtime_ns))
+                    self.assertEqual(marker.stat().st_mode & 0o777, 0o600)
+
     def test_cleanup_remains_visible_in_concise_mode(self):
         self.run_make("install-links", "AGENT=codex")
         retired = self.codex / "skills/feipi-old"

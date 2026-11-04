@@ -282,10 +282,11 @@ def equal(left, right):
     left_mode, right_mode = left.lstat().st_mode, right.lstat().st_mode
     if stat.S_IFMT(left_mode) != stat.S_IFMT(right_mode):
         return False
-    if stat.S_IMODE(left_mode) != stat.S_IMODE(right_mode):
-        return False
+    # 符号链接的权限不控制目标访问，macOS 上却会随 umask 改变。
     if stat.S_ISLNK(left_mode):
         return os.readlink(left) == os.readlink(right)
+    if stat.S_IMODE(left_mode) != stat.S_IMODE(right_mode):
+        return False
     if stat.S_ISDIR(left_mode):
         names = {child.name for child in left.iterdir()}
         return names == {child.name for child in right.iterdir()} and all(
@@ -354,6 +355,8 @@ link_item() {
       fi
     done < <(find "$src" -mindepth 1 -maxdepth 1 -print0)
     printf '%s\n' "$src" > "$staging/$INSTALL_SOURCE_MARKER" || { rm -rf "$staging"; return 1; }
+    # 来源标记权限固定，避免不同 umask 使未变内容被反复判为更新。
+    chmod 600 "$staging/$INSTALL_SOURCE_MARKER" || { rm -rf "$staging"; return 1; }
 
     finish_staged_install "$staging" "$dest" "$label"
     return $?
@@ -416,6 +419,7 @@ copy_dir() {
       cp -R -p "$entry" "$staging/$name" || { rm -rf "$staging"; return 1; }
     done < <(find "$src" -mindepth 1 -maxdepth 1 -print0)
     printf '%s\n' "$src" > "$staging/$INSTALL_SOURCE_MARKER" || { rm -rf "$staging"; return 1; }
+    chmod 600 "$staging/$INSTALL_SOURCE_MARKER" || { rm -rf "$staging"; return 1; }
     finish_staged_install "$staging" "$dest" "$label"
   else
     local staging
