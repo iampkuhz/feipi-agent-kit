@@ -12,6 +12,7 @@ from pathlib import Path
 import re
 import sys
 import tempfile
+import time
 import urllib.error
 import urllib.request
 import uuid
@@ -210,10 +211,13 @@ def main():
     audio, prefix = Path(args.audio), Path(args.output_prefix)
     if args.check_cache:
         return 0 if cached(prefix, fingerprint(audio, profile, args.language)) else 1
+    started = time.perf_counter()
     record, reused = transcribe(audio, prefix, args.language, profile, base)
+    elapsed = time.perf_counter() - started
     # 仅报告认证来源，缓存命中时明确本次没有发起认证请求。
     auth_source = "not_requested_cache" if reused else "env:OMLX_API_KEY" if os.environ.get("OMLX_API_KEY") else "none"
     print("asr_auth=" + auth_source)
+    print("asr_elapsed_seconds={:.3f}".format(elapsed))
     print("requested_profile={}\nprofile={}\nmodel={}\ndevice=omlx\nasr_backend=omlx\nasr_model={}\nasr_timestamps=audio_chunk\ncache_reused={}\nsrt={}\ntext={}".format(
         args.profile, profile, record["model"], record["model"], int(reused), str(prefix) + ".srt", str(prefix) + ".txt"))
     return 0

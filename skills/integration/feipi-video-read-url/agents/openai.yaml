@@ -1,4 +1,4 @@
-version: 15
+version: 16
 interface:
   display_name: "视频 URL 读取与总结（中文）"
   short_description: "统一处理 YouTube、Bilibili、小红书等视频 URL，支持转写、关键帧取证与摘要。"

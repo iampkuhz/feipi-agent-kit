@@ -7,6 +7,8 @@
 | 默认、auto、fast | SenseVoiceSmall（sensevoicesmall） | 字幕优先，缺失时 ASR |
 | accurate、高精度、高质量、准确、逐字 | Qwen3-ASR-1.7B | ASR 优先，失败后尝试平台字幕 |
 
+`accurate` 是模型选择档位，不表示权重使用更高的数值精度，也不保证每段音频的字错率都更低。Qwen3-ASR-1.7B 可提供 BF16、4bit、8bit 等版本，实际使用哪种版本以服务模型 ID 为准；磁盘体积同时取决于参数量、量化位宽和未量化组件，不能只按文件大小判断速度或识别质量。运行时不自动替换服务中已有的权重版本。
+
 所有来源的 `whisper` 模式统一通过 `scripts/lib/omlx_transcribe.sh` 调用本地 `/v1/audio/transcriptions`。模式名、`.whisper.wav` 和 `whisper_profile` 保留兼容含义，不再使用 whisper.cpp。
 
 默认服务为 `http://127.0.0.1:8037/v1`，可以通过 `AGENT_OMLX_BASE_URL` 指定其他本机 HTTP(S) 端口；仅接受 localhost、127.0.0.1、::1。认证仅通过 `os.environ` 读取 `OMLX_API_KEY`，有值时添加 Bearer 请求头；变量缺失时不从文件补读。skill 不读取 `~/.env` 或其他 dotenv 文件，不主动执行 shell 启动文件，不输出密钥，也不将其写入仓库。请求不经过系统代理。
@@ -30,6 +32,8 @@ bash <本 skill>/scripts/extract_video_text.sh '<URL>' '<OUTPUT_ROOT>' auto --qu
 oMLX 当前接口的 `response_format` 不能保证返回 SRT，客户端请求 JSON 并自行以实际音频块起止构建 SRT/TXT。时间锚点只表示块范围，不能声称逐句或逐字对齐，也不能据此推断精确画面位置。来源状态必须说明模型、约30秒块级时间精度及识别风险；块边界可能切开词句，专名、数字仍需核验。
 
 一次请求超时为180秒，模型列表检查为10秒；每块只请求一次，失败交回统一入口，不自动换模型、并发重跑或回退云端。所有块完成后原子发布 SRT/TXT，最后发布 `.asr.json` 完成记录；失败不交付半份新稿，也不覆盖已有完整结果。
+
+成功日志中的 `asr_elapsed_seconds` 使用单调时钟记录 ASR 客户端耗时，包括音频校验、模型发现、模型首次加载、所有分块请求及结果落盘，不含平台下载和 ffmpeg 转换。缓存命中时该值表示缓存检查耗时；比较实际识别速度必须同时确认 `cache_reused=0`。
 
 ## 缓存与来源
 
