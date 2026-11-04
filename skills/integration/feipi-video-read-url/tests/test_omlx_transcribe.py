@@ -25,7 +25,7 @@ class OmlxTests(unittest.TestCase):
         self.audio, self.prefix = self.root / "input.wav", self.root / "transcript"
         self.make_audio(31)
         self.models = ["mlx-community/SenseVoiceSmall", "Qwen3-ASR-1.7B-bf16"]
-        self.posts, self.gets = [], []
+        self.posts, self.gets, self.get_headers = [], [], []
         self.responses = []
         owner = self
 
@@ -42,6 +42,7 @@ class OmlxTests(unittest.TestCase):
 
             def do_GET(self):
                 owner.gets.append(self.path)
+                owner.get_headers.append(dict(self.headers))
                 self.send_json({"data": [{"id": model} for model in owner.models]})
 
             def do_POST(self):
@@ -60,6 +61,7 @@ class OmlxTests(unittest.TestCase):
         self.env = dict(os.environ, AGENT_OMLX_BASE_URL="http://127.0.0.1:{}/v1".format(self.server.server_port),
                         HTTP_PROXY="http://127.0.0.1:1", HTTPS_PROXY="http://127.0.0.1:1", NO_PROXY="")
         self.env.pop("AGENT_OMLX_API_KEY", None)
+        self.env.pop("OMLX_API_KEY", None)
 
     def close_server(self):
         self.server.shutdown()
@@ -155,6 +157,7 @@ class OmlxTests(unittest.TestCase):
         self.models = []
         result = self.successful("fast")
         self.assertIn("cache_reused=1", result.stdout)
+        self.assertIn("asr_auth=not_requested_cache", result.stdout)
         self.assertEqual(len(self.gets), 1)
         self.assertEqual(len(self.posts), 2)
 
@@ -197,13 +200,42 @@ class OmlxTests(unittest.TestCase):
         self.assertNotEqual(self.run_client().returncode, 0)
 
     def test_check_models_and_api_key(self):
-        self.env["AGENT_OMLX_API_KEY"] = "test-private-key"
+        self.env["OMLX_API_KEY"] = "test-private-key"
         result = subprocess.run([sys.executable, str(CLIENT), "--check", "accurate"], env=self.env,
                                 capture_output=True, text=True, timeout=15)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.successful()
+        transcription = self.successful()
+        self.assertIn("asr_auth=env:OMLX_API_KEY", result.stdout)
+        self.assertIn("asr_auth=env:OMLX_API_KEY", transcription.stdout)
+        self.assertTrue(self.get_headers)
+        self.assertTrue(all(headers["Authorization"] == "Bearer test-private-key" for headers in self.get_headers))
         self.assertEqual(self.posts[0][1]["Authorization"], "Bearer test-private-key")
-        self.assertNotIn("test-private-key", result.stdout + result.stderr)
+        self.assertNotIn("test-private-key", result.stdout + result.stderr + transcription.stdout + transcription.stderr)
+
+    def test_missing_env_key_does_not_load_dotenv_or_shell_profile(self):
+        home = self.root / "home"
+        home.mkdir()
+        for filename in (".env", ".zshrc", ".zprofile", ".zshenv"):
+            (home / filename).write_text("export OMLX_API_KEY=file-only-private-key\n")
+        self.env["HOME"] = str(home)
+        self.env["AGENT_OMLX_API_KEY"] = "legacy-private-key"
+        result = self.successful()
+        self.assertIn("asr_auth=none", result.stdout)
+        self.assertTrue(self.get_headers)
+        self.assertTrue(all("Authorization" not in headers for headers in self.get_headers))
+        self.assertTrue(all("Authorization" not in headers for _, headers, _ in self.posts))
+        self.assertNotIn("private-key", result.stdout + result.stderr)
+
+    def test_unauthorized_response_names_env_var_without_exposing_key(self):
+        self.env["OMLX_API_KEY"] = "invalid-private-key"
+        self.responses = [401]
+        result = self.run_client()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("HTTP 401", result.stderr)
+        self.assertIn("OMLX_API_KEY", result.stderr)
+        self.assertNotIn("invalid-private-key", result.stdout + result.stderr)
+        self.assertNotIn("private error", result.stderr)
+        self.assertFalse(self.prefix.with_suffix(".asr.json").exists())
 
     def test_nonlocal_service_rejected(self):
         self.env["AGENT_OMLX_BASE_URL"] = "https://example.com/v1"

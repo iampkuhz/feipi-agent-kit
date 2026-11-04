@@ -1,6 +1,7 @@
 # 变更记录
 
 ## 2026-11-04
+- feipi-video-read-url v15：认证仅读取进程环境中的 OMLX_API_KEY，禁止读取 dotenv 文件，输出认证来源与缓存状态，补齐纯文字摘要交付校验
 - 工作台集成：合并全部组件，回收较新Multica声明，验收按启用角色执行
 - feipi-video-read-url v14：默认本地SenseVoice，高精度Qwen转写
 

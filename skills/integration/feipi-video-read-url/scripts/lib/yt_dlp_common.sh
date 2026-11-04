@@ -532,6 +532,8 @@ yt_common_run_whisper_mode_from_url() {
       echo "asr_backend=omlx"
       echo "asr_model=$existing_model"
       echo "asr_timestamps=audio_chunk"
+      echo "asr_auth=not_requested_cache"
+      echo "cache_reused=1"
       echo "device=omlx"
       echo "audio_file=reused"
       echo "transcribe_audio_file=$existing_wav"

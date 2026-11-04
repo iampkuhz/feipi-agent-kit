@@ -28,7 +28,8 @@ def effective_profile(profile):
 
 def request_json(base, path, body=None, content_type=None):
     headers = {}
-    key = os.environ.get("AGENT_OMLX_API_KEY", "")
+    # 认证仅来自进程环境，不读取 dotenv 或执行用户的 shell 启动文件。
+    key = os.environ.get("OMLX_API_KEY", "")
     if key:
         headers["Authorization"] = "Bearer " + key
     if content_type:
@@ -41,7 +42,7 @@ def request_json(base, path, body=None, content_type=None):
             result = json.load(response)
     except urllib.error.HTTPError as error:
         # 服务错误体可能包含上传内容或凭据，日志仅保留状态码。
-        hint = "，请设置 AGENT_OMLX_API_KEY" if error.code == 401 else ""
+        hint = "，请检查进程环境中的 OMLX_API_KEY" if error.code == 401 else ""
         raise ValueError("omlx_http_error: HTTP {}{}".format(error.code, hint)) from error
     except (OSError, ValueError, http.client.HTTPException) as error:
         raise ValueError("omlx_service_unavailable_or_invalid_json") from error
@@ -199,7 +200,9 @@ def main():
     if parsed.scheme not in ("http", "https") or parsed.hostname not in ("localhost", "127.0.0.1", "::1") or parsed.username or parsed.password or parsed.query or parsed.fragment:
         raise ValueError("AGENT_OMLX_BASE_URL 必须是无凭据的本机 HTTP(S) 地址")
     if args.check:
-        print("asr_backend=omlx\nmodel=" + resolve_model(base, args.check))
+        model = resolve_model(base, args.check)
+        print("asr_backend=omlx\nmodel={}\nasr_auth={}".format(
+            model, "env:OMLX_API_KEY" if os.environ.get("OMLX_API_KEY") else "none"))
         return 0
     if not args.audio or not args.output_prefix:
         parser.error("需要 audio 和 output_prefix")
@@ -208,6 +211,9 @@ def main():
     if args.check_cache:
         return 0 if cached(prefix, fingerprint(audio, profile, args.language)) else 1
     record, reused = transcribe(audio, prefix, args.language, profile, base)
+    # 仅报告认证来源，缓存命中时明确本次没有发起认证请求。
+    auth_source = "not_requested_cache" if reused else "env:OMLX_API_KEY" if os.environ.get("OMLX_API_KEY") else "none"
+    print("asr_auth=" + auth_source)
     print("requested_profile={}\nprofile={}\nmodel={}\ndevice=omlx\nasr_backend=omlx\nasr_model={}\nasr_timestamps=audio_chunk\ncache_reused={}\nsrt={}\ntext={}".format(
         args.profile, profile, record["model"], record["model"], int(reused), str(prefix) + ".srt", str(prefix) + ".txt"))
     return 0
