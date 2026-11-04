@@ -19,7 +19,7 @@ python3 scripts/restore-check.py ~/.local/state/multica/backups/本批次
 
 ## 2. 新机准备
 
-安装固定版本 Multica 0.6.3、Codex 0.162.1、Qoder 1.1.54、OpenClaw 2026.9.2，以及 Podman/Compose 和项目实际依赖。重建 Agent Kit、Multica Ops 和个人 OpenClaw 声明源码。包含未提交更改的源码需明确传输；不能只 clone 远端旧版本。备份中的 ops-runtime 提供本次实际发布脚本与声明的可恢复副本。按原 LiteLLM 项目流程恢复数据库、模型路由、客户端访问密钥及明确的两个容器名；确认 readiness 后实际请求编码模型。
+按当前 compatibility 安装固定版本 Multica 0.6.3、Codex 0.162.1，以及 Podman/Compose 和项目实际依赖；可选执行器仅在显式启用后安装对应版本。源码统一从 Agent Kit 的 components 发布，不恢复独立旧仓库作为运行来源。包含未提交更改的源码需明确传输；不能只 clone 远端旧版本。备份中的 ops-runtime 提供实际发布脚本与声明的可恢复副本。若启用 LiteLLM，按该服务流程恢复数据库、模型路由、客户端访问密钥和既有容器，确认 readiness 后实际请求编码模型。
 
 从备份 machine.reference.json 建立 `~/.config/multica-selfhost/machine.json`，0600。保留恢复数据库中的 workspace、Agent、项目及 resource UUID；更新主机名、源码和项目路径、工具包装路径、模型地址、Podman VM/容器名。role=primary。runtimes 与 daemon 的物理身份稍后重绑，不直接复用旧设备身份。
 
@@ -38,16 +38,17 @@ multica-service cp 本批次/uploads/. backend:/app/data/uploads/
 multica-service up -d --pull never
 ```
 
-如果目标已有业务数据，停止此流程，不加 `--clean` 覆盖。对照旧机数据库记录数、Issue/Agent UUID、附件数量并实际下载一个附件。重建 CLI personal 登录和工作区选择；确认 server_url/workspace_id 后注册新 daemon。依据 `runtime profile --help` 为原有隔离 OpenClaw profile 设置新机包装命令路径，不创建同名重复 profile。
+如果目标已有业务数据，停止此流程，不加 `--clean` 覆盖。对照旧机数据库记录数、Issue/Agent UUID、附件数量并实际下载一个附件。重建 CLI personal 登录和工作区选择；确认 server_url/workspace_id 后注册新 daemon。若启用隔离 OpenClaw，依据 `runtime profile --help` 为原 profile 设置新机包装命令路径，不创建同名重复 profile。
 
 ## 4. 重建能力并重绑
 
-发布运行副本、生成隔离 OpenClaw 候选配置并通过 schema 校验，使用 Agent Kit 既有安装器向三个客户端安装完整技能，重新认证工具。项目资源目标目录须先存在。
+发布运行副本，使用 Agent Kit 工作台安装完整技能并重新认证工具。当前默认只绑定 Codex；若启用隔离 OpenClaw，才生成并校验其候选配置。项目资源目标目录须先存在。
 
 ```bash
 python3 scripts/install-runtime.py
-python3 scripts/configure-openclaw.py
-multica-task runtime profile set-path 隔离Profile_UUID --path 新机multica-openclaw绝对路径
+# 仅在声明启用隔离 OpenClaw 时：
+# python3 scripts/configure-openclaw.py
+# multica-task runtime profile set-path 隔离Profile_UUID --path 新机multica-openclaw绝对路径
 # 新机并发配置为 1，禁自动升级；检查 setup 不覆盖 profile
 python3 scripts/manage-runtime.py install
 multica-task daemon status
@@ -64,7 +65,7 @@ rebind 仅更新本机 daemon/runtime 绑定；以 provider+profile+新 daemon �
 
 ## 5. 验收、切换和回退
 
-验收静态差异为零、重复应用零变更；每个执行器真实任务；/note 不增 run、派发一次、跨工具交接；缺失任务凭据明确失败；附件在任务目录清理后仍可下载；模拟模型/服务错误时保留产物并说明层级。整机重启并完成登录后，确认 Podman、LiteLLM、Multica 和 daemon 自动恢复，再跑一个小任务。此项不能用 launchctl 重启代替。
+验收静态差异为零、重复应用零变更；每个启用执行器真实任务；/note 不增 run、派发一次，多执行器时另验跨工具交接；缺失任务凭据明确失败；附件在任务目录清理后仍可下载；模拟模型/服务错误时保留产物并说明层级。整机重启并完成登录后，确认 Podman、Multica 和 daemon 自动恢复，可选模型服务按各自管理器验证，再跑一个小任务。此项不能用 launchctl 重启代替。
 
 全部通过后把旧 MacBook machine.json 的 role 改为 client，bootout 受管 LaunchAgent，并删除/移出仅此受管 plist（先确认 MulticaOpsManaged=true），避免下次登录恢复长期 worker。保留 multica-task/multica-work，personal profile 改连 Mac mini 的受信地址。当前 loopback 默认无法被 MacBook 访问；通过已有私网或显式 SSH 转发接入，不直接开放公网端口。
 

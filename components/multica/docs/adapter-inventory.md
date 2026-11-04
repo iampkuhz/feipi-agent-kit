@@ -1,13 +1,13 @@
 # 适配清单与责任边界
 
-2026-10-31，机器身份在私有 machine.json 中；这里只记录逻辑职责。具体实测见 VALIDATION.md。
+2026-11-04：当前启用 Codex Builder 与 Coordinator/Validator/Reviewer，其他执行器实现保留但未启用。机器身份在私有 machine.json 中；这里只记录逻辑职责。具体实测见 VALIDATION.md。
 
 | 适配 | 当前落地 | 检查/维护入口 |
 |---|---|---|
 | Codex Builder | 原生 App Server；model=gpt-6.1-sol/high；保留 LexiFlow 的局部工作包约束 | Agent 声明、精确 Codex runtime、共享 Skill |
-| Qoder Worker | 原生 ACP；CLI 账户默认模型；并发 1；不加入 LexiFlow 正式链 | 新建并绑定准确 Qoder runtime，实际任务取证 |
-| LiteLLM Coder | 隔离 OpenClaw local；selector=litellm-coder；路由 litellm/litellm-code-openai | provider 配置继续由原 OpenClaw 声明和 LiteLLM catalog 生成 |
-| OpenClaw Assistant | 同一隔离 runtime 的 main selector；保留已有默认模型 | 单独 Agent UUID，不与个人 runtime 混选 |
+| Qoder Worker（可选，未启用） | 原生 ACP；CLI 账户默认模型；并发 1；不加入 LexiFlow 正式链 | 显式补齐声明并绑定准确 Qoder runtime，实际任务取证 |
+| LiteLLM Coder（可选，未启用） | 隔离 OpenClaw local；selector=litellm-coder；路由 litellm/litellm-code-openai | provider 配置由 OpenClaw 组件声明和 LiteLLM catalog 生成 |
+| OpenClaw Assistant（可选，未启用） | 隔离 runtime 的 main selector；保留已有默认模型 | 单独 Agent UUID，不与个人 runtime 混选 |
 | Coordinator/Validator/Reviewer | 保留原项目职责与模型、验收权限 | 项目原流程维护；新层只做身份和协作配置 |
 | 个人 OpenClaw | 作为录入、查询和显式交接入口；原渠道/记忆不复制到后台 | Agent Kit 安装共享 Skill；不重启个人 Gateway |
 | 原个人 OpenClaw runtime | 不在本配置的执行绑定内 | 不能仅按 provider 选中；plan 核对 UUID/daemon/profile |

@@ -8,6 +8,25 @@ from adaptation import STATE, AdaptError, cli, digest, machine, private_write, r
 import work
 
 INDEX = STATE / 'acceptance-fixture.json'
+PROBE_AGENTS = ('codex-builder', 'litellm-coder', 'qoder-worker')
+
+
+def active_agents():
+    """按当前声明选择代表性验收角色；已声明但未绑定不能伪装成跳过。"""
+    import adapt
+    m = machine()
+    declared = {item['key']: item for item in adapt.catalog()['agents']}
+    active = []
+    for key in PROBE_AGENTS:
+        if key not in declared:
+            continue
+        runtime = declared[key]['runtime']
+        if not m.get('agents', {}).get(key) or runtime not in m.get('runtimes', {}):
+            raise AdaptError('已声明的验收角色缺少机器绑定：' + key)
+        active.append(key)
+    if not active:
+        raise AdaptError('当前声明没有可验收的代表角色。')
+    return active
 
 PROBE = '''import hashlib,json,os,pathlib,sys
 key=sys.argv[1]
@@ -24,8 +43,11 @@ print('probe passed: '+key)
 
 
 def prepare():
+    keys = active_agents()
     old = read_json(INDEX)
     if old:
+        if not set(keys).issubset(old.get('issues', {})):
+            raise AdaptError('当前验收角色未全部准备；核对既有 fixture 和项目绑定后补齐，不重复创建项目。')
         return old
     m = machine()
     root = Path.home() / '.local/share/multica/acceptance-workspace'
@@ -42,7 +64,7 @@ def prepare():
     private_write(INDEX, fixture)
     resource = cli('project', 'resource', 'add', project['id'], '--type', 'local_directory', '--daemon-id', m['daemon_id'], '--local-path', root, '--execution-mode', 'in_place')
     fixture['resource_id'] = resource['id']
-    for key in ['codex-builder','litellm-coder','qoder-worker']:
+    for key in keys:
         body = root / (key + '-task.md')
         body.write_text('仅执行本目录的适配验收。先读取共享 feipi-multica-manage-tasks 技能及 AGENTS.md。\n'
                         '1. 实际运行 `python3 probe.py '+key+'`；不得伪造报告。\n'
@@ -63,11 +85,13 @@ def prepare():
 
 
 def check():
+    keys = active_agents()
     fixture = read_json(INDEX)
-    if not fixture or len(fixture['issues']) != 3:
+    if not fixture or not set(keys).issubset(fixture.get('issues', {})):
         raise AdaptError('验收准备未完成；检查 fixture 和已创建的远端对象，不能盲目重跑。')
     results = {}
-    for key, issue in fixture['issues'].items():
+    for key in keys:
+        issue = fixture['issues'][key]
         runs = cli('issue','runs',issue)
         issue_data = cli('issue','get',issue)
         comments = cli('issue','comment','list',issue,'--full')
@@ -117,6 +141,8 @@ def main():
             private_write(STATE/'acceptance.json',{'time':datetime.datetime.now(datetime.timezone.utc).isoformat(),'environment_fingerprint':adapt.evidence_fingerprint(m,c),'summary':summary,'evidence':result})
     else:
         if not a.agent or not a.request_id: raise AdaptError('start 需要 --agent 和 --request-id')
+        if a.agent not in active_agents():
+            raise AdaptError('当前声明未启用该验收角色：' + a.agent)
         fixture=read_json(INDEX)
         if not fixture: raise AdaptError('先 prepare')
         args=type('Args',(),{})()
@@ -124,6 +150,8 @@ def main():
         args.packet=str(Path(fixture['root'])/(a.agent+'-packet.json'));args.request_id=a.request_id;args.parent=None
         result=work.run(args)
     print(json.dumps(result,ensure_ascii=False,indent=2))
+    if a.action == 'check' and not all(passed(value) for value in result.values()):
+        sys.exit(1)
 
 if __name__=='__main__':
     try: main()

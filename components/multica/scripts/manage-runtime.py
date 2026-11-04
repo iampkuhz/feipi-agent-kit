@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import plistlib
 import subprocess
+import time
 
 parser = argparse.ArgumentParser()
 parser.add_argument('action', choices=['install', 'start', 'stop', 'status'])
@@ -45,6 +46,13 @@ elif args.action == 'start':
     subprocess.run(['launchctl', 'bootstrap', domain, str(plist)], check=True)
 elif args.action == 'stop':
     subprocess.run(['launchctl', 'bootout', target], check=True)
+    # bootout 返回时进程组可能仍在退出；等注册项消失再允许发布和 bootstrap。
+    deadline = time.monotonic() + 45
+    while subprocess.run(['launchctl', 'print', target], stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL).returncode == 0:
+        if time.monotonic() >= deadline:
+            raise SystemExit('LaunchAgent is still unloading; do not publish or start another instance yet.')
+        time.sleep(0.2)
     print('Stopped managed runtime; Web/API remain available.')
 else:
     subprocess.run(['launchctl', 'print', target], check=True)

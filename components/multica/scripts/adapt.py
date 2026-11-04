@@ -26,9 +26,11 @@ def skill_body(m, c):
 
 def evidence_fingerprint(m, c):
     kit = Path(expand(m['agent_kit']))
-    return digest({'machine': m, 'catalog': c, 'capabilities': read_json(ROOT / 'config/capabilities.json'),
-                   'skills': {p: file_inventory(kit / p) for p in c['skill_checks']},
-                   'openclaw': read_json(Path(expand(m['openclaw_state'])) / 'openclaw.json')})
+    evidence = {'machine': m, 'catalog': c, 'capabilities': read_json(ROOT / 'config/capabilities.json'),
+                'skills': {p: file_inventory(kit / p) for p in c['skill_checks']}}
+    if any(a['runtime'] == 'openclaw-isolated' for a in c['agents']):
+        evidence['openclaw'] = read_json(Path(expand(m['openclaw_state'])) / 'openclaw.json')
+    return digest(evidence)
 
 
 def desired_agent(item, m):
@@ -183,26 +185,35 @@ def apply(expected):
 
 def doctor():
     m, c = machine(), catalog()
+    runtimes = {a['runtime'] for a in c['agents']}
     checks = []
     def check(name, ok, detail):
         checks.append({'check': name, 'status': 'pass' if ok else 'blocked', 'detail': detail})
-    for label, url in [('multica-ready', m['server_url'].rstrip('/') + '/readyz'), ('litellm-ready', m['litellm_readiness_url'])]:
+    urls = [('multica-ready', m['server_url'].rstrip('/') + '/readyz')]
+    if any(a['key'] == 'litellm-coder' for a in c['agents']):
+        urls.append(('litellm-ready', m.get('litellm_readiness_url')))
+    for label, url in urls:
+        if not url:
+            check(label, False, '已启用的执行器缺少服务地址')
+            continue
         try:
             with urllib.request.urlopen(url, timeout=4) as response:
                 check(label, response.status == 200, '仅验证服务就绪，不代表模型请求通过')
         except Exception as exc:
             check(label, False, type(exc).__name__)
-    for key, command in [('multica', 'multica'), ('codex', 'codex'), ('qoder', 'qodercli'), ('openclaw-isolated', 'multica-openclaw')]:
+    for key, version in c['compatibility'].items():
         try:
+            command = {'qoder': 'qodercli', 'openclaw-isolated': 'multica-openclaw'}.get(key, key)
             command = expand(m.get('commands', {}).get(key, command))
             p = subprocess.run([command, '--version'], text=True, capture_output=True, timeout=15)
-            version = c['compatibility'][key]
             check('version:' + key, p.returncode == 0 and version in p.stdout, '期望 ' + version)
         except (OSError, subprocess.TimeoutExpired):
             check('version:' + key, False, '命令不可用或超时')
     directories = list(dict.fromkeys(str(Path(expand(p)).parent) for p in m.get('commands', {}).values()))
     daemon_path = os.pathsep.join(directories + [str(Path.home()/'.local/bin'), '/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin'])
     for key, name in [('codex','codex'),('qoder','qodercli'),('openclaw','openclaw')]:
+        if ('openclaw-isolated' if key == 'openclaw' else key) not in runtimes:
+            continue
         declared = m.get('commands', {}).get(key)
         found = shutil.which(name, path=daemon_path)
         check('command-binding:' + key, bool(declared and found) and Path(expand(declared)).resolve() == Path(found).resolve(),
@@ -217,7 +228,9 @@ def doctor():
     for relative in c['skill_checks']:
         source = Path(expand(m['agent_kit'])) / relative
         expected = file_inventory(source)
-        for client in ['.codex', '.qoder', '.openclaw']:
+        clients = {'.codex'}
+        clients.update(client for runtime, client in [('qoder', '.qoder'), ('openclaw-isolated', '.openclaw')] if runtime in runtimes)
+        for client in sorted(clients):
             actual = file_inventory(Path.home() / client / 'skills' / source.name)
             changed = sorted(k for k in set(expected or {}) | set(actual or {}) if (expected or {}).get(k) != (actual or {}).get(k))
             check('skill:' + client + ':' + source.name, bool(expected) and not changed, {'different_files': changed[:12], 'count': len(changed)})
@@ -226,8 +239,9 @@ def doctor():
     checks.append({'check': 'skill-source', 'status': 'recorded', 'detail': {'repository': str(kit), 'head': head.stdout.strip(),
                    'content_sha256': {Path(p).name: digest(file_inventory(kit / p)) for p in c['skill_checks']},
                    'note': '内容摘要包含未提交更改；HEAD 不能单独代表安装内容'}})
-    isolated = read_json(Path(expand(m['openclaw_state'])) / 'openclaw.json', {})
-    check('openclaw-isolated', not isolated.get('channels') and isolated.get('plugins', {}).get('slots', {}).get('memory') == 'none', '隔离配置无渠道且关闭 memory 插件；实际 MCP 另由运行验收核对')
+    if 'openclaw-isolated' in runtimes:
+        isolated = read_json(Path(expand(m.get('openclaw_state', ''))) / 'openclaw.json', {})
+        check('openclaw-isolated', bool(m.get('openclaw_state')) and not isolated.get('channels') and isolated.get('plugins', {}).get('slots', {}).get('memory') == 'none', '隔离配置无渠道且关闭 memory 插件；实际 MCP 另由运行验收核对')
     for key, p in m['projects'].items():
         check('project:' + key, Path(expand(p['root'])).is_dir(), '目录存在；项目工程规则由项目维护')
     try:

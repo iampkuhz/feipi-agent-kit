@@ -11,6 +11,22 @@ spec.loader.exec_module(wb)
 
 
 class Recovery(unittest.TestCase):
+    def test_multica_diff_detects_runtime_code_without_expanding_capture(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            source = root/'components/multica/scripts/adapt.py'
+            source.parent.mkdir(parents=True)
+            source.write_text('old code')
+            home = root/'home'
+            live = home/'.local/share/multica/ops/scripts/adapt.py'
+            live.parent.mkdir(parents=True)
+            live.write_text('newer published code')
+            with patch.object(wb, 'ROOT', root), patch.object(wb, 'HOME', home), patch.object(wb, 'mappings', side_effect=lambda _: {}), patch.object(wb, 'source_files', side_effect=lambda p: [source] if p.name == 'scripts' else []), patch('builtins.print'):
+                self.assertEqual(wb.differences('multica', show=False), ['scripts/adapt.py'])
+                with self.assertRaisesRegex(ValueError, '不在允许回收范围'):
+                    wb.capture('multica', ['scripts/adapt.py'])
+            self.assertEqual(source.read_text(), 'old code')
+
     def test_failed_mac_publish_restores_existing_links_and_snapshot(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)

@@ -1,4 +1,6 @@
 import importlib
+import contextlib
+import io
 import json
 import os
 from pathlib import Path
@@ -17,6 +19,32 @@ import acceptance
 
 
 class Acceptance(unittest.TestCase):
+    def test_failed_check_exits_nonzero(self):
+        result = {'codex-builder': {'probe': {}, 'runs': [], 'issue_status': 'todo', 'attachment_verified': False}}
+        with patch.object(sys, 'argv', ['acceptance.py', 'check']), patch.object(acceptance, 'check', return_value=result), contextlib.redirect_stdout(io.StringIO()):
+            with self.assertRaises(SystemExit) as stopped:
+                acceptance.main()
+            self.assertEqual(stopped.exception.code, 1)
+
+    def test_current_codex_only_policy_excludes_historical_roles(self):
+        m = {'agents': {'codex-builder': 'agent'}, 'runtimes': {'codex': {'id': 'runtime'}}}
+        c = {'agents': [{'key': 'codex-builder', 'runtime': 'codex'}]}
+        with patch.object(acceptance, 'machine', return_value=m), patch.object(adapt, 'catalog', return_value=c):
+            self.assertEqual(acceptance.active_agents(), ['codex-builder'])
+
+    def test_declared_role_without_binding_is_blocked(self):
+        c = {'agents': [{'key': 'qoder-worker', 'runtime': 'qoder'}]}
+        with patch.object(acceptance, 'machine', return_value={'agents': {}, 'runtimes': {}}), patch.object(adapt, 'catalog', return_value=c):
+            with self.assertRaisesRegex(base.AdaptError, '缺少机器绑定'):
+                acceptance.active_agents()
+
+    def test_existing_fixture_does_not_require_disabled_roles(self):
+        m = {'agents': {'codex-builder': 'agent'}, 'runtimes': {'codex': {'id': 'runtime'}}}
+        c = {'agents': [{'key': 'codex-builder', 'runtime': 'codex'}]}
+        fixture = {'root': '/unused', 'issues': {'codex-builder': 'issue', 'qoder-worker': 'old'}}
+        with patch.object(acceptance, 'machine', return_value=m), patch.object(adapt, 'catalog', return_value=c), patch.object(acceptance, 'read_json', return_value=fixture):
+            self.assertEqual(acceptance.prepare(), fixture)
+
     def test_old_attachment_cannot_certify_a_new_execution(self):
         report = {'task_contract': {k: True for k in ['MULTICA_TOKEN', 'MULTICA_TASK_ID', 'MULTICA_AGENT_ID', 'MULTICA_WORKSPACE_ID', 'MULTICA_SERVER_URL']},
                   'token_kind': 'task', 'calculation': 5, 'task_id': 'old'}
@@ -30,6 +58,12 @@ class Acceptance(unittest.TestCase):
 
 
 class Authentication(unittest.TestCase):
+    def test_attachment_download_uses_native_flags_and_accepts_text(self):
+        response = subprocess.CompletedProcess([], 0, stdout='Downloaded report.json', stderr='')
+        with patch.object(base, 'task_context', return_value=True), patch.object(base.subprocess, 'run', return_value=response) as native:
+            self.assertEqual(base.cli('attachment', 'download', 'attachment', '--output-dir', '/private/report'), response.stdout)
+            self.assertNotIn('--output', native.call_args[0][0])
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.spy = Path(self.temp.name) / 'cli'
@@ -59,6 +93,28 @@ class Authentication(unittest.TestCase):
 
 
 class Bindings(unittest.TestCase):
+    def test_codex_evidence_does_not_require_retired_openclaw_state(self):
+        with tempfile.TemporaryDirectory() as root:
+            m = {'agent_kit': root}
+            c = {'agents': [{'runtime': 'codex'}], 'skill_checks': []}
+            self.assertIsInstance(adapt.evidence_fingerprint(m, c), str)
+
+    def test_codex_doctor_does_not_probe_disabled_runtimes(self):
+        with tempfile.TemporaryDirectory() as root:
+            m = {'agent_kit': root, 'server_url': 'http://localhost', 'workspace_id': 'workspace',
+                 'profile': 'personal', 'commands': {'codex': '/test/codex'}, 'projects': {}}
+            c = {'agents': [{'key': 'codex-builder', 'runtime': 'codex'}],
+                 'compatibility': {'codex': 'test-version'}, 'skill_checks': []}
+            def read(path, default=None):
+                return {'server_url': m['server_url'], 'workspace_id': 'workspace', 'max_concurrent_tasks': 1} if str(path).endswith('config.json') else (default or {})
+            response = subprocess.CompletedProcess([], 0, stdout='test-version', stderr='')
+            with patch.object(adapt, 'machine', return_value=m), patch.object(adapt, 'catalog', return_value=c), patch.object(adapt, 'read_json', side_effect=read), patch.object(adapt.subprocess, 'run', return_value=response), patch.object(adapt.urllib.request, 'urlopen') as http, patch.object(adapt.shutil, 'which', return_value='/test/codex'), patch.object(adapt, 'build_plan', return_value={'actions': []}), patch.object(adapt, 'public_plan', return_value={}), patch.object(adapt, 'evidence_fingerprint', return_value='fingerprint'):
+                http.return_value.__enter__.return_value.status = 200
+                result = adapt.doctor()
+            self.assertTrue(result['static_ok'])
+            self.assertEqual(http.call_count, 1)
+            self.assertNotIn('openclaw-isolated', [v['check'] for v in result['checks']])
+
     def test_dispatch_rejects_runtime_and_model_drift_before_execution(self):
         m={'agents':{'worker':'a'},'runtimes':{'codex':{'id':'r'}}}
         c={'agents':[{'key':'worker','runtime':'codex','model':'fixed'}]}

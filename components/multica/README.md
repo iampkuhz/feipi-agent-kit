@@ -4,6 +4,14 @@
 
 服务采用 Multica v0.6.3，源码固定在 `~/.local/share/multica/server`，Web/API/PostgreSQL 镜像由 `config/compose.pinned.yml` 锁定 digest。当前目录不保存真实凭据或业务数据。后台运行副本位于 `~/.local/share/multica/ops`，通过 `scripts/install-runtime.py` 发布，避免 launchd 直接读取 Documents 被 macOS 拒绝；运行副本不手工编辑。
 
+## 当前运行选择（2026-11-04）
+
+已回收本机11月1日正式发布的声明：当前仅启用 Codex Builder 及 LexiFlow 的 Coordinator、Validator、Reviewer，机器只绑定 Codex runtime。合并历史能力不重新启用 Qoder、OpenClaw Assistant 或 LiteLLM Coder；相关实现和历史说明保留，启用前需显式补齐声明、机器身份及实际验收。
+
+`acceptance.py` 按当前声明选择代表性角色，不强制运行已停用的角色；已声明但缺少机器绑定仍明确失败。当前完整路径以 Codex Builder 验证任务凭据、执行、回写与附件，不能将10月31日的其他执行器结果当作本次通过。
+
+11月1日已发布的持续监督器、停止等待与局部发布功能一并回收：监督器复用现有 Multica 容器，每60秒检查就绪并维护唯一 daemon；共享 Podman VM 启动脱离 LaunchAgent 进程组。发布前排空任务，启动脚本更新先停止监督器。验收附件按原生下载命令取回，失败时检查返回非零。
+
 ## 适配与配置管理（2026-10-31）
 
 已实现 `multica-ops plan/apply/verify/doctor` 和 `multica-work` 统一交互。日常操作以 [适配操作手册](docs/adaptation-runbook.md) 为准；Mac mini 单主机切换见 [迁移流程](docs/mac-mini-migration.md)。声明与机器绑定分开；共享 Skill 由 Agent Kit 维护。
@@ -45,7 +53,7 @@ multica-work note <任务编号> --body-file progress.md --request-id <本次固
 
 前端/API 绑定 loopback，数据库没有宿主端口。CLI 自动升级关闭，初期 daemon 和 Agent 并发都为 1。
 
-已安装 `local.multica.personal` LaunchAgent，负责登录启动和 daemon 退出恢复；运行前按机器绑定启动已存在的 Podman VM、本服务和两个 LiteLLM 依赖容器，并等待服务就绪；不创建或升级依赖。管理入口：
+已安装 `local.multica.personal` LaunchAgent，负责登录启动、持续服务检查和 daemon 退出恢复；按机器绑定启动已存在的 Podman VM、本服务，等待 API/Web 就绪。不创建或升级容器，当前 Codex 流程不依赖 LiteLLM。管理入口：
 
 ```bash
 python3 ~/Documents/tools/llm/feipi-agent-kit/components/multica/scripts/manage-runtime.py status
@@ -55,11 +63,11 @@ python3 ~/Documents/tools/llm/feipi-agent-kit/components/multica/scripts/manage-
 
 停止请使用上述 stop；单独 `multica-task daemon stop` 会被守护重新拉起。stop 保留 Web/API。需要维护配置或升级时，先排空运行中的任务。更新本目录 bin、镜像锁定或后台启动脚本后，执行 `scripts/install-runtime.py` 发布运行副本；更新启动定义时先 stop，再运行 `scripts/manage-runtime.py install`。
 
-OpenClaw 分两路使用：原 Gateway 通过 `multica-task` 录入和查询；Multica 中的 `OpenClaw Assistant` 绑定 `OpenClaw Multica` 自定义 runtime，使用独立状态目录 `~/.local/share/multica/openclaw-state`。`scripts/configure-openclaw.py` 从原声明仓库读取原模型定义，再合并本仓库 LiteLLM 角色；从全局 `~/.env` 只投影三项所需 provider 变量，不复制原渠道、插件或个人记忆。隔离执行端关闭 memory 插件，避免无关 embedding 请求。原 Gateway 不切换入口、不重启。
+原 Gateway 可通过 `multica-task` 录入和查询。以下为历史可选 OpenClaw 执行方案：`OpenClaw Assistant` 绑定 `OpenClaw Multica` 自定义 runtime，使用独立状态目录 `~/.local/share/multica/openclaw-state`。`scripts/configure-openclaw.py` 从声明组件读取原模型定义，再合并 LiteLLM 角色；从全局 `~/.env` 只投影三项所需 provider 变量，不复制原渠道、插件或个人记忆。隔离执行端关闭 memory 插件，避免无关 embedding 请求。原 Gateway 不切换入口、不重启。
 
-## LiteLLM Agent
+## 历史可选方案：LiteLLM Agent
 
-按用户当前选择，仅启用 LiteLLM 编码 Agent，通过上述独立 OpenClaw runtime 调用本地 `http://localhost:4000/v1`。使用现有客户端虚拟密钥，不把密钥写进 Multica 的 Agent 字段或源码。
+以下记录此前的 LiteLLM 编码 Agent 方案；当前默认声明不启用该 Agent，通过上述独立 OpenClaw runtime 调用本地 `http://localhost:4000/v1`。使用现有客户端虚拟密钥，不把密钥写进 Multica 的 Agent 字段或源码。
 
 | Multica Agent | OpenClaw Agent ID | LiteLLM 模型别名 | 用途 |
 |---|---|---|---|

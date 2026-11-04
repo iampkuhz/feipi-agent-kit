@@ -1,5 +1,7 @@
 # Multica 与本机 Agent 的操作流程
 
+当前默认仅绑定 Codex runtime 与4个 Codex 角色，其他执行器的实现按需启用。`acceptance.py` 只验收当前声明中的代表角色；已声明但没有机器绑定会停止，不用历史结果补齐。
+
 配置仓库维护期望配置；Multica 保存任务、评论、附件与运行记录。当前主力为 MacBook，未来由 Mac mini 接替。一个 daemon 负责长期运行；MacBook 切换后只保留临时交互入口。
 
 ## 文件与职责
@@ -34,7 +36,7 @@ multica-work recover TASK-123
 
 `handoff` 用正常 @回复唤醒下一角色；不可把它统一改成静默日志。提交验收用 deliver，上传附件再 `in_review --no-start`，不自动标 Done。项目自身的审批与独立验收规则继续有效。
 
-逻辑键：`codex-builder`、`qoder-worker`、`openclaw-assistant`、`litellm-coder`；`coordinator`、`validator`、`reviewer` 保留 LexiFlow 专用范围。模型执行语义见 capabilities：OpenClaw 的 model 是 Agent ID，`litellm-coder` 再选择 `litellm/litellm-code-openai`。
+当前通用逻辑键为 `codex-builder`；`coordinator`、`validator`、`reviewer` 保留 LexiFlow 专用范围。历史可选键 `qoder-worker`、`openclaw-assistant`、`litellm-coder` 需先补齐声明、runtime 及实际验收后使用；OpenClaw 的 model 是 Agent ID，`litellm-coder` 再选择 `litellm/litellm-code-openai`。
 
 交接包字段见 [任务模板](../TASK_TEMPLATE.md)。通用派发入口要求当前 daemon 上明确的 in_place 项目资源。原生 worktree 项目继续使用其原有流程并记录真实目录。必需 MCP 未有任务内验证器时入口会阻止自动派发；不得用空 mcpServers 声称关闭所有 MCP。
 
@@ -64,13 +66,15 @@ multica-ops doctor
 
 安装器先校验 Python/JSON，再逐文件原子发布和生成校验清单；整批不是原子事务，排空期间发布。首次启动定义用 `manage-runtime.py install`，已经注册时先 stop。配置更新不需要重建服务镜像。
 
-技能更新在 Agent Kit 根运行三次既有安装器：`bash scripts/install_skills.sh --agent codex`，再 qoder/openclaw。安装器处理本仓库全部已登记技能，保留其他来源。之后同步 workspace Skill：plan → apply → verify。doctor 比较本次关键技能全部运行文件，排除 tests/evals、缓存和 tmp；不能只比较 SKILL.md。
+已有运行副本可用 `install-runtime.py --only config/agents.json` 定点发布；可重复 `--only`。`--remove 相对文件名` 仅能移除源码已退役、摘要未变的受管文件，拒绝覆盖无关命令。局部发布前会校验既有清单；遇到运行修改先比较回收。工作台 diff/doctor 同时比较运行代码，配置以外的代码差异需审阅合并，不能用 capture 扩大回收范围。
+
+技能更新在 Agent Kit 根运行 `./workbench diff skills`，再 `./workbench apply skills`，备份后安装到各客户端并保留其他来源。之后同步 workspace Skill：plan → apply → verify。doctor 比较当前执行器所需技能的全部运行文件，排除 tests/evals、缓存和 tmp；不能只比较 SKILL.md。
 
 ## 启动、隔离与恢复
 
-LaunchAgent `local.multica.personal` 在用户登录后启动，依次检查/启动 machine.json 明确的 Podman VM、本服务、既有 LiteLLM DB/Proxy，再等待两个服务 readiness，最后运行 daemon。不会创建或升级依赖容器。依赖不存在时明确失败，由 launchd 后续重试；不把端口健康当作模型请求成功。仍需 Mac mini 上实测整机重启和 FileVault 登录。
+LaunchAgent `local.multica.personal` 在用户登录后启动持续监督器。它检查/启动 machine.json 明确的 Podman VM，仅启动已存在且停止的 Multica postgres/backend/frontend 容器；API 和 Web 就绪后维护唯一 daemon，每60秒复查。缺少容器时要求显式安装，不自动创建或升级。共享 VM 启动脱离 LaunchAgent 进程组，停止监督器时保留容器。当前 Codex 流程不依赖 LiteLLM；其他模型服务由各自管理器维护。不把端口健康当作模型请求成功；Mac mini 整机重启和 FileVault 登录仍需在目标机实测。
 
-daemon 的 OpenClaw 能力发现与包装命令均指向隔离目录；CLI 生成的每任务 OPENCLAW_CONFIG_PATH 保留。个人 Gateway 不切换目录、不重启。原个人 OpenClaw runtime 仍可被原生发现，但配置仅绑定隔离 runtime，禁止在 UI 中误选个人实例。
+若重新启用 OpenClaw 执行器，能力发现与包装命令均须指向隔离目录，保留 CLI 生成的每任务 OPENCLAW_CONFIG_PATH。个人 Gateway 不切换目录、不重启，禁止在 UI 中误选个人实例。
 
 失败先分层：服务/依赖 → daemon/runtime → 认证 → 模型 → 工具/技能 → 产物。`recover` 只查询，不重跑。pending 回执表示请求可能已经到达服务器；查 Issue 评论中的 request-id、runs 和附件，记录结论后显式确定新一轮操作，不删除回执盲重试。跨机器/直接 UI 调用不受本机锁保护。
 
@@ -80,12 +84,12 @@ daemon 的 OpenClaw 能力发现与包装命令均指向隔离目录；CLI 生�
 python3 scripts/acceptance.py prepare
 python3 scripts/acceptance.py start --agent codex-builder --request-id 本轮固定ID
 python3 scripts/acceptance.py check
-# 上一 run 终态后，依次换 litellm-coder / qoder-worker；不并发
+# 多执行器显式启用后，仅在上一 run 终态时验收下一角色；不并发
 python3 scripts/acceptance.py check --save
 ```
 
-prepare 创建专用项目与三张未分派 Issue，私有 fixture 防重复；不使用 LexiFlow 正式任务。新一轮验收先核对已有 runs 和产物，使用新的、可说明的 request-id；同一轮重试保留原 ID。fixture 丢失而同名项目存在会拒绝接管，需人工恢复准确绑定。
+prepare 按当前声明创建专用项目及代表角色的未分派 Issue，私有 fixture 防重复；不使用 LexiFlow 正式任务。历史 fixture 中停用的角色不参与本轮验收，新增角色缺少 fixture 则停止，不重复创建项目。新一轮验收先核对已有 runs 和产物，使用新的、可说明的 request-id；同一轮重试保留原 ID。fixture 丢失而同名项目存在会拒绝接管，需人工恢复准确绑定。
 
-探针验证五项任务环境、真实执行与计算、OpenClaw 实际任务配置的渠道/MCP 名称、任务身份回写、附件和待验收状态。MCP 实际调用明确为 not-tested；要依赖某 MCP，应另加其真实任务调用验收。`--save` 保存环境摘要与逐角色结果，配置/机器/技能变化后 doctor 标记证据待更新。实际测试记录在 [VALIDATION.md](../VALIDATION.md)。
+探针验证五项任务环境、真实执行与计算、任务身份回写、下载附件和待验收状态；启用隔离 OpenClaw 时还核对任务配置。附件内容必须匹配最新 completed 执行，旧附件不能证明新执行成功，未通过时 check 返回非零。MCP 实际调用明确为 not-tested；要依赖某 MCP，应另加其真实任务调用验收。`--save` 保存环境摘要与逐角色结果，配置/机器/技能变化后 doctor 标记证据待更新。历史测试记录在 [VALIDATION.md](../VALIDATION.md)，本轮集成见 [工作台验收](../../../docs/workbench-validation.md)。
 
 依据： [Multica runtime 与任务环境契约](https://multica.ai/docs/daemon-runtimes)、[评论触发与 /note](https://multica.ai/docs/mentioning-agents)。借鉴 [multica-agent-team](https://github.com/stone16/multica-agent-team) 的职责/实例/部署拆分、[Mops](https://github.com/jamillazarev/multica-ops/blob/main/REFERENCE.md) 的恢复方法和 [stometa-skills](https://github.com/stone16/stometa-skills/blob/main/docs/multica.md) 的能力验证边界；具体行为以本机 0.6.3 及实测为准。

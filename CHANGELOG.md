@@ -1,6 +1,7 @@
 # 变更记录
 
 ## 2026-11-04
+- 工作台集成：合并全部组件，回收较新Multica声明，验收按启用角色执行
 - feipi-video-read-url v14：默认本地SenseVoice，高精度Qwen转写
 
 ## 2026-10-31

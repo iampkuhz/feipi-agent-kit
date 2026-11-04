@@ -96,6 +96,13 @@ def mappings(component):
 
 def differences(component, show=True):
     pairs = mappings(component)
+    if component == 'multica':
+        # 运行代码也可能比仓库新；只读比对，回收白名单仍仅限配置。
+        base = ROOT/'components/multica'
+        for src in source_files(base/'scripts') + source_files(base/'bin') + [base/'versions.json']:
+            if src.is_file():
+                rel = str(src.relative_to(base))
+                pairs[rel] = (src, HOME/'.local/share/multica/ops'/rel)
     changed = []
     for name, (src, live) in pairs.items():
         if digest(src) == digest(live):
@@ -117,6 +124,7 @@ def differences(component, show=True):
     if not changed:
         print(component + ': 受管配置内容一致。')
     if component == 'multica':
+        print('运行代码差异需审阅后合并；capture --select 仅允许受管配置。')
         print('服务端 UI 字段的差异：./workbench multica plan；选择回收：./workbench multica capture --help')
     return changed
 

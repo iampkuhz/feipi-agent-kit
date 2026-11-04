@@ -2,12 +2,33 @@
   "schema": 1,
   "policy": "真实任务证据才能声明已验证；桌面 MCP 配置不构成后台兼容证据",
   "runtimes": {
-    "codex": {"execution": "app-server", "model_selection": "Multica Agent model + thinking_level", "required_commands": ["codex", "multica-task", "multica-work"], "required_skills": ["feipi-multica-manage-tasks"], "required_mcp": [], "optional_mcp": ["runtime native inherited MCP; verify per task"]},
-    "qoder": {"execution": "ACP", "model_selection": "Qoder CLI 当前账户默认模型；任务日志记录实际值，不声称固定模型", "required_commands": ["qodercli", "multica-task", "multica-work"], "required_skills": ["feipi-multica-manage-tasks"], "required_mcp": [], "optional_mcp": ["ACP 协商支持的传输；verify per task"]},
-    "openclaw-isolated": {"execution": "local", "model_selection": "Multica model=Agent ID；litellm-coder -> litellm/litellm-code-openai", "required_commands": ["multica-openclaw", "multica-task", "multica-work"], "required_skills": ["feipi-multica-manage-tasks"], "required_mcp": [], "optional_mcp": []}
+    "codex": {
+      "execution": "app-server",
+      "model_selection": "Multica Agent model + thinking_level",
+      "required_commands": [
+        "codex",
+        "multica-task",
+        "multica-work"
+      ],
+      "required_skills": [
+        "feipi-multica-manage-tasks"
+      ],
+      "required_mcp": [],
+      "optional_mcp": [
+        "runtime native inherited MCP; verify per task"
+      ]
+    }
   },
   "skills": {
-    "feipi-multica-manage-tasks": {"source": "Agent Kit", "workspace_copy": "SKILL.md 单文件契约；执行程序由 multica-ops 发布", "verification": "全文与资源内容校验；执行命令回写"},
-    "feipi-video-read-url": {"source": "Agent Kit", "verification": "SKILL.md、脚本、引用及依赖文件全量比较；运行产物 tmp 不纳入版本", "scope": "Codex/Qoder/个人 OpenClaw；隔离 OpenClaw 按任务绑定，不自动复制全部个人技能"}
+    "feipi-multica-manage-tasks": {
+      "source": "Agent Kit",
+      "workspace_copy": "SKILL.md 单文件契约；执行程序由 multica-ops 发布",
+      "verification": "全文与资源内容校验；执行命令回写"
+    },
+    "feipi-video-read-url": {
+      "source": "Agent Kit",
+      "verification": "SKILL.md、脚本、引用及依赖文件全量比较；运行产物 tmp 不纳入版本",
+      "scope": "当前仅核对 Codex；其他客户端和隔离执行器延后评估"
+    }
   }
 }

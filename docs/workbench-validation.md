@@ -1,8 +1,30 @@
-# 本机切换验收 · 2026-10-31
+# 工作台实机验收记录
+
+## 2026-11-04：全部分支集成与复验
+
+本轮合入 Multica 任务技能、Mac/Multica/OpenClaw/OpenClash 组件、workbench/develop 入口与备份恢复能力，以及 video oMLX 转写。保留原提交历史。11月1日已正式发布的 Multica 声明与运行脚本较分支源码更新，经发布清单核对后回收；当前仅启用 Codex Builder 和 LexiFlow 三个专用角色，其他执行器实现保留。
+
+| 验证 | 本轮结果 |
+| --- | --- |
+| 研发回归 | 10组检查全部通过：Mac、Multica、OpenClaw、OpenClash、Skills Harness、services、workbench、安装器、Multica skill、video ASR 契约。修复后补跑 Multica 31项与 workbench 6项，全部通过；安装器11项、服务18项、oMLX HTTP契约19项通过 |
+| 统一检查 | `./workbench doctor`、`./workbench private check`、`./workbench multica verify` 返回0，受管运行文件一致，LiteLLM就绪且配置来自运行副本 |
+| 终端与编辑器 | 实际登录Zsh发现 compdef/nvm，Node v26.11.1；实际Neovim启动并返回验收标记 |
+| OpenClaw | 本机 Gateway 模型请求返回 `FEIPI_INTEGRATION_MODEL_OK_20261104`，provider=qwen，model=litellm-code-openai；4.257秒；未请求外部投递 |
+| OpenClash | 路由器真实请求 Baidu/Google 均HTTP200；连接表分别命中 Domestic→DIRECT、PROXY→地区优先→香港自动 |
+| Multica | 排空后停止监督器、备份发布、重新启动。新 Codex Builder run `01a1a5b4-4017-74a0-821f-28ab412ca441` completed；实际probe、五项任务身份、note/deliver、in_review与附件下载全部通过。下载JSON与最新run报告一致，报告SHA-256为 `44b2e1287390678045e2d89890ad0a33647a2df170b67c91aaee889ff4b832f7` |
+| Skills发布 | 备份后更新5个客户端中的video skill，其余45个受管安装项跳过；第三方技能保留 |
+
+本轮修复：doctor按启用执行器检查依赖和版本，Codex模式不再访问已移除的LiteLLM/OpenClaw机器字段；验收角色随声明选择，缺失绑定明确失败；附件下载不再追加原生命令不支持的JSON参数，报告必须匹配最新执行，验收未通过返回非零。回收持续监督器、共享VM启动进程组隔离、停止等待与局部发布能力，新增隔离HOME及模拟监督测试。workbench diff/doctor现在同时检查运行代码，配置回收白名单未扩大。
+
+本轮原始日志与摘要位于私有 `~/.local/state/feipi-workbench/integration-20261104/`，研发检查位于仓库忽略目录 `tmp/workbench-integration/`。运行发布备份保留在 `~/.local/state/feipi-workbench/changes/`；回收前源码与第一次运行发布也均有备份。`.mcp.json`、`.claude/settings.local.json` 的摘要与本轮开始时相同。
+
+实际任务验收覆盖当前Codex通路，未重新启用或验收停用的Qoder/LiteLLM执行器；MCP实际调用保持not-tested。路由器未主动断网注入故障，Mac mini整机迁移尚未执行。以下10月31日记录为历史证据，不能当作本轮复测。
+
+## 2026-10-31：本机切换
 
 本次保留 feipi-agent-kit 原 Git，未另建仓库或重新初始化历史。原 dotfiles、multica-ops、两份 OpenClaw 仓库均保留；原未提交工作在首次完整工作区备份中可恢复。引入的源码和未提交改进按原职责归入组件，运行环境通过显式副本接管。
 
-## 实际来源与效果
+### 实际来源与效果
 
 | 范围 | 切换前 → 切换后 | 实际证据 |
 | --- | --- | --- |
@@ -18,7 +40,7 @@
 
 活动 HOME 链接、自启动、运行绑定中原 dotfiles/multica-ops/OpenClaw 来源依赖已检查。Qwen 的 output-language.md 已改成受管实拷；8 个指向不存在的旧 agent-skills 公共资源链接已备份并移除。`~/.qwen/settings.json.orig` 是保留的历史备份链接，不是加载入口；含 env/认证/codingPlan 的真实 settings.json 保留私有，不整份覆盖。
 
-## 代表性任务与联网
+### 代表性任务与联网
 
 Multica 新验收 Issue：`01a19174-65d3-7714-9933-8ddee0ba8882`。执行 `01a1917a-abf1-742f-8bf1-b98397d61bb4` 使用 LiteLLM Coder、隔离 OpenClaw runtime，实际运行 probe，task 身份字段齐全，计算值 5；随后 note、deliver，将 Issue 留在 `in_review`。附件 `01a1917c-15f3-73c3-aff2-cf38d97c81c4` 已通过原生 CLI 重新下载，JSON task_id 与该执行一致，SHA-256 为 `6554318b4f441afe346294b08f13702259ebdda5893ee404cad4cf3f4f883dab`。不是复用旧 Issue/旧附件或只检查 completed。
 
@@ -33,7 +55,7 @@ OpenClaw 原资料交互 run：`dda93a81-230c-4423-8bb3-aa55eb9a26c6`，会话 `
 
 可重跑 `./workbench service openclash verify`。没有主动切断节点模拟所有地区故障，也没有把策略 API 可访问当作联网证据。
 
-## 备份与恢复验证
+### 备份与恢复验证
 
 - 首次源码/未提交文件/运行配置：`~/.local/state/feipi-workbench/backups/20261031-175613`，保留各仓库工作树归档、Git patch/status、HEAD 和受保护配置摘要。
 - OpenClaw 最终停写批次：`~/.local/state/feipi-workbench/openclaw-backups/offline-20261031-183125.ZtkgnV`。摘要通过；停写时 4 个主要 SQLite 通过；解到新的私有临时目录后，包括工作区历史试验和锁库在内的 23 个 SQLite 全部 integrity_check=ok；workspace 文件和 env 链接保留，env 归档实际内容与原文件一致。完成后只删除该临时恢复目录，原数据不动。macOS tar 的 AppleDouble 元数据不当作第二份 env。
@@ -41,7 +63,7 @@ OpenClaw 原资料交互 run：`dda93a81-230c-4423-8bb3-aa55eb9a26c6`，会话 `
 - OpenClash 最小批次：`~/.local/state/feipi-workbench/openclash-backups/20261031-181654-680257`。压缩包 22,748 bytes，对比保留的原完整包 37,869,578 bytes；摘要和完整 tar 流通过。只含配置、订阅与覆写，排除 core/GeoIP/cache，均不进入 Git。路由器原模块/UCI 保存在 `/root/feipi-workbench-backup-20261031-181655`。
 - 工作台回退测试在临时 HOME 中验证了文件、目录、符号链接、原先不存在路径的恢复；公开回收路径白名单与秘密拒绝在写入前生效。当前机器没有为测试而故意回滚全部组件或中断家庭网络。
 
-## 本次发现和修复
+### 本次发现和修复
 
 Neovim 原通用 prettierd 规则会让纯文本保存超时，已限定到支持的文件类型，真实保存复验通过。OpenClaw 补全缓存缺失已用现有生成器补齐。Multica 只读预检失败原本留下 pending 回执，现改为预检通过后才记远端请求意图；网络结果不明仍保留 pending，不盲目重放。验收工具现要求下载的附件内容匹配最新执行，防止旧附件误判。LiteLLM 慢启动采用有界 readiness 等待，不重复重建数据库。
 
@@ -49,7 +71,7 @@ Neovim 原通用 prettierd 规则会让纯文本保存超时，已限定到支�
 
 仓库回归：Mac 离线 bootstrap 通过；Multica 14 项；服务 18 项；安装输出 11 项；工作台边界 5 项；OpenClaw 原部署/安装/微信测试及当前 schema 通过；Harness 的规则、命令、registry、manifest 和 10 个技能的布局/安装过滤全部通过；OpenClash 另执行路由器原生合并与核心校验。
 
-## 证据位置与边界
+### 证据位置与边界
 
 原始结果都在本机私有 `~/.local/state/feipi-workbench/`：`doctor-final.log`、`private-final.log`、`multica-evidence-summary.json`、`downloaded-artifacts/`、`openclaw-evidence-summary.json`、`openclaw-final-result.json`、`openclaw-restore-check.json`、`openclash-connectivity.json` 以及测试日志。公开文档只保留摘要，不复制记忆正文、订阅、密钥或登录态。
 

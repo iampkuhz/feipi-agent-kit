@@ -43,7 +43,7 @@ Zsh 调好了别名：`diff mac` → 打开私有差异文件 → `capture mac -
 
 OpenClaw 调好配置：`diff openclaw` → `capture openclaw --select openclaw.json` → schema 检查 → `apply openclaw` → 重启 Gateway、实际对话。回收拒绝常见明文凭据，但扫描不能代替人工审查；用 env/SecretRef 保存秘密。workspace 只管理 manifest 中的人格模板，记忆与会话永不回收公开 Git。
 
-Multica 网页调好 Agent：`./workbench multica plan` 看服务端差异；`./workbench multica capture --agent litellm-coder --field model` 先预览，追加 `--write` 才回收。允许的字段见 `--help`。共享协作指令单独治理，不把整个远端 Agent JSON 收回仓库。仓库往服务端：排空任务 → `apply multica` → `develop multica run -- python3 scripts/configure-openclaw.py` → `multica-openclaw config validate` → `workbench multica plan` → `workbench multica apply --plan-id <审阅的摘要>` → `workbench multica verify`。有启动脚本变化再 `service multica stop/start`。
+Multica 网页调好 Agent：`./workbench multica plan` 看服务端差异；`./workbench multica capture --agent codex-builder --field model` 先预览，追加 `--write` 才回收。允许的字段见 `--help`。共享协作指令单独治理，不把整个远端 Agent JSON 收回仓库。仓库往服务端：排空任务 → `apply multica` → `workbench multica plan` → `workbench multica apply --plan-id <审阅的摘要>` → `workbench multica verify`。启动脚本变化时先 `service multica stop`，发布后再 start；当前默认只绑定 Codex，启用可选 OpenClaw 执行器才需生成并校验其隔离配置。diff/doctor 同时比较运行代码和配置，capture 白名单仅限配置，较新的运行代码需审阅合并。
 
 路由器调好地区优先模块：`diff openclash` 会先 SSH 读取当前模块；`capture openclash --select OIX-Region-Priority.conf` 明确收回；原订阅、代理认证和 UCI 只进私有备份。应用后执行 `./workbench service openclash verify`，同时核对 HTTP 响应和核心连接路径。
 

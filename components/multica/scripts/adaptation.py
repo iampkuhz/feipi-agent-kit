@@ -74,11 +74,15 @@ def cli(*args, stdin=None, with_cursor=False):
     env = dict(os.environ)
     if not task_context() and MACHINE.exists():
         env['MULTICA_PERSONAL_PROFILE'] = machine()['profile']
-    result = subprocess.run([command, *map(str, args), '--output', 'json'], input=stdin,
+    # attachment download 只写文件，不提供 --output json。
+    as_json = args[:2] != ('attachment', 'download')
+    result = subprocess.run([command, *map(str, args), *(['--output', 'json'] if as_json else [])], input=stdin,
                             text=True, capture_output=True, env=env, timeout=90)
     if result.returncode:
         # CLI 错误可能含请求正文；不把个人配置或服务返回原文转抄进日志。
         raise AdaptError('Multica ' + ' '.join(args[:2]) + ' 失败，退出码 ' + str(result.returncode) + '；请检查认证、权限和原生 CLI 状态。')
+    if not as_json:
+        return result.stdout
     try:
         data = json.loads(result.stdout)
         if with_cursor:

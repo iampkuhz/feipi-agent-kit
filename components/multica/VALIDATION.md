@@ -1,8 +1,12 @@
 # 本机验收记录
 
+## 2026-11-04：工作台集成复验
+
+当前仅启用4个 Codex 角色，保留其他执行器实现。31项 Multica 测试通过；监督器停止、重新发布及启动后，新 Codex Builder 任务实际执行、回写、上传与下载附件通过，最新 run 与报告 task_id 一致。统一 doctor 与服务端 verify 均通过。完整证据和边界见 [工作台验收](../../docs/workbench-validation.md)。
+
 ## 2026-10-31：单主机适配落地
 
-本节为当前状态，后文保留历史部署证据。实际入口见 [操作手册](docs/adaptation-runbook.md)、[适配清单](docs/adapter-inventory.md) 和 [Mac mini 流程](docs/mac-mini-migration.md)。
+本节保留当时的多执行器部署证据，不代表当前启用范围。实际入口见 [操作手册](docs/adaptation-runbook.md)、[适配清单](docs/adapter-inventory.md) 和 [Mac mini 流程](docs/mac-mini-migration.md)。
 
 - 新增声明配置、私有机器绑定、plan/apply/verify/doctor、统一任务入口与共享 Skill；既有 6 个 Agent 保留职责，新建 Qoder Worker；7 个受管 Agent 的并发均为 1。首次应用 15 项，重复应用 0 项，读回零差异。不创建小队或新的项目流水线控制器。
 - 精确核对 daemon/runtime/provider/profile；runtime 切换和 UI 字段漂移受计划摘要约束；派发前再次核对预期 runtime、model、thinking、并发及 runtime_config，漂移时拒绝启动。写前有私有快照，局部失败不自动删除对象。源配置与后台副本分开发布。

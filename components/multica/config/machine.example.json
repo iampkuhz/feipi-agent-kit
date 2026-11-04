@@ -12,20 +12,11 @@
   "agents": {},
   "projects": {},
   "agent_kit": "~/Documents/tools/llm/feipi-agent-kit",
-  "openclaw_source": "~/Documents/tools/llm/feipi-agent-kit/components/openclaw/openclaw.json",
-  "openclaw_state": "~/.local/share/multica/openclaw-state",
-  "litellm_readiness_url": "http://localhost:4000/health/readiness",
   "startup": {
-    "podman_machine": "podman-machine-default",
-    "podman_containers": [
-      "litellm-db-podman",
-      "litellm-proxy-podman"
-    ]
+    "podman_machine": "podman-machine-default"
   },
   "commands": {
     "multica": "~/.local/bin/multica",
-    "codex": "/opt/homebrew/bin/codex",
-    "qoder": "~/.local/bin/qodercli",
-    "openclaw": "/opt/homebrew/bin/openclaw"
+    "codex": "/opt/homebrew/bin/codex"
   }
 }

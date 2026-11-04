@@ -2,9 +2,7 @@
   "schema": 1,
   "compatibility": {
     "multica": "0.6.3",
-    "codex": "0.162.1",
-    "qoder": "1.1.54",
-    "openclaw-isolated": "2026.9.2"
+    "codex": "0.162.1"
   },
   "agents": [
     {
@@ -15,30 +13,6 @@
       "thinking_level": "high",
       "max_concurrent_tasks": 1,
       "instructions": "config/instructions/codex-builder.md"
-    },
-    {
-      "key": "openclaw-assistant",
-      "name": "OpenClaw Assistant",
-      "runtime": "openclaw-isolated",
-      "model": "main",
-      "thinking_level": "",
-      "max_concurrent_tasks": 1,
-      "instructions": "config/instructions/openclaw-assistant.md",
-      "runtime_config": {
-        "mode": "local"
-      }
-    },
-    {
-      "key": "litellm-coder",
-      "name": "LiteLLM Coder",
-      "runtime": "openclaw-isolated",
-      "model": "litellm-coder",
-      "thinking_level": "",
-      "max_concurrent_tasks": 1,
-      "instructions": "config/instructions/litellm-coder.md",
-      "runtime_config": {
-        "mode": "local"
-      }
     },
     {
       "key": "coordinator",
@@ -66,16 +40,6 @@
       "thinking_level": "medium",
       "max_concurrent_tasks": 1,
       "instructions": "config/instructions/reviewer.md"
-    },
-    {
-      "key": "qoder-worker",
-      "name": "Qoder Worker",
-      "runtime": "qoder",
-      "model": "",
-      "thinking_level": "",
-      "max_concurrent_tasks": 1,
-      "instructions": "config/instructions/qoder-worker.md",
-      "create": true
     }
   ],
   "projects": [
