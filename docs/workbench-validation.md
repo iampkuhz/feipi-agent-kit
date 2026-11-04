@@ -1,5 +1,39 @@
 # 工作台实机验收记录
 
+## 2026-11-05：Multica 协作闭环与主干回归
+
+分支摸排时 main 为 `196ca69`。本地6个非 main 分支、GitHub 远端分支与 NAS 备份分支均已被其历史包含，没有遗漏的待合并提交。本轮在此基线上修复能力与补齐验收，不恢复已退役的 session-browser，不启用历史执行器。
+
+### 修改与验证
+
+| 范围 | 本轮结果 |
+| --- | --- |
+| Multica 任务入口 | `bind` 的活动任务、目录和归属检查移到写请求意图之前；预检失败不再污染 pending。`recover` 返回评论来源、parent、request-id 和附件定位；交接包拒绝错误字段类型 |
+| Multica 确定性回归 | 55项通过，覆盖记录、绑定、静默进展、派发、交付、交接、恢复、防重、部分交付、任务认证、完整 runtime、目录、技能和必需 MCP 边界 |
+| 协作 skill | `feipi-multica-manage-tasks` v2；收窄误触发，明确当前角色、触发评论、预检重试与未知请求恢复；测试入口复用组件契约，行为用例从3条扩至8条 |
+| 实机 Codex | 新 run `01a1a77f-db0e-7214-822c-bb61d8bbfff5` completed；实际探针、五项任务身份、Agent/runtime/工作区/cwd、探针版本、唯一进度与交付评论、真实 parent、附件重新下载全部通过；Issue 为 in_review |
+| 原生交互与防重 | 独立 Issue `01a1a781-beb4-79a5-932e-35d05d676d00`：record、bind、含真实提及的 note、deliver 重复同一 request-id 均返回原回执；只有3条动作评论、0个 run；交付附件下载一致，recover 不改变运行或回执 |
+| bind 实机反例 | Codex run 活动时绑定失败且没有请求回执；该 run 完成后，原输入和原 request-id 绑定成功，总 run 数仍为5（包含4个历史执行） |
+| 安装器 | 固定来源标记权限，比较链接时只核对链接目标，避免 umask 引起无内容变更的重复更新；12项隔离安装回归通过 |
+| 组件回归 | Mac 离线 bootstrap、OpenClaw 原部署/安装/微信测试及 schema、OpenClash 模块契约通过；services 18项、workbench 6项通过；Harness 核对10个技能的结构、安装过滤和归属清理 |
+| 视频 | 140项程序回归通过；真实本地媒体5项集成通过。SenseVoiceSmall 与 Qwen3-ASR-1.7B-4bit 均为首次推理（cache_reused=0），固定41秒合成样例的162个正文汉字逐字一致；不据此推算自然长音频准确率 |
+| PPT | 19项 P0 及完整现有回归通过；分层架构样例生成原生可编辑 PPTX，通过包/布局检查和 QuickLook/CoreText 渲染，已实际查看全尺寸预览，无缺字、重叠或裁切 |
+| 图表 | Mermaid 37项及真实架构图通过，已看图并用内置入口完成 review；draw.io 64项离线检查与6项真实 Podman 集成通过，代表图实际看图通过；PlantUML 122项通过，思维导图预览实际看图通过 |
+
+### 发布与证据
+
+skill v2 已发布到5个客户端及 Multica workspace；服务端只更新共享协作技能，没有更改角色模型或项目职责。运行代码在排空、停止监督器后发布并恢复守护。备份批次：`~/.local/state/feipi-workbench/changes/20261105-005535-859096-skills`、`20261105-005726-472714-multica`；workspace 技能更新快照为 `~/.local/state/multica/adaptation/rollback/20261104T165625333921Z.json`。安装器固定源码后串行复验 Harness 及真实 Codex 安装，10个受管技能全部跳过，第三方条目保留。
+
+统一 `workbench doctor`、`private check` 和 Multica 静态检查通过；新运行证据的环境指纹已匹配。指纹新增执行代码摘要，后续运行代码变化也会使旧证据失效。`.mcp.json` 与 `.claude/settings.local.json` 的 SHA-256 保持不变。
+
+程序日志、当前执行报告、下载证据、视觉审阅记录和代表产物在仓库忽略目录 `tmp/multica-acceptance-20261105/`；skill 评估范围记录在 `tmp/skill-evals/feipi-multica-manage-tasks/20261105/results.json`。实际验收回执与下载文件另保存在私有 `~/.local/state/multica/adaptation/`。
+
+本次探针附件 `01a1a784-857a-7780-aa8a-ceda067bbf63` 的下载文件 SHA-256 为 `81185d5064951b90ff1313057b94b04b75da69759473c6bfc1f412dcbcbff3fc`，内容匹配上述新 run；不依赖验收工作目录中唯一一份本地文件。
+
+本轮真实 Agent 评估覆盖 `fresh-task-delivery`；记录与预检恢复另有原生 CLI 集成，其余行为用例由隔离契约回归覆盖，未声称8条用例均已运行真实 Agent。handoff 的命令语义已回归，未运行 LexiFlow 专用审批链；必需 MCP、停用执行器、跨机器和整机恢复仍按原专项边界处理。
+
+首次图表检查出现 Podman info 超时、SSH 握手重置及 renderer 无响应；之后只读复查连接恢复，复验通过。未定位该瞬态问题的永久根因，首轮失败与后续通过日志均保留。期间原生 CLI 的个别历史查询也曾超时，使用活动运行与单 Agent 查询确认同一 run 继续执行，没有因观察超时重新派发。
+
 ## 2026-11-04：全部分支集成与复验
 
 本轮合入 Multica 任务技能、Mac/Multica/OpenClaw/OpenClash 组件、workbench/develop 入口与备份恢复能力，以及 video oMLX 转写。保留原提交历史。11月1日已正式发布的 Multica 声明与运行脚本较分支源码更新，经发布清单核对后回收；当前仅启用 Codex Builder 和 LexiFlow 三个专用角色，其他执行器实现保留。

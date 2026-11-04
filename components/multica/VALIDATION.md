@@ -1,5 +1,13 @@
 # 本机验收记录
 
+## 2026-11-05：请求恢复与当前 Codex 通路
+
+55项确定性回归通过；新增覆盖 bind 预检失败后的同意图恢复、交接包类型、recover 评论与附件定位、部分交付、交接和实机验收反例。协作 skill v2 已发布，8条行为用例同步当前执行范围。
+
+新 run `01a1a77f-db0e-7214-822c-bb61d8bbfff5` completed；实际探针、完整任务认证、当前 Agent/runtime/工作区/目录、探针 SHA-256、评论来源与 parent、唯一进度及交付、JSON 附件下载全部通过，Issue 保持 in_review。相同派发 request-id 返回原评论；另一独立交互 Issue 的 record/bind/note/deliver 重试均无额外副作用、0个 run。活动 run 阻止 bind 时不留下 pending，终态后原意图绑定成功。
+
+旧 fixture 会先确认排空再刷新探针；验收指纹包含运行代码，防止代码变化后沿用旧通过记录。当前 doctor 静态通过、运行证据指纹匹配。完整范围、发布备份和其余能力回归见 [工作台验收](../../docs/workbench-validation.md)。LexiFlow 专用链、必需 MCP、停用执行器和跨机器恢复未纳入本轮实际执行。
+
 ## 2026-11-04：工作台集成复验
 
 当前仅启用4个 Codex 角色，保留其他执行器实现。31项 Multica 测试通过；监督器停止、重新发布及启动后，新 Codex Builder 任务实际执行、回写、上传与下载附件通过，最新 run 与报告 task_id 一致。统一 doctor 与服务端 verify 均通过。完整证据和边界见 [工作台验收](../../docs/workbench-validation.md)。
