@@ -515,56 +515,28 @@ yt_common_run_whisper_mode_from_url() {
     return 1
   fi
 
-  # 残留产物处理：若已存在完整的 whisper 转写结果，检查 metadata 侧车
-  # 文件再决定是否复用，避免 accurate 请求静默复用 fast 结果。
-  local existing_wav existing_srt existing_meta existing_profile existing_model
+  # 只复用当前 oMLX 模型家族、档位、语言和音频指纹均匹配的完整结果。
+  local existing_wav existing_srt existing_model
   existing_wav="$(find "$out_dir" -maxdepth 1 -name '*.whisper.wav' -type f 2>/dev/null | sort | tail -n1 || true)"
-  if [[ -n "$existing_wav" && -f "$existing_wav" ]]; then
-    existing_srt="${existing_wav%.whisper.wav}.srt"
-    existing_meta="${existing_wav%.whisper.wav}.meta"
-    if [[ -f "$existing_srt" ]]; then
-      existing_profile=""
-      existing_model=""
-      if [[ -f "$existing_meta" ]]; then
-        existing_profile="$(LC_ALL=C sed -n 's/^profile=//p' "$existing_meta" | tail -n1)"
-        existing_model="$(LC_ALL=C sed -n 's/^model=//p' "$existing_meta" | tail -n1)"
-      fi
-
-      # accurate 请求必须复用来源匹配的结果；若 meta 缺失或不匹配，不复用。
-      # fast 请求可以复用任意来源的结果（降级可接受）。
-      if [[ "$whisper_profile" == "accurate" ]]; then
-        if [[ "$existing_profile" == "accurate" ]]; then
-          base="$(basename "${existing_wav%.whisper.wav}")"
-          output_prefix="$out_dir/$base"
-          text_file="$output_prefix.txt"
-          yt_common_subtitle_to_text "$existing_srt" "$text_file" || return 1
-          echo "复用已有 accurate whisper 转写结果: wav=$existing_wav, model=${existing_model:-unknown}" >&2
-          echo "requested_profile=$whisper_profile"
-          echo "profile=reused"
-          echo "model=${existing_model:-reused}"
-          echo "device=reused"
-          echo "audio_file=reused"
-          echo "transcribe_audio_file=$existing_wav"
-          echo "text_file=$text_file"
-          return 0
-        else
-          echo "准确模式请求，但已有转写为 ${existing_profile:-未知} 模式，不复用: $existing_srt" >&2
-        fi
-      else
-        base="$(basename "${existing_wav%.whisper.wav}")"
-        output_prefix="$out_dir/$base"
-        text_file="$output_prefix.txt"
-        yt_common_subtitle_to_text "$existing_srt" "$text_file" || return 1
-        echo "复用已有 whisper 转写结果（fast）: wav=$existing_wav, model=${existing_model:-unknown}" >&2
-        echo "requested_profile=$whisper_profile"
-        echo "profile=reused"
-        echo "model=${existing_model:-reused}"
-        echo "device=reused"
-        echo "audio_file=reused"
-        echo "transcribe_audio_file=$existing_wav"
-        echo "text_file=$text_file"
-        return 0
-      fi
+  if [[ -n "$existing_wav" ]]; then
+    output_prefix="${existing_wav%.whisper.wav}"
+    existing_srt="$output_prefix.srt"
+    if python3 "$YT_COMMON_LIB_DIR/omlx_transcribe.py" "$existing_wav" "$output_prefix" "$language" "$whisper_profile" --check-cache; then
+      text_file="$output_prefix.txt"
+      yt_common_subtitle_to_text "$existing_srt" "$text_file" || return 1
+      existing_model="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["model"])' "$output_prefix.asr.json")"
+      echo "复用已有 oMLX whisper 模式转写结果: model=$existing_model" >&2
+      echo "requested_profile=$whisper_profile"
+      echo "profile=reused"
+      echo "model=$existing_model"
+      echo "asr_backend=omlx"
+      echo "asr_model=$existing_model"
+      echo "asr_timestamps=audio_chunk"
+      echo "device=omlx"
+      echo "audio_file=reused"
+      echo "transcribe_audio_file=$existing_wav"
+      echo "text_file=$text_file"
+      return 0
     fi
   fi
 
@@ -616,19 +588,18 @@ yt_common_run_whisper_mode_from_url() {
   output_prefix="$out_dir/$base"
   srt_file="$output_prefix.srt"
   text_file="$output_prefix.txt"
-  rm -f "$srt_file" "$text_file"
 
   echo "pipeline_stage=audio_conversion" >&2
   transcribe_audio_file="$out_dir/$base.whisper.wav"
   rm -f "$transcribe_audio_file"
-  echo "转换音频为 whisper.cpp 兼容 WAV: $transcribe_audio_file" >&2
+  echo "转换音频为 oMLX 兼容 WAV: $transcribe_audio_file" >&2
   if ! ffmpeg -y -hide_banner -loglevel error -i "$audio_file" -ar 16000 -ac 1 -f wav "$transcribe_audio_file" >&2; then
     echo "whisper 模式失败：音频转 WAV 失败: $audio_file" >&2
     return 1
   fi
 
   echo "pipeline_stage=transcription" >&2
-  transcribe_log="$(mktemp "$out_dir/.whispercpp-log.XXXXXX")"
+  transcribe_log="$(mktemp "$out_dir/.omlx-log.XXXXXX")"
   set +e
   bash "$whisper_helper" "$transcribe_audio_file" "$output_prefix" "$language" "$whisper_profile" >"$transcribe_log" 2>&1
   run_code=$?
@@ -657,13 +628,12 @@ yt_common_run_whisper_mode_from_url() {
   fi
 
   if [[ ! -f "$srt_file" ]]; then
-    echo "whisper.cpp 已执行，但未找到转写结果: $srt_file" >&2
+    echo "oMLX 已执行，但未找到转写结果: $srt_file" >&2
     return 1
   fi
 
-  # 写入 metadata 侧车文件，供后续复用判断。
-  local meta_file="${transcribe_audio_file%.whisper.wav}.meta"
-  printf "profile=%s\nmodel=%s\nlanguage=%s\n" "$used_profile" "$used_model" "$language" > "$meta_file"
+  # 兼容旧调用方读取元数据；缓存信任来源仍仅为 oMLX 的 .asr.json。
+  printf "profile=%s\nmodel=%s\nlanguage=%s\n" "$used_profile" "$used_model" "$language" > "$output_prefix.meta"
 
   yt_common_subtitle_to_text "$srt_file" "$text_file" || return 1
   echo "requested_profile=$requested_profile"

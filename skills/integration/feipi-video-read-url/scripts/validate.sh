@@ -120,7 +120,9 @@ for required_file in \
   "$TARGET_DIR/scripts/install_deps.sh" \
   "$TARGET_DIR/scripts/lib/yt_dlp_common.sh" \
   "$TARGET_DIR/scripts/lib/youtube_retry_policy.sh" \
-  "$TARGET_DIR/scripts/lib/whispercpp_transcribe.sh" \
+  "$TARGET_DIR/scripts/lib/omlx_transcribe.sh" \
+  "$TARGET_DIR/scripts/lib/omlx_transcribe.py" \
+  "$TARGET_DIR/references/omlx-asr.md" \
   "$TARGET_DIR/references/sources.md"; do
   if [[ ! -f "$required_file" ]]; then
     echo "缺少文件：$required_file" >&2
@@ -193,7 +195,7 @@ if rg -n 'feipi-scripts/video|feipi-read-youtube-video|feipi-read-bilibili-video
   "$TARGET_DIR/scripts/extract_video_text.sh" \
   "$TARGET_DIR/scripts/install_deps.sh" \
   "$TARGET_DIR/scripts/lib/yt_dlp_common.sh" \
-  "$TARGET_DIR/scripts/lib/whispercpp_transcribe.sh" >&2; then
+  "$TARGET_DIR/scripts/lib/omlx_transcribe.sh" >&2; then
   echo "检测到旧依赖或旧 skill 名残留" >&2
   exit 1
 fi

@@ -16,7 +16,7 @@ description: 用于按用户意图处理视频网站 URL（如 YouTube、Bilibil
 - `video`：下载视频。
 - `audio`：提取音频。
 - `subtitle`：优先提取标准字幕并转成带时间戳文本。
-- `whisper`：在无可用字幕或用户明确要求时，使用 `whisper.cpp` 转写。
+- `whisper`：在无可用字幕或用户明确要求时，使用本地 oMLX 转写（沿用 `whisper` 模式名）。
 
 2. 内容总结
 - `summary`：只交付结构化摘要。
@@ -35,7 +35,7 @@ description: 用于按用户意图处理视频网站 URL（如 YouTube、Bilibil
 python3 <本 skill>/scripts/extract_content.py '<URL>' '<OUTPUT_DIR>'
 ```
 
-该入口支持 YouTube、Bilibili、小红书；小红书自动交给同级 `feipi-xiaohongshu-read-note` 判断图文/视频。默认字幕优先、内置 whisper.cpp fast 回退，并通过 ffmpeg 远程输入端 seek 只截首帧。仅获取独立音频与按需画面；不下载完整原视频，合流视频不能作为 ASR 回退。可用 `--quality accurate` 保留高质量转写档位。其他既有来源、用户明确只要文字或明确下载需求继续使用原入口。
+该入口支持 YouTube、Bilibili、小红书；小红书自动交给同级 `feipi-xiaohongshu-read-note` 判断图文/视频。默认字幕优先、本地 oMLX SenseVoiceSmall 回退，并通过 ffmpeg 远程输入端 seek 只截首帧。仅获取独立音频与按需画面；不下载完整原视频，合流视频不能作为 ASR 回退。可用 `--quality accurate` 保留高质量转写档位。其他既有来源、用户明确只要文字或明确下载需求继续使用原入口。
 
 调用方必须指定独立输出目录，不得写入 skill 安装目录。结果为 `extraction_manifest.json`（`schema=feipi-content-extraction-v1`），包含来源、正文/字幕/ASR、图片/帧及 OCR/视觉观察独立清单。退出码 0=complete、2=partial、1=failed/blocked；先读 manifest 判断已有证据。字段、读图登记、失败边界及安装依赖见 [通用提取合同](references/content-extraction.md)。
 
@@ -52,7 +52,7 @@ python3 <本 skill>/scripts/extract_content.py '<URL>' '<OUTPUT_DIR>'
 1. 用户给出视频 URL，希望先验证链接是否可读、可下载或可转写。
 2. 用户要下载视频、提取音频、提取字幕、做 whisper 转写。
 
-严道适配使用公开详情接口核验标题和未加密历史回放，不读取浏览器凭据；报名默认停止并逐例处理。已正常登录并实际播放到结尾的单讲，可按 `references/sources.md` 提供24小时内、来源与媒体/清单指纹匹配的账号播放证据接回统一入口；付费、加密或仍在直播时停止。直播回放按视频处理，集合页先选择单讲。先检查独立字幕及画面硬字幕，未发现接口字段不能据此认定无字幕。需要语音识别时由统一入口回退内置 whisper.cpp；严道语言默认 auto，支持 videoEn 媒体。文章内有多个直接视频时，以 AGENT_DRVOICE_VIDEO_INDEX 指定从1开始的序号；独立保存每段身份，不把图文介绍当作转写。仅支持已核验的站点视频和OSS域名；微信等iframe播放器另行逐例解析。
+严道适配使用公开详情接口核验标题和未加密历史回放，不读取浏览器凭据；报名默认停止并逐例处理。已正常登录并实际播放到结尾的单讲，可按 `references/sources.md` 提供24小时内、来源与媒体/清单指纹匹配的账号播放证据接回统一入口；付费、加密或仍在直播时停止。直播回放按视频处理，集合页先选择单讲。先检查独立字幕及画面硬字幕，未发现接口字段不能据此认定无字幕。需要语音识别时由统一入口回退本地 oMLX；严道语言默认 auto，支持 videoEn 媒体。文章内有多个直接视频时，以 AGENT_DRVOICE_VIDEO_INDEX 指定从1开始的序号；独立保存每段身份，不把图文介绍当作转写。仅支持已核验的站点视频和OSS域名；微信等iframe播放器另行逐例解析。
 3. 用户只想先拿到结构化摘要，不希望默认继续做背景分析。
 4. 用户明确要求“继续扩展分析”“补充背景/影响/相关新闻/最新进展”。
 5. 用户单独追问“这个视频的上下文背景是什么”“这件事的来龙去脉是什么”。
@@ -117,12 +117,11 @@ python3 <本 skill>/scripts/extract_content.py '<URL>' '<OUTPUT_DIR>'
 - 最终摘要或背景内容必须由大模型基于转写和外部资料生成，禁止用词频或模板硬拼结论。
 
 3. 转写严格性（强制）
-- 只允许使用当前 skill 内置的 `whisper.cpp` 链路（`scripts/lib/whispercpp_transcribe.sh`）。
-- 禁止改用 Python 版 whisper、OpenAI whisper 或其他转写工具。
-- fast 只允许使用已存在的 `ggml-base.bin`（或 `ggml-small.bin` / `ggml-large-v3-turbo-q5_0.bin`）。
-- accurate 只允许使用已存在的 `ggml-large-v3-q5_0.bin`。
-- 运行时若模型缺失，只能提示用户显式执行 `scripts/install_deps.sh`，禁止脚本静默切换其他模型。
-- 必须通过 `scripts/extract_video_text.sh` 获取带时间戳文本，禁止手写 `whisper-cli` 参数。
+- 统一调用本 skill 的 `scripts/lib/omlx_transcribe.sh`，通过本地 oMLX `/v1/audio/transcriptions` 识别。
+- 默认和 `fast` 使用 `sensevoicesmall`（SenseVoiceSmall）；`accurate` 使用 `qwen3-asr-1.7b`（Qwen3-ASR-1.7B）。按 `/v1/models` 解析实际模型 ID；缺失或同一家族多个候选时明确失败，不切换其他模型。
+- 服务默认 `http://127.0.0.1:8037/v1`；自定义本机端口用 `AGENT_OMLX_BASE_URL`，认证用 `AGENT_OMLX_API_KEY`。运行时不启动服务、不下载模型、不改 oMLX 配置。
+- 必须通过 `scripts/extract_video_text.sh` 获取文本，禁止手写其他识别命令。`whisper` 模式名、`whisper_profile` 字段与 `.whisper.wav` 文件名仅作兼容。
+- 音频按不超过 30 秒分块顺序识别，时间戳表示音频块范围，并非逐句或逐字对齐；来源状态必须披露“oMLX 模型名、约30秒块级时间戳、识别风险”。只有全部块请求完成才交付文本；全空转写失败，不用标题补正文。详见 [oMLX 转写配置](references/omlx-asr.md)。
 
 4. 分段触发强约束
 - 未显式要求背景时，不得自动补第二阶段。
@@ -158,7 +157,7 @@ python3 <本 skill>/scripts/extract_content.py '<URL>' '<OUTPUT_DIR>'
 - 长视频保护：whisper 模式会输出 `duration_sec`、`long_video` 和 `estimated_risk`，执行方可据此预估耗时，不做交互式确认。用户显式传 `accurate` 仍可按设计执行。
 - 字幕原文件保留不动；转换时将无效 UTF-8 字节替换为 `�`，用 `subtitle_encoding_replaced_bytes` 披露受损字节数。先完整解析全部有效字幕、核对末尾时间戳，再原子写入 TXT；失败不能返回成功文本路径。
 - 复用 SRT 时也会重新生成并校验 TXT，修复历史残留的半份文本；成功日志包含 `subtitle_cue_count`、`text_last_timestamp`。有字节替换时必须在摘要来源状态披露文本损坏风险。
-- 中断后残留的 `.whisper.wav` + `.srt` 会被自动复用，不会触发重复下载或重复转写。执行方不要删除 run_dir 下已有的媒体文件，除非是本次 run 明确的临时文件。
+- 中断后残留的 `.whisper.wav` + `.srt` + `.asr.json` 仅在模型家族、档位、语言、音频 SHA256 与完整 SRT 校验均匹配时复用，不会触发重复下载或重复转写。执行方不要删除 run_dir 下已有的媒体文件，除非是本次 run 明确的临时文件。
 
 9. Bilibili 网络诊断契约（强制）
 - 若日志出现 `diagnostic_code=bilibili_network_preflight_failed`，只能说明当前执行环境的网络预检失败，不能直接断言 Bilibili 不可访问或代理未启动。
@@ -233,21 +232,13 @@ python3 <本 skill>/scripts/extract_content.py '<URL>' '<OUTPUT_DIR>'
 - `accurate`：先 `whisper`，失败再回退 `subtitle`。
 - `fast`：先 `subtitle`，失败再回退 `whisper`。
 
-3. fast 模型缺失不静默降级
-- fast 模型缺失时直接失败，提示用户执行 `scripts/install_deps.sh`，不静默回退 accurate。
-- accurate 模型缺失时同样失败并提示安装。
+3. 服务与模型检查
+- `scripts/install_deps.sh --check` 检查本地服务与 SenseVoiceSmall；加 `--accurate` 同时检查 Qwen3-ASR-1.7B。
+- 模型缺失时提示在 oMLX 中配置，不静默切换模型；accurate 的既有字幕回退会明确输出 `mode=subtitle`。
 
-4. accurate 资源参数
-- `accurate` 使用 beam_size=3、best_of=3、threads=4（经 clamp 后不超过物理核心）。
-- 相比旧版 beam=8/best_of=8，资源消耗显著降低，适用于需要较高转写质量的场景。
-- `fast` 使用 beam_size=2、best_of=2、threads=8（经 clamp），优先保障速度。
-
-3. 观测字段
-- `extract_video_text.sh` 输出中包含：
-  - `run_dir`
-  - `whisper_profile`
-  - `selection_reason`
-  - `strategy`
+4. 观测字段
+- `extract_video_text.sh` 保留 `run_dir`、`whisper_profile`、`selection_reason`、`strategy`，ASR 成功时新增 `asr_backend=omlx`、`asr_model`、`asr_timestamps=audio_chunk`。
+- `.asr.json` 保存实际模型、音频指纹、分块时间范围与原文；取证 manifest 的 ASR 来源为 `omlx`，明确模型与块级时间精度。
 
 ## 工作流（Explore -> Plan -> Implement -> Verify）
 
@@ -416,6 +407,6 @@ bash "$SKILL_DIR/scripts/render_background_prompt.sh" \
 - 统一提取入口：`scripts/extract_video_text.sh`
 - 依赖安装入口：`scripts/install_deps.sh`
 - 请求包模板脚本：`scripts/render_summary_prompt.sh`、`scripts/render_background_prompt.sh`
-- 本地公共库：`scripts/lib/yt_dlp_common.sh`、`scripts/lib/whispercpp_transcribe.sh`
+- 本地公共库：`scripts/lib/yt_dlp_common.sh`、`scripts/lib/omlx_transcribe.sh`
 - 字幕转换：`scripts/lib/subtitle_to_text.py`（Python 3 标准库）
 - 来源说明：`references/sources.md`

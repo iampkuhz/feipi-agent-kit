@@ -157,11 +157,12 @@ fi
 
 # --- 来源状态要求 ---
 source_status_rule="5) 必须输出 '## 来源状态' 章节，且包含以下字段：
-   - 文本来源：标准字幕 / 自动字幕 / Whisper 转写 / 已有文本 / 未知
+   - 文本来源：标准字幕 / 自动字幕 / oMLX 转写（注明实际模型） / 已有文本 / 未知
    - 是否完整：完整 / 已截断 / 仅局部片段 / 分段摘要
    - 是否带时间戳：是 / 否
    - 是否使用外部资料：否 / 是，仅用于背景
-   - 主要风险：无 / 自动字幕误差 / Whisper 误识别 / 中段截断 / 无时间戳 / 其他"
+   - 主要风险：无 / 自动字幕误差 / ASR 误识别 / 中段截断 / 无时间戳 / 其他
+   - 若下方提供 oMLX 来源信息，必须披露其模型与约30秒块级时间范围，不能声称逐句或逐字对齐。"
 
 # --- 视频类型识别 ---
 video_type_rule="6) 请根据视频标题和转写内容判断 video_type，并在'## 摘要概述'内使用对应的三级标题组织内容：
@@ -203,6 +204,21 @@ $(python3 "$(dirname "${BASH_SOURCE[0]}")/lib/video_identity.py" --prompt "$URL"
 字幕总行数: $line_count
 是否截断: $truncated
 是否含时间戳: $HAS_TIMESTAMPS
+$(python3 - "$TRANSCRIPT_PATH" <<'PY'
+import hashlib
+import json
+from pathlib import Path
+import sys
+path = Path(sys.argv[1])
+try:
+    record = json.loads(path.with_suffix('.asr.json').read_text())
+    if (record.get('schema') == 'omlx-asr-v1' and record.get('text_sha256') == hashlib.sha256(path.read_bytes()).hexdigest()):
+        print('oMLX 来源信息: ' + json.dumps({key: record.get(key) for key in
+              ('model', 'timestamp_source', 'chunk_seconds', 'duration_seconds')}, ensure_ascii=False))
+except (OSError, ValueError, AttributeError):
+    pass
+PY
+)
 摘要风格: $SUMMARY_STYLE
 
 当前只执行"摘要提取"，必须严格按下面结构输出，标题完全一致：

@@ -1,5 +1,8 @@
 # 变更记录
 
+## 2026-11-04
+- feipi-video-read-url v14：默认本地SenseVoice，高精度Qwen转写
+
 ## 2026-10-31
 - 统一工作台：引入现有 Mac/Multica/OpenClaw/OpenClash 源码，增加 workbench/develop、选择性配置回收、私有备份与回退；完成当前机器和路由器接管，证据见 docs/workbench-validation.md
 - feipi-multica-manage-tasks v1：新增任务记录、派发与持久交接

@@ -123,11 +123,19 @@ class ReliabilityTests(unittest.TestCase):
         helper = self.root / "helper"
         self.program(helper, "exit 99")
         (self.root / "video.whisper.wav").touch()
-        (self.root / "video.meta").write_text("profile=fast\nmodel=mock\n")
         srt = self.root / "video.srt"
-        srt.write_bytes(b"1\n02:33:38,620 --> 02:33:39,180\nlast \xff\n")
+        srt.write_text("1\n02:33:38,620 --> 02:33:39,180\nlast\n")
         target = self.root / "video.txt"
         target.write_text("old partial result")
+        import hashlib
+        import json
+        from importlib.util import spec_from_file_location, module_from_spec
+        spec = spec_from_file_location("omlx", SCRIPTS / "lib/omlx_transcribe.py")
+        client = module_from_spec(spec)
+        spec.loader.exec_module(client)
+        record = dict(client.fingerprint(self.root / "video.whisper.wav", "fast", "zh"),
+                      model="SenseVoiceSmall", srt_sha256=hashlib.sha256(srt.read_bytes()).hexdigest())
+        (self.root / "video.asr.json").write_text(json.dumps(record))
         call = 'yt_common_run_whisper_mode_from_url url "$1" "$2" zh fast'
         result = self.shell(call, self.root, helper)
         self.assertEqual(result.returncode, 0, result.stderr)

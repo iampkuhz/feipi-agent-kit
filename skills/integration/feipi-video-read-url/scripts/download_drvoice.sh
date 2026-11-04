@@ -34,6 +34,6 @@ else
   ffmpeg -nostdin -v error -y -i "$VIDEO" -vn -ac 1 -ar 16000 -c:a pcm_s16le "$AUDIO"
 fi
 if [[ "$MODE" == audio ]]; then echo "audio_file=$AUDIO"; exit 0; fi
-bash "$SCRIPT_DIR/lib/whispercpp_transcribe.sh" "$AUDIO" "$OUT_DIR/transcript" "$LANGUAGE" "$PROFILE"
+bash "$SCRIPT_DIR/lib/omlx_transcribe.sh" "$AUDIO" "$OUT_DIR/transcript" "$LANGUAGE" "$PROFILE"
 python3 "$SCRIPT_DIR/lib/subtitle_to_text.py" "$OUT_DIR/transcript.srt" "$OUT_DIR/transcript.txt"
 echo "text_file=$OUT_DIR/transcript.txt"
