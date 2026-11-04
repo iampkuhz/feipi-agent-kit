@@ -42,14 +42,18 @@ class Acceptance(unittest.TestCase):
         m = {'agents': {'codex-builder': 'agent'}, 'runtimes': {'codex': {'id': 'runtime'}}}
         c = {'agents': [{'key': 'codex-builder', 'runtime': 'codex'}]}
         fixture = {'root': '/unused', 'issues': {'codex-builder': 'issue', 'qoder-worker': 'old'}}
-        with patch.object(acceptance, 'machine', return_value=m), patch.object(adapt, 'catalog', return_value=c), patch.object(acceptance, 'read_json', return_value=fixture):
+        with patch.object(acceptance, 'machine', return_value=m), patch.object(adapt, 'catalog', return_value=c), patch.object(acceptance, 'read_json', return_value=fixture), patch.object(acceptance, 'cli', return_value=[]), patch.object(acceptance, 'prepare_files') as refresh:
             self.assertEqual(acceptance.prepare(), fixture)
+            refresh.assert_called_once_with(Path('/unused'), ['codex-builder'])
 
     def test_old_attachment_cannot_certify_a_new_execution(self):
         report = {'task_contract': {k: True for k in ['MULTICA_TOKEN', 'MULTICA_TASK_ID', 'MULTICA_AGENT_ID', 'MULTICA_WORKSPACE_ID', 'MULTICA_SERVER_URL']},
                   'token_kind': 'task', 'calculation': 5, 'task_id': 'old'}
-        value = {'probe': report, 'runs': [{'id': 'new', 'status': 'failed'}, {'id': 'old', 'status': 'completed'}],
-                 'issue_status': 'in_review', 'attachment_count': 2, 'attachment_verified': True}
+        expected = dict(agent_key='codex-builder', agent_id='agent', workspace_id='workspace', runtime_id='runtime', cwd='/probe', probe_sha256='sha')
+        report.update({k:v for k,v in expected.items() if k != 'runtime_id'})
+        value = {'probe': report, 'runs': [{'id': 'new', 'status': 'failed'}, dict(id='old', status='completed', agent_id='agent', runtime_id='runtime', workspace_id='workspace', work_dir='/probe')],
+                 'issue_status': 'in_review', 'attachment_count': 2, 'attachment_verified': True,
+                 'expected': expected, 'progress_verified': True, 'delivery_verified': True}
         self.assertFalse(acceptance.passed(value))
         value['runs'] = value['runs'][1:]
         self.assertTrue(acceptance.passed(value))

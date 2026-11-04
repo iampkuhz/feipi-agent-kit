@@ -16,6 +16,8 @@
 
 已实现 `multica-ops plan/apply/verify/doctor` 和 `multica-work` 统一交互。日常操作以 [适配操作手册](docs/adaptation-runbook.md) 为准；Mac mini 单主机切换见 [迁移流程](docs/mac-mini-migration.md)。声明与机器绑定分开；共享 Skill 由 Agent Kit 维护。
 
+任务预检失败可在缺口解除后复用原 request-id；真实请求结果不明仍保留 pending，先 recover 核对运行、评论与附件。实机验收将身份、目录、探针版本、评论线程和下载附件绑定到最新执行；doctor 的静态通过不替代当前运行证据。
+
 ## 日常入口
 
 ```bash

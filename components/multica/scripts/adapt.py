@@ -27,7 +27,8 @@ def skill_body(m, c):
 def evidence_fingerprint(m, c):
     kit = Path(expand(m['agent_kit']))
     evidence = {'machine': m, 'catalog': c, 'capabilities': read_json(ROOT / 'config/capabilities.json'),
-                'skills': {p: file_inventory(kit / p) for p in c['skill_checks']}}
+                'skills': {p: file_inventory(kit / p) for p in c['skill_checks']},
+                'implementation': {p: file_inventory(ROOT / p) for p in ['bin', 'scripts']}}
     if any(a['runtime'] == 'openclaw-isolated' for a in c['agents']):
         evidence['openclaw'] = read_json(Path(expand(m['openclaw_state'])) / 'openclaw.json')
     return digest(evidence)

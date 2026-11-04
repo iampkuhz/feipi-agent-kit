@@ -34,6 +34,8 @@ multica-work recover TASK-123
 
 同一意图始终复用 request-id。`record` 为未分派 Backlog，`bind` 记录当前工作，`note` 自动加 `/note`。`dispatch` 先用 `--no-start` 设置归属，再发送唯一显式 @交接评论；仅 assign Backlog 不启动。服务端 `trigger_outcomes` 表示 queued/coalesced/blocked，仍需查 runs 确认实际启动。后台评论触发的任务必须传 `--parent 触发评论ID`。
 
+`bind` 先核对活动运行、真实目录和交互归属，预检失败不留下 pending。缺口解除后可用原输入及 request-id 重试；已成功的重试直接返回原回执，不再次预检或回写。正文、交接包或附件变化属于新意图，先核对当前状态再确定新 request-id。
+
 `handoff` 用正常 @回复唤醒下一角色；不可把它统一改成静默日志。提交验收用 deliver，上传附件再 `in_review --no-start`，不自动标 Done。项目自身的审批与独立验收规则继续有效。
 
 当前通用逻辑键为 `codex-builder`；`coordinator`、`validator`、`reviewer` 保留 LexiFlow 专用范围。历史可选键 `qoder-worker`、`openclaw-assistant`、`litellm-coder` 需先补齐声明、runtime 及实际验收后使用；OpenClaw 的 model 是 Agent ID，`litellm-coder` 再选择 `litellm/litellm-code-openai`。
@@ -76,7 +78,7 @@ LaunchAgent `local.multica.personal` 在用户登录后启动持续监督器。�
 
 若重新启用 OpenClaw 执行器，能力发现与包装命令均须指向隔离目录，保留 CLI 生成的每任务 OPENCLAW_CONFIG_PATH。个人 Gateway 不切换目录、不重启，禁止在 UI 中误选个人实例。
 
-失败先分层：服务/依赖 → daemon/runtime → 认证 → 模型 → 工具/技能 → 产物。`recover` 只查询，不重跑。pending 回执表示请求可能已经到达服务器；查 Issue 评论中的 request-id、runs 和附件，记录结论后显式确定新一轮操作，不删除回执盲重试。跨机器/直接 UI 调用不受本机锁保护。
+失败先分层：服务/依赖 → daemon/runtime → 认证 → 模型 → 工具/技能 → 产物。`recover` 只查询，汇总 runs、评论来源/parent、request-id、附件 ID/文件名和本机回执，不复制评论全文、不重跑。pending 表示请求可能已经到达服务器；部分交付可能已经上传但状态更新未确认。核对远端后显式确定下一步，不删除回执盲重试。跨机器/直接 UI 调用不受本机锁保护。
 
 ## 可重复验收
 
@@ -88,8 +90,10 @@ python3 scripts/acceptance.py check
 python3 scripts/acceptance.py check --save
 ```
 
-prepare 按当前声明创建专用项目及代表角色的未分派 Issue，私有 fixture 防重复；不使用 LexiFlow 正式任务。历史 fixture 中停用的角色不参与本轮验收，新增角色缺少 fixture 则停止，不重复创建项目。新一轮验收先核对已有 runs 和产物，使用新的、可说明的 request-id；同一轮重试保留原 ID。fixture 丢失而同名项目存在会拒绝接管，需人工恢复准确绑定。
+prepare 按当前声明创建专用项目及代表角色的未分派 Issue，私有 fixture 防重复；不使用 LexiFlow 正式任务。已有 fixture 会先确认没有活动 run，再刷新探针、任务说明和交接包，避免沿用旧版本脚本。历史 fixture 中停用的角色不参与本轮验收，新增角色缺少 fixture 则停止，不重复创建项目。新一轮验收先核对已有 runs 和产物，使用新的、可说明的 request-id；同一轮重试保留原 ID。fixture 丢失而同名项目存在会拒绝接管，需人工恢复准确绑定。
 
-探针验证五项任务环境、真实执行与计算、任务身份回写、下载附件和待验收状态；启用隔离 OpenClaw 时还核对任务配置。附件内容必须匹配最新 completed 执行，旧附件不能证明新执行成功，未通过时 check 返回非零。MCP 实际调用明确为 not-tested；要依赖某 MCP，应另加其真实任务调用验收。`--save` 保存环境摘要与逐角色结果，配置/机器/技能变化后 doctor 标记证据待更新。历史测试记录在 [VALIDATION.md](../VALIDATION.md)，本轮集成见 [工作台验收](../../../docs/workbench-validation.md)。
+探针验证五项任务环境、真实执行与计算，以及当前 Agent、runtime、工作区、目录和探针 SHA-256。Agent 以固定的本次 task ID 加 `-note` 回写并重复同一命令，验收器只接受一条本次进度；交付用 `-deliver`，两者的 author/source_task_id/parent 必须匹配当前执行。附件重新下载后须与本次报告一致，Issue 为 in_review。旧附件、错误身份、错误线程或过期探针均不能证明通过，check 失败返回非零。启用隔离 OpenClaw 时还核对任务配置。
+
+MCP 实际调用明确为 not-tested；要依赖某 MCP，应另加其真实任务调用验收。`--save` 保存环境摘要与逐角色结果，配置、机器、技能或 Multica 执行代码变化后 doctor 标记证据待更新。doctor 退出码零只表示静态检查没有阻塞，仍须检查 runtime-capabilities 是否 evidence-required。历史测试记录在 [VALIDATION.md](../VALIDATION.md)，本轮集成见 [工作台验收](../../../docs/workbench-validation.md)。
 
 依据： [Multica runtime 与任务环境契约](https://multica.ai/docs/daemon-runtimes)、[评论触发与 /note](https://multica.ai/docs/mentioning-agents)。借鉴 [multica-agent-team](https://github.com/stone16/multica-agent-team) 的职责/实例/部署拆分、[Mops](https://github.com/jamillazarev/multica-ops/blob/main/REFERENCE.md) 的恢复方法和 [stometa-skills](https://github.com/stone16/stometa-skills/blob/main/docs/multica.md) 的能力验证边界；具体行为以本机 0.6.3 及实测为准。

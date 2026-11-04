@@ -5,9 +5,9 @@ import datetime
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
-import uuid
 
 from adaptation import (ROOT, STATE, AdaptError, cli, digest, expand, lock, machine,
                         private_write, read_json, resolve_runtime, task_context)
@@ -59,7 +59,14 @@ def inspect(issue):
         if value.get('operation', {}).get('issue') in refs or value.get('result', {}).get('issue_id') in refs:
             receipts.append({'request_id': value.get('request_id'), 'state': value.get('state'),
                              'operation': value.get('operation', {}).get('action'), 'path': str(path)})
-    return {'issue': details, 'runs': cli('issue', 'runs', issue), 'receipts': receipts}
+    comments = cli('issue', 'comment', 'list', issue, '--full')
+    evidence = [{'id': c['id'], 'parent_id': c.get('parent_id'),
+                 'source_task_id': c.get('source_task_id'), 'author_type': c.get('author_type'),
+                 'request_ids': re.findall(r'^request-id: (.+)$', c.get('content', ''), re.MULTILINE),
+                 'attachments': [{k: a.get(k) for k in ['id', 'filename']} for a in c.get('attachments') or []]}
+                for c in comments]
+    return {'issue': details, 'runs': cli('issue', 'runs', issue),
+            'comments': evidence, 'receipts': receipts}
 
 
 def packet(path):
@@ -67,11 +74,14 @@ def packet(path):
     required = ['objective', 'scope', 'directory', 'acceptance', 'artifacts', 'remaining', 'required_commands', 'required_mcp']
     if not isinstance(value, dict) or any(k not in value for k in required):
         raise AdaptError('交接包缺字段：' + ', '.join(required))
-    if not all(value[k] for k in ['objective', 'scope', 'directory', 'acceptance']):
-        raise AdaptError('目标、范围、目录和验收要求不能为空。')
+    if not all(isinstance(value[k], str) and value[k].strip()
+               for k in ['objective', 'scope', 'directory', 'acceptance']):
+        raise AdaptError('目标、范围、目录和验收要求必须为非空字符串。')
     for key in ['artifacts', 'remaining', 'required_commands', 'required_mcp']:
         if not isinstance(value[key], list):
             raise AdaptError('交接包字段必须为数组：' + key)
+        if any(not isinstance(item, str) or not item.strip() for item in value[key]):
+            raise AdaptError('交接包数组只能包含非空字符串：' + key)
     if not Path(expand(value['directory'])).is_dir():
         raise AdaptError('交接执行目录不存在。')
     return value
@@ -145,6 +155,13 @@ def run(args):
             data['artifact_hashes'][str(p)] = hashlib.sha256(p.read_bytes()).hexdigest()
     prepared = {}
     def before_request():
+        if args.action == 'bind':
+            if cli('issue', 'runs', args.issue, '--active'):
+                raise AdaptError('已有后台任务；先交接或排空后绑定当前聊天。')
+            directory = Path(args.directory).expanduser().resolve(strict=True)
+            if not directory.is_dir() or not args.owner.strip():
+                raise AdaptError('绑定需要实际目录和非空的交互归属。')
+            prepared['directory'] = str(directory)
         if args.action in {'dispatch', 'handoff'}:
             if args.action == 'dispatch' and task_context():
                 raise AdaptError('后台任务交接请使用 handoff 回复触发评论；dispatch 由本机用户使用。')
@@ -156,10 +173,7 @@ def run(args):
                         '--status', 'backlog', '--description-stdin', stdin=body + marker)
             return {'issue_id': issue['id'], 'status': 'recorded-without-dispatch'}
         if args.action == 'bind':
-            if cli('issue', 'runs', args.issue, '--active'):
-                raise AdaptError('已有后台任务；先交接或排空后绑定当前聊天。')
-            directory = str(Path(args.directory).expanduser().resolve(strict=True))
-            result = comment(args.issue, '/note\n当前交互处理：' + args.owner + '\n目录：' + directory + marker, args.parent)
+            result = comment(args.issue, '/note\n当前交互处理：' + args.owner + '\n目录：' + prepared['directory'] + marker, args.parent)
             return {'comment_id': result['id'], 'status': 'bound-without-dispatch'}
         if args.action == 'note':
             result = comment(args.issue, '/note\n' + body + marker, args.parent)

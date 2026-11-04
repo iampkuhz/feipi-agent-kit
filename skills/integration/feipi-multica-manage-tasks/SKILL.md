@@ -1,6 +1,6 @@
 ---
 name: feipi-multica-manage-tasks
-description: 用于把本地聊天工作记录到 Multica、查询进展、静默回写、明确派发和跨 Agent 交接；用户要记录任务、交给后台、提交验收或恢复任务时使用。普通编码但未涉及 Multica、服务部署或技能治理不触发。
+description: 用于把本地聊天工作记录到 Multica、查询进展、静默回写、明确派发和跨 Agent 交接；用户要求 Multica 任务协作、后台执行、提交验收或恢复任务时使用。普通编码、部署或技能治理未要求 Multica 协作时不触发。
 ---
 
 # Multica 任务协作
@@ -8,6 +8,8 @@ description: 用于把本地聊天工作记录到 Multica、查询进展、静�
 ## 输入与输出
 
 从对话确定 Issue 或项目、用户意图、实际工作目录和交付要求。能从当前项目和 Issue 取得的信息直接读取；不要凭 Agent 显示名猜机器。输出 Issue 链接、实际执行者及 runtime、结果或阻塞、验证证据。只同步任务与结果，不复制私有聊天历史。
+
+先区分记录、当前聊天处理和后台执行。仅要求讨论或设计时先调查与设计，不创建或派发任务；已明确授权的执行与验收连续完成，不重复确认。
 
 ## 执行入口
 
@@ -27,7 +29,7 @@ description: 用于把本地聊天工作记录到 Multica、查询进展、静�
 | 唤醒下一角色 | `handoff ISSUE --agent 逻辑键 --packet 交接包.json --request-id 固定ID` | 是，正常 @回复 |
 | 失败后接着做 | `recover ISSUE`，检查后决定续接 | 否，不自动重派 |
 
-评论触发的后台任务必须在 note、deliver、handoff 中加 `--parent 原触发评论ID`。这个 ID 来自原生任务上下文，不是另一个工具的会话 ID。不得把所有完成交接都改成静默评论；需要下一角色运行时才用 handoff。遵循项目已有角色、审批和验收规则，不能用此入口跳过 LexiFlow 的正式协作要求。
+评论触发的后台任务必须在 note、deliver、handoff 中加 `--parent 原触发评论ID`。用 `multica-task issue runs ISSUE` 定位当前 MULTICA_TASK_ID 对应的 trigger_comment_id；它不是其他工具的会话 ID。不得把所有完成交接都改成静默评论；需要下一角色运行时才用 handoff。执行角色以当前声明和完整绑定为准，历史示例不代表已启用；LexiFlow 专用角色只在其正式范围内使用，不能借来执行通用验收。
 
 ## 交接包
 
@@ -53,8 +55,11 @@ dispatch 核对 Agent 的完整 runtime 身份、daemon、profile、项目目录
 ## 重试、结果和恢复
 
 - 同一次意图的 request-id 固定，例如 `issue-123-deliver-1`；重试复用，不能每次生成新值。已成功返回原回执；pending 表示服务端结果未确认，先查 Issue、评论、runs 和产物。它是本机防重，不承诺多机器事务。
+- 只读预检失败尚未发送请求，不应产生 pending；缺口解除后以原输入和原 request-id 重试。已成功的请求直接返回原回执；输入或附件改变属于新意图，先核对现状再使用新 request-id。
+- `recover ISSUE` 返回运行、评论来源、request-id、附件定位和本机回执；只供核对，不重派、不删除 pending，也不把未知请求自动改为成功。部分交付可能已经上传附件但未更新状态，同样先核对服务端。
 - `multica-task issue runs ISSUE`、`issue comment list ISSUE` 用于取证。已有活动 run 时不要重派。跨工具依赖显式交接包，同工具续接由原生 runtime 管理；不互换私有 session ID。
 - 区分服务就绪、模型请求成功、技能和工具实际可用、产物验证通过四层结果。报告真实失败层，不因进程退出码为零自动宣告任务验收。
+- doctor/verify 通过仅证明其覆盖的静态配置或服务检查；`evidence-required` 表示当前环境仍需实机证据。报告和附件必须对应本次 run、实际 Agent、runtime、工作区与目录；旧通过记录不能替代当前验收。
 - deliver 正文写明产物、验证命令和结果、未验证事项及剩余工作；至少上传一个持久附件，可为包含提交/PR 地址的交付说明。临时目录不能是唯一交付。用户或项目验收流程决定 Done。
 - 不主动向 Telegram、邮件或其他外部渠道发送通知；遵循本次用户明确授权。
 

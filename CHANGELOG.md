@@ -1,6 +1,7 @@
 # 变更记录
 
 ## 2026-11-05
+- feipi-multica-manage-tasks v2：修复绑定重试并补齐协作验收
 - feipi-video-read-url v18：本地媒体、停顿切口与转写来源校验
 
 ## 2026-11-04
