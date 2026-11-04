@@ -9,7 +9,7 @@ python3 <feipi-xiaohongshu-read-note>/scripts/extract_note.py '<URL>' '<OUTPUT_D
 python3 <feipi-video-read-url>/scripts/extract_content.py '<URL>' '<OUTPUT_DIR>'
 ```
 
-输出目录必须由调用方指定且不能位于任意 skill 安装目录内。每次调用使用独立目录；重复调用已存在 manifest 的目录拒绝覆盖。默认视频字幕优先、内置 whisper.cpp fast 回退，并按需远程抽帧；不下载完整原视频。图文逐图保存。两个入口均输出 `<OUTPUT_DIR>/extraction_manifest.json`；stdout 仅输出 manifest 路径与状态。退出码 0=complete，2=partial（已有证据或等待宿主读图），1=failed/blocked；manifest 始终是业务状态真源（参数或文件系统错误除外）。
+输出目录必须由调用方指定且不能位于任意 skill 安装目录内。每次调用使用独立目录；重复调用已存在 manifest 的目录拒绝覆盖。默认视频字幕优先、本地 oMLX SenseVoiceSmall 回退（accurate 使用 Qwen3-ASR-1.7B），并按需远程抽帧；不下载完整原视频。图文逐图保存。两个入口均输出 `<OUTPUT_DIR>/extraction_manifest.json`；stdout 仅输出 manifest 路径与状态。退出码 0=complete，2=partial（已有证据或等待宿主读图），1=failed/blocked；manifest 始终是业务状态真源（参数或文件系统错误除外）。
 
 ## JSON 结构
 
@@ -67,10 +67,12 @@ JSON 为 `[{"source_artifact_id":"image-001","ocr_text":"…","observation":"…
 
 提取完成不表示摘要充分。摘要集成另按 [摘要覆盖复核](summary-coverage.md) 清点子主题、保留比较与选择依据；宿主生成覆盖清单，`scripts/review_summary.py` 校验实际来源和摘要片段。初次只截首帧；AI 根据全部字幕选择 0–5 个额外点并保存 [选帧计划](frame-selection.md)，追加画面用 `extract_frames.py - NEW_DIR --base-dir OLD_DIR --plan frame_plan.json`，从清单直接读取原始访问链接，复制既有证据到新目录后补帧，不重新转写或覆盖旧目录。
 
-两个 skill 作为同一 Git ref 的同级目录安装；笔记入口通过 sibling 位置发现视频 skill，也可用 `--video-skill <PATH>` 指定。运行 Python 3.9+ 标准库，视频另需要现有 yt-dlp/ffmpeg/whisper.cpp；tests/evals 不安装。
+两个 skill 作为同一 Git ref 的同级目录安装；笔记入口通过 sibling 位置发现视频 skill，也可用 `--video-skill <PATH>` 指定。运行 Python 3.9+ 标准库，视频另需要现有 yt-dlp/ffmpeg/Python 3 与本地 oMLX 服务及对应 ASR 模型；tests/evals 不安装。
 
 ## 可选的正常浏览器取证输入（兼容 v1）
 
 匿名访问受限、已有正常浏览器会话能显示笔记时，宿主可读取可见 DOM/轮播图与实际页面资源，并保存最小取证 JSON 后传 `extract_note.py URL OUTPUT_DIR --rendered-note INPUT_JSON`；不导出 Cookie 或登录凭据。输出 schema、字段与退出码不变。source artifact 增加 provenance=browser_dom。输入包详见笔记 skill 的 references/rendered-note.md；脚本校验原链接、source_url 和 noteId 一致。匿名失败目录与浏览器成功目录分开保留。
 
 可选 `--quality fast|accurate` 复用既有转写档位，默认 fast；不改变 v1 的输出字段和默认字幕优先行为。accurate 沿用既有语音优先的高质量策略。
+
+ASR channel 的 `provenance=omlx`，包含实际 `model`、`timestamp_source=audio_chunk`、`timestamp_precision_seconds=30`。时间锚点为不超过30秒的音频块范围，不是句级对齐；摘要来源状态须保留该精度限制。配置见 [oMLX 转写](omlx-asr.md)。

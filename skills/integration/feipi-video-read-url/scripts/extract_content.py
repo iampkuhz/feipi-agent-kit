@@ -32,7 +32,7 @@ def collect_video(url, root, manifest, times=None, media_info=None, quality="fas
     except ValueError as error:
         if manifest["channels"]["source"]["status"] != "complete":
             channel(manifest, "source", "unavailable", str(error))
-    # 复用统一字幕优先/内置 whisper.cpp。公共模式禁止配置文件与浏览器凭据，
+    # 复用统一字幕优先/本地 oMLX。公共模式禁止配置文件与浏览器凭据，
     # 只准独立音频流；平台只有合流视频时不下载原片来换取语音。
     log = root / "text-extraction.log"
     code, output = run_logged(["bash", str(SCRIPTS / "extract_video_text.sh"), url,
@@ -48,8 +48,10 @@ def collect_video(url, root, manifest, times=None, media_info=None, quality="fas
         anchor = {"type": "time_range", "start_seconds": 0,
                   "end_seconds": info.get("duration") if info else None, "timestamps": "inline"}
         artifact(manifest, root, kind, kind, target, anchor, source_url=manifest["canonical_url"])
-        channel(manifest, kind, "complete", provenance="whisper.cpp" if kind == "asr" else "platform_subtitles",
-                requested_quality=quality)
+        channel(manifest, kind, "complete", provenance="omlx" if kind == "asr" else "platform_subtitles",
+                requested_quality=quality,
+                **({"model": fields.get("asr_model"), "timestamp_source": "audio_chunk",
+                    "timestamp_precision_seconds": 30} if kind == "asr" else {}))
         if kind == "asr":
             channel(manifest, "subtitles", "unavailable", "subtitles_unavailable_used_asr")
     else:

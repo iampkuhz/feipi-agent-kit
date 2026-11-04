@@ -33,7 +33,7 @@ run_subtitle_mode() {
   [[ "$code" -eq 0 ]] || return "$code"
   if [[ -z "$subtitle_file" ]]; then
     echo 'diagnostic_code=xiaohongshu_subtitles_not_exposed' >&2
-    echo '未获得独立字幕；auto 模式将回退内置 whisper.cpp。笔记描述不作为转写。' >&2
+    echo '未获得独立字幕；auto 模式将回退本地 oMLX SenseVoiceSmall。笔记描述不作为转写。' >&2
     return 1
   fi
   yt_common_subtitle_to_text "$subtitle_file" "${subtitle_file%.*}.txt"
@@ -47,6 +47,6 @@ case "$MODE" in
   subtitle) run_subtitle_mode ;;
   whisper)
     yt_common_run_whisper_mode_from_url "$SOURCE_URL" "$OUT_DIR" \
-      "$SCRIPT_DIR/lib/whispercpp_transcribe.sh" "$LANGUAGE" "$PROFILE"
+      "$SCRIPT_DIR/lib/omlx_transcribe.sh" "$LANGUAGE" "$PROFILE"
     ;;
 esac

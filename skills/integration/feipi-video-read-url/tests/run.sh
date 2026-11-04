@@ -446,27 +446,8 @@ fi
 
 # --- 离线 stub 测试：档位语义验证（不依赖真实网络/whisper） ---
 
-# 测试 6：whispercpp_transcribe.sh 的 auto 解析为 fast（非 accurate）
-# 直接读取脚本中的 resolve_effective_profile 逻辑。
-TRANSCRIBE_SCRIPT="$RUNTIME_DIR/lib/whispercpp_transcribe.sh"
-if rg -q 'resolve_effective_profile' "$TRANSCRIBE_SCRIPT"; then
-  # 检查 auto → fast 而非 auto → accurate
-  auto_resolve_block="$(awk '/^resolve_effective_profile\(\)/,/^}/' "$TRANSCRIBE_SCRIPT")"
-  if printf "%s\n" "$auto_resolve_block" | grep -q 'echo "fast"'; then
-    stub_pass "whisper-auto-resolves-to-fast"
-  else
-    stub_fail_msg "whisper-auto-resolves-to-fast" "resolve_effective_profile 未返回 fast"
-  fi
-else
-  stub_fail_msg "whisper-auto-resolves-to-fast" "找不到 resolve_effective_profile 函数"
-fi
-
-# 测试 7：禁止 fast 静默退 accurate
-if rg -q 'fast_model_missing_use_accurate' "$TRANSCRIBE_SCRIPT"; then
-  stub_fail_msg "no-fast-to-accurate-fallback" "仍存在 fast_model_missing_use_accurate 静默回退"
-else
-  stub_pass "no-fast-to-accurate-fallback"
-fi
+# oMLX 的档位、缓存与失败行为通过真实 HTTP 替身验证。
+run_simple_case "omlx-asr-contract" pass python3 "$SCRIPT_DIR/test_omlx_transcribe.py"
 
 # 测试 8：download_youtube.sh 的 auto 不再因为时长切 accurate
 YOUTUBE_SCRIPT="$RUNTIME_DIR/download_youtube.sh"
@@ -482,22 +463,6 @@ if rg -q 'auto_duration_short' "$BILIBILI_SCRIPT"; then
   stub_fail_msg "bili-no-duration-accurate" "download_bilibili.sh 仍存在 auto_duration_short 逻辑"
 else
   stub_pass "bili-no-duration-accurate"
-fi
-
-# 测试 10：accurate 参数不是极端配置（beam≤3, best_of≤3）
-accurate_beam="$(sed -n 's/^WHISPER_BEAM_SIZE_ACCURATE=//p' "$TRANSCRIBE_SCRIPT")"
-accurate_best_of="$(sed -n 's/^WHISPER_BEST_OF_ACCURATE=//p' "$TRANSCRIBE_SCRIPT")"
-if [[ "$accurate_beam" -le 3 && "$accurate_best_of" -le 3 ]]; then
-  stub_pass "accurate-params-bounded"
-else
-  stub_fail_msg "accurate-params-bounded" "beam=$accurate_beam, best_of=$accurate_best_of，预期均≤3"
-fi
-
-# 测试 11：Metal 失败后已开始转写不自动 CPU 重跑
-if rg -q 'METAL_EARLY_FAIL' "$TRANSCRIBE_SCRIPT"; then
-  stub_pass "metal-no-cpu-after-transcription"
-else
-  stub_fail_msg "metal-no-cpu-after-transcription" "缺少 Metal 已开始转写不 CPU 重跑的保护"
 fi
 
 # --- 测试 11（增强）：重试链预算验证 ---
@@ -1072,7 +1037,7 @@ fi
 
 # --- 测试 5：已存在 mp3 回填路径（sed 逻辑验证，保留作为完整函数测试的对照） ---
 #    模拟 yt-dlp 输出 "has already been downloaded"，验证能从日志回填音频路径。
-#    直接测试路径回填逻辑，不经过完整 whisper 流程（避免依赖真实 ffmpeg/whisper.cpp）。
+#    直接测试路径回填逻辑，不经过完整 whisper 流程（避免依赖真实 ffmpeg/oMLX）。
 ALREADY_EXISTS_DIR="$STUB_DIR/already-exists"
 mkdir -p "$ALREADY_EXISTS_DIR"
 
@@ -1178,7 +1143,7 @@ if [[ "$STATUS_FIELDS_OK" -eq 1 ]]; then
 fi
 
 # --- 测试 9：残留 .whisper.wav 不会被误删 ---
-WHISPER_HELPER="$SKILL_DIR/scripts/lib/whispercpp_transcribe.sh"
+WHISPER_HELPER="$SKILL_DIR/scripts/lib/omlx_transcribe.sh"
 if rg -q 'rm -f.*out_dir.*\.whisper\.wav' "$SKILL_DIR/scripts/lib/yt_dlp_common.sh"; then
   stub_fail_msg "no-aggressive-wav-cleanup" "yt_dlp_common.sh 仍存在通配符删除 .whisper.wav"
 else
@@ -1192,12 +1157,7 @@ else
 fi
 
 
-# --- 测试 10：accurate 不复用 fast profile 结果 ---
-if rg -q "existing_profile.*==.*accurate" "$SKILL_DIR/scripts/lib/yt_dlp_common.sh"; then
-  stub_pass "accurate-no-reuse-fast"
-else
-  stub_fail_msg "accurate-no-reuse-fast" "yt_dlp_common.sh 未找到 accurate 不复用 fast 的保护逻辑"
-fi
+# accurate 不复用 fast 已由 omlx-asr-contract 实际执行公共流程与 HTTP 请求验证。
 
 # --- 测试 11：install_deps.sh 默认不要求 accurate 模型 ---
 if rg -q "REQUIRE_ACCURATE=0" "$SKILL_DIR/scripts/install_deps.sh"; then
@@ -1399,9 +1359,9 @@ else
 fi
 
 if python3 "$SCRIPT_DIR/test_cached_audio_recovery.py"; then
-  stub_pass "cached-audio-context-recovery"
+  stub_pass "cached-audio-validation"
 else
-  stub_fail_msg "cached-audio-context-recovery" "已归档音频复用与独立解码条件回归失败"
+  stub_fail_msg "cached-audio-validation" "已归档音频复用与独立解码条件回归失败"
 fi
 
 if python3 "$SCRIPT_DIR/test_summary_layout.py"; then

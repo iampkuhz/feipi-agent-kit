@@ -1,5 +1,8 @@
 # 变更记录
 
+## 2026-11-04
+- feipi-video-read-url v14：默认本地SenseVoice，高精度Qwen转写
+
 ## 2026-10-29
 - 安装输出按目标分组并区分新增、更新、跳过与警告；默认精简未变更明细，增加 `VERBOSE=1`、终端颜色/粗体及即时失败日志
 - feipi-mermaid-generate-diagram v1：新增六类图生成与本地图包验收

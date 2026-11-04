@@ -11,7 +11,6 @@ import wave
 
 SKILL = Path(__file__).resolve().parents[1]
 HELPER = SKILL / 'scripts/lib/verify_cached_audio.py'
-WHISPER = SKILL / 'scripts/lib/whispercpp_transcribe.sh'
 
 
 class CachedAudioTests(unittest.TestCase):
@@ -84,60 +83,6 @@ class CachedAudioTests(unittest.TestCase):
         self.make_audio()
         self.env['CACHE_TEST_PCM'] = ''
         self.assertNotEqual(self.run_helper().returncode, 0)
-
-
-class ContextRecoveryTests(unittest.TestCase):
-    def setUp(self):
-        temporary = tempfile.TemporaryDirectory()
-        self.addCleanup(temporary.cleanup)
-        self.root = Path(temporary.name)
-        self.audio, self.prefix = self.root/'audio.wav', self.root/'transcript'
-        self.audio.write_bytes(b'fixture; mock CLI does not decode')
-        models = self.root/'models'
-        models.mkdir()
-        (models/'ggml-base.bin').touch()
-        self.args = self.root/'args.json'
-        cli = self.root/'mock-whisper'
-        cli.write_text(f'#!{sys.executable}\nimport json,os,sys\nfrom pathlib import Path\n'
-            "Path(os.environ['CONTEXT_TEST_ARGS']).write_text(json.dumps(sys.argv[1:]))\n"
-            "Path(sys.argv[sys.argv.index('-of')+1]+'.srt').write_text('1\\n00:00:00,000 --> 00:00:01,000\\nfixture\\n')\n")
-        cli.chmod(0o755)
-        script = WHISPER.read_text().replace(
-            'WHISPER_CPP_BIN_DEFAULT="/opt/homebrew/opt/whisper-cpp/bin/whisper-cli"',
-            f'WHISPER_CPP_BIN_DEFAULT="{cli}"').replace(
-            'WHISPER_MODEL_DIR_DEFAULT="$HOME/Library/Caches/whisper.cpp/models"',
-            f'WHISPER_MODEL_DIR_DEFAULT="{models}"')
-        self.script = self.root/'whisper.sh'
-        self.script.write_text(script)
-        self.env = dict(os.environ, TMPDIR=str(self.root)+'/', CONTEXT_TEST_ARGS=str(self.args))
-        self.env.pop('AGENT_VIDEO_RECOVERY_NO_CONTEXT', None)
-
-    def run_script(self):
-        return subprocess.run(['bash', str(self.script), str(self.audio), str(self.prefix),
-            'zh', 'fast'], env=self.env, capture_output=True, text=True, timeout=15)
-
-    def test_default_context_preserved(self):
-        result = self.run_script()
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertNotIn('-mc', json.loads(self.args.read_text()))
-        self.assertIn('text_context=default', result.stdout)
-
-    def test_opt_in_passes_zero_context(self):
-        self.env['AGENT_VIDEO_RECOVERY_NO_CONTEXT'] = '1'
-        result = self.run_script()
-        self.assertEqual(result.returncode, 0, result.stderr)
-        args = json.loads(self.args.read_text())
-        self.assertEqual(args[args.index('-mc')+1], '0')
-        self.assertIn('text_context=disabled', result.stdout)
-
-    def test_invalid_value_stops_before_cli_or_srt_removal(self):
-        self.env['AGENT_VIDEO_RECOVERY_NO_CONTEXT'] = 'yes'
-        srt = self.prefix.with_suffix('.srt')
-        srt.write_text('previous')
-        result = self.run_script()
-        self.assertNotEqual(result.returncode, 0)
-        self.assertFalse(self.args.exists())
-        self.assertEqual(srt.read_text(), 'previous')
 
 
 if __name__ == '__main__':

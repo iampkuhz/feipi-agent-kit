@@ -44,7 +44,7 @@ normalize_out_dir() {
 OUT_DIR="$(normalize_out_dir "$OUT_DIR_RAW")"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WHISPER_HELPER="$SCRIPT_DIR/lib/whispercpp_transcribe.sh"
+WHISPER_HELPER="$SCRIPT_DIR/lib/omlx_transcribe.sh"
 YT_COMMON_LIB="$SCRIPT_DIR/lib/yt_dlp_common.sh"
 
 AGENT_CHROME_PROFILE="${AGENT_CHROME_PROFILE:-}"
@@ -411,7 +411,7 @@ run_whisper_mode() {
   echo "whisper_profile_requested=$WHISPER_PROFILE"
   echo "whisper_profile_resolved=$resolved_profile"
   echo "whisper_profile_reason=$profile_reason"
-  echo "完成: mode=whisper, engine=whisper.cpp, profile=$used_profile, model=$used_model, device=$used_device, audio=$audio_file, text=$text_file"
+  echo "完成: mode=whisper, engine=omlx, profile=$used_profile, model=$used_model, device=$used_device, audio=$audio_file, text=$text_file"
 }
 
 case "$MODE" in

@@ -8,7 +8,9 @@
       "expected": [
         "识别为 summary",
         "默认选择 fast",
-        "先获取可靠字幕或转写文本"
+        "先获取可靠字幕或转写文本",
+        "ASR 时调用本地 oMLX SenseVoiceSmall",
+        "来源状态披露约30秒块级时间精度"
       ],
       "forbidden": [
         "主动扩展相关新闻",
@@ -33,7 +35,9 @@
       "expected": [
         "选择 accurate",
         "使用统一提取入口",
-        "保留来源状态"
+        "保留来源状态",
+        "调用本地 oMLX Qwen3-ASR-1.7B",
+        "不得复用旧 whisper.cpp 或 fast 缓存"
       ],
       "forbidden": [
         "额外启动轮询进程",
@@ -94,7 +98,7 @@
       "prompt": "总结小红书视频：带着去家务化的思路装修你就会获得... https://xhslink.cn/o/4fVBDGJn6Rk 先复制内容，然后去【小红书】一键查看笔记。",
       "expected": [
         "从分享文案取出原始短链，使用统一提取入口和 fast 档位",
-        "保留分享参数；无独立字幕时回退内置 whisper.cpp",
+        "保留分享参数；无独立字幕时回退本地 oMLX SenseVoiceSmall",
         "基于带时间戳文本生成摘要并披露来源和识别风险"
       ],
       "forbidden": [

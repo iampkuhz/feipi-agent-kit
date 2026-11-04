@@ -388,7 +388,9 @@ if ! yt_common_require_tools dryrun; then
 fi
 
 if [[ "$CHECK_ONLY" == "1" ]]; then
-  bash "$INSTALL_SCRIPT" --check >/dev/null
+  dependency_args=(--check)
+  if [[ "$WHISPER_PROFILE" == "accurate" ]]; then dependency_args+=(--accurate); fi
+  bash "$INSTALL_SCRIPT" "${dependency_args[@]}" >/dev/null
   echo "dependency_ok=1"
   echo "source=$SOURCE"
   echo "run_dir=$RUN_DIR"
@@ -625,6 +627,10 @@ echo "strategy=$STRATEGY"
 echo "whisper_profile=$WHISPER_PROFILE"
 echo "selection_reason=$PROFILE_REASON"
 echo "mode_calls=$MODE_CALL_COUNT"
+if [[ "$USED_MODE" == "whisper" ]]; then
+  echo "asr_backend=omlx"
+  sed -n 's/^asr_model=/asr_model=/p; s/^asr_timestamps=/asr_timestamps=/p' "$LAST_MODE_LOG" | tail -n2
+fi
 if [[ -n "$DURATION_SEC" ]]; then
   echo "duration_sec=$DURATION_SEC"
 fi
