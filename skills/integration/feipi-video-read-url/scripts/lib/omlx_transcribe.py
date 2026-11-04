@@ -6,7 +6,6 @@ import hashlib
 import http.client
 import io
 import json
-import math
 import os
 from pathlib import Path
 import re
@@ -18,9 +17,10 @@ import urllib.request
 import uuid
 import wave
 
+from split_audio import CHUNK_POLICY, DEFAULT_MAX_SECONDS, audio_properties, plan_audio, validate_max_seconds
+
 MODELS = {"fast": "sensevoicesmall", "accurate": "qwen3-asr-1.7b"}
-CHUNK_SECONDS = 30
-CACHE_SCHEMA = "omlx-asr-v1"
+CACHE_SCHEMA = "omlx-asr-v2"
 
 
 def effective_profile(profile):
@@ -71,35 +71,84 @@ def resolve_model(base, profile):
     return candidates[0]
 
 
-def fingerprint(audio, profile, language):
+def fingerprint(audio, profile, language, max_seconds=DEFAULT_MAX_SECONDS):
+    rate, frames = audio_properties(audio)
     digest = hashlib.sha256()
     with audio.open("rb") as source:
         for block in iter(lambda: source.read(1024 * 1024), b""):
             digest.update(block)
     return {"schema": CACHE_SCHEMA, "backend": "omlx", "profile": profile,
             "model_family": MODELS[profile], "language": language,
-            "audio_sha256": digest.hexdigest(), "chunk_seconds": CHUNK_SECONDS}
+            "audio_sha256": digest.hexdigest(), "audio_frames": frames, "sample_rate": rate,
+            "chunk_seconds": max_seconds, "chunk_policy": CHUNK_POLICY}
 
 
-def cached(prefix, expected):
+def transcript_outputs(chunks):
+    rows = [(p["start"], p["end"], " ".join(p["text"].split())) for p in chunks if p["text"].strip()]
+    if not rows:
+        raise ValueError("omlx_empty_transcript")
+    srt = "\n\n".join("{}\n{} --> {}\n{}".format(i, stamp(a), stamp(b), text)
+                          for i, (a, b, text) in enumerate(rows, 1)) + "\n"
+    text = "".join("- [{}] {}\n".format(stamp(a).split(",")[0], text) for a, _, text in rows)
+    return srt, text
+
+
+def cached(prefix, expected=None, repair_text=True):
     try:
         record = json.loads(Path(str(prefix) + ".asr.json").read_text())
         if not isinstance(record, dict):
             return None
         if not isinstance(record.get("model"), str) or not record["model"]:
             return None
-        if not all(record.get(key) == value for key, value in expected.items()):
+        if expected is not None and not all(record.get(key) == value for key, value in expected.items()):
+            return None
+        if record.get("schema") != CACHE_SCHEMA or record.get("chunk_policy") != CHUNK_POLICY:
+            return None
+        profile = record.get("profile")
+        if profile not in MODELS or record.get("model_family") != MODELS[profile]:
+            return None
+        model = re.sub(r"[^a-z0-9]", "", record["model"].rsplit("/", 1)[-1].lower())
+        family = re.sub(r"[^a-z0-9]", "", MODELS[profile])
+        if not re.fullmatch(family + r"(?:bf16|fp16|4bit|8bit)?", model):
+            return None
+        maximum = validate_max_seconds(record["chunk_seconds"])
+        last = 0
+        for piece in record["chunks"]:
+            a, b = piece["start_frame"], piece["end_frame"]
+            if (type(a) is not int or type(b) is not int or a != last or b <= a
+                    or b - a > int(maximum * 16000) or not isinstance(piece["text"], str)
+                    or piece["cut_reason"] not in ("pause", "forced", "end")
+                    or piece["start"] != a / 16000 or piece["end"] != b / 16000):
+                return None
+            last = b
+        if (not last or record["duration_seconds"] != last / 16000
+                or record["audio_frames"] != last or record["sample_rate"] != 16000):
+            return None
+        srt, text = transcript_outputs(record["chunks"])
+        if (record.get("timestamp_source") != "audio_chunk"
+                or not re.fullmatch(r"[a-f0-9]{64}", record["audio_sha256"])
+                or hashlib.sha256(srt.encode()).hexdigest() != record.get("srt_sha256")
+                or hashlib.sha256(text.encode()).hexdigest() != record.get("text_sha256")):
             return None
         data = Path(str(prefix) + ".srt").read_bytes()
         if not data or hashlib.sha256(data).hexdigest() != record.get("srt_sha256"):
             return None
-        # TXT 是派生产物，中断造成缺失或半份时从完整 SRT 恢复，无需重复识别。
+        # TXT 是派生产物；从已与完整 SRT 校验一致的分块正文恢复，无需重复识别。
         target = Path(str(prefix) + ".txt")
         if not target.is_file() or hashlib.sha256(target.read_bytes()).hexdigest() != record.get("text_sha256"):
-            from subtitle_to_text import convert
-            convert(Path(str(prefix) + ".srt"), target)
+            if not repair_text:
+                return None
+            temporary = None
+            try:
+                with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=prefix.parent, delete=False) as handle:
+                    temporary = Path(handle.name)
+                    handle.write(text)
+                os.replace(temporary, target)
+            finally:
+                if temporary is not None and temporary.exists():
+                    temporary.unlink()
         return record
-    except (OSError, ValueError):
+    except (OSError, ValueError, KeyError, TypeError, OverflowError, EOFError, wave.Error):
         return None
 
 
@@ -127,21 +176,18 @@ def stamp(seconds):
     return "{:02d}:{:02d}:{:02d},{:03d}".format(hour, minute, second, ms)
 
 
-def transcribe(audio, prefix, language, profile, base):
-    expected = fingerprint(audio, profile, language)
+def transcribe(audio, prefix, language, profile, base, max_seconds=DEFAULT_MAX_SECONDS):
+    expected = fingerprint(audio, profile, language, max_seconds)
     record = cached(prefix, expected)
     if record:
         return record, True
+    rate, frames, plan = plan_audio(audio, max_seconds)
     model = resolve_model(base, profile)
-    rows, chunks = [], []
+    chunks = []
     with wave.open(str(audio), "rb") as source:
-        if (source.getnchannels(), source.getsampwidth(), source.getframerate(), source.getcomptype()) != (1, 2, 16000, "NONE"):
-            raise ValueError("omlx_audio_requires_16khz_mono_pcm_s16le")
-        frames = source.getnframes()
-        if frames <= 0:
-            raise ValueError("omlx_empty_audio")
-        for offset in range(0, frames, CHUNK_SECONDS * 16000):
-            count = min(CHUNK_SECONDS * 16000, frames - offset)
+        for piece in plan:
+            offset = piece["start_frame"]
+            count = piece["end_frame"] - offset
             pcm = source.readframes(count)
             if len(pcm) != count * 2:
                 raise ValueError("omlx_truncated_audio")
@@ -149,6 +195,9 @@ def transcribe(audio, prefix, language, profile, base):
             with wave.open(payload, "wb") as target:
                 target.setparams((1, 2, 16000, 0, "NONE", "not compressed"))
                 target.writeframes(pcm)
+            print("asr_chunk_start={}/{} start={:.3f} end={:.3f} cut={}".format(
+                len(chunks) + 1, len(plan), offset / rate, (offset + count) / rate, piece["cut_reason"]),
+                file=sys.stderr, flush=True)
             body, content_type = multipart(model, language, payload.getvalue())
             result = request_json(base, "/audio/transcriptions", body, content_type)
             text = result.get("text")
@@ -157,15 +206,9 @@ def transcribe(audio, prefix, language, profile, base):
             # SenseVoice 的语言/情绪标签属于控制信息，不混入摘要正文。
             text = re.sub(r"<\|[^|]*\|>", "", text).strip()
             start, end = offset / 16000, (offset + count) / 16000
-            chunks.append({"start": start, "end": end, "text": text})
-            if text:
-                rows.append((start, end, " ".join(text.split())))
-            print("asr_chunk={}/{}".format(len(chunks), math.ceil(frames / (CHUNK_SECONDS * 16000))), file=sys.stderr)
-    if not rows:
-        raise ValueError("omlx_empty_transcript")
-    srt = "\n\n".join("{}\n{} --> {}\n{}".format(i, stamp(a), stamp(b), text)
-                          for i, (a, b, text) in enumerate(rows, 1)) + "\n"
-    text = "".join("- [{}] {}\n".format(stamp(a).split(",")[0], text) for a, _, text in rows)
+            chunks.append(dict(piece, start=start, end=end, text=text))
+            print("asr_chunk={}/{}".format(len(chunks), len(plan)), file=sys.stderr, flush=True)
+    srt, text = transcript_outputs(chunks)
     record = dict(expected, model=model, timestamp_source="audio_chunk", duration_seconds=frames / 16000,
                   chunks=chunks, srt_sha256=hashlib.sha256(srt.encode()).hexdigest(),
                   text_sha256=hashlib.sha256(text.encode()).hexdigest())
@@ -193,7 +236,9 @@ def main():
     parser.add_argument("profile", nargs="?", default="auto", choices=("auto", "fast", "accurate"))
     parser.add_argument("--check", choices=("fast", "accurate"))
     parser.add_argument("--check-cache", action="store_true")
+    parser.add_argument("--max-seconds", type=float, default=DEFAULT_MAX_SECONDS)
     args = parser.parse_args()
+    validate_max_seconds(args.max_seconds)
     base = os.environ.get("AGENT_OMLX_BASE_URL", "http://127.0.0.1:8037/v1").rstrip("/")
     # 明确限制本机，保留用户期望的本地服务边界。
     from urllib.parse import urlsplit
@@ -210,9 +255,9 @@ def main():
     profile = effective_profile(args.profile)
     audio, prefix = Path(args.audio), Path(args.output_prefix)
     if args.check_cache:
-        return 0 if cached(prefix, fingerprint(audio, profile, args.language)) else 1
+        return 0 if cached(prefix, fingerprint(audio, profile, args.language, args.max_seconds)) else 1
     started = time.perf_counter()
-    record, reused = transcribe(audio, prefix, args.language, profile, base)
+    record, reused = transcribe(audio, prefix, args.language, profile, base, args.max_seconds)
     elapsed = time.perf_counter() - started
     # 仅报告认证来源，缓存命中时明确本次没有发起认证请求。
     auth_source = "not_requested_cache" if reused else "env:OMLX_API_KEY" if os.environ.get("OMLX_API_KEY") else "none"

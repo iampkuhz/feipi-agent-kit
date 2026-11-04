@@ -48,6 +48,9 @@ if [[ -z "$URL" ]]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ ! "$URL" =~ ^https?:// ]]; then
+  exec python3 "$SCRIPT_DIR/lib/read_local_media.py" "$URL" "$OUT_DIR" "$MODE" "$WHISPER_PROFILE"
+fi
 SOURCE="$(detect_source "$URL")"
 
 case "$SOURCE" in

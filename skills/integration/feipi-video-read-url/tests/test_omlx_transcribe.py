@@ -273,6 +273,160 @@ yt_common_run_whisper_mode_from_url "$3" "$4" "$5" zh "$6"
             self.assertIn(model, result.stdout)
         self.assertEqual(len(self.posts), 4)
 
+    def speech_with_pause(self, seconds, pause_start, pause_end):
+        with wave.open(str(self.audio), "wb") as target:
+            target.setparams((1, 2, 16000, 0, "NONE", "not compressed"))
+            target.writeframes(b"\x10\x27" * (pause_start * 16000))
+            target.writeframes(b"\x00\x00" * ((pause_end - pause_start) * 16000))
+            target.writeframes(b"\x10\x27" * ((seconds - pause_end) * 16000))
+
+    def posted_pcm(self):
+        pieces = []
+        for _, _, body in self.posts:
+            start = body.index(b"RIFF")
+            end = body.index(b"\r\n--feipi", start)
+            with wave.open(io.BytesIO(body[start:end]), "rb") as audio:
+                pieces.append(audio.readframes(audio.getnframes()))
+        return b"".join(pieces)
+
+    def test_pause_cut_and_forced_cut_upload_every_sample_once(self):
+        self.speech_with_pause(70, 24, 25)
+        result = self.successful()
+        chunks = self.record()["chunks"]
+        self.assertAlmostEqual(chunks[0]["end"], 24.5, places=2)
+        self.assertEqual(chunks[0]["cut_reason"], "pause")
+        self.assertTrue(any(chunk["cut_reason"] == "forced" for chunk in chunks))
+        self.assertTrue(all(chunk["end"] - chunk["start"] <= 30 for chunk in chunks))
+        with wave.open(str(self.audio), "rb") as original:
+            self.assertEqual(self.posted_pcm(), original.readframes(original.getnframes()))
+        self.assertIn("asr_chunk_start=1/3 start=0.000 end=24.500 cut=pause", result.stderr)
+
+    def test_sixty_second_example_and_cache_parameter_isolation(self):
+        self.speech_with_pause(80, 56, 63)
+        result = self.run_client("accurate", extra=("--max-seconds", "60"))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertAlmostEqual(self.record()["chunks"][0]["end"], 59.5, places=2)
+        self.assertEqual(self.record()["chunk_seconds"], 60)
+        self.assertIn("cache_reused=1", self.run_client("accurate", extra=("--max-seconds", "60")).stdout)
+        self.assertEqual(len(self.posts), 2)
+        self.assertIn("cache_reused=0", self.successful("accurate").stdout)
+        self.assertEqual(len(self.posts), 5)
+
+    def test_fixed_chunk_cache_is_not_reused_for_pause_chunking(self):
+        self.successful()
+        record = self.record()
+        record["schema"] = "omlx-asr-v1"
+        record.pop("chunk_policy")
+        self.prefix.with_suffix(".asr.json").write_text(json.dumps(record))
+        self.assertIn("cache_reused=0", self.successful().stdout)
+        self.assertEqual(len(self.posts), 4)
+
+    def test_changed_pause_policy_and_corrupt_chunk_trace_are_not_reused(self):
+        for corrupt in ("policy", "range", "text", "model"):
+            self.successful()
+            record = self.record()
+            if corrupt == "policy":
+                record["chunk_policy"] = "pause-start-v1"
+            elif corrupt == "range":
+                record["chunks"][-1]["start_frame"] += 1
+            elif corrupt == "text":
+                record["chunks"][0]["text"] = "与SRT不符"
+            else:
+                record["model"] = "unrelated-model"
+            self.prefix.with_suffix(".asr.json").write_text(json.dumps(record))
+            before = len(self.posts)
+            self.assertIn("cache_reused=0", self.successful().stdout)
+            self.assertEqual(len(self.posts), before + 2)
+
+    def test_summary_rejects_corrupt_asr_trace_without_modifying_text(self):
+        self.successful()
+        before = self.prefix.with_suffix(".txt").read_bytes()
+        record = self.record()
+        record["chunks"][0]["end_frame"] -= 1
+        self.prefix.with_suffix(".asr.json").write_text(json.dumps(record))
+        result = subprocess.run(["bash", str(SKILL / "scripts/render_summary_prompt.sh"),
+                                 "https://youtube.com/watch?v=test", "测试", "31", str(self.prefix.with_suffix(".txt"))],
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("oMLX 来源信息:", result.stdout)
+        self.assertIn("ASR 来源校验未通过", result.stdout)
+        self.assertEqual(self.prefix.with_suffix(".txt").read_bytes(), before)
+
+    def test_summary_rejects_changed_extracted_audio(self):
+        self.successful()
+        self.prefix.with_suffix(".whisper.wav").write_bytes(b"broken extracted audio")
+        result = subprocess.run(["bash", str(SKILL / "scripts/render_summary_prompt.sh"),
+                                 "https://youtube.com/watch?v=test", "测试", "31", str(self.prefix.with_suffix(".txt"))],
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("oMLX 来源信息:", result.stdout)
+        self.assertIn("ASR 来源校验未通过", result.stdout)
+        self.assertNotIn("Traceback", result.stderr)
+
+    def test_local_video_entrypoint_preserves_audio_and_cache_and_summary(self):
+        video = self.root / "带 空格的视频.mp4"
+        subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-f", "lavfi", "-i", "color=s=16x16:r=1",
+                        "-i", str(self.audio), "-map", "0:v", "-map", "1:a", "-c:v", "libx264",
+                        "-c:a", "aac", "-shortest", str(video)], check=True)
+        entry = SKILL / "scripts/extract_video_text.sh"
+        command = ["bash", str(entry), str(video), str(self.root / "out"), "auto"]
+        result = subprocess.run(command, env=self.env, capture_output=True, text=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        fields = dict(line.split("=", 1) for line in result.stdout.splitlines() if "=" in line)
+        self.assertEqual(fields["source"], "local")
+        with wave.open(fields["audio_path"], "rb") as audio:
+            self.assertEqual(self.posted_pcm(), audio.readframes(audio.getnframes()))
+        prompt = subprocess.run(["bash", str(SKILL / "scripts/render_summary_prompt.sh"), str(video), "",
+                                 fields["duration_sec"], fields["text_path"]], capture_output=True, text=True)
+        self.assertEqual(prompt.returncode, 0, prompt.stderr)
+        self.assertIn('"title_source": "local_filename"', prompt.stdout)
+        self.assertIn('"model": "mlx-community/SenseVoiceSmall"', prompt.stdout)
+        self.assertIn(str(video), prompt.stdout)
+        self.assertIn("提取音频：" + fields["audio_path"], prompt.stdout)
+        count = len(self.posts)
+        result = subprocess.run(command, env=self.env, capture_output=True, text=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("cache_reused=1", result.stdout)
+        self.assertIn("audio_reused=1", result.stdout)
+        self.assertEqual(len(self.posts), count)
+        # 源文件内容变化不能误用同路径旧结果。
+        with video.open("ab") as output:
+            output.write(b"\x00\x00\x00\x08free")
+        result = subprocess.run(command, env=self.env, capture_output=True, text=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("cache_reused=0", result.stdout)
+        self.assertGreater(len(self.posts), count)
+
+    def test_invalid_chunk_limits_fail_before_any_service_request(self):
+        for value in ("0", "nan", "inf"):
+            self.assertNotEqual(self.run_client(extra=("--max-seconds", value)).returncode, 0)
+        self.assertFalse(self.gets)
+        self.assertFalse(self.posts)
+
+    def test_splitter_only_exposes_max_seconds_setting(self):
+        import re
+        splitter = SKILL / "scripts/lib/split_audio.py"
+        result = subprocess.run([sys.executable, str(splitter), "--help"], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(set(re.findall(r"--[a-z-]+", result.stdout)), {"--help", "--max-seconds"})
+        result = subprocess.run([sys.executable, str(splitter), str(self.audio), "--listen"],
+                                capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+
+    def test_splitter_cli_produces_lossless_wav_files(self):
+        splitter = SKILL / "scripts/lib/split_audio.py"
+        result = subprocess.run([sys.executable, str(splitter), str(self.audio)],
+                                capture_output=True, text=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        output = Path(next(line.split("=", 1)[1] for line in result.stdout.splitlines() if line.startswith("output_dir=")))
+        pcm = bytearray()
+        for path in sorted(output.glob("*.wav")):
+            with wave.open(str(path), "rb") as chunk:
+                self.assertLessEqual(chunk.getnframes(), 30 * 16000)
+                pcm.extend(chunk.readframes(chunk.getnframes()))
+        with wave.open(str(self.audio), "rb") as original:
+            self.assertEqual(bytes(pcm), original.readframes(original.getnframes()))
+
 
 if __name__ == "__main__":
     unittest.main()

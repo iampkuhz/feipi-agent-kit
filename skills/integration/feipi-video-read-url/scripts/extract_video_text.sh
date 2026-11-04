@@ -342,6 +342,12 @@ resolve_url_key() {
 }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# 本地文件不进入站点、Cookie、代理或 yt-dlp 链路；沿用相同选档与文本输出合同。
+if [[ ! "$URL" =~ ^https?:// ]]; then
+  local_args=()
+  if [[ "$CHECK_ONLY" == "1" ]]; then local_args+=(--check-deps); fi
+  exec python3 "$SCRIPT_DIR/lib/read_local_media.py" "$URL" "$OUT_ROOT_DIR" "$MODE" "$WHISPER_PROFILE" "${local_args[@]+${local_args[@]}}"
+fi
 INSTALL_SCRIPT="$SCRIPT_DIR/install_deps.sh"
 YT_COMMON_LIB="$SCRIPT_DIR/lib/yt_dlp_common.sh"
 SOURCE="$(detect_source "$URL")"

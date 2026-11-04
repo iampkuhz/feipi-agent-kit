@@ -192,6 +192,22 @@
         "通过引用校验就宣称语义完整",
         "主句保守而detail偷偷补入确定参数"
       ]
+    },
+    {
+      "id": "local-video-summary",
+      "prompt": "总结我电脑上的 /tmp/带 空格的视频.mp4，提取完整音频并保留原时间。",
+      "expected": [
+        "以本地文件路径调用 extract_video_text.sh，默认 SenseVoiceSmall",
+        "从 audio_path 与 text_path 读取实际音频和正文；不把文件名当作内容",
+        "附件保留原件、提取音频与转写路径，来源披露 local_filename、实际模型和块级时间范围",
+        "按真实转写生成摘要；认证只读进程环境 OMLX_API_KEY"
+      ],
+      "forbidden": [
+        "因不是 URL 拒绝本地媒体",
+        "把本地文件交给 yt-dlp 或上传到外部服务",
+        "宣称逐句或逐字对齐",
+        "把模拟 ASR、合成样例或无人工参考稿结果称为通用准确率"
+      ]
     }
   ]
 }

@@ -1,10 +1,11 @@
 # 变更记录
 
+## 2026-11-05
+- feipi-video-read-url v18：本地媒体、停顿切口与转写来源校验
+
 ## 2026-11-04
-- feipi-video-read-url v16：用单调时钟输出独立 ASR 客户端耗时，区分下载转换与缓存，明确质量档位与权重量化的区别
-- feipi-video-read-url v15：认证仅读取进程环境中的 OMLX_API_KEY，禁止读取 dotenv 文件，输出认证来源与缓存状态，补齐纯文字摘要交付校验
+- feipi-video-read-url v17：双档转写、认证计时与连续停顿切分
 - 工作台集成：合并全部组件，回收较新Multica声明，验收按启用角色执行
-- feipi-video-read-url v14：默认本地SenseVoice，高精度Qwen转写
 
 ## 2026-10-31
 - 统一工作台：引入现有 Mac/Multica/OpenClaw/OpenClash 源码，增加 workbench/develop、选择性配置回收、私有备份与回退；完成当前机器和路由器接管，证据见 docs/workbench-validation.md

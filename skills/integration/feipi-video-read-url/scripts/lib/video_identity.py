@@ -21,6 +21,9 @@ def clean(value):
 
 
 def url_identity(url):
+    # 本地路径没有站点原标题；身份由适配器记录文件内容指纹与文件名。
+    if not re.match(r"^https?://", url):
+        return "本地文件", ""
     parsed = urlsplit(url)
     host = (parsed.hostname or "").lower()
     parts = parsed.path.strip("/").split("/")
@@ -66,10 +69,17 @@ def read_json(path):
 
 
 def resolve(url, raw_path, cache_path):
+    if not re.match(r"^https?://", url):
+        url = str(Path(url).expanduser().resolve())
     platform, url_id = url_identity(url)
     identity = {"schema_version": 1, "input_url": url, "platform": platform,
                 "video_id": url_id, "video_title": "", "title_source": "unavailable"}
     cached = read_json(cache_path)
+    if (platform == "本地文件" and cached.get("input_url") == url
+            and cached.get("title_source") == "local_filename"
+            and re.fullmatch(r"[a-f0-9]{32}", str(cached.get("video_id", "")))):
+        identity.update(video_id=cached["video_id"], video_title=clean(cached.get("video_title")),
+                        title_source="local_filename")
     if (cached.get("input_url") == url and cached.get("title_source") in ("yt_dlp", "drvoice_public_api")
             and clean(cached.get("video_title")) and clean(cached.get("video_id"))):
         identity.update(video_id=clean(cached["video_id"]),
@@ -124,6 +134,7 @@ def main():
                          ensure_ascii=False))
         print('展示规则：在正文开头明确平台和视频名；摘要任务在来源状态保留完整原标题及标题来源，背景或分段任务则在现有正文内标注。'
               'title_source=caller 只表示调用方提供，不能宣称已核实原标题；'
+              'local_filename 仅表示本地文件名，附件保留本地原文件路径；'
               'unavailable 表示原标题未取得，使用平台和视频 ID（短链接则保留原链接）。'
               '原标题不是正文证据，不得据此编造内容。不新增二级标题，附件继续保留原始视频链接。')
         return

@@ -122,24 +122,37 @@ class ReliabilityTests(unittest.TestCase):
         self.program(self.bin / "uname", "echo Darwin")
         helper = self.root / "helper"
         self.program(helper, "exit 99")
-        (self.root / "video.whisper.wav").touch()
+        import wave
+        with wave.open(str(self.root / "video.whisper.wav"), "wb") as audio:
+            audio.setparams((1, 2, 16000, 0, "NONE", "not compressed"))
+            audio.writeframes(b"\x00\x00" * (31 * 16000))
         srt = self.root / "video.srt"
-        srt.write_text("1\n02:33:38,620 --> 02:33:39,180\nlast\n")
         target = self.root / "video.txt"
         target.write_text("old partial result")
         import hashlib
         import json
+        import sys
         from importlib.util import spec_from_file_location, module_from_spec
+        from unittest.mock import patch
         spec = spec_from_file_location("omlx", SCRIPTS / "lib/omlx_transcribe.py")
         client = module_from_spec(spec)
-        spec.loader.exec_module(client)
+        with patch.object(sys, "path", [str(SCRIPTS / "lib"), *sys.path]):
+            spec.loader.exec_module(client)
+        chunks = [{"start_frame": 0, "end_frame": 480000, "start": 0, "end": 30,
+                   "text": "", "cut_reason": "pause"},
+                  {"start_frame": 480000, "end_frame": 496000, "start": 30, "end": 31,
+                   "text": "last", "cut_reason": "end"}]
+        srt_data, txt_data = client.transcript_outputs(chunks)
+        srt.write_text(srt_data)
         record = dict(client.fingerprint(self.root / "video.whisper.wav", "fast", "zh"),
-                      model="SenseVoiceSmall", srt_sha256=hashlib.sha256(srt.read_bytes()).hexdigest())
+                      model="SenseVoiceSmall", timestamp_source="audio_chunk", duration_seconds=31,
+                      chunks=chunks, srt_sha256=hashlib.sha256(srt.read_bytes()).hexdigest(),
+                      text_sha256=hashlib.sha256(txt_data.encode()).hexdigest())
         (self.root / "video.asr.json").write_text(json.dumps(record))
         call = 'yt_common_run_whisper_mode_from_url url "$1" "$2" zh fast'
         result = self.shell(call, self.root, helper)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("[02:33:38]", target.read_text())
+        self.assertIn("[00:00:30]", target.read_text())
         srt.write_text("no timestamp")
         result = self.shell(call, self.root, helper)
         self.assertNotEqual(result.returncode, 0)

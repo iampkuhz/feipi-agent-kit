@@ -162,7 +162,7 @@ source_status_rule="5) 必须输出 '## 来源状态' 章节，且包含以下�
    - 是否带时间戳：是 / 否
    - 是否使用外部资料：否 / 是，仅用于背景
    - 主要风险：无 / 自动字幕误差 / ASR 误识别 / 中段截断 / 无时间戳 / 其他
-   - 若下方提供 oMLX 来源信息，必须披露其模型与约30秒块级时间范围，不能声称逐句或逐字对齐。"
+   - 若下方提供 oMLX 来源信息，必须披露其模型与 chunk_seconds 所表示的分块上限及块级时间范围，不能声称逐句或逐字对齐。"
 
 # --- 视频类型识别 ---
 video_type_rule="6) 请根据视频标题和转写内容判断 video_type，并在'## 摘要概述'内使用对应的三级标题组织内容：
@@ -192,11 +192,20 @@ evidence_disclosure="10) 禁止空泛免责；必须披露真实证据状态：
     - 允许并要求说明：文本是否截断、字幕是否自动生成、Whisper 是否可能存在转写误差、哪些结论来自视频、哪些结论来自模型提炼、哪些结论来自外部背景、哪些信息无法从当前材料确认
     - 禁止：用'可能不准确，仅供参考'作为结尾套话；明明材料不足却输出确定性事实；把外部背景伪装成视频内观点；把模型判断伪装成视频原话"
 
+attachment_rule="15) '附件'段必须包含：
+   - 原始视频：$URL
+   - 转写文本：$TRANSCRIPT_PATH"
+local_audio="${TRANSCRIPT_PATH%.*}.whisper.wav"
+if [[ ! "$URL" =~ ^https?:// && -f "$local_audio" ]]; then
+  attachment_rule+="
+   - 提取音频：$local_audio"
+fi
+
 cat <<EOF
 请基于下面提供的"视频字幕/转写文本"生成中文总结（摘要模式）。
 目标：只交付可直接阅读的结构化摘要，不主动扩展到背景、影响或相关新闻。
 
-视频 URL: $URL
+视频来源（URL 或本地路径）: $URL
 $(python3 "$(dirname "${BASH_SOURCE[0]}")/lib/video_identity.py" --prompt "$URL" "$TITLE" "$(dirname "$TRANSCRIPT_PATH")")
 视频时长(秒): $DURATION_SEC
 文本来源: $TRANSCRIPT_PATH
@@ -204,19 +213,28 @@ $(python3 "$(dirname "${BASH_SOURCE[0]}")/lib/video_identity.py" --prompt "$URL"
 字幕总行数: $line_count
 是否截断: $truncated
 是否含时间戳: $HAS_TIMESTAMPS
-$(python3 - "$TRANSCRIPT_PATH" <<'PY'
-import hashlib
+$(python3 - "$TRANSCRIPT_PATH" "$(dirname "${BASH_SOURCE[0]}")/lib" <<'PY'
 import json
 from pathlib import Path
 import sys
+import wave
+sys.path.insert(0, sys.argv[2])
+from omlx_transcribe import cached, fingerprint
 path = Path(sys.argv[1])
 try:
-    record = json.loads(path.with_suffix('.asr.json').read_text())
-    if (record.get('schema') == 'omlx-asr-v1' and record.get('text_sha256') == hashlib.sha256(path.read_bytes()).hexdigest()):
+    record = cached(path.with_suffix(''), repair_text=False)
+    audio = path.with_suffix('.whisper.wav')
+    if record and audio.is_file():
+        record = cached(path.with_suffix(''), fingerprint(audio, record['profile'], record['language'],
+                        record['chunk_seconds']), repair_text=False)
+    if record:
         print('oMLX 来源信息: ' + json.dumps({key: record.get(key) for key in
-              ('model', 'timestamp_source', 'chunk_seconds', 'duration_seconds')}, ensure_ascii=False))
-except (OSError, ValueError, AttributeError):
-    pass
+              ('model', 'timestamp_source', 'chunk_seconds', 'chunk_policy', 'duration_seconds', 'audio_sha256')}, ensure_ascii=False))
+    elif path.with_suffix('.asr.json').exists():
+        print('ASR 来源校验未通过：不得根据旁边的缓存记录声称模型、完整性或时间精度已核实。')
+except (OSError, ValueError, AttributeError, KeyError, EOFError, wave.Error):
+    if path.with_suffix('.asr.json').exists():
+        print('ASR 来源校验未通过：不得声称已核实音频来源或模型信息。')
 PY
 )
 摘要风格: $SUMMARY_STYLE
@@ -245,9 +263,7 @@ ${anti_cliche_rule}
 16) 先按来源结构清点主题与子主题，再对最终摘要反向复核。按内容类型保留实质细节：论述保留观点、依据和结论；教程保留前提、步骤、参数和注意事项；来源包含比较或建议时，保留选项、优缺点、推荐强度、理由、代价与适用条件。不要强行填充来源未涉及的字段，也不能只凑齐一级标题。专名、数字或单位转写不清时列为待核验；有画面工具时按需补帧，不凭上下文补值。摘要长度由用户目标与实际内容决定，不预设领域模板。
 ${style_rules}
 ${evidence_disclosure}
-15) "附件"段只保留两项，且必须同时出现：
-   - 原始视频：$URL
-   - 转写文本：$TRANSCRIPT_PATH
+${attachment_rule}
 
 若用户后续明确要求扩展分析，再单独执行背景模式；本次不要输出"相关影响和背景分析"或"上下文背景"。
 

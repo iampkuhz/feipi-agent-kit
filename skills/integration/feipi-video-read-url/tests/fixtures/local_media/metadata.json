@@ -1,0 +1,14 @@
+{
+  "schema": "local-media-fixture-v1",
+  "source": "macOS say Tingting, authored reference before synthesis",
+  "voice": "Tingting",
+  "rate": 175,
+  "encoding": "AAC mono 16kHz 48kbit/s",
+  "duration_seconds": 41.02325,
+  "human_listening_performed": false,
+  "comparison": "Ignore punctuation and whitespace only; compare every remaining character without correction.",
+  "sha256": {
+    "reference.txt": "6f68a0bd63ef40ee536e5e2d1363e57d80e1eaa6b2f1f877369bf4c4f1457582",
+    "speech.m4a": "d32e1f156860e0d9c835415a0091454a846a8cdb73a70be8bc0c117a9b1e974c"
+  }
+}

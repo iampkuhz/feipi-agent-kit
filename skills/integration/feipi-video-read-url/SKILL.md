@@ -1,13 +1,13 @@
 ---
 name: feipi-video-read-url
-description: 用于按用户意图处理视频网站 URL（如 YouTube、Bilibili、小红书及分享短链），覆盖下载、音视频提取、字幕转写、摘要和背景扩展；在用户提供视频 URL 需要处理时触发。若用户处理的是本地文件或非视频 URL，不要误用本 skill。
+description: 用于按用户意图处理视频网站 URL（如 YouTube、Bilibili、小红书及分享短链）或本地视频、音频文件，覆盖下载、音频提取、字幕转写、摘要和背景扩展；在用户提供视频 URL 或本地媒体路径需要处理时触发。非媒体文件或普通网页不适用。
 ---
 
 [//]: # (# 视频 URL 读取与总结（中文）)
 [//]: # ()
 [//]: # (## 核心目标)
 [//]: # ()
-输入视频 URL，根据用户意图走一条统一链路：
+输入视频 URL 或本地音视频路径，根据用户意图走一条统一链路：
 
 [//]: # ()
 
@@ -26,6 +26,22 @@ description: 用于按用户意图处理视频网站 URL（如 YouTube、Bilibil
 3. 站点扩展
 - 当前统一入口已覆盖 YouTube、Bilibili、小红书视频笔记及分享短链、严道医声网单讲（`/v2/speaker/<编号>`）及文章内视频（`/v2/article/<编号>`）。
 - 后续新增站点时，只在当前 skill 内新增来源适配脚本，不再新建平行 skill。
+
+## 本地视频与音频
+
+本地文件复用原有文字提取、oMLX 和摘要请求入口，不经过 yt-dlp、Cookie 或代理：
+
+```bash
+bash <本 skill>/scripts/extract_video_text.sh '/绝对路径/视频.mp4' '<OUTPUT_ROOT>' auto --instruction '总结视频'
+# 只提取完整音轨，不调用 ASR：
+bash <本 skill>/scripts/download_video.sh '/绝对路径/视频.mp4' '<OUTPUT_ROOT>' audio
+```
+
+也接受本地音频路径和带空格的路径；相对路径按调用时目录解析。`auto` 与 `whisper` 都转写首条音轨，默认 SenseVoiceSmall，`--quality accurate` 使用 Qwen3-ASR-1.7B；本地不尝试平台字幕。显式 `subtitle` 会停止并提示改用转写。`dryrun` 仅探测音轨，`video` 返回原文件路径。本地普通输入同样不猜测意图；仅给路径时先 dryrun。
+
+输出 `audio_path` 是完整的16kHz单声道PCM WAV，保留静音，供 ASR 与交付复用；`text_path`、`srt_path` 与 URL 链路含义一致。`source_media.json` 记录原件内容指纹、原始路径、音轨及音频指纹，按原件内容隔离运行目录；原件内容变化或音频损坏不会复用旧稿。原件不改写。`duration_sec` 为向上取整的摘要兼容时长，`audio_duration_seconds` 和来源清单保留实际采样时长。
+
+取得带时间戳文本后，完整读取正文，再按既有流程用 `render_summary_prompt.sh` 生成请求包并由宿主完成摘要；第一个参数可直接传同一本地路径。脚本不生成伪摘要。来源状态说明本地文件、实际模型和块级时间精度，附件保留原件路径、提取音频和转写路径；`title_source=local_filename` 仅表示文件名，不能作为内容证据。当前 `extract_content.py` 的画面取证 manifest 仍用于其已支持的网站 URL，本地纯文字总结使用上述入口。
 
 ## 通用内容取证（调用方集成）
 
@@ -49,7 +65,7 @@ python3 <本 skill>/scripts/extract_content.py '<URL>' '<OUTPUT_DIR>'
 
 ## 适用场景
 
-1. 用户给出视频 URL，希望先验证链接是否可读、可下载或可转写。
+1. 用户给出视频 URL 或本地音视频路径，希望验证、提取、转写或总结。
 2. 用户要下载视频、提取音频、提取字幕、做 whisper 转写。
 
 严道适配使用公开详情接口核验标题和未加密历史回放，不读取浏览器凭据；报名默认停止并逐例处理。已正常登录并实际播放到结尾的单讲，可按 `references/sources.md` 提供24小时内、来源与媒体/清单指纹匹配的账号播放证据接回统一入口；付费、加密或仍在直播时停止。直播回放按视频处理，集合页先选择单讲。先检查独立字幕及画面硬字幕，未发现接口字段不能据此认定无字幕。需要语音识别时由统一入口回退本地 oMLX；严道语言默认 auto，支持 videoEn 媒体。文章内有多个直接视频时，以 AGENT_DRVOICE_VIDEO_INDEX 指定从1开始的序号；独立保存每段身份，不把图文介绍当作转写。仅支持已核验的站点视频和OSS域名；微信等iframe播放器另行逐例解析。
@@ -59,8 +75,8 @@ python3 <本 skill>/scripts/extract_content.py '<URL>' '<OUTPUT_DIR>'
 
 ## 不适用场景
 
-1. 用户没有提供视频 URL。
-2. 用户只给本地音视频文件，不是 URL 来源。
+1. 用户没有提供视频 URL 或本地音视频路径。
+2. 用户给的是非媒体文件或普通网页。
 3. 用户要求跳过当前 skill、手工拼接下载/转写命令。
 4. 需要治理或重构 skill 本身；这类任务应使用 `feipi-skill-govern`。
 
@@ -80,7 +96,7 @@ python3 <本 skill>/scripts/extract_content.py '<URL>' '<OUTPUT_DIR>'
 ## 先确认什么
 
 1. 必填
-- 视频 URL
+- 视频 URL 或本地音视频路径
 
 2. 按需确认
 - 输出目录
@@ -121,7 +137,7 @@ python3 <本 skill>/scripts/extract_content.py '<URL>' '<OUTPUT_DIR>'
 - 默认和 `fast` 使用 `sensevoicesmall`（SenseVoiceSmall）；`accurate` 使用 `qwen3-asr-1.7b`（Qwen3-ASR-1.7B）。按 `/v1/models` 解析实际模型 ID；缺失或同一家族多个候选时明确失败，不切换其他模型。
 - 服务默认 `http://127.0.0.1:8037/v1`；自定义本机端口用 `AGENT_OMLX_BASE_URL`，认证仅从进程环境读取 `OMLX_API_KEY`。不得读取 `~/.env` 等配置文件、主动执行 shell 启动文件或输出密钥。运行时不启动服务、不下载模型、不改 oMLX 配置。
 - 必须通过 `scripts/extract_video_text.sh` 获取文本，禁止手写其他识别命令。`whisper` 模式名、`whisper_profile` 字段与 `.whisper.wav` 文件名仅作兼容。
-- 音频按不超过 30 秒分块顺序识别，时间戳表示音频块范围，并非逐句或逐字对齐；来源状态必须披露“oMLX 模型名、约30秒块级时间戳、识别风险”。只有全部块请求完成才交付文本；全空转写失败，不用标题补正文。详见 [oMLX 转写配置](references/omlx-asr.md)。
+- 音频默认优先在停顿处切成不超过 30 秒的连续无重叠块，找不到合适停顿时按上限切开。切分脚本只有 `--max-seconds` 一个可调配置，不提供试听模式。时间戳表示音频块范围，并非逐句或逐字对齐；来源状态必须披露“oMLX 模型名、约30秒块级时间戳、识别风险”。只有全部块请求完成才交付文本；全空转写失败，不用标题补正文。详见 [oMLX 转写配置](references/omlx-asr.md)。
 
 4. 分段触发强约束
 - 未显式要求背景时，不得自动补第二阶段。
@@ -170,7 +186,7 @@ python3 <本 skill>/scripts/extract_content.py '<URL>' '<OUTPUT_DIR>'
 - 摘要结果 `summary_result.md` 的顶层标题必须且仅包含：`## 摘要概述`、`## 来源状态`、`## 附件`
 - `## 摘要概述` 先总后分：v2 使用从已审核条目选出的“先看重点”，不另写无依据概述；后续按来源主题使用三级标题组织。历史纯文字模板可使用总述段。
 - `## 来源状态` 必须显式输出文本来源、完整性、时间戳状态、外部资料使用状态、主要风险
-- `## 附件` 必须包含原始视频 URL；本地成套交付时可附实际可访问的转写路径，Telegram 单独发送的摘要不得列出接收方拿不到的相对文件路径。
+- `## 附件` 必须包含原始视频 URL 或本地原件路径；本地文件同时保留提取音频与转写路径，Telegram 单独发送的摘要不得列出接收方拿不到的相对文件路径。
 - 历史纯文字摘要交付前，使用固定标签 `是否完整`、`是否带时间戳`、`是否使用外部资料`；本地附件使用 `转写文本` 标签和绝对路径链接。执行 `bash <本 skill>/scripts/lint_summary_result.sh '<summary_result.md>' --mode structured`，修正未通过项后再交付。校验只检查格式与披露，不能替代全文阅读和原文对照。
 - 不同 video_type 的差异放在 `## 摘要概述` 内部的三级标题中，不改变顶层结构
 - 默认总结视频不主动扩展背景，不主动搜索新闻
@@ -182,6 +198,7 @@ python3 <本 skill>/scripts/extract_content.py '<URL>' '<OUTPUT_DIR>'
 - Bilibili：由 `scripts/download_bilibili.sh` 适配。
 - 小红书：由 `scripts/download_xiaohongshu.sh` 适配；支持 `xiaohongshu.com/explore/<笔记ID>`、`/discovery/item/<笔记ID>`、`xhslink.com` 与 `xhslink.cn` 分享短链。保留分享参数，默认匿名提取；遇登录、验证码、图文笔记或无法读取媒体时明确失败，不把笔记文案当成视频转写。详见 `references/sources.md`。
 - 严道医声网：由 `scripts/download_drvoice.sh` 适配。
+- 本地视频/音频：由 `scripts/lib/read_local_media.py` 适配首条完整音轨，纯文字总结复用原入口。
 
 2. 统一入口
 - 文字摘要与下载入口为 `scripts/extract_video_text.sh`、`scripts/download_video.sh`；需要画面证据时使用 `scripts/extract_content.py`。取证入口内部复用文字入口，不重复启动转写。
@@ -195,7 +212,7 @@ python3 <本 skill>/scripts/extract_content.py '<URL>' '<OUTPUT_DIR>'
 ## 输入与输出
 
 1. 最少输入
-- 视频 URL
+- 视频 URL 或本地音视频路径
 
 2. 可选输入
 - 视频标题
@@ -209,9 +226,9 @@ python3 <本 skill>/scripts/extract_content.py '<URL>' '<OUTPUT_DIR>'
 
 3. 输出
 - `extract_video_text.sh` 会在 `output_dir` 下按 `source-url_key` 自动建子目录。
-- 子目录内包含本次 URL 的音频、字幕、转写与日志，避免多视频文件平铺。
+- 子目录内包含本次来源的音频、字幕、转写与日志，避免多视频文件平铺；本地按内容指纹建目录。
 - `video_identity.json`：平台、视频 ID、完整标题、标题来源和聊天标题候选；只保存必要身份字段，不保存 Cookie、请求头或媒体直链。
-- 产物文件名自动去空格（空格替换为下划线）。
+- 站点产物文件名自动去空格（空格替换为下划线）；本地原件不改名。
 - 直接读取模式会额外产出：
   - `dryrun`：标题、视频 ID、网络或认证状态日志。
   - `video`：视频文件。

@@ -448,6 +448,8 @@ fi
 
 # oMLX 的档位、缓存与失败行为通过真实 HTTP 替身验证。
 run_simple_case "omlx-asr-contract" pass python3 "$SCRIPT_DIR/test_omlx_transcribe.py"
+run_simple_case "local-media-contract" pass python3 "$SCRIPT_DIR/test_local_media.py"
+run_simple_case "pause-split-contract" pass python3 "$SCRIPT_DIR/test_split_audio.py"
 
 # 测试 8：download_youtube.sh 的 auto 不再因为时长切 accurate
 YOUTUBE_SCRIPT="$RUNTIME_DIR/download_youtube.sh"

@@ -1,5 +1,9 @@
 # 来源与合并说明
 
+## 本地媒体
+
+`download_video.sh` 与 `extract_video_text.sh` 接受本地视频或音频路径，分派 `scripts/lib/read_local_media.py`。本地不使用站点下载器、代理、浏览器登录态或平台字幕，完整解码首条音轨为 PCM WAV 后复用现有 oMLX 客户端。原件不修改，按原件内容 SHA256 隔离运行目录；`source_media.json` 记录原始路径、音轨、原件与音频指纹，`video_identity.json` 明确 `title_source=local_filename`。来源限定为真实音频转写，文件名不能替代正文。多音轨暂固定选第一条，不增加额外选择配置。
+
 ## 已归档严道音频与循环稿对照
 
 严道统一入口遇到既有`audio.whisper.wav`时，先流式重解码当前完整视频，核对16kHz单声道16-bit PCM的长度与SHA256。完全相同才复用并保存`audio_cache_validation.json`；参数不符、截断、解码失败或内容不同时停止并保留原件。校验不落地新的音频副本，也不替代视频来源身份检查。
