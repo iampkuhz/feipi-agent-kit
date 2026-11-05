@@ -49,6 +49,8 @@ Multica 网页调好 Agent：`./workbench multica plan` 看服务端差异；`./
 
 研发时 `./develop <组件> test`、`./develop <组件> run -- <命令>`。它们不会自动发布；显式命令本身若会改环境仍有副作用。只有 Skills 提供 `./develop skills link`，结束后 `./workbench apply skills` 恢复实拷。不要直接编辑运行副本而忘记 capture。
 
+技能安装会排除根目录的 `tests/`、`evals/` 和 `node_modules/`，并在内容、权限与链接均未变化时跳过复制。Git 只保存 npm 包清单和锁文件；本地依赖由技能在使用时按锁文件准备。Mermaid 和 PPT 复用系统 Node，以各自本机共享缓存保存固定 npm 依赖；Mermaid 另外复用已安装 Chrome，多个客户端不重复复制或安装；日常执行不运行 `npm update`。新机首次使用需准备依赖，缓存可重建，运行资料与私有数据仍按以下边界保留。
+
 ## 私有范围与备份
 
 | 资料 | 位置与要求 |
