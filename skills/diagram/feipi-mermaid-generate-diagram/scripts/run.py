@@ -13,6 +13,7 @@ from pathlib import Path
 
 from model import ROOT, TYPES, Invalid, check_source, check_visible_text, generate, fingerprint, load, require, safe_relative, sha, validate
 from package import CONTRACT, artifact_hashes, contract_hash, layout_issues, verify
+from prepare_runtime import ensure_runtime
 
 
 def write(path, data):
@@ -126,6 +127,8 @@ def locked_run(brief_path,folder,diagram,reuse,browser,start):
         write(folder/'brief.json',packaged)
         (folder/'diagram.mmd').write_text(source)
         (folder/'explanation.md').write_text(explain(b))
+        runtime = ensure_runtime()
+        cmd += ['--runtime', runtime['path']]
         ready = invoke(cmd+['--check'],30)
         report['renderer']=ready['renderer']
         attempt += 1

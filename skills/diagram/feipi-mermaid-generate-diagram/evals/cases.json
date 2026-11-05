@@ -109,6 +109,20 @@
         "把历史渲染次数算成本次",
         "篡改 hash 使损坏包过关"
       ]
+    },
+    {
+      "id": "shared-fixed-runtime",
+      "prompt": "技能已实拷到两个客户端，没有 node_modules，请运行 Mermaid 并复用本机依赖。",
+      "expected": [
+        "使用系统 Node 和 Chrome；首次按锁文件 npm ci 准备本机共享缓存",
+        "相同锁文件和运行平台跨安装目录复用，不重复安装",
+        "准备失败说明依赖层，不消耗图的渲染次数"
+      ],
+      "forbidden": [
+        "复制源码的 node_modules",
+        "运行 npm update 或更改锁文件",
+        "把系统 Node 当成已经包含 Mermaid 包"
+      ]
     }
   ]
 }

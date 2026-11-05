@@ -3,16 +3,27 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import puppeteer from 'puppeteer';
-import {renderMermaid} from '@mermaid-js/mermaid-cli';
+import {createRequire} from 'node:module';
+import {fileURLToPath, pathToFileURL} from 'node:url';
+import {execFileSync} from 'node:child_process';
 
-const version = async name => JSON.parse(await fs.readFile(new URL('../node_modules/'+name+'/package.json',import.meta.url),'utf8')).version;
 const hash = data => crypto.createHash('sha256').update(data).digest('hex');
 const args = process.argv.slice(2);
 const value = flag => args.includes(flag) ? args[args.indexOf(flag)+1] : undefined;
 let browser;
 let stage = 'renderer';
 try {
+  const runtime = value('--runtime') ?? JSON.parse(execFileSync('python3',
+    [fileURLToPath(new URL('./prepare_runtime.py',import.meta.url)), '--check'],
+    {encoding:'utf8',timeout:15000})).path;
+  const lockBytes = await fs.readFile(new URL('../package-lock.json',import.meta.url));
+  if (!lockBytes.equals(await fs.readFile(path.join(runtime,'package-lock.json')))) {
+    throw new Error('共享依赖与当前锁文件不同，请准备当前版本依赖');
+  }
+  const runtimeRequire = createRequire(path.join(runtime,'package.json'));
+  const puppeteer = runtimeRequire('puppeteer');
+  const {renderMermaid} = await import(pathToFileURL(runtimeRequire.resolve('@mermaid-js/mermaid-cli')));
+  const version = async name => JSON.parse(await fs.readFile(path.join(runtime,'node_modules',name,'package.json'),'utf8')).version;
   let executablePath = value('--browser');
   if (!executablePath) {
     const candidates = [
@@ -33,7 +44,7 @@ try {
   };
   const locked=JSON.parse(await fs.readFile(new URL('../package-lock.json',import.meta.url),'utf8'));
   for (const [field,name] of Object.entries({cli:'@mermaid-js/mermaid-cli',mermaid:'mermaid',puppeteer:'puppeteer'})) {
-    if(renderer[field] !== locked.packages['node_modules/'+name].version) throw new Error('依赖版本与 lockfile 不一致，请重新 npm ci');
+    if(renderer[field] !== locked.packages['node_modules/'+name].version) throw new Error('依赖版本与 lockfile 不一致，请重新准备固定依赖');
   }
   if (args.includes('--check')) {
     console.log(JSON.stringify({status:'ready',renderer}));

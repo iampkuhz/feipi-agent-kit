@@ -2,17 +2,25 @@
 
 需要 Python 3.10+（PyYAML 6、jsonschema 4）、Node.js 22.13+、Chrome/Chromium。运行只使用固定 lockfile 中的 Mermaid CLI 12.0.0、Mermaid、Puppeteer；浏览器进程仅为本次调用创建并在结束时关闭。没有服务端口、容器或在线渲染服务。
 
-在 skill 目录准备依赖：
+复用系统已安装的 Node、npm 与 Chrome，不依赖全局安装的 Mermaid/Puppeteer。npm 包按 `package.json` 和 `package-lock.json` 固定版本，`node_modules` 是本地可重建内容，不进入 Git 或技能安装副本。不要使用 `npm update` 作为运行或安装步骤。
+
+在 skill 目录准备 Python 依赖；Node 依赖可显式准备，也会在 `scripts/run.py` 的有效输入首次运行时按需准备：
 
 ```bash
 python3 -m pip install -r scripts/requirements.txt
-PUPPETEER_SKIP_DOWNLOAD=true npm ci --ignore-scripts --no-audit --no-fund
+python3 scripts/prepare_runtime.py
+python3 scripts/prepare_runtime.py --check
 node scripts/render.mjs --check
 ```
 
+共享缓存位于 `$XDG_CACHE_HOME/feipi-agent-kit/mermaid/`；未设置时，macOS 使用 `~/Library/Caches/feipi-agent-kit/mermaid/`，其他系统使用 `~/.cache/feipi-agent-kit/mermaid/`。缓存按两个包清单的内容、系统/架构、Node 主版本和 ABI 隔离，不按客户端目录重复安装。同一版本并发准备只执行一次；失败不发布可用标记。`--check` 只读、不安装、不联网。
+
+准备使用 `npm ci --ignore-scripts --no-audit --no-fund --prefer-offline`，禁止 Puppeteer 下载浏览器。只有首次或清单/运行平台变化时需要准备；之后直接使用缓存，离线也可运行。损坏的依赖在预检中明确失败；确认没有相关渲染任务后，删除该版本缓存并重新准备，不在渲染失败后盲目更新。
+
 优先使用已安装的 Google Chrome（macOS）或 /usr/bin 下的 Chromium/Chrome。其他位置在 run.py 和 render.mjs 传 `--browser /absolute/path/to/chrome`。没有浏览器时明确报告缺少依赖，让用户安装其选择的浏览器，不暗中切换公共 renderer。
 
-预检只启动一次短生命周期浏览器以确认可用性，不渲染用户图。正式渲染单独启动浏览器，65秒上限；超时只终止本次调用创建的进程组。没有 `--no-sandbox`、自动提权或反复重启。连接权限错误与依赖不存在是不同失败层。
+依赖准备中的单次 `npm ci` 最多180秒，计入入口的静态阶段，不消耗图的渲染次数。预检只启动一次短生命周期浏览器以确认可用性，不渲染用户图。正式渲染单独启动浏览器，65秒上限；超时只终止本次调用创建的进程组。没有 `--no-sandbox`、自动提权或反复重启。连接权限错误与依赖不存在是不同失败层。
+
 
 渲染依赖的伪域名 `mermaid-cli-intercept.invalid` 由 CLI 本地拦截并从依赖目录加载资源；其他 HTTP 请求全部拒绝。图包仍应避免包含密钥等不需要展示的输入。PNG 使用白底与系统中文字体，SVG 不嵌入字体，跨机显示可能因字体不同而变化；以同时交付的 PNG 核对视觉。
 

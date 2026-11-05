@@ -20,7 +20,7 @@ description: 生成或修改 Mermaid 架构图、时序图、组件图、活动�
 python3 scripts/run.py --brief brief.yaml --out-dir package
 ```
 
-1. 第一次使用先按 [本地运行](references/runtime.md) 准备固定依赖。入口不会在渲染失败后自行联网安装或更换 renderer。
+1. 使用系统已有 Node 和 Chrome；首次运行会按锁文件在本机共享缓存执行一次 `npm ci`，之后跨安装目录复用。也可先按 [本地运行](references/runtime.md) 显式准备。依赖准备失败直接报告，不在渲染失败后换 renderer 或更新依赖。
 2. 入口依次做 schema、语义、预算、源码覆盖、一次浏览器预检、真实 SVG 渲染、同图 PNG 预览、几何检查及独立图包复核。输入失败不启动浏览器。
 3. 查看返回的 `paths.preview`，检查中文、层级、关系、分支和密集区域，确认无重叠、错归属、裁切。自动几何检查不能代替视觉检查。
 4. `review_required` 表示技术检查通过，仍未完成验收。实际看图后记录具体结论：

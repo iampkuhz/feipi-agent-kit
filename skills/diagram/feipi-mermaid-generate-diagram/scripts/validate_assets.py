@@ -20,7 +20,7 @@ for path in sorted((root/'assets/examples').glob('*.json')):
  b=validate(load(path),path.parent)
  if b['diagram_type'] in TYPES:check_source(b,generate(b))
  else:check_source(b,path.with_suffix('.mmd').read_text())
-for name in ('run.py','render.mjs','model.py','package.py','review_package.py','verify_package.py'):
+for name in ('run.py','render.mjs','prepare_runtime.py','model.py','package.py','review_package.py','verify_package.py'):
  assert (root/'scripts'/name).is_file(),name
 assert (root/'package-lock.json').is_file()
 print('结构、schema、全部示例与元数据通过')

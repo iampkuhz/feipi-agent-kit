@@ -14,6 +14,8 @@ class RuntimeTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.root=Path(self.temp.name)
         self.b=load(ROOT/'assets/examples/component.json');self.brief=self.root/'b.json';self.out=self.root/'package';self.save()
+        runtime = patch('run.ensure_runtime', return_value={'path': str(self.root/'runtime')})
+        self.runtime = runtime.start();self.addCleanup(runtime.stop)
     def tearDown(self):self.temp.cleanup()
     def save(self):self.brief.write_text(json.dumps(self.b,ensure_ascii=False))
     def test_missing_renderer_preserves_source_without_attempt(self):
@@ -21,6 +23,13 @@ class RuntimeTests(unittest.TestCase):
             r=run(self.brief,self.out)
         self.assertEqual(r['failure_class'],'renderer');self.assertEqual(r['attempt_index'],0)
         self.assertTrue((self.out/'diagram.mmd').is_file());self.assertFalse((self.out/'diagram.svg').exists());self.assertEqual(call.call_count,1)
+    def test_dependency_setup_failure_does_not_consume_render_attempt(self):
+        self.runtime.side_effect = RuntimeError('npm unavailable')
+        with patch('run.invoke') as call:
+            r=run(self.brief,self.out)
+        call.assert_not_called()
+        self.assertEqual(r['failure_class'],'renderer');self.assertEqual(r['attempt_index'],0)
+        self.assertIn('npm unavailable',r['issues'][0])
     def test_failed_source_cannot_repeatedly_consume_attempts(self):
         with patch('run.invoke',side_effect=[{'renderer':{}},Invalid('syntax error')]) as call:
             r=run(self.brief,self.out)
