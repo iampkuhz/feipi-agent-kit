@@ -6,7 +6,7 @@ set -euo pipefail
 # 1. 过滤链接模式：入口文件实拷、运行目录链接到用户级 agent 目录
 # 2. 过滤拷贝模式：安装到项目目录内（<project>/.agents/skills 等）
 #
-# skill 根目录下的 tests/ 与 evals/ 只供源码维护，不进入任何安装目标。
+# skill 根目录下的 tests/、evals/ 与 node_modules/ 不进入安装目标。
 # 安装来源写入隐藏标记；再次安装时只清理本仓库已退役的入口。
 #
 # 安装前自动验证：
@@ -247,7 +247,7 @@ collect_shared_roots() {
 
   # rg 的 1 表示无匹配，是合法的空依赖列表；真正的扫描错误继续上抛。
   { rg -o --no-filename '\$REPO_ROOT/[A-Za-z0-9._/-]+' "$SRC_ROOT" -g '*.sh' \
-      -g '!**/tests/**' -g '!**/evals/**' || [[ "$?" -eq 1 ]]; } \
+      -g '!**/tests/**' -g '!**/evals/**' -g '!**/node_modules/**' || [[ "$?" -eq 1 ]]; } \
     | sed -E 's#^\$REPO_ROOT/##' \
     | cut -d'/' -f1 \
     | sort -u \
@@ -262,13 +262,13 @@ collect_shared_roots() {
 
 is_skill_development_dir() {
   case "$1" in
-    tests|evals) return 0 ;;
+    tests|evals|node_modules) return 0 ;;
     *) return 1 ;;
   esac
 }
 
 installation_trees_equal() {
-  python3 - "$1" "$2" <<'PYEOF'
+  python3 - "$1" "$2" "${3:-staged}" <<'PYEOF'
 import filecmp
 import os
 from pathlib import Path
@@ -296,7 +296,30 @@ def equal(left, right):
 
 
 try:
-    sys.exit(0 if equal(Path(sys.argv[1]), Path(sys.argv[2])) else 1)
+    source, destination = map(Path, sys.argv[1:3])
+    mode = sys.argv[3]
+    if mode == 'staged':
+        same = equal(source, destination)
+    else:
+        # 比较安装后的有效树，未变时不创建临时副本；保留逐字节与权限检查。
+        names = {p.name for p in source.iterdir() if p.name not in {'tests', 'evals', 'node_modules'}}
+        marker = destination / '.feipi-agent-kit-source'
+        same = (destination.is_dir() and not destination.is_symlink()
+                and stat.S_IMODE(destination.stat().st_mode) == 0o700
+                and {p.name for p in destination.iterdir()} == names | {marker.name}
+                and marker.is_file() and not marker.is_symlink()
+                and stat.S_IMODE(marker.stat().st_mode) == 0o600
+                and marker.read_bytes() == (str(source) + '\n').encode())
+        if same:
+            for name in names:
+                left, right = source / name, destination / name
+                if mode == 'link' and left.is_dir():
+                    same = right.is_symlink() and os.readlink(right) == str(left)
+                else:
+                    same = equal(left, right)
+                if not same:
+                    break
+    sys.exit(0 if same else 1)
 except OSError as error:
     print(f"[ERROR] 无法比较安装内容：{error}", file=sys.stderr)
     sys.exit(2)
@@ -448,7 +471,7 @@ collect_all_skills() {
 
     # 跳过隐藏目录
     local basename
-    basename="$(basename "$skill_dir")"
+    basename="${skill_dir##*/}"
     [[ "$basename" == .* ]] && continue
 
     # 检查是否是有效的技能目录（满足任一条件）：
@@ -468,7 +491,7 @@ collect_all_skills() {
     if [[ "$is_skill" == true ]]; then
       all_skill_dirs+=("$skill_dir")
     fi
-  done < <(find "$src_root" -type d -print0 2>/dev/null)
+  done < <(find "$src_root" -type d \( -name '.*' -o -name node_modules -o -name tests -o -name evals -o -name __pycache__ \) -prune -o -type d -print0)
 
   # 第二遍：排除那些有子技能的父目录
   # 如果一个技能目录的子目录中还有其他技能目录，则排除这个父目录
@@ -781,7 +804,21 @@ PYEOF
 install_entry() {
   local install_func="$1" src="$2" dest="$3" label="$4" status=0
   ITEM_STATUS=""
-  "$install_func" "$src" "$dest" "$label" || status=$?
+  if [[ -f "$src/SKILL.md" ]]; then
+    local mode=copy comparison=0
+    if [[ "$install_func" == link_item ]]; then mode=link; fi
+    installation_trees_equal "$src" "$dest" "$mode" || comparison=$?
+    if [[ "$comparison" -eq 0 ]]; then
+      ITEM_STATUS=skipped
+      if [[ "$VERBOSE" == true ]]; then status_line skipped "${label}（内容未变）"; fi
+    elif [[ "$comparison" -eq 1 ]]; then
+      "$install_func" "$src" "$dest" "$label" || status=$?
+    else
+      status=1
+    fi
+  else
+    "$install_func" "$src" "$dest" "$label" || status=$?
+  fi
   if [[ "$status" -ne 0 && "$status" -ne 2 ]]; then
     status_line failed "安装失败：$dest" >&2
     return 1
@@ -810,9 +847,9 @@ install_skills() {
   heading "$label"
   printf '  目标：%s\n' "$dest_root"
   if [[ "$mode" == link ]]; then
-    printf '  模式：入口实拷、运行目录链接；排除 tests/evals\n'
+    printf '  模式：入口实拷、运行目录链接；排除 tests/evals/node_modules\n'
   else
-    printf '  模式：实拷；排除 tests/evals\n'
+    printf '  模式：实拷；排除 tests/evals/node_modules\n'
   fi
   if [[ "$VERBOSE" == true ]]; then printf '  源目录：%s\n' "$SRC_ROOT"; fi
 

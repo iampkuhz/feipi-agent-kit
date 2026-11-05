@@ -122,6 +122,44 @@ class InstallOutputTests(unittest.TestCase):
         self.assert_counts(result.stdout, skipped=3)
         self.assertFalse(retired.is_symlink())
 
+    def test_dependencies_are_not_discovered_or_installed_in_any_mode(self):
+        for name in ('feipi-one','feipi-two'):
+            dep=self.repo/'skills/integration'/name/'node_modules/foreign-package'
+            dep.mkdir(parents=True);(dep/'SKILL.md').write_text('not a skill')
+        for args,dest in [
+            (('install-links','AGENT=codex'),self.codex/'skills'),
+            (('install','AGENT=codex'),self.codex/'skills'),
+            (('install-links','AGENT=openclaw'),self.openclaw/'skills'),
+            (('install-project',f'PROJECT={self.project}'),self.project/'.agents/skills'),
+        ]:
+            with self.subTest(args=args):
+                self.run_make(*args)
+                self.assertFalse((dest/'feipi-one/node_modules').exists())
+                local=dest/'feipi-one/node_modules';local.mkdir();(local/'old').write_text('old copy')
+                self.run_make(*args)
+                self.assertFalse(local.exists())
+
+    def test_unchanged_skills_are_not_copied_to_staging(self):
+        for name in ('feipi-one','feipi-two'):
+            (self.repo/'skills/integration'/name/'scripts/run.sh').write_text('no shared dependencies\n')
+        for target in ('install','install-links'):
+            with self.subTest(target=target):
+                self.run_make(target,'AGENT=codex')
+                fake=self.base/('fail-cp-'+target);fake.mkdir()
+                cp=fake/'cp';cp.write_text('#!/bin/sh\nexit 77\n');cp.chmod(0o755)
+                result=self.run_make(target,'AGENT=codex',env=dict(self.env,PATH=f'{fake}{os.pathsep}'+self.env['PATH']))
+                self.assert_counts(result.stdout,skipped=2)
+
+    def test_same_size_and_mtime_corruption_and_permission_drift_are_repaired(self):
+        self.run_make('install','AGENT=codex')
+        dest=self.codex/'skills/feipi-one/SKILL.md';before=dest.stat()
+        content=dest.read_bytes();dest.write_bytes(content.replace(b'fixture',b'changed'))
+        os.utime(dest,ns=(before.st_atime_ns,before.st_mtime_ns))
+        result=self.run_make('install','AGENT=codex')
+        self.assert_counts(result.stdout,updated=1,skipped=2);self.assertEqual(dest.read_bytes(),content)
+        dest.chmod(0o600 if dest.stat().st_mode&0o777!=0o600 else 0o644)
+        self.assert_counts(self.run_make('install','AGENT=codex').stdout,updated=1,skipped=2)
+
     def test_shared_link_repair_and_conflict_are_not_new_installs(self):
         self.run_make("install-links", "AGENT=codex")
         shared = self.codex / "shared"

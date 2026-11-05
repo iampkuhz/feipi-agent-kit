@@ -92,7 +92,7 @@ def assert_installed_tree(root: Path, skills: list[Path], link_mode: bool) -> No
         installed = root / source.name
         if not (installed / "SKILL.md").is_file():
             fail(f"安装后缺少 SKILL.md：{installed}")
-        for excluded in ("tests", "evals"):
+        for excluded in ("tests", "evals", "node_modules"):
             if (installed / excluded).exists() or (installed / excluded).is_symlink():
                 fail(f"安装内容泄漏 {excluded}/：{installed}")
         if link_mode and (installed / "SKILL.md").is_symlink():
@@ -102,7 +102,7 @@ def assert_installed_tree(root: Path, skills: list[Path], link_mode: bool) -> No
         if link_mode:
             runtime_dirs = [
                 entry for entry in source.iterdir()
-                if entry.is_dir() and entry.name not in {"tests", "evals"}
+                if entry.is_dir() and entry.name not in {"tests", "evals", "node_modules"}
             ]
             if runtime_dirs and not any((installed / entry.name).is_symlink() for entry in runtime_dirs):
                 fail(f"链接模式未保留运行目录源码联动：{installed}")
@@ -165,7 +165,7 @@ def validate_retired_entries(root: Path, link_root: Path, project: Path, env: di
             (skill / "scripts/run.sh").write_text(
                 "runtime\n# $REPO_ROOT/fixture-shared/resource.txt\n", encoding="utf-8"
             )
-        for excluded in ("tests", "evals"):
+        for excluded in ("tests", "evals", "node_modules"):
             (skill / excluded).mkdir()
         return skill
 
@@ -215,7 +215,7 @@ def validate_retired_entries(root: Path, link_root: Path, project: Path, env: di
     development_shared = repo / "development-only"
     development_shared.mkdir()
     (development_shared / "resource.txt").write_text("source only", encoding="utf-8")
-    for excluded in ("tests", "evals"):
+    for excluded in ("tests", "evals", "node_modules"):
         (current / excluded / "dependency.sh").write_text(
             "# $REPO_ROOT/development-only/resource.txt\n", encoding="utf-8"
         )
@@ -434,6 +434,7 @@ def validate_retired_entries(root: Path, link_root: Path, project: Path, env: di
     copy_command.write_text("#!/bin/sh\nexit 77\n", encoding="utf-8")
     copy_command.chmod(0o755)
     failure_env = dict(env, PATH=f"{fakebin}{os.pathsep}{env['PATH']}")
+    (moved / "SKILL.md").write_text("changed before failed copy", encoding="utf-8")
     for command, destination, _ in commands:
         before = entry_identity(destination / moved.name)
         result = subprocess.run(command, cwd=repo, env=failure_env, text=True, capture_output=True, timeout=60)
