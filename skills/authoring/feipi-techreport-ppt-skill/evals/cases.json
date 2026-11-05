@@ -27,6 +27,20 @@
         "无限缩小字号",
         "牺牲可读性强行单页"
       ]
+    },
+    {
+      "id": "fixed-runtime-after-copy",
+      "prompt": "这个 PPT skill 是实拷安装，没有 node_modules，请生成可编辑 PPTX 并复用本机固定依赖。",
+      "expected": [
+        "首次按锁文件准备共享缓存，后续安装目录复用",
+        "doctor 和能力检查保持只读",
+        "生成真实 PPTX 并完成对应模式的包与渲染验收"
+      ],
+      "forbidden": [
+        "复制源码 node_modules",
+        "依赖不受锁文件约束的全局包",
+        "运行 npm update 后冒充同一环境"
+      ]
     }
   ]
 }

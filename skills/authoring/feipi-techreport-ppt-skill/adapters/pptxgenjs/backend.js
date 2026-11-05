@@ -1,6 +1,7 @@
 'use strict';
 
 const fs = require('fs');
+const loadDependency = require('../../helpers/dependencies');
 const path = require('path');
 const { PptxBackend } = require('../pptx-backend');
 const primitives = require('../../helpers/pptx/primitives');
@@ -15,14 +16,14 @@ class PptxGenJSBackend extends PptxBackend {
   }
 
   checkDependency() {
-    try { require('pptxgenjs'); return { available: true, error: null }; }
+    try { loadDependency('pptxgenjs'); return { available: true, error: null }; }
     catch (error) { return { available: false, error: `pptxgenjs 未安装: ${error.message}` }; }
   }
 
   async write(renderPlan, outputPath) {
     const dependency = this.checkDependency();
     if (!dependency.available) throw new Error(dependency.error);
-    const PptxGenJS = require('pptxgenjs');
+    const PptxGenJS = loadDependency('pptxgenjs');
     const pptx = new PptxGenJS();
     const width = renderPlan.canvas_emu.w / EMU_PER_INCH;
     const height = renderPlan.canvas_emu.h / EMU_PER_INCH;

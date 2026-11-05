@@ -8,7 +8,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const JSZip = require('jszip');
+const JSZip = require('../dependencies')('jszip');
 const { TokenStore } = require('../../compiler/token-store');
 const tokenStore = TokenStore.loadDefault();
 

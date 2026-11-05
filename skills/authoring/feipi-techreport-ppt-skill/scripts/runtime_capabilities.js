@@ -6,6 +6,7 @@
 const { computePipelineLevel } = require('../helpers/pipeline/level');
 const { execSync } = require('child_process');
 const path = require('path');
+const dependency = require('../helpers/dependencies');
 
 function detectNode() {
   const version = process.version.replace(/^v/, '');
@@ -13,29 +14,7 @@ function detectNode() {
 }
 
 function detectModule(name) {
-  try {
-    const resolved = require.resolve(name);
-    const pkgPath = path.join(resolved.split(path.sep + 'node_modules' + path.sep)[0], 'node_modules', name, 'package.json');
-    let version = 'unknown';
-    try {
-      const pkg = JSON.parse(require('fs').readFileSync(pkgPath, 'utf-8'));
-      version = pkg.version;
-    } catch {
-      // try direct require
-      try {
-        const mod = require(name);
-        if (mod && mod.version) version = mod.version;
-      } catch {
-        // fallback: try resolving package.json
-        const directPkg = path.join(require.resolve(name + '/package.json'));
-        const pkg = JSON.parse(require('fs').readFileSync(directPkg, 'utf-8'));
-        version = pkg.version;
-      }
-    }
-    return { available: true, version };
-  } catch {
-    return { available: false, install_hint: `npm install ${name}` };
-  }
+  return dependency.info(name);
 }
 
 function detectCommand(cmd) {

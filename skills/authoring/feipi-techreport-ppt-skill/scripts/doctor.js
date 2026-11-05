@@ -3,13 +3,12 @@
  * 运行时环境诊断：输出中文能力矩阵、缺失依赖和启用建议。
  * 不自动安装任何依赖。
  *
- * 依赖解析策略：
- * 1. 先检查 skill 目录下的 node_modules/pptxgenjs（本地安装）
- * 2. 再检查全局 node_modules/pptxgenjs
+ * 从与锁文件匹配的本机共享缓存只读探测；不使用全局 npm 包。
  */
 const { computePipelineLevel } = require('../helpers/pipeline/level');
 const { execSync } = require('child_process');
 const path = require('path');
+const dependency = require('../helpers/dependencies');
 const fs = require('fs');
 
 const SCRIPT_DIR = __dirname;
@@ -20,27 +19,7 @@ function detectNode() {
 }
 
 function detectModule(name) {
-  // Check skill-local node_modules first
-  const localPath = path.join(SKILL_DIR, 'node_modules', name, 'package.json');
-  if (fs.existsSync(localPath)) {
-    try {
-      const pkg = JSON.parse(fs.readFileSync(localPath, 'utf-8'));
-      return { available: true, version: pkg.version, location: 'local (skill/node_modules)' };
-    } catch {
-      // fall through to global check
-    }
-  }
-  // Check global/parent node_modules
-  try {
-    const pkgJson = require.resolve(name + '/package.json');
-    const pkg = JSON.parse(fs.readFileSync(pkgJson, 'utf-8'));
-    return { available: true, version: pkg.version, location: 'global' };
-  } catch {
-    return {
-      available: false,
-      install_hint: `cd ${SKILL_DIR} && npm install  # 或使用 npm install pptxgenjs 全局安装`,
-    };
-  };
+  return dependency.info(name);
 }
 
 function detectCommand(cmd) {
@@ -134,7 +113,7 @@ function main() {
   console.log('   不需要任何 npm 依赖或外部工具');
   console.log('');
   console.log('2. pptx-build:');
-  console.log('   需要 pptxgenjs: cd ' + SKILL_DIR + ' && npm install');
+  console.log('   需要 pptxgenjs: cd ' + SKILL_DIR + ' && python3 scripts/prepare_runtime.py');
   console.log('   可编译 IR → PPTX，验证布局和无重叠');
   console.log('');
   console.log('3. full visual/render:');

@@ -1,6 +1,7 @@
 # 变更记录
 
 ## 2026-11-05
+- feipi-techreport-ppt-skill v4：固定依赖独立缓存与安装后运行验收
 - feipi-mermaid-generate-diagram v2：固定依赖按需准备与跨客户端复用
 - 安装器：稳定来源标记与链接比较，避免跨 umask 重复更新
 - feipi-multica-manage-tasks v2：修复绑定重试并补齐协作验收

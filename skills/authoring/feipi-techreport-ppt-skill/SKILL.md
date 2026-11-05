@@ -20,6 +20,8 @@ description: 用于将中文技术材料重构成 CTO、技术负责人和管理
 
 通用 PPTX 读取、写入、渲染、兼容性和文件检查优先复用官方 Presentations skill。P0 的确定性后端为仓内 `pptxgenjs` adapter；后端不得反向定义视觉规范。未来替换后端时，Semantic Slide IR、合同和 token 保持不变。
 
+使用系统 Node；npm 依赖首次使用时按锁文件准备到本机共享缓存，多个客户端复用，不复制 `node_modules` 或使用全局包代替固定版本。也可运行 `python3 scripts/prepare_runtime.py` 显式准备；`--check`、doctor 和能力探测只读，不自动安装。细节见 [运行环境](references/runtime-environment.md)。
+
 ## 默认行为
 
 - 默认语言：简体中文，保留必要英文术语。

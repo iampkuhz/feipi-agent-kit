@@ -12,6 +12,7 @@
 'use strict';
 
 const path = require('path');
+const dependency = require('../helpers/dependencies');
 const fs = require('fs');
 const { execSync } = require('child_process');
 
@@ -39,13 +40,8 @@ const DEMO_BENCHMARKS = [
 
 // 检查依赖
 function detectModule(name) {
-  try {
-    const pkgJson = require.resolve(name + '/package.json');
-    const pkg = JSON.parse(fs.readFileSync(pkgJson, 'utf-8'));
-    return { available: true, version: pkg.version };
-  } catch {
-    return { available: false };
-  }
+  try { dependency(name); return dependency.info(name); }
+  catch { return { available: false }; }
 }
 
 function detectCommand(cmd) {
@@ -72,7 +68,7 @@ if (!pptxgenjs.available) {
   console.log('⚠ pptxgenjs 未安装，无法生成 PPTX demo deck。');
   console.log('');
   console.log('安装方法:');
-  console.log(`  cd ${SKILL_DIR} && npm install`);
+  console.log(`  cd ${SKILL_DIR} && python3 scripts/prepare_runtime.py`);
   console.log('');
   console.log('Demo 覆盖场景:');
 
@@ -86,7 +82,7 @@ if (!pptxgenjs.available) {
       scenario: b.scenario,
       ir_exists: fs.existsSync(path.join(BENCHMARK_DIR, b.name, 'slide-ir.json'))
     })),
-    instruction: '安装 pptxgenjs 后重新运行: npm install && node scripts/generate_demo_deck.js'
+    instruction: '安装 pptxgenjs 后重新运行: python3 scripts/prepare_runtime.py && node scripts/generate_demo_deck.js'
   };
 
   for (const b of DEMO_BENCHMARKS) {
@@ -106,7 +102,7 @@ if (!pptxgenjs.available) {
 }
 
 // pptxgenjs 可用，生成 demo deck
-const PptxGenJS = require('pptxgenjs');
+const PptxGenJS = dependency('pptxgenjs');
 const theme = require(path.join(SKILL_DIR, 'helpers', 'pptx', 'theme.js'));
 const compiler = require(path.join(SKILL_DIR, 'helpers', 'pptx', 'compiler.js'));
 

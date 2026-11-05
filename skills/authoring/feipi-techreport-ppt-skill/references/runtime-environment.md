@@ -2,16 +2,19 @@
 
 ## 基础
 
-- Node.js 与 skill 本地 `npm ci`；
+- 系统 Node.js 18+、npm 和 Python 3；
 - `ajv` 用于 schema 校验；
 - `pptxgenjs` 用于 P0 backend；
 - `zip/unzip` 用于 OpenXML postcheck。
 
 ```bash
 cd skills/authoring/feipi-techreport-ppt-skill
-npm ci
+python3 scripts/prepare_runtime.py
+python3 scripts/prepare_runtime.py --check
 node scripts/doctor.js --json
 ```
+
+首次使用 Ajv/PPTX 编译能力时自动运行一次固定锁文件的 `npm ci --ignore-scripts --no-audit --no-fund --prefer-offline`。共享缓存位于 `$XDG_CACHE_HOME/feipi-agent-kit/ppt/`；未设置时，macOS 使用 `~/Library/Caches/feipi-agent-kit/ppt/`，其他系统使用 `~/.cache/feipi-agent-kit/ppt/`。以包清单内容、系统/架构、Node 主版本和 ABI 隔离；相同版本跨客户端复用。准备失败不发布缓存；不向技能目录写入依赖，不运行 `npm update` 或依赖全局 npm 包。doctor 和 runtime_capabilities 只检查已准备的缓存。
 
 ## 渲染优先级
 

@@ -2,7 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const Ajv2020 = require('ajv/dist/2020');
+const Ajv2020 = require('../helpers/dependencies')('ajv/dist/2020');
 const { TokenStore, DEFAULT_SKILL_ROOT } = require('./token-store');
 const { ContractRegistry } = require('./contract-registry');
 const { adaptV1ToV2 } = require('./v1-to-v2');

@@ -54,7 +54,7 @@ if (!fs.existsSync(FIXTURE_PATH)) {
   process.exit(1);
 }
 
-const PptxGenJS = require('pptxgenjs');
+const PptxGenJS = require('../helpers/dependencies')('pptxgenjs');
 const theme = require(path.join(SKILL_DIR, 'helpers', 'pptx', 'theme.js'));
 const compiler = require(path.join(SKILL_DIR, 'helpers', 'pptx', 'compiler.js'));
 
