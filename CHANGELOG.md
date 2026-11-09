@@ -1,5 +1,8 @@
 # 变更记录
 
+## 2026-11-09
+- Makefile skills 安装目标统一命名为 `install-skills`；`install-links` 保留为兼容别名
+
 ## 2026-11-06
 - feipi-health-maintain-family-records v1：家庭健康归档核验与双端命令
 - 安装器与工作台支持按客户端和单个 skill 发布，定向安装保留其他入口

@@ -70,7 +70,7 @@ Mac、Skills 和服务定义默认使用实拷运行副本；Multica 继续使�
 make help                      # 查看所有可用命令
 make setup                     # 只读检查服务依赖
 ./workbench apply skills       # 备份后实拷安装 Skills
-make install VERBOSE=1         # 兼容实拷安装入口；install-links 仅用于源码调试
+make install VERBOSE=1         # 兼容实拷安装入口；install-skills 仅用于源码调试
 make searxng-up / down / restart / logs
 make litellm-up / down / restart / logs
 make doctor                    # 健康检查

@@ -180,9 +180,9 @@ def validate_retired_entries(root: Path, link_root: Path, project: Path, env: di
         (source_root / "registry.yaml").write_text("\n".join(records) + "\n", encoding="utf-8")
 
     commands = (
-        (["make", "install-links", "AGENT=codex"], link_root, True),
+        (["make", "install-skills", "AGENT=codex"], link_root, True),
         (["make", "install-project", f"PROJECT={project}"], project / ".agents/skills", False),
-        (["make", "install-links", "AGENT=openclaw"], openclaw_home / "skills", False),
+        (["make", "install-skills", "AGENT=openclaw"], openclaw_home / "skills", False),
     )
 
     def install(expect_success: bool = True, verbose: bool = False) -> dict[Path, str]:

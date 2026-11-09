@@ -84,33 +84,33 @@ class InstallOutputTests(unittest.TestCase):
         self.assertFalse(self.codex.exists())
 
     def test_new_repeat_and_updated_entries(self):
-        first = self.run_make("install-links", "AGENT=codex")
+        first = self.run_make("install-skills", "AGENT=codex")
         self.assert_counts(first.stdout, added=3)
         self.assertEqual(first.stdout.count("[新增]"), 3)
         self.assertNotIn("[PASS]", first.stdout)
         self.assertNotIn("\033[", first.stdout + first.stderr)
         dest = self.codex / "skills/feipi-one/SKILL.md"
         before = dest.stat()
-        repeat = self.run_make("install-links", "AGENT=codex")
+        repeat = self.run_make("install-skills", "AGENT=codex")
         self.assert_counts(repeat.stdout, skipped=3)
         self.assertNotIn("[跳过]", repeat.stdout)
         self.assertNotIn("feipi-one", repeat.stdout)
         self.assertEqual((before.st_ino, before.st_mtime_ns), (dest.stat().st_ino, dest.stat().st_mtime_ns))
         source = self.repo / "skills/integration/feipi-one/SKILL.md"
         source.write_text(source.read_text() + "changed\n")
-        changed = self.run_make("install-links", "AGENT=codex")
+        changed = self.run_make("install-skills", "AGENT=codex")
         self.assert_counts(changed.stdout, updated=1, skipped=2)
         self.assertIn("[更新] feipi-one", changed.stdout)
         self.assertEqual(dest.read_bytes(), source.read_bytes())
 
     def test_verbose_shows_skip_and_preservation_reasons(self):
-        self.run_make("install-links", "AGENT=codex")
+        self.run_make("install-skills", "AGENT=codex")
         foreign = self.codex / "skills/foreign-skill"
         foreign.mkdir()
-        concise = self.run_make("install-links", "AGENT=codex")
+        concise = self.run_make("install-skills", "AGENT=codex")
         self.assertIn("移除 0 · 保留 1", concise.stdout)
         self.assertNotIn("[保留]", concise.stdout)
-        verbose = self.run_make("install-links", "AGENT=codex", "VERBOSE=1")
+        verbose = self.run_make("install-skills", "AGENT=codex", "VERBOSE=1")
         self.assertIn("[跳过] feipi-one（内容未变）", verbose.stdout)
         self.assertIn("[跳过] 共享/shared（链接未变）", verbose.stdout)
         self.assertIn(f"[保留] {foreign}（无来源标记", verbose.stdout)
@@ -119,7 +119,7 @@ class InstallOutputTests(unittest.TestCase):
         self.assertTrue(foreign.is_dir())
 
     def test_source_marker_is_stable_across_umask_in_copy_and_link_modes(self):
-        for target in ['install', 'install-links']:
+        for target in ['install', 'install-skills']:
             with self.subTest(target=target):
                 if self.codex.exists():
                     shutil.rmtree(self.codex)
@@ -138,10 +138,10 @@ class InstallOutputTests(unittest.TestCase):
                     self.assertEqual(marker.stat().st_mode & 0o777, 0o600)
 
     def test_cleanup_remains_visible_in_concise_mode(self):
-        self.run_make("install-links", "AGENT=codex")
+        self.run_make("install-skills", "AGENT=codex")
         retired = self.codex / "skills/feipi-old"
         retired.symlink_to(self.repo / "skills/integration/feipi-old", target_is_directory=True)
-        result = self.run_make("install-links", "AGENT=codex")
+        result = self.run_make("install-skills", "AGENT=codex")
         self.assertIn(f"[清理] 已移除本仓库旧入口：{retired}", result.stdout)
         self.assertIn("移除 1 · 保留 0", result.stdout)
         self.assert_counts(result.stdout, skipped=3)
@@ -152,9 +152,9 @@ class InstallOutputTests(unittest.TestCase):
             dep=self.repo/'skills/integration'/name/'node_modules/foreign-package'
             dep.mkdir(parents=True);(dep/'SKILL.md').write_text('not a skill')
         for args,dest in [
-            (('install-links','AGENT=codex'),self.codex/'skills'),
+            (('install-skills','AGENT=codex'),self.codex/'skills'),
             (('install','AGENT=codex'),self.codex/'skills'),
-            (('install-links','AGENT=openclaw'),self.openclaw/'skills'),
+            (('install-skills','AGENT=openclaw'),self.openclaw/'skills'),
             (('install-project',f'PROJECT={self.project}'),self.project/'.agents/skills'),
         ]:
             with self.subTest(args=args):
@@ -167,7 +167,7 @@ class InstallOutputTests(unittest.TestCase):
     def test_unchanged_skills_are_not_copied_to_staging(self):
         for name in ('feipi-one','feipi-two'):
             (self.repo/'skills/integration'/name/'scripts/run.sh').write_text('no shared dependencies\n')
-        for target in ('install','install-links'):
+        for target in ('install','install-skills'):
             with self.subTest(target=target):
                 self.run_make(target,'AGENT=codex')
                 fake=self.base/('fail-cp-'+target);fake.mkdir()
@@ -186,17 +186,17 @@ class InstallOutputTests(unittest.TestCase):
         self.assert_counts(self.run_make('install','AGENT=codex').stdout,updated=1,skipped=2)
 
     def test_shared_link_repair_and_conflict_are_not_new_installs(self):
-        self.run_make("install-links", "AGENT=codex")
+        self.run_make("install-skills", "AGENT=codex")
         shared = self.codex / "shared"
         shared.unlink()
         shared.symlink_to(self.base / "missing", target_is_directory=True)
-        repaired = self.run_make("install-links", "AGENT=codex")
+        repaired = self.run_make("install-skills", "AGENT=codex")
         self.assertIn("[更新] 共享/shared（修复失效链接）", repaired.stdout)
         self.assert_counts(repaired.stdout, updated=1, skipped=2)
         self.assertEqual(shared.resolve(), (self.repo / "shared").resolve())
         shared.unlink()
         shared.mkdir()
-        conflict = self.run_make("install-links", "AGENT=codex")
+        conflict = self.run_make("install-skills", "AGENT=codex")
         self.assertIn("[警告] 共享/shared（目标已存在且非软链接，跳过：", conflict.stderr)
         self.assert_counts(conflict.stdout, skipped=3, warnings=1)
         self.assertFalse(shared.is_symlink())
@@ -204,7 +204,7 @@ class InstallOutputTests(unittest.TestCase):
     def test_project_openclaw_and_compatibility_entrypoints(self):
         for args, destination in (
             (("install-project", f"PROJECT={self.project}"), self.project / ".agents"),
-            (("install-links", "AGENT=openclaw"), self.openclaw),
+            (("install-skills", "AGENT=openclaw"), self.openclaw),
         ):
             with self.subTest(args=args):
                 first = self.run_make(*args)
@@ -225,23 +225,23 @@ class InstallOutputTests(unittest.TestCase):
     def test_multi_agent_totals(self):
         self.codex.mkdir()
         self.openclaw.mkdir()
-        result = self.run_make("install-links")
+        result = self.run_make("install-skills")
         self.assertEqual(result.stdout.count("小计：新增 3"), 2)
         self.assert_counts(result.stdout, added=6)
-        self.assert_counts(self.run_make("install-links").stdout, skipped=6)
+        self.assert_counts(self.run_make("install-skills").stdout, skipped=6)
 
     def test_no_shared_dependencies_is_a_successful_install(self):
         for name in ("feipi-one", "feipi-two"):
             (self.repo / "skills/integration" / name / "scripts/run.sh").write_text("# no shared dependencies\n")
-        first = self.run_make("install-links", "AGENT=codex")
+        first = self.run_make("install-skills", "AGENT=codex")
         self.assert_counts(first.stdout, added=2)
-        self.assert_counts(self.run_make("install-links", "AGENT=codex").stdout, skipped=2)
+        self.assert_counts(self.run_make("install-skills", "AGENT=codex").stdout, skipped=2)
 
     def test_color_controls_for_pipes(self):
-        forced = self.run_make("install-links", "AGENT=codex", "COLOR=always")
+        forced = self.run_make("install-skills", "AGENT=codex", "COLOR=always")
         self.assertIn("\033[1;32m[新增]\033[0m", forced.stdout)
         self.assertIn("\033[1;36mcodex\033[0m", forced.stdout)
-        repeat = self.run_make("install-links", "AGENT=codex", "COLOR=always", "VERBOSE=1")
+        repeat = self.run_make("install-skills", "AGENT=codex", "COLOR=always", "VERBOSE=1")
         self.assertIn("\033[2m[跳过]\033[0m", repeat.stdout)
         for options, env in (
             (("COLOR=never",), self.env),
@@ -249,7 +249,7 @@ class InstallOutputTests(unittest.TestCase):
             (("COLOR=auto",), dict(self.env, TERM="dumb")),
         ):
             with self.subTest(options=options, env=env.get("NO_COLOR")):
-                output = self.run_make("install-links", "AGENT=codex", *options, env=env)
+                output = self.run_make("install-skills", "AGENT=codex", *options, env=env)
                 self.assertNotIn("\033[", output.stdout + output.stderr)
 
     def test_auto_color_on_terminal_and_plain_redirected_stderr(self):
@@ -257,7 +257,7 @@ class InstallOutputTests(unittest.TestCase):
         (self.codex / "shared").mkdir()  # 警告写入单独重定向的 stderr。
         master, slave = pty.openpty()
         try:
-            process = subprocess.Popen(["make", "install-links", "AGENT=codex"], cwd=self.repo,
+            process = subprocess.Popen(["make", "install-skills", "AGENT=codex"], cwd=self.repo,
                                        env=self.env, stdout=slave, stderr=subprocess.PIPE)
             # 持续读取，避免 PTY 缓冲阻塞；保留 slave 到读取完毕，兼容 macOS。
             chunks = []
@@ -299,7 +299,7 @@ class InstallOutputTests(unittest.TestCase):
         command = fakebin / "cp"
         command.write_text('#!/bin/sh\ncase "$*" in *feipi-two*) exit 77;; esac\nexec /bin/cp "$@"\n')
         command.chmod(0o755)
-        result = self.run_make("install-links", "AGENT=codex", success=False,
+        result = self.run_make("install-skills", "AGENT=codex", success=False,
                                env=dict(self.env, PATH=f"{fakebin}{os.pathsep}{self.env['PATH']}"))
         self.assertIn("[新增] feipi-one", result.stdout)
         self.assertIn("[失败] 安装失败：", result.stderr)
@@ -310,14 +310,14 @@ class InstallOutputTests(unittest.TestCase):
         self.assertFalse((self.codex / "skills/feipi-two").exists())
 
     def test_validation_failure_and_invalid_options_stop_before_install(self):
-        bad_color = self.run_make("install-links", "AGENT=codex", "COLOR=bad", success=False)
+        bad_color = self.run_make("install-skills", "AGENT=codex", "COLOR=bad", success=False)
         self.assertIn("无效颜色模式", bad_color.stderr)
         missing = subprocess.run(["bash", "scripts/install_skills.sh", "--color"], cwd=self.repo,
                                  env=self.env, capture_output=True, text=True, timeout=10)
         self.assertNotEqual(missing.returncode, 0)
         self.assertIn("--color 缺少参数", missing.stderr)
         (self.repo / "skills/integration/feipi-one/SKILL.md").unlink()
-        failed = self.run_make("install-links", "AGENT=codex", success=False)
+        failed = self.run_make("install-skills", "AGENT=codex", success=False)
         self.assertIn("[FAIL]", failed.stderr)
         self.assertIn("[失败] 注册表验证失败", failed.stderr)
         self.assertNotIn("[清理]", failed.stdout)

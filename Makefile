@@ -1,8 +1,9 @@
 # Feipi Agent Kit Makefile
 # 仓库级包装命令：
-# - `make install-links`：过滤安装到用户级 agent 目录（入口实拷、运行目录链接）
+# - `make install-skills`：过滤安装到用户级 agent 目录（入口实拷、运行目录链接）
 # - `make install-project PROJECT=/path/to/project`：拷贝安装到项目目录
-# - `make install`：日常实拷；研发链接用 `make install-links`
+# - `make install`：日常实拷；源码调试用 `make install-skills`
+# - `make install-links`：`install-skills` 的兼容旧名称
 # - `make <service>-up`：启动服务
 # - `make <service>-down`：停止服务
 
@@ -24,7 +25,7 @@ LITELLM_DIR := tools/gateway/litellm
 CRAWL4AI_DIR := tools/crawl/crawl4ai
 OTEL_DIR := tools/gateway/otel
 
-.PHONY: help install install-links install-project
+.PHONY: help install install-skills install-links install-project
 .PHONY: searxng-up searxng-down searxng-restart searxng-logs
 .PHONY: litellm-up litellm-down litellm-restart litellm-logs
 .PHONY: searxng-mcp-run searxng-mcp-http searxng-mcp-test  # [已退役]
@@ -41,7 +42,7 @@ help:
 	@echo "Feipi 工作台：./workbench（日常） / ./develop（研发）"
 	@echo ""
 	@echo "===== Skills 管理 ====="
-	@echo "  make install-links [AGENT=codex|qwen|qoder|claudecode|openclaw]"
+	@echo "  make install-skills [AGENT=codex|qwen|qoder|claudecode|openclaw]"
 	@echo "  make install-project PROJECT=/path/to/project [AGENT=...]"
 	@echo "  make install [AGENT=...] [PROJECT=/path/to/project|DIR=/path/to/project]"
 	@echo "  输出选项：VERBOSE=1 查看跳过明细；COLOR=auto|always|never 控制颜色"
@@ -85,9 +86,11 @@ else
 	@$(MAKE) --no-print-directory install-project AGENT="$(AGENT)" PROJECT="$(RESOLVED_PROJECT)"
 endif
 
-install-links:
+install-skills:
 	@echo "显式源码调试：后续源码修改会影响已链接技能；恢复日常用 ./workbench apply skills。"
 	@$(INSTALL_SCRIPT) $(if $(AGENT),--agent "$(AGENT)") $(INSTALL_OUTPUT_FLAGS)
+
+install-links: install-skills
 
 install-project:
 	@if [[ -z "$(RESOLVED_PROJECT)" ]]; then \

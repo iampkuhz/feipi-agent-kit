@@ -187,7 +187,7 @@ README 和版本声明安装依赖；含原生编译产物的旧环境尤其需�
 - [新 Mac 服务重建](https://github.com/iampkuhz/feipi-agent-kit/blob/main/docs/setup-new-mac.md)
 
 旧机仓库位于 `~/Documents/tools/llm/feipi-agent-kit`；离线时直接阅读仓库内对应文件。
-Skills 使用该仓库自己的 `make install-links` 入口；服务、Podman machine、环境变量、
+Skills 使用该仓库自己的 `make install-skills` 入口；服务、Podman machine、环境变量、
 健康检查和后续自启均按该仓库维护的说明处理。Dotfiles 不增加第二套 Compose 或自启脚本。
 本次仅核对其文件与说明存在，没有运行它的安装或启停命令。
 
