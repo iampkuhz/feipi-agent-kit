@@ -5,6 +5,7 @@ import datetime
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -20,8 +21,19 @@ def catalog():
 
 
 def skill_body(m, c):
-    path = Path(expand(m['agent_kit'])) / c['skill']['path'] / 'SKILL.md'
-    return path.read_text()
+    source = Path(expand(m['agent_kit'])) / c['skill']['path']
+    # 当前受管执行链为 Codex。同名 workspace Skill 会遮蔽用户完整包，
+    # 生成的单文件入口明确指向已发布资源，不能让后台读研发源码或空相对路径。
+    installed = Path.home() / '.codex/skills' / c['skill']['name']
+    if installed.is_symlink() or file_inventory(source) != file_inventory(installed):
+        raise AdaptError('共享 Skill 尚未完整发布或内容漂移；先 workbench apply skills，再 plan。')
+    body = (installed / 'SKILL.md').read_text()
+    body = re.sub(r'\]\(((?:references|templates)/[^)]+)\)',
+                  lambda match: '](<' + str(installed / match.group(1)) + '>)', body)
+    header, content = body.split('\n---\n', 1)
+    return (header + '\n---\n\n完整资源目录（SKILL_DIR）：`' + str(installed) + '`。'
+            '这是本机已发布完整 Skill；本文为工作区单文件入口，脚本、模板与参考以该目录为根，'
+            '不要以当前仅有 SKILL.md 的任务目录解析资源。\n' + content)
 
 
 def evidence_fingerprint(m, c):

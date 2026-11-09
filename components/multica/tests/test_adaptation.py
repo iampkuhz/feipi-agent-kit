@@ -18,6 +18,32 @@ import work
 import acceptance
 
 
+class WorkspaceSkillResources(unittest.TestCase):
+    def test_snapshot_uses_published_package_and_rejects_drift(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'kit/skills/integration/example'
+            installed = root / '.codex/skills/example'
+            body = '---\nname: example\ndescription: 测试\n---\n\n[流程](references/steps.md)\n'
+            for path in (source, installed):
+                (path / 'references').mkdir(parents=True)
+                (path / 'SKILL.md').write_text(body)
+                (path / 'references/steps.md').write_text('真实资源')
+            m = {'agent_kit': str(root / 'kit')}
+            c = {'skill': {'path': 'skills/integration/example', 'name': 'example'}}
+            with patch.object(Path, 'home', return_value=root):
+                snapshot = adapt.skill_body(m, c)
+                self.assertIn(str(installed / 'references/steps.md'), snapshot)
+                self.assertIn('SKILL_DIR', snapshot)
+                self.assertNotIn(str(source), snapshot)
+                (installed / 'references/steps.md').write_text('漂移')
+                with self.assertRaisesRegex(base.AdaptError, '完整发布'):
+                    adapt.skill_body(m, c)
+                (installed / 'references/steps.md').unlink()
+                with self.assertRaises(base.AdaptError):
+                    adapt.skill_body(m, c)
+
+
 class Acceptance(unittest.TestCase):
     def test_failed_check_exits_nonzero(self):
         result = {'codex-builder': {'probe': {}, 'runs': [], 'issue_status': 'todo', 'attachment_verified': False}}

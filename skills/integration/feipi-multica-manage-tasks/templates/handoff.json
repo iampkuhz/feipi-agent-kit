@@ -1,0 +1,10 @@
+{
+  "objective": "要交付的结果",
+  "scope": "允许范围和项目规则位置",
+  "directory": "/实际工作目录",
+  "acceptance": "可执行的通过标准",
+  "artifacts": [],
+  "remaining": [],
+  "required_commands": [],
+  "required_mcp": []
+}

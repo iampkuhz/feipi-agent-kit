@@ -1,5 +1,5 @@
 version: 2
 interface:
   display_name: "Multica 任务协作"
-  short_description: "记录、查询和静默回写 Multica 任务，明确派发、跨工具交接并提交持久验收证据。"
-  default_prompt: "请使用 $feipi-multica-manage-tasks，先区分讨论、记录与启动执行，复用 multica-work 和 multica-task，核对当前启用角色、Issue、机器、runtime、目录及项目规则。后台缺任务认证时停止；进度用 /note，真正交接用正常回复并保留当前 run 的真实触发评论 parent。复用固定 request-id，预检失败修复缺口后重试，pending 先 recover 取证。交付与本次执行一致的产物、实际验证结果及未验证事项。"
+  short_description: "定位当前仓库的 Multica 项目，规范查询、录入、进展、交接和持久交付。"
+  default_prompt: "请使用 $feipi-multica-manage-tasks，先用项目上下文入口定位实际目录、项目 ID/URL 与启用状态，区分讨论、记录、当前聊天执行和后台派发。查询先看摘要，分页或截断时按需展开；按短模板通过 multica-work 回写，记录不能启动执行。复用固定 request-id，pending 先 recover；后台沿用完整任务身份和真实触发 parent。核实产物、验证和 Issue 状态，保留项目验收规则。"

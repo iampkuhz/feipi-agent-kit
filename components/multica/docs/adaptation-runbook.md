@@ -11,7 +11,7 @@
 | Agent 职责、模型选择、并发 | `config/agents.json`、`config/instructions/` | 保留项目规则，机器参数用 `${...}` 绑定 |
 | 能力要求和兼容组合 | `config/capabilities.json`、agents 的 compatibility | 区分静态检查与任务实际调用 |
 | 机器身份、路径和依赖 | `~/.config/multica-selfhost/machine.json` | 0600；不进入 Git；迁机重建 daemon/runtime |
-| 技能正文 | Agent Kit 的 `skills/integration/feipi-multica-manage-tasks` | 通过既有安装器安装完整技能；工作区同步单文件 SKILL.md |
+| 技能正文 | Agent Kit 的 `skills/integration/feipi-multica-manage-tasks` | 安装完整技能后同步工作区单文件入口，入口注明已发布资源目录 |
 | 运行副本 | `~/.local/share/multica/ops` | 只能从源码发布，不手改 |
 | 变更快照和请求回执 | `~/.local/state/multica/adaptation` | 私有；备份；不提交；并发锁限本机 |
 | 数据库、附件、服务密钥 | Multica 私有存储、env vault 的最小投影 | 同批备份，工具登录另行认证 |
@@ -21,6 +21,8 @@
 ## 日常交互
 
 在 Codex、Qoder、个人 OpenClaw 中使用共享 Skill：`$feipi-multica-manage-tasks`。新聊天重新加载技能。后台 Agent 已绑定同一 workspace Skill，不要求继承桌面聊天历史。
+
+先按 Skill 的 `scripts/project.py context` 从当前目录读取现有机器项目绑定，取得 project_id 与项目 URL；`find/read` 只查询该项目并标明分页或截断。需要项目主动关联工作时，使用 `enable` 预览仓库 AGENTS 入口，再在已授权范围内 `--apply`；机器映射本身不等于主动启用。具体边界与典型操作见 [Skill 项目接入](../../../skills/integration/feipi-multica-manage-tasks/references/project-setup.md) 和 [标准操作](../../../skills/integration/feipi-multica-manage-tasks/references/operations.md)。
 
 ```bash
 multica-work --help
@@ -71,6 +73,8 @@ multica-ops doctor
 已有运行副本可用 `install-runtime.py --only config/agents.json` 定点发布；可重复 `--only`。`--remove 相对文件名` 仅能移除源码已退役、摘要未变的受管文件，拒绝覆盖无关命令。局部发布前会校验既有清单；遇到运行修改先比较回收。工作台 diff/doctor 同时比较运行代码，配置以外的代码差异需审阅合并，不能用 capture 扩大回收范围。
 
 技能更新在 Agent Kit 根运行 `./workbench diff skills`，再 `./workbench apply skills`，备份后安装到各客户端并保留其他来源。之后同步 workspace Skill：plan → apply → verify。doctor 比较当前执行器所需技能的全部运行文件，排除 tests/evals、缓存和 tmp；不能只比较 SKILL.md。
+
+本机 Multica 0.6.3 的同名 workspace Skill 优先于用户目录，工作区只装载 SKILL.md。当前受管执行链为 Codex，因此同步器先比较源码与 `~/.codex/skills/feipi-multica-manage-tasks` 的全部运行文件，再从已安装正文生成工作区入口：注明完整资源目录 SKILL_DIR，并将参考和模板链接改为该目录的绝对路径。未安装或内容漂移时拒绝同步，后台不直接加载研发目录。更换执行器或机器时需按实际安装路径重新验收，不能沿用旧入口。
 
 ## 启动、隔离与恢复
 

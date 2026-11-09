@@ -1,26 +1,37 @@
 ---
 name: feipi-multica-manage-tasks
-description: 用于把本地聊天工作记录到 Multica、查询进展、静默回写、明确派发和跨 Agent 交接；用户要求 Multica 任务协作、后台执行、提交验收或恢复任务时使用。普通编码、部署或技能治理未要求 Multica 协作时不触发。
+description: 用于定位仓库对应的 Multica 项目、查询录入任务、静默回写、派发交接和提交验收；用户要求任务协作，或仓库明确启用 Multica 的实质执行工作时使用。普通咨询、仅讨论方案及未启用项目的普通工作不触发写入。
 ---
 
 # Multica 任务协作
 
 ## 输入与输出
 
-从对话确定 Issue 或项目、用户意图、实际工作目录和交付要求。能从当前项目和 Issue 取得的信息直接读取；不要凭 Agent 显示名猜机器。输出 Issue 链接、实际执行者及 runtime、结果或阻塞、验证证据。只同步任务与结果，不复制私有聊天历史。
+从实际工作目录解析项目，再结合对话确定 Issue、用户意图和交付要求。输出任务链接、操作结果、当前状态/实际执行者、证据或阻塞、下一步。只同步任务与结果，不复制私有聊天历史。
 
 先区分记录、当前聊天处理和后台执行。仅要求讨论或设计时先调查与设计，不创建或派发任务；已明确授权的执行与验收连续完成，不重复确认。
 
-## 执行入口
+生成报告、写入文件和“提交结果供验收”属于执行；核对过程只读并不使报告交付变成纯查询。真正的普通咨询或进度查询只回答信息，不产出待交付工作，不写任务或评论。
 
-使用本机已安装的 `multica-work`（任务语义与回执）和 `multica-task`（原生查询）。首次先读 `multica-work --help` 及所用子命令帮助。缺少命令时报告环境缺口；不要另写 API 客户端或直接读取个人 token。服务部署、机器绑定与发布由 multica-ops 维护。
+## 项目定位与启用
+
+先运行本 Skill 的 `python3 scripts/project.py context --directory 实际工作目录`（脚本路径相对完整 Skill 目录，不相对业务仓库；工作区单文件入口使用其中注明的 SKILL_DIR）。返回 project_id、project_url、directory_role、enabled；复用现有机器映射并核对服务端身份，不逐次询问项目链接或按名称猜测。
+
+context 成功后直接复用返回的 ID、URL 与目录，不再为定位项目扫描客户端配置、会话、计划、记忆或凭据目录。失败时只核对实际目录和既有机器绑定，并按具体错误处理；不靠全盘搜索补猜。
+
+context 成功只证明可定位。仓库 AGENTS.md 明确声明项目键并加载本 Skill 后，enabled 才为 true；主动关联还须遵守入口限定的客户端和工作范围，例如仅 Codex 启用不能扩展至其他客户端。对范围内已授权的实质工作主动关联与回写。用户显式要求 Multica 操作可在未启用项目执行本次操作，不顺带永久启用。仅讨论或设计不创建任务或评论。
+
+初次配置、项目键冲突、worktree/release 边界和仓库入口的预览/应用见 [项目接入](references/project-setup.md)。新仓库无唯一绑定时先核对现有项目，再按授权接入；查询失败不能当作项目不存在。后台任务不修改机器配置或仓库入口。
+
+## 标准操作
+
+查询使用本 Skill 的 project.py；写入复用已安装的 `multica-work`（任务语义与回执）和 `multica-task`（原生 CLI）。首次读帮助及所用子命令帮助，标准输入、回执和典型用法见 [操作参考](references/operations.md)。缺少命令时报告环境缺口；不要另写 API 客户端或直接读取个人 token。服务部署、机器绑定与发布由 Multica 运维组件维护。
 
 普通调用自动使用 personal profile；后台沿用 Multica 注入的 task token、task ID、agent ID、workspace ID 和 server URL。任一任务身份缺失应停止，禁止改用个人配置绕过。后台不能修改机器配置、安装技能或启动第二个 daemon。
 
-## 意图到动作
-
 | 用户意图 | 操作 | 是否启动运行 |
 |---|---|---|
+| 找当前项目/任务 | `project.py context / find / read` | 否，只读当前项目 |
 | 把事情记下来 | `record --project ID --title 标题 --body-file 文件 --request-id 固定ID` | 否，创建未分派 Backlog |
 | 当前聊天处理 | `bind ISSUE --directory 目录 --owner 当前工具及聊天标识 --request-id 固定ID` | 否，记录交互归属 |
 | 更新进展 | `note ISSUE --body-file 文件 --request-id 固定ID` | 否，自动加 `/note` |
@@ -31,22 +42,18 @@ description: 用于把本地聊天工作记录到 Multica、查询进展、静�
 
 评论触发的后台任务必须在 note、deliver、handoff 中加 `--parent 原触发评论ID`。用 `multica-task issue runs ISSUE` 定位当前 MULTICA_TASK_ID 对应的 trigger_comment_id；它不是其他工具的会话 ID。不得把所有完成交接都改成静默评论；需要下一角色运行时才用 handoff。执行角色以当前声明和完整绑定为准，历史示例不代表已启用；LexiFlow 专用角色只在其正式范围内使用，不能借来执行通用验收。
 
-## 交接包
+## 信息组织与工作节点
 
-JSON 必须包含以下字段：
+1. **开始**：context 定位；明确编号直接 read，否则 find 候选并核对范围。明确同一事项则复用；没有合适任务且已获执行/录入授权时按 [需求模板](templates/task.md) 创建。标题描述成果，不把角色或未经确定的版本写死。
+2. **执行/恢复前**：读取最新需求、有效评论和活动 Run。find 的 has_more 为真、read 的正文被截断或线程有回复时，先按需展开相关内容；不能把一页无匹配视为不存在，也不能只依赖旧聊天上下文。已有后台执行时先确认接手方式，bind 不会注册原生会话或取得目录排他锁。
+3. **范围或阻塞变化**：用 [进展模板](templates/progress.md) 写当前结果、证据、剩余、下一责任人、需要用户事项，通过 note 静默回写。不逐条复制聊天，不给纯查询写评论。父任务受影响时补简短汇总，避免机械同步状态。
+4. **交付**：用户要求“提交结果供验收”时，按 [交付模板](templates/delivery.md) 写实际产物、已验证项和剩余限制，执行 deliver 上传持久附件，再读回附件与 Review 状态；只写本地报告不算提交。整体任务尚未通过验收不妨碍提交本次有界结果，不能因此省略回写，也不能自签整体通过。需要下一角色执行时显式 handoff，按项目自己的验收标准决定 Done。
 
-```json
-{
-  "objective": "要达到的结果",
-  "scope": "允许修改的范围、禁止事项和项目规则位置",
-  "directory": "/实际项目目录",
-  "acceptance": "可执行的验收标准",
-  "artifacts": ["已有提交、附件或可访问文件"],
-  "remaining": ["剩余工作与失败层"],
-  "required_commands": ["git"],
-  "required_mcp": []
-}
-```
+模板是内容约定，填写实际事实，删掉不适用提示，不上传未填写的范文。稳定需求放正文，过程留评论，工程规则引用仓库文件。标准动作返回不足的信息从 read 取得；不编造任务 URL、负责人或验证结果。
+
+## 派发与交接包
+
+复制 [交接包模板](templates/handoff.json)，填写 objective、scope、directory、acceptance、artifacts、remaining、required_commands、required_mcp；前四项为非空字符串，后四项为字符串数组。跨工具传递任务与产物，不传私有会话历史。
 
 dispatch 核对 Agent 的完整 runtime 身份、daemon、profile、项目目录、共享技能和命令。通用入口只处理当前机器绑定的 in_place 项目；worktree 交给原生项目流程并记录实际目录。必需 MCP 若没有任务内调用证据，不能仅凭桌面配置标记可用；此入口会阻止自动派发。可选工具缺失可降级，但须说明。
 
@@ -65,4 +72,4 @@ dispatch 核对 Agent 的完整 runtime 身份、daemon、profile、项目目录
 
 ## 验收标准
 
-读回 Issue 和 runs：记录、绑定及进展没有新增 run；派发有且仅有目标执行，重复 request-id 返回原回执；交付附件可取得且状态为待验收。无法完成时明确保留了哪些产物、阻塞层和接手方式。
+先核实项目和目录正确，再读回 Issue 和 runs：记录、绑定及进展没有新增 run；派发有且仅有目标执行，重复 request-id 返回原回执；交付附件可取得且状态为待验收。项目启用需在新会话验证实际加载；后台会话桌面显示、原 Run 纠偏和排他接管属于客户端接入能力，本 Skill 不宣称已经实现。无法完成时明确保留了哪些产物、阻塞层和接手方式。

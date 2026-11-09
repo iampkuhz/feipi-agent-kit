@@ -14,6 +14,7 @@ REPO_ROOT="$(cd "$SKILL_DIR/../../.." && pwd)"
 ! rg -n '(^|[^A-Za-z])(tests|evals)/|scripts/test\.sh' "$SKILL_DIR/SKILL.md"
 
 bash -n "$SCRIPT_DIR/run.sh"
+python3 -B -m unittest discover -s "$SCRIPT_DIR" -p 'test_*.py'
 # 复用组件的真实命令契约测试；不把文件存在等同于任务行为正确。
 python3 -m unittest discover -s "$REPO_ROOT/components/multica/tests" -p 'test_*.py'
 echo "确定性契约通过: feipi-multica-manage-tasks；真实 Agent 验收另做。"

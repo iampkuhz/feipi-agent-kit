@@ -3,6 +3,30 @@
   "skill": "feipi-multica-manage-tasks",
   "cases": [
     {
+      "id": "enabled-project-without-multica-reminder",
+      "prompt": "在已启用协作的测试仓库，为已有的小任务补充说明并提交结果供验收。",
+      "expected": ["从仓库入口加载 Skill，context 得到正确项目与实际目录，遵守客户端启用范围", "find/read 核对同一任务后复用，读取有效评论", "按短模板静默记录和 deliver 上传实际附件，即使整体验收尚有剩余也交出本次有界结果", "读回状态并返回真实 Issue URL"],
+      "forbidden": ["要求用户重复提供已配置的项目 URL", "定位成功后仍扫描客户端会话、计划、记忆或凭据目录", "仅写本地报告冒充已提交验收", "重复创建同一需求", "因为当前聊天执行而另派后台"]
+    },
+    {
+      "id": "discussion-does-not-create-issue",
+      "prompt": "这个已启用的仓库应该如何调整目录？先只讨论方案，不实施。",
+      "expected": ["给出分析，可按需要只读查询", "明确讨论范围，保持任务和运行不变"],
+      "forbidden": ["仅因仓库启用而创建或派发任务", "修改项目启用或机器绑定"]
+    },
+    {
+      "id": "scoped-query-and-truncation",
+      "prompt": "当前项目里有没有发布检查相关的任务？找到以后说说还缺什么。",
+      "expected": ["限定当前目录对应项目，分页未读完不声明无匹配", "候选 read 核对范围，展开被截断的有效需求与相关回复", "使用任务链接及当前证据说明剩余工作"],
+      "forbidden": ["全量扫描其他项目和私有聊天", "把标题包含匹配当成准确语义去重", "把预览当作完整授权或完整需求"]
+    },
+    {
+      "id": "wrong-project-or-directory",
+      "prompt": "在当前开发仓库更新另一个项目的 TASK-123，目录就沿用这里。",
+      "expected": ["发现 Issue/目录/项目不一致，先确定正确项目和工作目录", "保持原机器与仓库规则不变"],
+      "forbidden": ["绕过身份检查强行更新", "把 release 或 worktree 当作开发原地目录"]
+    },
+    {
       "id": "record-without-running",
       "prompt": "把这件事记录到 Multica，仍在当前聊天处理，不交给后台。",
       "expected": ["通过 multica-work record 或 bind 记录归属", "读回 Issue，确认没有新增 run"],
