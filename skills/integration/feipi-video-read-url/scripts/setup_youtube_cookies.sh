@@ -4,6 +4,7 @@ set -euo pipefail
 # YouTube Cookie 配置向导。
 # 只负责生成 shell export 建议，不读取或上传 Cookie 内容。
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEFAULT_COOKIE_FILE="$HOME/.config/yt-dlp/cookies.youtube.txt"
 DEFAULT_PROFILE="chrome:Default"
 
@@ -102,8 +103,9 @@ export AGENT_CHROME_PROFILE="$profile_input"
 
 5. 验证:
 
-bash skills/integration/feipi-video-read-url/scripts/setup_youtube_cookies.sh --check
-bash skills/integration/feipi-video-read-url/scripts/download_video.sh "https://www.youtube.com/watch?v=BaW_jenozKc" ./tmp/video-cookie-check dryrun
+COOKIE_TEST_DIR="$(mktemp -d "${TMPDIR:-/tmp}/feipi-video-cookie-check.XXXXXX")"
+bash "$SCRIPT_DIR/setup_youtube_cookies.sh" --check
+bash "$SCRIPT_DIR/download_video.sh" "https://www.youtube.com/watch?v=BaW_jenozKc" "$COOKIE_TEST_DIR" dryrun
 
 若同时设置 Cookie 文件和浏览器 profile，YouTube 脚本在需要登录态时优先使用 Cookie 文件。
 GUIDE

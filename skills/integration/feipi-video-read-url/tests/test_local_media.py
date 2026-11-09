@@ -110,7 +110,8 @@ class LocalMediaTests(unittest.TestCase):
 
     @unittest.skipUnless(os.environ.get("FEIPI_OMLX_LIVE_TEST") == "1", "需显式启用真实本地 oMLX 集成测试")
     def test_real_omlx_recovers_every_reference_character(self):
-        root = Path(os.environ.get("FEIPI_OMLX_TEST_OUTPUT", SKILL.parents[2] / "tmp/skill-evals/feipi-video-read-url/local-live"))
+        configured_output = os.environ.get("FEIPI_OMLX_TEST_OUTPUT")
+        root = Path(configured_output) if configured_output else Path(tempfile.mkdtemp(prefix="feipi-video-read-url-live-"))
         root.mkdir(parents=True, exist_ok=True)
         video = self.make_video(root)
         expected = characters((FIXTURE / "reference.txt").read_text())

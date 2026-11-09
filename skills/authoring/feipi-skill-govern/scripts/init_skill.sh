@@ -15,7 +15,8 @@ usage() {
 示例:
   bash scripts/init_skill.sh video-read-youtube --layer integration
   bash scripts/init_skill.sh report-generate-brief --resources scripts,references,assets --layer authoring
-  bash scripts/init_skill.sh video-read-youtube scripts,references /tmp/skills
+  temp_dir="$(mktemp -d)"
+  bash scripts/init_skill.sh video-read-youtube scripts,references "$temp_dir/skills"
 USAGE
 }
 
@@ -57,14 +58,17 @@ POSITIONAL_TARGET_USED=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --resources)
+      if [[ $# -lt 2 ]]; then echo "--resources 缺少参数值" >&2; exit 1; fi
       RESOURCES_INPUT="$2"
       shift 2
       ;;
     --layer)
+      if [[ $# -lt 2 ]]; then echo "--layer 缺少参数值" >&2; exit 1; fi
       LAYER_INPUT="$2"
       shift 2
       ;;
     --target)
+      if [[ $# -lt 2 ]]; then echo "--target 缺少参数值" >&2; exit 1; fi
       TARGET_INPUT="$2"
       shift 2
       ;;

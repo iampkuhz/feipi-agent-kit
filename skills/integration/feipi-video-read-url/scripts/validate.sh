@@ -27,7 +27,7 @@ SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd "$SKILL_DIR/../../.." && pwd)"
 TARGET_INPUT="${1:-$SKILL_DIR}"
 TARGET_DIR="$TARGET_INPUT"
-ALLOWED_LAYERS="authoring diagram integration platform"
+ALLOWED_LAYERS="authoring diagram integration"
 DISCOURAGED_ACTIONS="web ops automate misc helper utils tools temp tmp skill"
 LEGACY_ACTION_HINTS="read write summarize review analyze test debug refactor generate gen configure send plan planning design build deploy translate govern code coding docs"
 
@@ -67,11 +67,11 @@ validate_skill_name() {
 
   domain="${parts[1]}"
   action="${parts[2]}"
-  if printf "%s\n" "$LEGACY_ACTION_HINTS" | tr ' ' '\n' | rg -qx "$domain"; then
+  if printf "%s\n" "$LEGACY_ACTION_HINTS" | tr ' ' '\n' | grep -Exq "$domain"; then
     echo "检测到旧 action-first 命名痕迹：第二段像 action，请先确定 domain 再命名" >&2
     exit 1
   fi
-  if printf "%s\n" "$DISCOURAGED_ACTIONS" | tr ' ' '\n' | rg -qx "$action"; then
+  if printf "%s\n" "$DISCOURAGED_ACTIONS" | tr ' ' '\n' | grep -Exq "$action"; then
     echo "action 不能使用低语义词：$action" >&2
     exit 1
   fi
@@ -96,7 +96,7 @@ validate_repo_layer() {
     exit 1
   fi
 
-  if ! printf "%s\n" "$ALLOWED_LAYERS" | tr ' ' '\n' | rg -qx "$layer"; then
+  if ! printf "%s\n" "$ALLOWED_LAYERS" | tr ' ' '\n' | grep -Exq "$layer"; then
     echo "不支持的 layer：$layer" >&2
     exit 1
   fi
@@ -145,7 +145,7 @@ FRONTMATTER="$(awk '
 
 NAME_VALUE="$(printf "%s\n" "$FRONTMATTER" | sed -nE 's/^name:[[:space:]]*(.+)[[:space:]]*$/\1/p' | head -n1)"
 DESC_VALUE="$(printf "%s\n" "$FRONTMATTER" | sed -nE 's/^description:[[:space:]]*(.+)[[:space:]]*$/\1/p' | head -n1)"
-EXTRA_KEYS="$(printf "%s\n" "$FRONTMATTER" | sed -nE 's/^([a-zA-Z0-9_-]+):.*$/\1/p' | rg -v '^(name|description)$' || true)"
+EXTRA_KEYS="$(printf "%s\n" "$FRONTMATTER" | sed -nE 's/^([a-zA-Z0-9_-]+):.*$/\1/p' | grep -Ev '^(name|description)$' || true)"
 
 if [[ "$NAME_VALUE" != "$BASE" ]]; then
   echo "name 字段必须与目录名一致：$NAME_VALUE != $BASE" >&2
@@ -160,34 +160,34 @@ if [[ -n "$EXTRA_KEYS" ]]; then
   exit 1
 fi
 
-if ! rg -Pq '\p{Han}' "$SKILL_FILE"; then
+if ! grep -Eq '[㐀-䶿一-鿿]' "$SKILL_FILE"; then
   echo "SKILL.md 必须包含中文内容" >&2
   exit 1
 fi
-if ! rg -q '下载|转写|摘要|背景|验证|校验|测试|验收' "$SKILL_FILE"; then
+if ! grep -Eq '下载|转写|摘要|背景|验证|校验|测试|验收' "$SKILL_FILE"; then
   echo "SKILL.md 必须覆盖执行边界与验证要求" >&2
   exit 1
 fi
 
-if ! rg -q '^version:[[:space:]]*[0-9]+[[:space:]]*$' "$OPENAI_FILE"; then
+if ! grep -Eq '^version:[[:space:]]*[0-9]+[[:space:]]*$' "$OPENAI_FILE"; then
   echo "agents/openai.yaml 缺少顶层整数 version" >&2
   exit 1
 fi
 for field in display_name short_description default_prompt; do
-  if ! rg -q "^[[:space:]]+$field:[[:space:]]*.+$" "$OPENAI_FILE"; then
+  if ! grep -Eq "^[[:space:]]+$field:[[:space:]]*.+$" "$OPENAI_FILE"; then
     echo "agents/openai.yaml 缺少字段：$field" >&2
     exit 1
   fi
 done
 
 for placeholder in '{{SKILL_NAME}}' '{{SKILL_DESCRIPTION}}' '{{TITLE}}' '{{DISPLAY_NAME}}' '{{SHORT_DESCRIPTION}}' '{{DEFAULT_PROMPT}}'; do
-  if rg -Fq "$placeholder" "$SKILL_FILE" "$OPENAI_FILE"; then
+  if grep -Fq "$placeholder" "$SKILL_FILE" "$OPENAI_FILE"; then
     echo "存在未替换模板占位符：$placeholder" >&2
     exit 1
   fi
 done
 
-if rg -n 'feipi-scripts/video|feipi-read-youtube-video|feipi-read-bilibili-video|feipi-summarize-video-url' \
+if grep -En 'feipi-scripts/video|feipi-read-youtube-video|feipi-read-bilibili-video|feipi-summarize-video-url' \
   "$SKILL_FILE" "$OPENAI_FILE" \
   "$TARGET_DIR/scripts/download_video.sh" \
   "$TARGET_DIR/scripts/download_youtube.sh" \
@@ -214,25 +214,25 @@ for f in lint_prompt_contract.sh lint_summary_result.sh; do
 done
 
 # 新增：检查 render_summary_prompt.sh 包含来源状态规则
-if ! rg -q "来源状态" "$TARGET_DIR/scripts/render_summary_prompt.sh"; then
+if ! grep -Eq "来源状态" "$TARGET_DIR/scripts/render_summary_prompt.sh"; then
   echo "render_summary_prompt.sh 缺少来源状态规则" >&2
   exit 1
 fi
 
 # 新增：检查 render_summary_prompt.sh 包含时间戳检测
-if ! rg -q "HAS_TIMESTAMPS" "$TARGET_DIR/scripts/render_summary_prompt.sh"; then
+if ! grep -Eq "HAS_TIMESTAMPS" "$TARGET_DIR/scripts/render_summary_prompt.sh"; then
   echo "render_summary_prompt.sh 缺少时间戳检测" >&2
   exit 1
 fi
 
 # 新增：检查 render_background_prompt.sh 包含证据披露
-if ! rg -q "空泛免责" "$TARGET_DIR/scripts/render_background_prompt.sh"; then
+if ! grep -Eq "空泛免责" "$TARGET_DIR/scripts/render_background_prompt.sh"; then
   echo "render_background_prompt.sh 缺少证据披露规则" >&2
   exit 1
 fi
 
 # 新增：检查 SKILL.md 包含摘要风格说明
-if ! rg -qi "summary_style|摘要风格" "$TARGET_DIR/SKILL.md"; then
+if ! grep -Eqi "summary_style|摘要风格" "$TARGET_DIR/SKILL.md"; then
   echo "SKILL.md 缺少摘要风格说明" >&2
   exit 1
 fi

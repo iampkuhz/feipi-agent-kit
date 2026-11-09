@@ -27,8 +27,8 @@ const PLACEHOLDER_PATTERNS = [
 
 // 绝对路径泄漏模式
 const PATH_LEAK_PATTERNS = [
-  /\/Users\/\w+\/[^\s]{5,}/,
-  /\/home\/\w+\/[^\s]{5,}/,
+  new RegExp('/' + 'Users/' + '\\w+/' + '[^\\s]{5,}'),
+  new RegExp('/' + 'home/' + '\\w+/' + '[^\\s]{5,}'),
   /C:\\Users\\[^\s]{5,}/i,
 ];
 

@@ -15,12 +15,8 @@
 #   0: Gate 通过（default 模式下 static-only 也算通过）
 #   1: Gate 有 FAIL 项（strict 模式下缺少依赖必定 exit 1）
 #
-# 输出（按模式隔离，防止并发覆盖）:
-#   tmp/ppt-skill-v2-run/release/default/release-report.md
-#   tmp/ppt-skill-v2-run/release/default/release-report.json
-#   或
-#   tmp/ppt-skill-v2-run/release/strict/release-report.md
-#   tmp/ppt-skill-v2-run/release/strict/release-report.json
+# 输出：在仓库 tmp/ppt-skill-v2-run 下为每次运行创建独立目录；可用
+# FEIPI_PPT_RELEASE_OUTPUT_DIR 指定其他输出父目录。最终路径会打印在终端。
 
 set -uo pipefail
 
@@ -30,13 +26,35 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 
 STRICT_MODE=0
 MODE_LABEL="default"
-if [[ "${1:-}" == "--strict" ]]; then
-  STRICT_MODE=1
-  MODE_LABEL="strict"
-fi
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --strict)
+      STRICT_MODE=1
+      MODE_LABEL="strict"
+      shift
+      ;;
+    --help|-h)
+      echo "用法: bash tests/release_gate.sh [--strict]"
+      echo "环境变量: FEIPI_PPT_RELEASE_OUTPUT_DIR 指定报告父目录"
+      exit 0
+      ;;
+    *)
+      echo "未知参数: $1" >&2
+      exit 1
+      ;;
+  esac
+done
 
-# Mode-specific report directories to prevent concurrent overwrite
-RELEASE_DIR="$REPO_ROOT/tmp/ppt-skill-v2-run/release/$MODE_LABEL"
+OUTPUT_PARENT="${FEIPI_PPT_RELEASE_OUTPUT_DIR:-$REPO_ROOT/tmp/ppt-skill-v2-run}"
+if ! mkdir -p "$OUTPUT_PARENT"; then
+  echo "无法创建 release gate 输出父目录：$OUTPUT_PARENT" >&2
+  exit 1
+fi
+# mktemp ensures concurrent or repeated runs never overwrite prior reports.
+RELEASE_DIR="$(mktemp -d "$OUTPUT_PARENT/release-$MODE_LABEL.XXXXXX")" || {
+  echo "无法创建独立 release gate 输出目录：$OUTPUT_PARENT" >&2
+  exit 1
+}
 ARTIFACTS_DIR="$RELEASE_DIR/artifacts"
 mkdir -p "$RELEASE_DIR" "$ARTIFACTS_DIR"
 
@@ -218,7 +236,7 @@ echo "  5/9: Residue search..."
 echo "## 5. Residue Search" >> "$REPORT_MD"
 PLACEHOLDER_FOUND=0
 for f in $(find "$SKILL_DIR/tests/fixtures/benchmarks" -name "slide-ir.json" 2>/dev/null); do
-  MATCHES=$(rg -c "xxxx|lorem|ipsum" "$f" 2>/dev/null | grep -v ':0$' || true)
+  MATCHES=$(grep -Ec "xxxx|lorem|ipsum" "$f" 2>/dev/null | grep -v ':0$' || true)
   if [ -n "$MATCHES" ]; then
     PLACEHOLDER_FOUND=$((PLACEHOLDER_FOUND + 1))
   fi
@@ -227,12 +245,47 @@ if [ "$PLACEHOLDER_FOUND" -eq 0 ]; then
   pass "无 placeholder/lorem/xxxx 残留"
 else
   fail "发现 $PLACEHOLDER_FOUND 处可能的 placeholder 残留"
-  rg -n "placeholder|lorem|xxxx" "$SKILL_DIR" 2>/dev/null | head -20 >> "$REPORT_MD" || true
+  python3 - "$SKILL_DIR" "$REPORT_MD" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+report = Path(sys.argv[2])
+pattern = re.compile(r"placeholder|lorem|xxxx", re.IGNORECASE)
+matches = []
+for path in root.rglob("*"):
+    if not path.is_file() or any(part in {"node_modules", ".git", "__pycache__"} for part in path.parts):
+        continue
+    for number, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+        if pattern.search(line):
+            matches.append(f"{path}:{number}:{line}")
+            if len(matches) == 20:
+                break
+    if len(matches) == 20:
+        break
+with report.open("a", encoding="utf-8") as output:
+    if matches:
+        output.write("\n".join(matches) + "\n")
+PY
 fi
 echo "" >> "$REPORT_MD"
 
 # Path leak search
-PATH_LEAK_FOUND_ACTUAL=$(rg -c "/Users/|/home/oai|/mnt/data" "$SKILL_DIR/tests/fixtures" "$SKILL_DIR/templates" 2>/dev/null | grep -v ':0$' | wc -l || true)
+PATH_LEAK_FOUND_ACTUAL=$(python3 - "$SKILL_DIR/tests/fixtures" "$SKILL_DIR/templates" <<'PY'
+import sys
+from pathlib import Path
+
+roots = [Path(value) for value in sys.argv[1:]]
+needles = ["/" + "Users/", "/" + "home/" + "oai", "/" + "mnt/" + "data"]
+count = 0
+for root in roots:
+    for path in root.rglob("*"):
+        if path.is_file() and any(needle in path.read_text(encoding="utf-8", errors="replace") for needle in needles):
+            count += 1
+print(count)
+PY
+)
 if [ "$PATH_LEAK_FOUND_ACTUAL" -eq 0 ]; then
   pass "无绝对路径泄漏（fixtures/templates 范围）"
 else

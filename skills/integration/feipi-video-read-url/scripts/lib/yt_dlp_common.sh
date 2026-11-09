@@ -379,7 +379,7 @@ yt_common_mode_whisper_audio_with_format_fallback() {
       return 0
     fi
 
-    if rg -qi "403|HTTP Error|Requested format is not available|Only images" "$log_file"; then
+    if grep -Eqi "403|HTTP Error|Requested format is not available|Only images" "$log_file"; then
       echo "yt_common_whisper_audio: format=$format_var 下载失败" >&2
     fi
     yt_common_print_diagnostic "$log_file" >&2
@@ -467,14 +467,14 @@ yt_common_report_youtube_failure() {
   stage="${stage:-unknown}"
   echo "failure_log=$log_file" >&2
   echo "failure_stage=$stage" >&2
-  if [[ "$stage" != "media_download" ]] || ! rg -aqi 'HTTP Error 403|403 Forbidden|Requested format is not available|Only images are available' "$log_file"; then
+  if [[ "$stage" != "media_download" ]] || ! grep -Eqi 'HTTP Error 403|403 Forbidden|Requested format is not available|Only images are available' "$log_file"; then
     echo "diagnostic_code=youtube_text_extraction_failed" >&2
     echo "retry_action=inspect_current_youtube_log" >&2
     return 0
   fi
   stale="$(LC_ALL=C sed -n 's/^yt_dlp_stale=//p' "$log_file" | tail -n1)"
   case "$stale" in 0|1) ;; *) stale=unknown ;; esac
-  if rg -aqi 'GVS PO Token' "$log_file"; then
+  if grep -Eqi 'GVS PO Token' "$log_file"; then
     po_token=1
   fi
   echo "diagnostic_code=youtube_media_download_blocked" >&2

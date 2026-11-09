@@ -11,11 +11,12 @@
 
 1. Scope
 - 判断任务是否真的是 skill 治理任务。
-- 锁定 `target_skill`、`task_type`、`allowed_shared_files`。
-- 若用户没有点名多 skill，不扩散到其他 skills。
+- 锁定 `target_skill` 或用户明确要求的 registry 全集、`task_type`、`allowed_shared_files`。
+- 默认不扩散到其他 skills；用户明确要求全仓审计时，按 registry 全集执行并分组收口。
 
 2. Step 1 基线审计
 - 读取 `SKILL.md`、`agents/openai.yaml`、直接使用到的 `references/`、`scripts/`、`assets/`、`templates/`。
+- 按授权范围递归检查脚本与测试代码中的绝对路径、临时路径、平台专属命令和未声明依赖。
 - 输出问题清单，标记命名、layer、触发、执行、资源、脚本归位、验证状态。
 
 3. Step 1.5 命名与归位评审
@@ -28,11 +29,13 @@
 - 触发问题：优先改 frontmatter、`agents/openai.yaml`。
 - 执行问题：优先改 `SKILL.md`、直接关联的 `references/`。
 - 资源和脚本问题：优先改本地 `scripts/`、`assets/`、`templates/`，不要继续把仓库级包装器当核心依赖。
+- 全仓审计修复时，按 skill 分组修改，更新每个受影响 skill 的版本和 `CHANGELOG.md`。
 - 临时治理文档：只输出到仓库根 `tmp/` 或系统临时目录，禁止写回 skill 内部。
 
 5. Step 3 验证与收口
 - 结构校验：`bash scripts/validate.sh <skill-dir>`。
 - 行为校验：`bash tests/run.sh` 或更贴近目标 skill 的本地 test。
+- 平台/路径校验：`python3 scripts/check_portability.py <skill-dir>`；全仓由 `python3 scripts/harness/validate_skill_layout.py` 调用。
 - 旧规则残留搜索：搜索旧命名文本、过时模板占位符、旧入口依赖。
 - 版本与记录：按 `references/version-policy.md` 与 `references/changelog-policy.md` 收口。
 

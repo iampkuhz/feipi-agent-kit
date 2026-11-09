@@ -1,4 +1,4 @@
-version: 18
+version: 19
 interface:
   display_name: "视频与本地音频读取总结（中文）"
   short_description: "处理视频 URL 与本地音视频，支持音频提取、转写、关键帧取证与摘要。"

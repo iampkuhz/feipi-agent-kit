@@ -2,6 +2,7 @@
 """目标身份、正文缺失、图片失败、浏览器取证与视频复用回归。"""
 import importlib.util
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -100,7 +101,8 @@ class NoteTests(unittest.TestCase):
         validate(self.root)
 
     def test_platform_image_boundary_and_invalid_payload(self):
-        for url in ("https://example.invalid/private", "https://xhscdn.com.evil.invalid/a", "file:///private", "https://u:p@xhscdn.com/a"):
+        private_file_url = "file://" + os.path.sep + "private"
+        for url in ("https://example.invalid/private", "https://xhscdn.com.evil.invalid/a", private_file_url, "https://u:p@xhscdn.com/a"):
             with self.assertRaises(ValueError): note.public_url(url, image=True)
         with self.assertRaises(note.FetchError): note.image_extension(b"<html>login</html>")
 

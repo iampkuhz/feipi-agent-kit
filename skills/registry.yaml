@@ -14,7 +14,7 @@ skills:
     entry: SKILL.md
     validation:
       type: script
-      command: bash skills/authoring/feipi-skill-govern/scripts/validate.sh
+      command: bash skills/authoring/feipi-skill-govern/scripts/validate.sh skills/authoring/feipi-skill-govern
     status: stable
 
   - name: feipi-techreport-ppt-skill

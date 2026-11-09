@@ -1,4 +1,4 @@
-version: 2
+version: 3
 interface:
   display_name: "Mermaid 作图与验收"
   short_description: "生成、修改并校验 Mermaid 六类图及通用图；其他格式用对应入口"

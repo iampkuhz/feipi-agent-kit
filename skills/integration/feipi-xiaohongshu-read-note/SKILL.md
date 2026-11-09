@@ -13,7 +13,7 @@ description: 读取小红书图文或视频笔记及分享短链，保存正文�
 python3 <本 skill>/scripts/extract_note.py '<URL>' '<OUTPUT_DIR>'
 ```
 
-安装路径不同可传 `--video-skill '<feipi-video-read-url 目录>'`。视频默认字幕优先、whisper.cpp fast 回退、只截首帧；额外截图按同级视频 skill 的 references/frame-selection.md，由 AI 阅读全部字幕后提交 0–5 个时间点及字幕依据，使用 --plan 追加，累计最多首帧加5帧。高质量转写可传 `--quality accurate`。完整视频从不作为提取回退，只有独立音频流才能转写；只有合流视频而无独立音频时明确保留部分结果。结果写入非空目录或 skill 安装目录会被拒绝。
+安装路径不同可传 `--video-skill '<feipi-video-read-url 目录>'`。视频默认字幕优先、whisper.cpp fast 回退、只截首帧；额外截图按同级视频 skill 的[选帧规则](../feipi-video-read-url/references/frame-selection.md)，由 AI 阅读全部字幕后提交 0–5 个时间点及字幕依据，使用 --plan 追加，累计最多首帧加5帧。高质量转写可传 `--quality accurate`。完整视频从不作为提取回退，只有独立音频流才能转写；只有合流视频而无独立音频时明确保留部分结果。结果写入非空目录或 skill 安装目录会被拒绝。
 
 脚本 stdout 返回 `manifest_path` 和 `status`。退出码 0=complete、2=partial、1=failed/blocked。即使返回非零也先读取 manifest；错误参数、目录不可写或缺少视频 skill 时可能尚无 manifest。输出合同由同级 `feipi-video-read-url` 中的 `content-extraction.md` 提供；路径也可由 `--video-skill` 确认。
 
@@ -24,7 +24,7 @@ python3 <本 skill>/scripts/extract_note.py '<URL>' '<OUTPUT_DIR>'
 1. 读取 manifest 的 metadata、channels 与 artifacts；页面、正文、字幕、ASR 是独立证据。标题只用于身份，正文只作为笔记文案，不得代替视频转写。
 2. 按 image 的 `anchor.index` 顺序实际打开保存的图片，再按 frame 的 `anchor.seconds` 打开关键帧。保存图片不等于已读取图片。可用本机 OCR 辅助，但核对原图；不引入未经验证的外部解析服务。
 3. 对每张实际读取的图片/帧分别写 `source_artifact_id`、`ocr_text`、`observation`、`uncertainties`。模糊品牌、数字、尺寸明确保留不确定；没读到文字使用空字符串，不推断不存在文字。视频封面标为 video_cover，不视为视频帧。
-4. 将 JSON 数组交给视频 skill 的 `scripts/record_observations.py '<OUTPUT_DIR>' '<JSON_FILE>'`，将 OCR 和视觉观察分别登记；未读图片保持 pending。
+4. 将 JSON 数组交给视频 skill 的[观察登记脚本](../feipi-video-read-url/scripts/record_observations.py)，参数为 `'<OUTPUT_DIR>' '<JSON_FILE>'`，将 OCR 和视觉观察分别登记；未读图片保持 pending。
 5. 宿主模型仅根据 body/subtitles/asr 和实际读取的图片/帧生成摘要、关键词，分别标注文案、语音、图号/时间点；不得用搜索摘要补齐。可写调用方目录 `summary.md`、`keywords.json`，无需把内容带回 skill。
 6. 先读同级 `feipi-video-read-url` 的 `SKILL.md`，按其中“摘要覆盖复核”指引清点全文及每张图的主题/子主题，逐项保留比较、建议、理由、代价和适用条件；生成 `summary_coverage.json`，调用该视频 skill 中的摘要复核脚本（`review_summary.py MANIFEST SUMMARY COVERAGE`）。图片保存和提取 complete 不代表摘要充分；无法确认的内容在摘要明确待核验。校验只检查引用可追溯，不能替代实际语义复核。
 

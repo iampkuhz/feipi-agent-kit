@@ -271,7 +271,7 @@ print_auth_guidance() {
 
 is_auth_related_error() {
   local err_file="$1"
-  rg -qi "login required|logged in|Subtitles are only available when logged in|会员|大会员|403 Forbidden|HTTP Error 403|HTTP Error 412|HTTP Error 429|Too Many Requests|请先登录|限地区" "$err_file"
+  grep -Eqi "login required|logged in|Subtitles are only available when logged in|会员|大会员|403 Forbidden|HTTP Error 403|HTTP Error 412|HTTP Error 429|Too Many Requests|请先登录|限地区" "$err_file"
 }
 
 # 可选回调：yt_common_run 在失败时会调用该函数。

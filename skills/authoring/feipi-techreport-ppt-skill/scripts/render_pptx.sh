@@ -13,7 +13,13 @@ if [[ $# -lt 2 ]]; then
   exit 1
 fi
 
-INPUT_PPTX="$(realpath "$1")"
+INPUT_PPTX_INPUT="$1"
+case "$INPUT_PPTX_INPUT" in
+  /*) ;;
+  *) INPUT_PPTX_INPUT="$PWD/$INPUT_PPTX_INPUT" ;;
+esac
+INPUT_PPTX_DIR="$(cd "$(dirname "$INPUT_PPTX_INPUT")" && pwd -P)"
+INPUT_PPTX="$INPUT_PPTX_DIR/$(basename "$INPUT_PPTX_INPUT")"
 OUTPUT_DIR="$2"
 JSON_MODE=""
 if [[ "${3:-}" == "--json" ]]; then
@@ -38,22 +44,24 @@ RENDER_CMD=()
 if command -v soffice &>/dev/null; then
   RENDERER="soffice"
   RENDER_CMD=(soffice --headless)
-elif command -v libreoffice &>/dev/null; then
+elif command -v libreoffice >/dev/null 2>&1; then
   RENDERER="libreoffice"
   RENDER_CMD=(libreoffice --headless)
 fi
 
 if [[ -z "$RENDERER" ]]; then
-  # 尝试 macOS 常见 LibreOffice 路径
-  for app_path in \
-    "/Applications/LibreOffice.app/Contents/MacOS/soffice" \
-    "/Applications/OpenOffice.app/Contents/MacOS/soffice"; do
-    if [[ -x "$app_path" ]]; then
-      RENDERER="$app_path"
-      RENDER_CMD=("$app_path" --headless)
-      break
-    fi
-  done
+  # macOS 应用包不一定把 soffice 加入 PATH，先用系统索引发现应用位置。
+  if [[ "$(uname -s)" == "Darwin" ]] && command -v mdfind >/dev/null 2>&1; then
+    while IFS= read -r app_path; do
+      [[ -z "$app_path" ]] && continue
+      candidate="$app_path/Contents/MacOS/soffice"
+      if [[ -x "$candidate" ]]; then
+        RENDERER="$candidate"
+        RENDER_CMD=("$candidate" --headless)
+        break
+      fi
+    done < <(mdfind 'kMDItemCFBundleIdentifier == "org.libreoffice.script"' 2>/dev/null)
+  fi
 fi
 
 if [[ -z "$RENDERER" ]]; then

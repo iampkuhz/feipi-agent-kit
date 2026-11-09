@@ -10,12 +10,14 @@ description: 用于治理 repo 内 skill 的命名、触发、执行、模板、
 - 让 `feipi-skill-govern` 成为后续 skill 治理的唯一正确入口，先修规则真源，再修脚本、模板与验证闭环。
 - 输出必须可追溯：问题清单、修复清单、验证结果、剩余风险、待重审项缺一不可。
 - 默认只治理目标 skill 与直接共享文件，不把发现的所有问题捆成一次无边界大动作。
+- 当用户明确要求审计或修复全部 skills 时，该明确范围优先；按 skill 分组审计和修复，并同步各自版本及变更记录。
 
 ## 适用场景
 
 - 新建 repo 内 skill，并确定 `domain -> action -> object -> layer`。
 - 重构已有 skill 的命名、layer、触发文案、执行流程、模板、脚本或验证方式。
 - 审计某个 skill 或 `feipi-skill-govern` 自身，清理旧规则、旧模板、旧校验残留。
+- 用户明确要求对全部 skills 或仓库级 skill 脚本做跨平台/路径审计。
 - 产出 Step 1、Step 1.5、Step 2 报告、rename plan、governance report 与待重审清单。
 
 ## 不适用场景
@@ -27,7 +29,7 @@ description: 用于治理 repo 内 skill 的命名、触发、执行、模板、
 ## 先确认什么
 
 1. 必填
-- `target_skill`：本次要治理的唯一目标 skill，或新建 skill 的目标能力。
+- `target_skill`：本次要治理的目标 skill，或新建 skill 的目标能力；用户明确要求全仓治理时记录为 registry 全集。
 - `task_type`：`create` / `refactor` / `govern` / `self-audit`。
 - `success_criteria`：本次要消除的失真点，例如旧命名、误触发、模板漂移、验证不闭环。
 
@@ -55,7 +57,8 @@ description: 用于治理 repo 内 skill 的命名、触发、执行、模板、
 3. 若涉及命名或归位，严格按 `domain -> action -> object -> layer` 决策。
 4. 判断问题落在哪层：触发层、执行层、资源层、脚本归位层、验证层。
 5. 只改最小有效改动集；发现其他 skill 问题只登记，不扩散执行。
-6. 完成本地验证、旧规则残留搜索、版本与变更记录同步，再关闭。
+6. 检查路径来源、外部命令前置条件、临时目录清理方式及 macOS/Linux 差异。
+7. 完成本地验证、旧规则残留搜索、版本与变更记录同步，再关闭。
 
 ## 默认策略
 
@@ -70,12 +73,18 @@ description: 用于治理 repo 内 skill 的命名、触发、执行、模板、
 - `tests/` 保存确定性脚本测试、集成测试和 fixtures，统一入口为 `tests/run.sh`；`evals/` 保存真实 Agent 行为用例、判定标准和基线，不保存运行产物。
 - `tests/`、`evals/` 都是源码维护目录，安装器必须排除；评估输出写入仓库 `tmp/`，不能回流到 skill。
 - 创建或迁移开发资料时按需读取 `references/development-layout.md`。
+- Skill 脚本从自身位置推导仓库与资源路径，不写开发者目录或应用安装目录的绝对路径。
+- 临时产物用唯一临时目录，优先采用 `mktemp`、`tempfile`、Node `os.tmpdir()` 等系统接口，并只清理本次创建的目录。
+- macOS/Linux 共用脚本兼容 Bash 3.2 与 BSD/GNU 工具差异；可选平台工具通过 `command -v`、平台检测或参数发现，且不能成为隐式必需依赖。
+- Skill 的安装与校验不能隐式依赖 ripgrep；优先用基础 `grep`、Python 标准库或明确的依赖预检。
 
 ## 执行流程（治理态）
 
 1. Step 1：基线审计
 - 读取目标 skill 的入口文件和直接资源。
+- 用户要求全仓审计时，按 registry 逐项遍历 skill 中的脚本和测试代码，排除 `node_modules`、缓存、构建产物等第三方内容。
 - 产出问题清单，标记命名、layer、触发、执行、资源、脚本归位、验证七类状态。
+- 检查开发者/系统绝对路径、固定共享临时路径、Bash 版本语法、BSD/GNU 命令差异和未声明的外部命令依赖。
 - 产物必须写到仓库根 `tmp/` 或系统临时目录，不得写回 skill 内部目录。
 
 2. Step 1.5：命名与归位评审
@@ -84,13 +93,14 @@ description: 用于治理 repo 内 skill 的命名、触发、执行、模板、
 - 产出 rename review 与 rename plan 草稿；统一放到仓库根 `tmp/` 或系统临时目录。
 
 3. Step 2：定点修复
-- 只修改目标 skill 与直接共享文件。
+- 默认只修改目标 skill 与直接共享文件；用户明确授权全仓范围时，可修改审计发现的各 skill，并按责任分组记录。
 - 同步修触发配置、`SKILL.md`、`references/`、`scripts/`、`assets/`、`templates/` 的一致性。
 - 若发现仓库根目录残留的公共模板或运行时脚本，优先迁回目标 skill 内部；无法证明仍被现役 skill 使用时，直接删除。
 - Step 2 检查清单属于临时执行文档，只能写到 `tmp/` 或系统临时目录。
 
 4. Step 3：验证与收口
 - 先做结构校验，再做行为校验，再做旧规则残留搜索。
+- 运行目标 skill 的 `scripts/check_portability.py`；全仓范围运行仓库级 skill 布局校验。静态检查不能替代在目标操作系统上的真实执行。
 - 输出 governance report、validation status 与待重审清单。
 - governance report 属于临时治理文档，不得沉淀回当前 skill。
 
@@ -109,6 +119,7 @@ description: 用于治理 repo 内 skill 的命名、触发、执行、模板、
 - `references/governance-process.md`：Step 1 / Step 1.5 / Step 2 / Step 3 的治理流程（含产物落位）。
 - `references/version-changelog-policy.md`：版本号递增与 CHANGELOG 极简记录规则。
 - `references/quality-checklist.md`：交付前核查清单。
+- `scripts/check_portability.py`：检查固定机器路径、固定临时路径与常见 Bash/BSD/GNU 不兼容项。
 - `references/reassessment-backlog.md`：既有治理结论待重审清单。
 - 其他规则见 `references/repo-constraints.md`、`references/frontmatter-policy.md`、`references/anti-patterns.md`。
 
@@ -130,6 +141,8 @@ description: 用于治理 repo 内 skill 的命名、触发、执行、模板、
 bash scripts/validate.sh .
 bash tests/run.sh
 ```
+
+仓库根目录需对全部已注册 skill 验收时，使用仓库级 skill 布局校验器。
 
 2. 仓库根目录执行
 ```bash

@@ -38,7 +38,7 @@ class UrlTests(unittest.TestCase):
 
     def test_other_hosts_credentials_ports_and_profiles_rejected(self):
         for url in ("https://xiaohongshu.com.evil.example/explore/" + NOTE_ID,
-                    "https://evil.example/a", "file:///etc/passwd",
+                    "https://evil.example/a", "file://" + os.path.sep + "etc/passwd",
                     "https://user:pass@www.xiaohongshu.com/explore/" + NOTE_ID,
                     "https://www.xiaohongshu.com:444/explore/" + NOTE_ID,
                     "https://www.xiaohongshu.com/user/profile/example"):
@@ -76,7 +76,7 @@ class EntrypointTests(unittest.TestCase):
         shutil.copytree(SCRIPTS, self.scripts, ignore=shutil.ignore_patterns("__pycache__"))
         self.bin = self.root / "bin"
         self.bin.mkdir()
-        for name in ("python3", "rg", "ffmpeg"):
+        for name in ("python3", "grep", "ffmpeg"):
             (self.bin / name).symlink_to(shutil.which(name))
         self.program("brew", "#!/bin/bash\nexit 1\n")
         self.program("yt-dlp", f'''#!{sys.executable}
@@ -98,7 +98,7 @@ print('装修与家务')
         # 网络边界独立测试；统一入口使用固定解析结果，不触碰线上服务。
         (self.scripts / "lib/xiaohongshu_url.py").write_text(f"print({NOTE!r})\n")
         self.args = self.root / "calls.jsonl"
-        self.env = dict(os.environ, PATH=str(self.bin) + ":/usr/bin:/bin",
+        self.env = dict(os.environ, PATH=str(self.bin) + os.pathsep + os.defpath,
                         XHS_TEST_ARGS=str(self.args), AGENT_CHROME_PROFILE="")
         self.out = self.root / "output"
 

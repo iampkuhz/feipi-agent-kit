@@ -132,7 +132,7 @@ require_declared_direction() {
 require_legend_if_configured() {
   local include_legend
   include_legend="$(brief_value "$BRIEF_FILE" "layout.include_legend" "false")"
-  if [[ "$include_legend" == "true" ]] && ! printf '%s\n' "$CONTENT" | grep -Eiq '^[[:space:]]*legend\b'; then
+  if [[ "$include_legend" == "true" ]] && ! printf '%s\n' "$CONTENT" | grep -Eiq '^[[:space:]]*legend([^[:alnum:]_]|$)'; then
     echo "布局校验失败：layout.include_legend=true 时必须包含 legend" >&2
     exit 6
   fi
@@ -184,7 +184,7 @@ except:
   fi
 
   if [[ "$INCLUDE_LEGEND" == "true" ]]; then
-    if ! printf '%s\n' "$CONTENT" | grep -Eiq '^[[:space:]]*legend\b'; then
+    if ! printf '%s\n' "$CONTENT" | grep -Eiq '^[[:space:]]*legend([^[:alnum:]_]|$)'; then
       echo "布局校验失败：缺少 legend，读者无法快速识别层级语义" >&2
       exit 6
     fi
@@ -224,7 +224,7 @@ if [[ "$DIAGRAM_TYPE" == "sequence" ]]; then
     exit 6
   fi
 
-  if printf '%s\n' "$CONTENT" | grep -Eiq '^[[:space:]]*separator\b'; then
+  if printf '%s\n' "$CONTENT" | grep -Eiq '^[[:space:]]*separator([^[:alnum:]_]|$)'; then
     echo "布局校验失败：不要使用 PlantUML separator 关键字；请改用 == 组名 == 分隔线" >&2
     exit 7
   fi
@@ -299,7 +299,7 @@ if [[ "$DIAGRAM_TYPE" == "activity" ]]; then
   fi
   require_spacing
   require_legend_if_configured
-  if printf '%s\n' "$CONTENT" | grep -Eiq '^[[:space:]]*autonumber\b'; then
+  if printf '%s\n' "$CONTENT" | grep -Eiq '^[[:space:]]*autonumber([^[:alnum:]_]|$)'; then
     echo "布局校验失败：activity 使用 S 编号，禁止 autonumber" >&2
     exit 8
   fi

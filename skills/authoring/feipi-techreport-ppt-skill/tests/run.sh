@@ -77,13 +77,30 @@ if (!doctor.pipeline_level || doctor.pipeline_level !== runtime.pipeline_level) 
 }
 NODE
 
-if rg -n 'fontSize\s*:\s*[0-9]|fontSize\s*\|\||font_size_pt\s*\|\||fontScale|autoFit\s*:\s*true|shrink_font' \
-  "$SKILL_DIR/helpers" "$SKILL_DIR/adapters" "$SKILL_DIR/compiler" "$SKILL_DIR/scripts" -g '*.js'; then
+FONT_FALLBACKS="$(find "$SKILL_DIR/helpers" "$SKILL_DIR/adapters" "$SKILL_DIR/compiler" "$SKILL_DIR/scripts" \
+  \( -type d -name node_modules -prune \) -o \( -type f -name '*.js' -exec grep -En 'fontSize[[:space:]]*:[[:space:]]*[0-9]|fontSize[[:space:]]*\|\||font_size_pt[[:space:]]*\|\||fontScale|autoFit[[:space:]]*:[[:space:]]*true|shrink_font' {} + \) 2>/dev/null || true)"
+if [[ -n "$FONT_FALLBACKS" ]]; then
+  printf '%s\n' "$FONT_FALLBACKS"
   echo '发现绕过 token 的字号 fallback 或自动缩放路径' >&2
   exit 1
 fi
 
-if rg -n '/Users/.*/Downloads/feipi-ppt-design-kit' "$SKILL_DIR/helpers" "$SKILL_DIR/compiler" "$SKILL_DIR/adapters"; then
+EXTERNAL_KIT_PATHS="$(python3 - "$SKILL_DIR/helpers" "$SKILL_DIR/compiler" "$SKILL_DIR/adapters" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+pattern = re.compile(r"/Users/[^/]+/Downloads/feipi-ppt-design-kit")
+for root in map(Path, sys.argv[1:]):
+    for path in root.rglob("*"):
+        if path.is_file() and "node_modules" not in path.parts:
+            for number, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+                if pattern.search(line):
+                    print(f"{path}:{number}:{line}")
+PY
+)"
+if [[ -n "$EXTERNAL_KIT_PATHS" ]]; then
+  printf '%s\n' "$EXTERNAL_KIT_PATHS"
   echo '发现外部 Downloads design-kit 路径' >&2
   exit 1
 fi

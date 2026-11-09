@@ -54,7 +54,7 @@ TEST_SCRIPT="$TARGET_DIR/tests/run.sh"
 
 echo "=== 校验 skill 目录：$TARGET_DIR ==="
 
-bash "$VALIDATE_INTERNAL" "$TARGET_DIR" >/dev/null
+bash "$VALIDATE_INTERNAL" "$TARGET_DIR"
 echo "[PASS] 结构与规则校验通过"
 
 if [[ ! -f "$OPENAI_FILE" ]]; then
@@ -63,14 +63,14 @@ if [[ ! -f "$OPENAI_FILE" ]]; then
 fi
 echo "[PASS] agents/openai.yaml 存在"
 
-if ! rg -q '^version:[[:space:]]*[0-9]+[[:space:]]*$' "$OPENAI_FILE"; then
+if ! grep -Eq '^version:[[:space:]]*[0-9]+[[:space:]]*$' "$OPENAI_FILE"; then
   echo "[FAIL] agents/openai.yaml 的 version 必须是顶层整数" >&2
   exit 1
 fi
 echo "[PASS] version 字段为顶层整数"
 
 for field in display_name short_description default_prompt; do
-  if ! rg -q "^[[:space:]]+$field:[[:space:]]*.+$" "$OPENAI_FILE"; then
+  if ! grep -Eq "^[[:space:]]+$field:[[:space:]]*.+$" "$OPENAI_FILE"; then
     echo "[FAIL] agents/openai.yaml 缺少非空字段：$field" >&2
     exit 1
   fi
@@ -97,9 +97,9 @@ done
 
 for placeholder in "${placeholders[@]}"; do
   for file in "$TARGET_DIR/SKILL.md" "$TARGET_DIR/agents/openai.yaml" "$TARGET_DIR/tests/run.sh"; do
-    if [[ -f "$file" ]] && rg -Fq "$placeholder" "$file"; then
+    if [[ -f "$file" ]] && grep -Fq "$placeholder" "$file"; then
       echo "[FAIL] 检测到未替换模板占位符：$placeholder (文件：$file)" >&2
-      rg -Fn "$placeholder" "$file" >&2 || true
+      grep -Fn "$placeholder" "$file" >&2 || true
       exit 1
     fi
   done
@@ -107,17 +107,11 @@ done
 echo "[PASS] 无未替换模板占位符"
 
 if [[ "$(basename "$TARGET_DIR")" != "feipi-skill-govern" ]] \
-  && rg -n '(^|[^A-Za-z])(tests|evals)/|scripts/test\.sh' "$TARGET_DIR/SKILL.md"; then
+  && grep -En '(^|[^A-Za-z])(tests|evals)/|scripts/test\.sh' "$TARGET_DIR/SKILL.md"; then
   echo "[FAIL] 普通 skill 的 SKILL.md 不得引用 tests/evals；仅 Skill Creator 在治理时加载开发目录" >&2
   exit 1
 fi
 echo "[PASS] 运行入口未引入开发目录"
-
-while IFS= read -r script_path; do
-  [[ -z "$script_path" ]] && continue
-  bash -n "$script_path"
-done < <(find "$TARGET_DIR/scripts" -maxdepth 1 -type f -name '*.sh' | sort)
-echo "[PASS] scripts/*.sh 语法检查通过"
 
 while IFS= read -r resource_path; do
   [[ -z "$resource_path" ]] && continue
@@ -125,7 +119,7 @@ while IFS= read -r resource_path; do
     echo "[FAIL] SKILL.md 引用了不存在的路径：$resource_path" >&2
     exit 1
   fi
-done < <(rg -o 'references/[A-Za-z0-9._/-]+\.md|assets/[A-Za-z0-9._/-]+\.md|scripts/[A-Za-z0-9._/-]+\.sh' "$SKILL_FILE" | sort -u)
+done < <(grep -Eo '(\.\./[A-Za-z0-9._-]+/)?(references|assets|scripts)/[A-Za-z0-9._/-]+\.(md|txt|yaml|yml|json|puml|svg|png|sh|bash|py|js|mjs|cjs)' "$SKILL_FILE" | sort -u)
 echo "[PASS] SKILL.md 中的资源路径可解析"
 
 echo "校验通过：$TARGET_DIR"

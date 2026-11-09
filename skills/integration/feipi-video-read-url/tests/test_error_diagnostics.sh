@@ -30,15 +30,18 @@ for tool in curl nc ffmpeg; do
 done
 # 隔离宿主 Homebrew，确保本例只验证 PATH 中的 mock 版本。
 printf '#!/usr/bin/env bash\nexit 1\n' > "$AUDIT_TMP/bin/brew"
-RG_BIN="$(command -v rg)"
-ln -s "$RG_BIN" "$AUDIT_TMP/bin/rg"
+GREP_BIN="$(command -v grep)"
+ln -s "$GREP_BIN" "$AUDIT_TMP/bin/grep"
+PYTHON_BIN="$(command -v python3)"
+ln -s "$PYTHON_BIN" "$AUDIT_TMP/bin/python3"
+SYSTEM_PATH="$(python3 -c 'import os; print(os.defpath)')"
 # 允许非 macOS 的 CI 覆盖下载失败路径；不会调用真实转写器。
 printf '#!/usr/bin/env bash\necho Darwin\n' > "$AUDIT_TMP/bin/uname"
 chmod +x "$AUDIT_TMP/bin/"*
 
 mkdir -p "$AUDIT_TMP/output/youtube-a4RcpaTccFc/logs"
 printf 'pipeline_stage=transcription\n' > "$AUDIT_TMP/output/youtube-a4RcpaTccFc/logs/youtube-whisper-noauth.log"
-if env PATH="$AUDIT_TMP/bin:/usr/bin:/bin" AGENT_CHROME_PROFILE= AGENT_YOUTUBE_COOKIE_FILE= \
+if env PATH="$AUDIT_TMP/bin:$SYSTEM_PATH" AGENT_CHROME_PROFILE= AGENT_YOUTUBE_COOKIE_FILE= \
   bash "$RUNTIME_DIR/extract_video_text.sh" 'https://www.youtube.com/watch?v=a4RcpaTccFc' \
   "$AUDIT_TMP/output" auto --instruction '总结视频' > "$AUDIT_TMP/result.log" 2>&1; then
   echo 'FAIL: 全部下载失败却报告成功' >&2
@@ -80,7 +83,7 @@ grep -Fq "failure_log=$log_file" "$AUDIT_TMP/result.log"
   source "$RUNTIME_DIR/lib/yt_dlp_common.sh"
   yt_common_init "$AUDIT_TMP/recovered"
   yt_common_on_error() { yt_common_run_cmd "$1" --version; }
-  PATH="$AUDIT_TMP/bin:/usr/bin:/bin"
+  PATH="$AUDIT_TMP/bin:$SYSTEM_PATH"
   yt_common_run_with_success_log 'https://www.youtube.com/watch?v=test' \
     > "$AUDIT_TMP/recovered.out" 2> "$AUDIT_TMP/recovered.err"
 )
@@ -88,7 +91,7 @@ grep -q first-marker "$AUDIT_TMP/recovered.err"
 grep -q 2020.01.01-test "$AUDIT_TMP/recovered.out"
 
 # 通过真实入口产生无 Cookie 重试，最终诊断必须指向该次日志。
-if env PATH="$AUDIT_TMP/bin:/usr/bin:/bin" AGENT_CHROME_PROFILE=Default AGENT_YOUTUBE_COOKIE_FILE= TEST_AUTH_SIGNAL=1 \
+if env PATH="$AUDIT_TMP/bin:$SYSTEM_PATH" AGENT_CHROME_PROFILE=Default AGENT_YOUTUBE_COOKIE_FILE= TEST_AUTH_SIGNAL=1 \
   bash "$RUNTIME_DIR/extract_video_text.sh" 'https://www.youtube.com/watch?v=a4RcpaTccFc' \
   "$AUDIT_TMP/noauth-output" whisper --instruction '总结视频' > "$AUDIT_TMP/noauth-result.log" 2>&1; then
   echo 'FAIL: 无 Cookie 重试全失败却报告成功' >&2
@@ -116,7 +119,7 @@ exit 1
 MOCK
 chmod +x "$AUDIT_TMP/homebrew/bin/yt-dlp" "$AUDIT_TMP/bin/brew"
 (
-  PATH="$AUDIT_TMP/bin:/usr/bin:/bin"
+  PATH="$AUDIT_TMP/bin:$SYSTEM_PATH"
   source "$RUNTIME_DIR/lib/yt_dlp_common.sh"
   yt_common_require_tools dryrun
   [[ "$YT_DLP_BIN" == "$AUDIT_TMP/homebrew/bin/yt-dlp" ]]

@@ -1,4 +1,4 @@
-version: 3
+version: 4
 interface:
   display_name: "中文文本去废话"
   short_description: "精炼汇报等文稿，诊断表达问题；也可根据对话和要点提炼自然回复，保留事实与立场。"

@@ -238,9 +238,11 @@ def check_validation_scripts(root, skills):
             # check_skill_metadata reports the missing command as the contract error.
             continue
 
-        # Extract the script path from the command (e.g., "bash path/to/script.sh" -> path/to/script.sh)
-        parts = shlex.split(val_cmd)
-        script_path = parts[-1] if parts else ""
+        script_path = validation_script_path(val_cmd)
+        if not script_path:
+            print(f"  [FAIL] Skill '{name}' validation command does not identify a script: {val_cmd}")
+            all_ok = False
+            continue
 
         full_script = os.path.join(root, script_path)
         if os.path.isfile(full_script):
@@ -250,6 +252,27 @@ def check_validation_scripts(root, skills):
             all_ok = False
 
     return all_ok
+
+
+def validation_script_path(command):
+    """Find the executable script operand, ignoring later arguments.
+
+    Registry commands may pass a target directory after the script, for example
+    ``bash scripts/validate.sh skills/integration/example``. The previous
+    implementation selected the final token and mistook that directory for the
+    validation script.
+    """
+    try:
+        parts = shlex.split(command)
+    except ValueError:
+        return ""
+    if not parts:
+        return ""
+
+    for index, part in enumerate(parts):
+        if re.search(r"\.(?:sh|py|js|mjs|cjs)$", part):
+            return part
+    return ""
 
 
 def main():

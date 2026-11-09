@@ -1,6 +1,15 @@
 # 变更记录
 
 ## 2026-11-09
+- feipi-xiaohongshu-read-note v4：测试路径改用系统接口生成
+- feipi-skill-govern v7：补齐路径与双平台校验
+- feipi-techreport-ppt-skill v5：移除安装路径、修复脚本语法并隔离测试产物
+- feipi-writing-refine-text v4：测试改用系统 grep
+- feipi-drawio-generate-diagram v4：临时套接字路径动态生成
+- feipi-mermaid-generate-diagram v3：浏览器路径自动发现
+- feipi-plantuml-generate-diagram v13：校验兼容系统 Bash 与 grep
+- feipi-multica-manage-tasks v3：测试移除 ripgrep 依赖
+- feipi-video-read-url v19：脚本兼容系统 grep、安装路径与独立临时目录
 - feipi-dingtalk-send-webhook v6：移出技能及分发清单
 - Makefile skills 安装目标统一命名为 `install-skills`；`install-links` 保留为兼容别名
 

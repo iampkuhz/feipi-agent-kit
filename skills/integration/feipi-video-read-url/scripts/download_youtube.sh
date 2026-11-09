@@ -374,7 +374,7 @@ yt_common_on_error() {
   shift
 
   if [[ "$AUTH_SOURCE" != "none" ]] && [[ "$YT_AUTH_RETRY_NOAUTH" -eq 0 ]]; then
-    if rg -qi "Requested format is not available|Only images are available|n challenge solving failed|Sign in to confirm|confirm you're not a bot|HTTP Error 429|403 Forbidden" "$err_file"; then
+    if grep -Eqi "Requested format is not available|Only images are available|n challenge solving failed|Sign in to confirm|confirm you're not a bot|HTTP Error 429|403 Forbidden" "$err_file"; then
       YT_AUTH_RETRY_NOAUTH=1
       echo "检测到带认证请求失败，回退无认证重试..." >&2
       apply_youtube_auth_mode none
@@ -389,7 +389,7 @@ yt_common_on_error() {
 
   if [[ "$AUTH_SOURCE" == "none" ]] && [[ "$YT_AUTH_RETRY_WITH_AUTH" -eq 0 ]]; then
     if [[ -n "$AGENT_YOUTUBE_COOKIE_FILE" || -n "$AGENT_CHROME_PROFILE" ]]; then
-      if rg -qi "Sign in to confirm|confirm you're not a bot|HTTP Error 429|403 Forbidden|Subtitles are only available when logged in" "$err_file"; then
+      if grep -Eqi "Sign in to confirm|confirm you're not a bot|HTTP Error 429|403 Forbidden|Subtitles are only available when logged in" "$err_file"; then
         YT_AUTH_RETRY_WITH_AUTH=1
         echo "检测到可能需要登录态，尝试带认证重试..." >&2
         apply_youtube_auth_mode "$(preferred_youtube_auth_mode)"
@@ -419,7 +419,7 @@ yt_common_on_error() {
     fi
   fi
 
-  if rg -qi "confirm you're not a bot|Sign in to confirm|403 Forbidden|HTTP Error 429" "$err_file"; then
+  if grep -Eqi "confirm you're not a bot|Sign in to confirm|403 Forbidden|HTTP Error 429" "$err_file"; then
     YT_BOT_HIT=1
     print_bot_guidance
   fi
@@ -497,7 +497,7 @@ run_whisper_mode() {
   if ! yt_common_run_whisper_mode_from_url "$URL" "$OUT_DIR" "$WHISPER_HELPER" zh "$resolved_profile" >"$whisper_log" 2>&1; then
     # 标准路径失败，检查是否是格式/下载错误
     if [[ "$(yt_common_last_stage "$whisper_log")" == "media_download" ]] \
-      && rg -qi "403|HTTP Error|Requested format is not available|Only images" "$whisper_log"; then
+      && grep -Eqi "403|HTTP Error|Requested format is not available|Only images" "$whisper_log"; then
       echo "whisper 标准音频下载失败，尝试 format fallback..." >&2
       yt_common_print_diagnostic "$whisper_log" >&2
       rm -f "$whisper_log"

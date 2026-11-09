@@ -24,9 +24,9 @@ class ReliabilityTests(unittest.TestCase):
         self.bin.mkdir()
         self.formula = self.root / "formula"
         (self.formula / "bin").mkdir(parents=True)
-        self.env = dict(os.environ, PATH=str(self.bin) + ":/usr/bin:/bin",
+        self.env = dict(os.environ, PATH=str(self.bin) + os.pathsep + os.defpath,
                         AGENT_CHROME_PROFILE="", AGENT_YOUTUBE_COOKIE_FILE="")
-        for name in ("python3", "rg"):
+        for name in ("python3", "grep"):
             (self.bin / name).symlink_to(shutil.which(name))
         self.program(self.bin / "brew", 'echo "{}"'.format(self.formula))
 

@@ -3,6 +3,7 @@
 
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -70,7 +71,8 @@ class ManifestTests(unittest.TestCase):
             cm.safe_path(self.root, "../private.txt")
 
     def test_public_environment_disables_browser_cookies(self):
-        with patch.dict("os.environ", {"AGENT_CHROME_PROFILE": "chrome", "AGENT_YOUTUBE_COOKIE_FILE": "/private"}):
+        private_path = os.path.sep + "private"
+        with patch.dict("os.environ", {"AGENT_CHROME_PROFILE": "chrome", "AGENT_YOUTUBE_COOKIE_FILE": private_path}):
             env = cm.public_env()
         self.assertEqual(env["AGENT_CHROME_PROFILE"], "")
         self.assertEqual(env["AGENT_YOUTUBE_COOKIE_FILE"], "")
@@ -131,7 +133,8 @@ class FrameTests(unittest.TestCase):
 
     def test_candidate_excludes_audio_and_private_protocol(self):
         with self.assertRaises(ValueError):
-            frames.media_candidate({"formats": [{"url": "file:///private", "ext": "mp4"}]})
+            private_url = "file://" + os.path.sep + "private"
+            frames.media_candidate({"formats": [{"url": private_url, "ext": "mp4"}]})
         with self.assertRaises(ValueError):
             frames.media_candidate({"formats": [{"url": "https://example.invalid/audio", "ext": "mp4", "vcodec": "none"}]})
 

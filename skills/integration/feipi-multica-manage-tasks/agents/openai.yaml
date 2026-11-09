@@ -1,4 +1,4 @@
-version: 2
+version: 3
 interface:
   display_name: "Multica 任务协作"
   short_description: "定位当前仓库的 Multica 项目，规范查询、录入、进展、交接和持久交付。"

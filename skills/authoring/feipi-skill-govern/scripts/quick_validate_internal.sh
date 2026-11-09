@@ -28,7 +28,7 @@ SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd "$SKILL_DIR/../../.." && pwd)"
 DIR_INPUT="$1"
 DIR="$DIR_INPUT"
-ALLOWED_LAYERS="authoring diagram integration platform"
+ALLOWED_LAYERS="authoring diagram integration"
 DISCOURAGED_ACTIONS="web ops automate misc helper utils tools temp tmp skill"
 LEGACY_ACTION_HINTS="read write summarize review analyze test debug refactor generate gen configure send plan planning design build deploy translate govern code coding docs"
 
@@ -59,7 +59,7 @@ validate_skill_name() {
     exit 1
   fi
 
-  if printf "%s" "$name" | rg -qi '(anthropic|claude)'; then
+  if printf "%s" "$name" | grep -Eqi '(anthropic|claude)'; then
     echo "name 不能包含保留词 anthropic 或 claude" >&2
     exit 1
   fi
@@ -76,11 +76,11 @@ validate_skill_name() {
 
   domain="${name_tokens[1]}"
   action="${name_tokens[2]}"
-  if printf "%s\n" "$LEGACY_ACTION_HINTS" | tr ' ' '\n' | rg -qx "$domain"; then
+  if printf "%s\n" "$LEGACY_ACTION_HINTS" | tr ' ' '\n' | grep -Exq "$domain"; then
     echo "检测到旧 action-first 命名痕迹：第二段像 action，请先确定 domain 再命名" >&2
     exit 1
   fi
-  if printf "%s\n" "$DISCOURAGED_ACTIONS" | tr ' ' '\n' | rg -qx "$action"; then
+  if printf "%s\n" "$DISCOURAGED_ACTIONS" | tr ' ' '\n' | grep -Exq "$action"; then
     echo "action 不能使用低语义词：$action" >&2
     exit 1
   fi
@@ -109,7 +109,7 @@ validate_repo_layer() {
     exit 1
   fi
 
-  if ! printf "%s\n" "$ALLOWED_LAYERS" | tr ' ' '\n' | rg -qx "$layer"; then
+  if ! printf "%s\n" "$ALLOWED_LAYERS" | tr ' ' '\n' | grep -Exq "$layer"; then
     echo "不支持的 layer: $layer" >&2
     echo "允许的 layer: $ALLOWED_LAYERS" >&2
     exit 1
@@ -145,7 +145,7 @@ if [[ -z "$NAME_VALUE" || -z "$DESC_VALUE" ]]; then
   exit 1
 fi
 
-EXTRA_KEYS="$(printf "%s\n" "$FRONTMATTER" | sed -nE 's/^([a-zA-Z0-9_-]+):.*$/\1/p' | rg -v '^(name|description)$' || true)"
+EXTRA_KEYS="$(printf "%s\n" "$FRONTMATTER" | sed -nE 's/^([a-zA-Z0-9_-]+):.*$/\1/p' | grep -Ev '^(name|description)$' || true)"
 if [[ -n "$EXTRA_KEYS" ]]; then
   echo "Frontmatter 仅允许 name 与 description，发现额外字段：$(echo "$EXTRA_KEYS" | tr '\n' ' ')" >&2
   exit 1
@@ -158,12 +158,12 @@ fi
 
 validate_skill_name "$NAME_VALUE"
 
-if printf "%s" "$NAME_VALUE" | rg -q '<[^>]+>'; then
+if printf "%s" "$NAME_VALUE" | grep -Eq '<[^>]+>'; then
   echo "name 不能包含 XML 标签" >&2
   exit 1
 fi
 
-if printf "%s" "$DESC_VALUE" | rg -q '<[^>]+>'; then
+if printf "%s" "$DESC_VALUE" | grep -Eq '<[^>]+>'; then
   echo "description 不能包含 XML 标签" >&2
   exit 1
 fi
@@ -181,13 +181,13 @@ for placeholder in \
   '{{SHORT_DESCRIPTION}}' \
   '{{DEFAULT_PROMPT}}'
 do
-  if rg -Fq "$placeholder" "$SKILL_FILE"; then
+  if grep -Fq "$placeholder" "$SKILL_FILE"; then
     echo "SKILL.md 存在未替换模板占位符：$placeholder" >&2
     exit 1
   fi
 done
 
-if printf "%s" "$DESC_VALUE" | rg -q '(我 | 我们 | 你 | 您)'; then
+if printf "%s" "$DESC_VALUE" | grep -Eq '(我 | 我们 | 你 | 您)'; then
   echo "description 建议使用第三人称，避免“我/我们/你/您”" >&2
   exit 1
 fi
@@ -204,12 +204,18 @@ if [[ "$BODY_LINES" -gt 500 ]]; then
   exit 1
 fi
 
-if ! rg -Pq '\p{Han}' "$SKILL_FILE"; then
+if ! python3 - "$SKILL_FILE" <<'PY'
+import sys
+text = open(sys.argv[1], encoding="utf-8").read()
+if not any("\u3400" <= char <= "\u9fff" or "\uf900" <= char <= "\ufaff" for char in text):
+    raise SystemExit(1)
+PY
+then
   echo "SKILL.md 必须包含中文内容（检测不到中文字符）" >&2
   exit 1
 fi
 
-if ! rg -q '验证|校验|测试|验收' "$SKILL_FILE"; then
+if ! grep -Eq '验证|校验|测试|验收' "$SKILL_FILE"; then
   echo "SKILL.md 必须包含至少一种验证/校验/测试要求" >&2
   exit 1
 fi
@@ -240,7 +246,7 @@ if [[ "$BASE" == "feipi-skill-govern" ]]; then
   fi
 fi
 
-if rg -q '[A-Za-z]:\\|\\[A-Za-z0-9._-]+' "$SKILL_FILE"; then
+if grep -Eq '[A-Za-z]:\\|\\[A-Za-z0-9._-]+' "$SKILL_FILE"; then
   echo "SKILL.md 检测到 Windows 风格路径，请统一使用正斜杠" >&2
   exit 1
 fi
@@ -251,10 +257,10 @@ while IFS= read -r resource_path; do
     echo "SKILL.md 引用了不存在的路径：$resource_path" >&2
     exit 1
   fi
-done < <(rg -o 'references/[A-Za-z0-9._/-]+\.md|assets/[A-Za-z0-9._/-]+\.md|scripts/[A-Za-z0-9._/-]+\.sh' "$SKILL_FILE" | sort -u)
+done < <(grep -Eo '(\.\./[A-Za-z0-9._-]+/)?(references|assets|scripts)/[A-Za-z0-9._/-]+\.(md|txt|yaml|yml|json|puml|svg|png|sh|bash|py|js|mjs|cjs)' "$SKILL_FILE" | sort -u)
 
 if [[ "$BASE" != "feipi-skill-govern" ]]; then
-  if rg -n 'make[[:space:]]+(new|test|validate)|bash[[:space:]]+scripts/(init_skill|validate|test)\.sh|^##[[:space:]]*维护与回归' "$SKILL_FILE" >&2; then
+  if grep -En 'make[[:space:]]+(new|test|validate)|bash[[:space:]]+scripts/(init_skill|validate|test)\.sh|^##[[:space:]]*维护与回归' "$SKILL_FILE" >&2; then
     echo "非 feipi-skill-govern 的 SKILL.md 禁止包含 repo 维护命令或“维护与回归”章节" >&2
     exit 1
   fi
@@ -266,18 +272,18 @@ if [[ ! -f "$OPENAI_FILE" ]]; then
   exit 1
 fi
 
-if ! rg -q '^version:[[:space:]]*[0-9]+[[:space:]]*$' "$OPENAI_FILE"; then
+if ! grep -Eq '^version:[[:space:]]*[0-9]+[[:space:]]*$' "$OPENAI_FILE"; then
   echo "agents/openai.yaml 缺少顶层整数 version 字段" >&2
   exit 1
 fi
 
-if ! rg -q '^interface:' "$OPENAI_FILE"; then
+if ! grep -Eq '^interface:' "$OPENAI_FILE"; then
   echo "agents/openai.yaml 缺少 interface 根字段" >&2
   exit 1
 fi
 
 for k in display_name short_description default_prompt; do
-  if ! rg -q "^[[:space:]]+$k:" "$OPENAI_FILE"; then
+  if ! grep -Eq "^[[:space:]]+$k:" "$OPENAI_FILE"; then
     echo "agents/openai.yaml 缺少 $k 字段" >&2
     exit 1
   fi
@@ -291,13 +297,19 @@ for placeholder in \
   '{{SHORT_DESCRIPTION}}' \
   '{{DEFAULT_PROMPT}}'
 do
-  if rg -Fq "$placeholder" "$OPENAI_FILE"; then
+  if grep -Fq "$placeholder" "$OPENAI_FILE"; then
     echo "agents/openai.yaml 存在未替换模板占位符：$placeholder" >&2
     exit 1
   fi
 done
 
-if ! rg -Pq '\p{Han}' "$OPENAI_FILE"; then
+if ! python3 - "$OPENAI_FILE" <<'PY'
+import sys
+text = open(sys.argv[1], encoding="utf-8").read()
+if not any("\u3400" <= char <= "\u9fff" or "\uf900" <= char <= "\ufaff" for char in text):
+    raise SystemExit(1)
+PY
+then
   echo "agents/openai.yaml 必须包含中文描述字段" >&2
   exit 1
 fi
@@ -316,10 +328,52 @@ for placeholder in \
   '{{SHORT_DESCRIPTION}}' \
   '{{DEFAULT_PROMPT}}'
 do
-  if rg -Fq "$placeholder" "$TEST_SCRIPT"; then
+  if grep -Fq "$placeholder" "$TEST_SCRIPT"; then
     echo "tests/run.sh 存在未替换模板占位符：$placeholder" >&2
     exit 1
   fi
 done
 
-bash -n "$TEST_SCRIPT"
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "缺少依赖：python3（用于可移植路径与平台检查）" >&2
+  exit 1
+fi
+python3 "$SCRIPT_DIR/check_portability.py" "$TARGET_DIR"
+
+while IFS= read -r script_path; do
+  [[ -z "$script_path" ]] && continue
+  bash -n "$script_path"
+done < <(find "$TARGET_DIR" \( -type d -name node_modules -prune \) -o \( -type f -name '*.sh' -print \) | sort)
+echo "[PASS] 全部 Bash 脚本语法检查通过"
+
+python3 - "$TARGET_DIR" <<'PY'
+import os
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+skip = {"node_modules", ".git", ".venv", "venv", "__pycache__", "dist", "build"}
+for current, directories, files in os.walk(root):
+    directories[:] = [name for name in directories if name not in skip]
+    for name in files:
+        if name.endswith(".py"):
+            path = Path(current) / name
+            compile(path.read_text(encoding="utf-8"), str(path), "exec")
+PY
+echo "[PASS] 全部 Python 脚本语法检查通过"
+
+NODE_FILES="$(find "$TARGET_DIR" \( -type d -name node_modules -prune \) -o \
+  \( -type f \( -name '*.js' -o -name '*.mjs' -o -name '*.cjs' \) -print \) | sort)"
+if [[ -n "$NODE_FILES" ]]; then
+  if ! command -v node >/dev/null 2>&1; then
+    echo "[SKIP] 未安装 node，无法执行 JavaScript 语法检查"
+  else
+    while IFS= read -r script_path; do
+      [[ -z "$script_path" ]] && continue
+      node --check "$script_path"
+    done <<< "$NODE_FILES"
+    echo "[PASS] 全部 JavaScript 脚本语法检查通过"
+  fi
+fi
+
+echo "[PASS] 路径与 macOS/Linux 兼容静态检查通过"

@@ -17,7 +17,7 @@ const compiler = require('../../helpers/pptx/compiler');
 const postcheck = require('../../helpers/pptx/postcheck');
 const primitives = require('../../helpers/pptx/primitives');
 const designKitAdapter = require('../../helpers/design-kit/adapters/compiler-adapter');
-const { renderPptxEvidence } = require('../../helpers/pipeline/run-pipeline');
+const { renderPptxEvidence, findCommand } = require('../../helpers/pipeline/run-pipeline');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 let passed = 0;
@@ -209,7 +209,7 @@ async function main() {
     });
 
     await test('QuickLook/CoreText 可为三个场景生成全尺寸视觉证据', () => {
-      if (process.platform !== 'darwin' || !fs.existsSync('/usr/bin/qlmanage')) return;
+      if (process.platform !== 'darwin' || !findCommand('qlmanage')) return;
       for (const output of outputs) {
         const evidence = renderPptxEvidence(output, `${output}.render`);
         assert.equal(evidence.status, 'pass', JSON.stringify(evidence.issues));

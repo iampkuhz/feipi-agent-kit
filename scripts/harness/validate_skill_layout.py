@@ -16,6 +16,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 REGISTRY = REPO_ROOT / "skills/registry.yaml"
 INSTALLER = REPO_ROOT / "scripts/install_skills.sh"
 CREATOR_NAME = "feipi-skill-govern"
+SKILL_VALIDATOR = REPO_ROOT / "skills/authoring/feipi-skill-govern/scripts/validate.sh"
 DEVELOPMENT_REF = re.compile(r"(^|[\s'\"`(])(tests|evals)/|scripts/test\.sh", re.MULTILINE)
 
 
@@ -60,6 +61,15 @@ def validate_eval_cases(skill: Path) -> None:
 
 def validate_source_layout(skills: list[Path]) -> None:
     for skill in skills:
+        validation = subprocess.run(
+            ["bash", str(SKILL_VALIDATOR), str(skill)],
+            cwd=REPO_ROOT,
+            text=True,
+            errors="replace",
+            capture_output=True,
+        )
+        if validation.returncode:
+            fail(f"skill 结构/脚本/路径校验失败：{skill.relative_to(REPO_ROOT)}\n{validation.stdout}{validation.stderr}")
         test_entry = skill / "tests/run.sh"
         if not test_entry.is_file() or not os.access(test_entry, os.X_OK):
             fail(f"缺少可执行测试入口：{test_entry.relative_to(REPO_ROOT)}")

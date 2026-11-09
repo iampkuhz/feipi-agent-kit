@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // 固定依赖、本地浏览器、单次渲染；同一 SVG 提供 PNG 与几何证据。
 import fs from 'node:fs/promises';
+import {constants} from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {createRequire} from 'node:module';
@@ -24,15 +25,29 @@ try {
   const puppeteer = runtimeRequire('puppeteer');
   const {renderMermaid} = await import(pathToFileURL(runtimeRequire.resolve('@mermaid-js/mermaid-cli')));
   const version = async name => JSON.parse(await fs.readFile(path.join(runtime,'node_modules',name,'package.json'),'utf8')).version;
-  let executablePath = value('--browser');
+  let executablePath = value('--browser') ?? process.env.PUPPETEER_EXECUTABLE_PATH ?? '';
   if (!executablePath) {
-    const candidates = [
-      '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-      '/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome',
-    ];
-    for (const candidate of candidates) {
-      try {await fs.access(candidate); executablePath = candidate; break;} catch {}
+    try {
+      const bundledBrowser = puppeteer.executablePath();
+      await fs.access(bundledBrowser, constants.X_OK);
+      executablePath = bundledBrowser;
+    } catch {}
+  }
+  if (!executablePath) {
+    for (const entry of (process.env.PATH || '').split(path.delimiter).filter(Boolean)) {
+      for (const browserName of ['google-chrome', 'chromium', 'chromium-browser', 'chrome']) {
+        const candidate = path.join(entry, browserName);
+        try {
+          await fs.access(candidate, constants.X_OK);
+          executablePath = candidate;
+          break;
+        } catch {}
+      }
+      if (executablePath) break;
     }
+  }
+  if (!executablePath) {
+    throw new Error('未找到 Chromium/Chrome；请准备本地固定依赖，或用 --browser/PUPPETEER_EXECUTABLE_PATH 指定浏览器');
   }
   browser = await puppeteer.launch({executablePath, headless:true, timeout:15000,
     protocolTimeout:30000, args:['--disable-background-networking']});

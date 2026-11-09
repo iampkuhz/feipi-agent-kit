@@ -16,7 +16,8 @@ usage() {
 示例:
   bash scripts/init_skill_internal.sh video-read-youtube --layer integration
   bash scripts/init_skill_internal.sh feipi-video-read-youtube --resources scripts,references,assets --layer integration
-  bash scripts/init_skill_internal.sh report-generate-brief --layer authoring --target /tmp/skills
+  temp_dir="$(mktemp -d)"
+  bash scripts/init_skill_internal.sh report-generate-brief --layer authoring --target "$temp_dir/skills"
 USAGE
 }
 
@@ -36,21 +37,24 @@ shift
 RESOURCES="scripts,references"
 TARGET="auto"
 LAYER=""
-ALLOWED_LAYERS="authoring diagram integration platform"
+ALLOWED_LAYERS="authoring diagram integration"
 DISCOURAGED_ACTIONS="web ops automate misc helper utils tools temp tmp skill"
 LEGACY_ACTION_HINTS="read write summarize review analyze test debug refactor generate gen configure send plan planning design build deploy translate govern code coding docs"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --resources)
+      if [[ $# -lt 2 ]]; then echo "--resources 缺少参数值" >&2; exit 1; fi
       RESOURCES="$2"
       shift 2
       ;;
     --layer)
+      if [[ $# -lt 2 ]]; then echo "--layer 缺少参数值" >&2; exit 1; fi
       LAYER="$2"
       shift 2
       ;;
     --target)
+      if [[ $# -lt 2 ]]; then echo "--target 缺少参数值" >&2; exit 1; fi
       TARGET="$2"
       shift 2
       ;;
@@ -131,7 +135,7 @@ validate_skill_name() {
     exit 1
   fi
 
-  if printf "%s" "$name" | rg -qi '(anthropic|claude)'; then
+  if printf "%s" "$name" | grep -Eqi '(anthropic|claude)'; then
     echo "Skill 名称不能包含保留词 anthropic 或 claude" >&2
     exit 1
   fi
@@ -148,11 +152,11 @@ validate_skill_name() {
 
   domain="${tokens[1]}"
   action="${tokens[2]}"
-  if printf "%s\n" "$LEGACY_ACTION_HINTS" | tr ' ' '\n' | rg -qx "$domain"; then
+  if printf "%s\n" "$LEGACY_ACTION_HINTS" | tr ' ' '\n' | grep -Exq "$domain"; then
     echo "检测到旧 action-first 命名痕迹：第二段像 action，请先确定 domain 再命名" >&2
     exit 1
   fi
-  if printf "%s\n" "$DISCOURAGED_ACTIONS" | tr ' ' '\n' | rg -qx "$action"; then
+  if printf "%s\n" "$DISCOURAGED_ACTIONS" | tr ' ' '\n' | grep -Exq "$action"; then
     echo "action 不能使用低语义词：$action" >&2
     echo "请使用真正的动词原形，例如 read、generate、summarize、configure、send" >&2
     exit 1
@@ -164,7 +168,7 @@ validate_layer() {
   if [[ -z "$layer" ]]; then
     return 0
   fi
-  if ! printf "%s\n" "$ALLOWED_LAYERS" | tr ' ' '\n' | rg -qx "$layer"; then
+  if ! printf "%s\n" "$ALLOWED_LAYERS" | tr ' ' '\n' | grep -Exq "$layer"; then
     echo "不支持的 layer: $layer" >&2
     echo "允许的 layer: $ALLOWED_LAYERS" >&2
     exit 1

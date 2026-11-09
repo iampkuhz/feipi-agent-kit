@@ -6,6 +6,8 @@ SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 RUNTIME_DIR="$SKILL_DIR/scripts"
 REPO_ROOT="$(cd "$SKILL_DIR/../../.." && pwd)"
 TEST_DIR="$SCRIPT_DIR"
+TEST_TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/feipi-plantuml-tests.XXXXXX")"
+trap 'rm -rf "$TEST_TMP_ROOT"' EXIT
 
 PASS=0
 FAIL=0
@@ -105,7 +107,7 @@ for f in "$FALLBACK_DIAGRAM" "$ARCH_BRIEF" "$ARCH_DIAGRAM" "$SEQ_BRIEF" "$SEQ_DI
 done
 
 # Mindmap 完整入口产生本批唯一预检回执；后续图型共享它，不重复预检。
-MINDMAP_OUT="$(mktemp -d "${TMPDIR:-/tmp}/plantuml-mindmap-runner.XXXXXX")"
+MINDMAP_OUT="$(mktemp -d "$TEST_TMP_ROOT/mindmap-runner.XXXXXX")"
 PREFLIGHT_OUT="$MINDMAP_OUT/renderer-preflight.json"
 if ! python3 "$RUNTIME_DIR/run_mindmap.py" --brief "$MINDMAP_BRIEF" --out-dir "$MINDMAP_OUT" > "$MINDMAP_OUT/cli-result.json"; then
   cat "$MINDMAP_OUT/cli-result.json" >&2
@@ -144,7 +146,7 @@ fi
 # Step 3: Fallback 正向验证
 # =============================================================================
 echo "=== Step 3: Fallback 正向验证 ==="
-FALLBACK_OUT="/tmp/plantuml-fallback-smoke-test"
+FALLBACK_OUT="$TEST_TMP_ROOT/plantuml-fallback-smoke-test"
 run_validate "$FALLBACK_OUT" --diagram "$FALLBACK_DIAGRAM" --diagram-type fallback
 
 if [[ -f "$FALLBACK_OUT/validation.json" ]]; then
@@ -163,7 +165,7 @@ fi
 # =============================================================================
 echo "=== Step 4: Fallback 负向验证 ==="
 INVALID_DIAGRAM="$TEST_DIR/invalid-missing-enduml.puml"
-INVALID_OUT="/tmp/plantuml-fallback-invalid-test"
+INVALID_OUT="$TEST_TMP_ROOT/plantuml-fallback-invalid-test"
 rm -rf "$INVALID_OUT"
 
 if bash "$RUNTIME_DIR/validate_package.sh" \
@@ -184,7 +186,7 @@ fi
 # Step 5: Architecture 正向验证
 # =============================================================================
 echo "=== Step 5: Architecture 正向验证 ==="
-ARCH_OUT="/tmp/plantuml-arch-smoke-test"
+ARCH_OUT="$TEST_TMP_ROOT/plantuml-arch-smoke-test"
 run_validate "$ARCH_OUT" \
   --diagram-type architecture \
   --brief "$ARCH_BRIEF" \
@@ -206,7 +208,7 @@ fi
 # Step 6: Architecture 负向验证（缺组件/缺流程）
 # =============================================================================
 echo "=== Step 6: Architecture 负向验证 ==="
-ARCH_NEG_OUT="/tmp/plantuml-arch-neg-test"
+ARCH_NEG_OUT="$TEST_TMP_ROOT/plantuml-arch-neg-test"
 rm -rf "$ARCH_NEG_OUT"
 
 if bash "$RUNTIME_DIR/validate_package.sh" \
@@ -232,7 +234,7 @@ fi
 # Step 7: Sequence 正向验证
 # =============================================================================
 echo "=== Step 7: Sequence 正向验证 ==="
-SEQ_OUT="/tmp/plantuml-seq-smoke-test"
+SEQ_OUT="$TEST_TMP_ROOT/plantuml-seq-smoke-test"
 run_validate "$SEQ_OUT" \
   --diagram-type sequence \
   --brief "$SEQ_BRIEF" \
@@ -254,7 +256,7 @@ fi
 # Step 8: Sequence 负向验证（额外消息/缺 separator）
 # =============================================================================
 echo "=== Step 8: Sequence 负向验证 ==="
-SEQ_NEG_EXTRA="/tmp/plantuml-seq-neg-extra-test"
+SEQ_NEG_EXTRA="$TEST_TMP_ROOT/plantuml-seq-neg-extra-test"
 rm -rf "$SEQ_NEG_EXTRA"
 
 if bash "$RUNTIME_DIR/validate_package.sh" \
@@ -272,7 +274,7 @@ else
   fi
 fi
 
-SEQ_NEG_SEP="/tmp/plantuml-seq-neg-sep-test"
+SEQ_NEG_SEP="$TEST_TMP_ROOT/plantuml-seq-neg-sep-test"
 rm -rf "$SEQ_NEG_SEP"
 
 if bash "$RUNTIME_DIR/validate_package.sh" \
@@ -301,9 +303,9 @@ for spec in \
   "deployment|$DEPLOYMENT_BRIEF|$DEPLOYMENT_DIAGRAM" \
   "sequence|$SEQ_S_BRIEF|$SEQ_S_DIAGRAM"; do
   IFS='|' read -r profile brief diagram <<< "$spec"
-  out_dir="/tmp/plantuml-${profile}-v2-smoke-test"
-  [[ "$brief" == "$SEQ_S_BRIEF" ]] && out_dir="/tmp/plantuml-sequence-process-s-smoke-test"
-  [[ "$brief" == "$ACTIVITY_BRANCH_BRIEF" ]] && out_dir="/tmp/plantuml-activity-branch-smoke-test"
+  out_dir="$TEST_TMP_ROOT/plantuml-${profile}-v2-smoke-test"
+  [[ "$brief" == "$SEQ_S_BRIEF" ]] && out_dir="$TEST_TMP_ROOT/plantuml-sequence-process-s-smoke-test"
+  [[ "$brief" == "$ACTIVITY_BRANCH_BRIEF" ]] && out_dir="$TEST_TMP_ROOT/plantuml-activity-branch-smoke-test"
   run_validate "$out_dir" --diagram-type "$profile" --brief "$brief" --diagram "$diagram"
   if [[ -f "$out_dir/validation.json" ]]; then
     check_json_field "$out_dir/validation.json" schema_version "1.2" "$profile schema_version"
@@ -324,7 +326,7 @@ else
   pass "process_s 混用 M/R 正确拦截"
 fi
 
-UNLABELED_COMPONENT="/tmp/plantuml-component-unlabeled.puml"
+UNLABELED_COMPONENT="$TEST_TMP_ROOT/plantuml-component-unlabeled.puml"
 sed -E 's/[[:space:]]*:[[:space:]]*E[1-9][0-9]*[[:space:]]*$//' "$COMPONENT_DIAGRAM" > "$UNLABELED_COMPONENT"
 if python3 "$RUNTIME_DIR/check_coverage.py" --type component --brief "$COMPONENT_BRIEF" \
   --diagram "$UNLABELED_COMPONENT" >/dev/null 2>&1; then
@@ -333,7 +335,7 @@ else
   fail "component 无文字关系应被允许"
 fi
 
-PROCESS_S_AUTONUMBER="/tmp/plantuml-process-s-autonumber.puml"
+PROCESS_S_AUTONUMBER="$TEST_TMP_ROOT/plantuml-process-s-autonumber.puml"
 awk '{print} /skinparam ranksep/ {print "autonumber"}' "$SEQ_S_DIAGRAM" > "$PROCESS_S_AUTONUMBER"
 if bash "$RUNTIME_DIR/lint_layout.sh" --type sequence "$PROCESS_S_AUTONUMBER" "$SEQ_S_BRIEF" >/dev/null 2>&1; then
   fail "process_s autonumber 应被拦截"
@@ -390,7 +392,7 @@ else
 fi
 
 # 未注册图型只能进入 fallback，不得跳过 typed schema 后伪装成 typed profile。
-UNKNOWN_OUT="/tmp/plantuml-unknown-fallback-test"
+UNKNOWN_OUT="$TEST_TMP_ROOT/plantuml-unknown-fallback-test"
 run_validate "$UNKNOWN_OUT" --diagram-type class --diagram "$FALLBACK_DIAGRAM"
 if [[ -f "$UNKNOWN_OUT/validation.json" ]]; then
   check_json_field "$UNKNOWN_OUT/validation.json" diagram_type "class" "保留请求图型"
@@ -401,7 +403,7 @@ else
 fi
 
 # v1.2 hash 合同必须可复核，任一 artifact 被篡改都失败。
-HASH_OUT="/tmp/plantuml-component-v2-smoke-test"
+HASH_OUT="$TEST_TMP_ROOT/plantuml-component-v2-smoke-test"
 if python3 - "$HASH_OUT/validation.json" <<'PY' >/dev/null 2>&1
 import json
 import sys
@@ -462,7 +464,7 @@ else
 fi
 
 # 完全未变且通过当前合同的图包可显式复用，且不得再次访问 renderer。
-CACHE_OUT="$(mktemp -d /tmp/plantuml-cache-hit.XXXXXX)"
+CACHE_OUT="$(mktemp -d "$TEST_TMP_ROOT/plantuml-cache-hit.XXXXXX")"
 python3 - "$CACHE_OUT" "$TEST_DIR" <<'PY'
 import sys
 from pathlib import Path
@@ -477,7 +479,7 @@ if bash "$RUNTIME_DIR/validate_package.sh" \
   --diagram "$CACHE_OUT/diagram.puml" \
   --out-dir "$CACHE_OUT" \
   --reuse-valid-package >"$CACHE_LOG" 2>&1 \
-  && rg -q '^cache_hit=true$' "$CACHE_LOG"; then
+  && grep -Eq '^cache_hit=true$' "$CACHE_LOG"; then
   if python3 - "$CACHE_OUT/validation.json" <<'PY'
 import json
 import sys
@@ -503,7 +505,7 @@ else
 fi
 
 # renderer 缺失时不得复用旧 SVG 或写出 success。
-MISSING_RENDER_ROOT="$(mktemp -d /tmp/plantuml-missing-render.XXXXXX)"
+MISSING_RENDER_ROOT="$(mktemp -d "$TEST_TMP_ROOT/plantuml-missing-render.XXXXXX")"
 mkdir -p "$MISSING_RENDER_ROOT/scripts" "$MISSING_RENDER_ROOT/out"
 cp "$RUNTIME_DIR/validate_package.sh" "$MISSING_RENDER_ROOT/scripts/validate_package.sh"
 cp "$RUNTIME_DIR/validate_package.py" "$MISSING_RENDER_ROOT/scripts/validate_package.py"
@@ -538,7 +540,7 @@ fi
 # Step 11: 唯一入口与已删除兼容 skill
 # =============================================================================
 echo "=== Step 11: 唯一入口 ==="
-if rg -q 'fallback' "$SKILL_DIR/SKILL.md"; then
+if grep -Eq 'fallback' "$SKILL_DIR/SKILL.md"; then
   pass "SKILL.md 包含 fallback"
 else
   fail "SKILL.md 缺少 fallback"

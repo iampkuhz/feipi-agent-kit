@@ -500,7 +500,7 @@ log_indicates_auth_issue() {
   case "$(yt_common_last_stage "$log_file")" in
     audio_conversion|transcription|text_conversion) return 1 ;;
   esac
-  rg -aqi \
+  grep -Eqi \
     "Sign in to confirm|confirm you're not a bot|HTTP Error 429|Subtitles are only available when logged in|检测到可能的 YouTube bot/风控拦截|检测到可能需要登录态|检测到带认证请求失败|cookies-from-browser|AGENT_YOUTUBE_COOKIE_FILE 指向的文件不存在|AGENT_YOUTUBE_COOKIE_FILE 不可读" \
     "$log_file"
 }
@@ -553,7 +553,7 @@ report_bilibili_network_failure() {
 
   for log_file in "${expected_logs[@]}"; do
     [[ -f "$log_file" ]] || continue
-    if rg -q '^diagnostic_code=bilibili_network_preflight_failed$' "$log_file"; then
+    if grep -Eq '^diagnostic_code=bilibili_network_preflight_failed$' "$log_file"; then
       diagnostic_count=$((diagnostic_count + 1))
       if [[ -z "$first_diagnostic_log" ]]; then
         first_diagnostic_log="$log_file"
@@ -572,7 +572,7 @@ report_bilibili_network_failure() {
   else
     echo "failure_scope=mixed_failures" >&2
   fi
-  rg '^(diagnostic_code|direct_probe|proxy_url|proxy_port_state|retry_action)=' "$first_diagnostic_log" >&2
+  grep -E '^(diagnostic_code|direct_probe|proxy_url|proxy_port_state|retry_action)=' "$first_diagnostic_log" >&2
 }
 
 TEXT_FILE=""

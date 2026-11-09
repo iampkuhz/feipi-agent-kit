@@ -178,9 +178,16 @@ async function runPipeline(input, outputDir, options = {}) {
   return report;
 }
 
-function commandExists(command) {
-  try { execFileSync('/usr/bin/which', [command], { stdio: 'ignore' }); return true; }
-  catch { return false; }
+function findCommand(command) {
+  const pathEntries = (process.env.PATH || '').split(path.delimiter).filter(Boolean);
+  for (const entry of pathEntries) {
+    const candidate = path.join(entry, command);
+    try {
+      fs.accessSync(candidate, fs.constants.X_OK);
+      return candidate;
+    } catch {}
+  }
+  return null;
 }
 
 function renderPptxEvidence(pptxPath, outputDir) {
@@ -188,12 +195,14 @@ function renderPptxEvidence(pptxPath, outputDir) {
   let renderer = 'none';
   const issues = [];
   try {
-    if (os.platform() === 'darwin' && commandExists('qlmanage')) {
+    const quickLook = os.platform() === 'darwin' ? findCommand('qlmanage') : null;
+    const soffice = findCommand('soffice');
+    if (quickLook) {
       renderer = 'quicklook-coretext';
-      execFileSync('/usr/bin/qlmanage', ['-t', '-s', '1800', '-o', outputDir, pptxPath], { stdio: 'pipe', timeout: 60000 });
-    } else if (commandExists('soffice')) {
+      execFileSync(quickLook, ['-t', '-s', '1800', '-o', outputDir, pptxPath], { stdio: 'pipe', timeout: 60000 });
+    } else if (soffice) {
       renderer = 'libreoffice-compatibility';
-      execFileSync('soffice', ['--headless', '--convert-to', 'png', '--outdir', outputDir, pptxPath], { stdio: 'pipe', timeout: 60000 });
+      execFileSync(soffice, ['--headless', '--convert-to', 'png', '--outdir', outputDir, pptxPath], { stdio: 'pipe', timeout: 60000 });
     }
   } catch (error) {
     issues.push({ severity: 'hard_fail', type: 'render_failed', message: error.message });
@@ -221,4 +230,4 @@ function writeJson(filePath, data) {
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2) + '\n', 'utf-8');
 }
 
-module.exports = { runPipeline, writeJson, deriveQAStrategy, normalizeMode, renderPptxEvidence, hashIR };
+module.exports = { runPipeline, writeJson, deriveQAStrategy, normalizeMode, renderPptxEvidence, hashIR, findCommand };

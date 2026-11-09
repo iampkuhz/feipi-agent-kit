@@ -259,7 +259,7 @@ while IFS= read -r raw || [[ -n "$raw" ]]; do
         continue
       fi
 
-      if ! rg -q '^- \[[0-9]{2}:[0-9]{2}(:[0-9]{2})?\] ' "$text_path"; then
+      if ! grep -Eq '^- \[[0-9]{2}:[0-9]{2}(:[0-9]{2})?\] ' "$text_path"; then
         echo "[FAIL] $case_id 文本不含时间戳" >&2
         echo "日志: $log_file" >&2
         FAILED=$((FAILED + 1))
@@ -295,7 +295,7 @@ while IFS= read -r raw || [[ -n "$raw" ]]; do
         continue
       fi
 
-      if ! rg -q '^## 摘要概述$' "$summary_request" || ! rg -q '^## 附件$' "$summary_request"; then
+      if ! grep -Eq '^## 摘要概述$' "$summary_request" || ! grep -Eq '^## 附件$' "$summary_request"; then
         echo "[FAIL] $case_id 摘要请求包缺少结构约束" >&2
         echo "日志: $log_file" >&2
         FAILED=$((FAILED + 1))
@@ -319,7 +319,7 @@ while IFS= read -r raw || [[ -n "$raw" ]]; do
         continue
       fi
 
-      if ! rg -q '## 相关影响和背景分析' "$background_expand" || ! rg -q '背景知识补充（约2/3）' "$background_expand"; then
+      if ! grep -Eq '## 相关影响和背景分析' "$background_expand" || ! grep -Eq '背景知识补充（约2/3）' "$background_expand"; then
         echo "[FAIL] $case_id expand 背景请求包缺少章节结构" >&2
         echo "日志: $log_file" >&2
         FAILED=$((FAILED + 1))
@@ -340,7 +340,7 @@ while IFS= read -r raw || [[ -n "$raw" ]]; do
         continue
       fi
 
-      if ! rg -q '## 上下文背景' "$background_only" || ! rg -q '关键背景脉络' "$background_only"; then
+      if ! grep -Eq '## 上下文背景' "$background_only" || ! grep -Eq '关键背景脉络' "$background_only"; then
         echo "[FAIL] $case_id background-only 请求包缺少章节结构" >&2
         echo "日志: $log_file" >&2
         FAILED=$((FAILED + 1))
@@ -422,7 +422,7 @@ fi
 # 5. 普通无字幕日志不触发认证/可重试错误
 write_mock_log "err-no-subtitle" "There are no subtitles for the requested languages
 [SubtitlesConvertor] There aren't any subtitles to convert"
-if rg -qi "Sign in to confirm|confirm you're not a bot|HTTP Error 429|403 Forbidden|Subtitles are only available when logged in" "$STUB_DIR/err-no-subtitle.log"; then
+if grep -Eqi "Sign in to confirm|confirm you're not a bot|HTTP Error 429|403 Forbidden|Subtitles are only available when logged in" "$STUB_DIR/err-no-subtitle.log"; then
   stub_fail_msg "no-subtitle-not-auth" "普通无字幕被误判为认证问题"
 else
   stub_pass "no-subtitle-not-auth"
@@ -453,7 +453,7 @@ run_simple_case "pause-split-contract" pass python3 "$SCRIPT_DIR/test_split_audi
 
 # 测试 8：download_youtube.sh 的 auto 不再因为时长切 accurate
 YOUTUBE_SCRIPT="$RUNTIME_DIR/download_youtube.sh"
-if rg -q 'auto_duration_short' "$YOUTUBE_SCRIPT"; then
+if grep -Eq 'auto_duration_short' "$YOUTUBE_SCRIPT"; then
   stub_fail_msg "yt-no-duration-accurate" "download_youtube.sh 仍存在 auto_duration_short 逻辑"
 else
   stub_pass "yt-no-duration-accurate"
@@ -461,7 +461,7 @@ fi
 
 # 测试 9：download_bilibili.sh 的 auto 不再因为时长切 accurate
 BILIBILI_SCRIPT="$RUNTIME_DIR/download_bilibili.sh"
-if rg -q 'auto_duration_short' "$BILIBILI_SCRIPT"; then
+if grep -Eq 'auto_duration_short' "$BILIBILI_SCRIPT"; then
   stub_fail_msg "bili-no-duration-accurate" "download_bilibili.sh 仍存在 auto_duration_short 逻辑"
 else
   stub_pass "bili-no-duration-accurate"
@@ -492,7 +492,7 @@ fi
 
 # 测试 11c：format fallback 最多 2 个 format_variants
 YT_COMMON_LIB="$RUNTIME_DIR/lib/yt_dlp_common.sh"
-format_count="$(rg 'format_variants=' "$YT_COMMON_LIB" | wc -l | tr -d ' ')"
+format_count="$(grep -E 'format_variants=' "$YT_COMMON_LIB" | wc -l | tr -d ' ')"
 if [[ "$format_count" -le 2 && "$format_count" -gt 0 ]]; then
   stub_pass "format-fallback-max-2"
 else
@@ -501,7 +501,7 @@ fi
 
 # 测试 11d：extract_video_text.sh 的 MAX_MODE_CALLS 存在
 EXTRACT_SCRIPT="$RUNTIME_DIR/extract_video_text.sh"
-if rg -q 'MAX_MODE_CALLS=[0-9]+' "$EXTRACT_SCRIPT"; then
+if grep -Eq 'MAX_MODE_CALLS=[0-9]+' "$EXTRACT_SCRIPT"; then
   max_calls="$(sed -n 's/^MAX_MODE_CALLS=//p' "$EXTRACT_SCRIPT" | head -n1)"
   if [[ "$max_calls" -le 4 ]]; then
     stub_pass "extract-max-mode-calls"
@@ -513,18 +513,18 @@ else
 fi
 
 # 测试 11e：网络探测状态文件缓存逻辑存在
-if rg -q '\.network-ready' "$YOUTUBE_SCRIPT" && rg -q '\.network-ready' "$BILIBILI_SCRIPT"; then
+if grep -Eq '\.network-ready' "$YOUTUBE_SCRIPT" && grep -Eq '\.network-ready' "$BILIBILI_SCRIPT"; then
   stub_pass "network-probe-cache"
 else
   stub_fail_msg "network-probe-cache" "缺少 .network-ready 缓存逻辑"
 fi
 
 # 测试 11e-1：Bilibili 网络失败必须输出可判别诊断，且不得拼装内部重试命令
-if rg -q 'diagnostic_code=bilibili_network_preflight_failed' "$BILIBILI_SCRIPT" \
-  && rg -q 'probe_unavailable' "$BILIBILI_SCRIPT" \
-  && rg -q 'retry_action=rerun_same_unified_command' "$BILIBILI_SCRIPT" \
-  && ! rg -q 'retry_cmd=.*download_bilibili\.sh' "$BILIBILI_SCRIPT" \
-  && rg -q 'report_bilibili_network_failure' "$EXTRACT_SCRIPT"; then
+if grep -Eq 'diagnostic_code=bilibili_network_preflight_failed' "$BILIBILI_SCRIPT" \
+  && grep -Eq 'probe_unavailable' "$BILIBILI_SCRIPT" \
+  && grep -Eq 'retry_action=rerun_same_unified_command' "$BILIBILI_SCRIPT" \
+  && ! grep -Eq 'retry_cmd=.*download_bilibili\.sh' "$BILIBILI_SCRIPT" \
+  && grep -Eq 'report_bilibili_network_failure' "$EXTRACT_SCRIPT"; then
   stub_pass "bili-network-diagnostic"
 else
   stub_fail_msg "bili-network-diagnostic" "Bilibili 网络诊断字段、端口未知状态或统一入口重试动作不完整"
@@ -561,9 +561,9 @@ run_bili_network_stub() {
 
 run_bili_network_stub "$STUB_DIR/bili-probe-unavailable" probe_unavailable_output probe_unavailable_code
 if [[ "$probe_unavailable_code" -eq 1 ]] \
-  && printf '%s\n' "$probe_unavailable_output" | rg -q '^proxy_port_state=probe_unavailable$' \
-  && printf '%s\n' "$probe_unavailable_output" | rg -q '^retry_action=rerun_same_unified_command$' \
-  && ! printf '%s\n' "$probe_unavailable_output" | rg -q 'download_bilibili\.sh|<实际监听端口>'; then
+  && printf '%s\n' "$probe_unavailable_output" | grep -Eq '^proxy_port_state=probe_unavailable$' \
+  && printf '%s\n' "$probe_unavailable_output" | grep -Eq '^retry_action=rerun_same_unified_command$' \
+  && ! printf '%s\n' "$probe_unavailable_output" | grep -Eq 'download_bilibili\.sh|<实际监听端口>'; then
   stub_pass "bili-proxy-probe-unavailable"
 else
   stub_fail_msg "bili-proxy-probe-unavailable" "检测工具缺失时未输出 probe_unavailable，或仍包含不可执行重试示例"
@@ -572,7 +572,7 @@ fi
 ln -s "$(type -P false)" "$BILI_NETWORK_BIN/nc"
 run_bili_network_stub "$STUB_DIR/bili-not-listening" not_listening_output not_listening_code
 if [[ "$not_listening_code" -eq 1 ]] \
-  && printf '%s\n' "$not_listening_output" | rg -q '^proxy_port_state=not_listening$'; then
+  && printf '%s\n' "$not_listening_output" | grep -Eq '^proxy_port_state=not_listening$'; then
   stub_pass "bili-proxy-not-listening"
 else
   stub_fail_msg "bili-proxy-not-listening" "端口关闭时未输出 not_listening"
@@ -582,7 +582,7 @@ rm -f "$BILI_NETWORK_BIN/nc"
 ln -s "$(type -P true)" "$BILI_NETWORK_BIN/nc"
 run_bili_network_stub "$STUB_DIR/bili-listening-probe-failed" listening_output listening_code
 if [[ "$listening_code" -eq 1 ]] \
-  && printf '%s\n' "$listening_output" | rg -q '^proxy_port_state=listening_but_probe_failed$'; then
+  && printf '%s\n' "$listening_output" | grep -Eq '^proxy_port_state=listening_but_probe_failed$'; then
   stub_pass "bili-proxy-listening-probe-failed"
 else
   stub_fail_msg "bili-proxy-listening-probe-failed" "端口监听但代理探测失败时状态不正确"
@@ -603,8 +603,8 @@ retry_action=rerun_same_unified_command'
   mkdir -p "$BILI_SINGLE_DIR"
   printf '%s\n' "$BILI_DIAGNOSTIC_CONTENT" > "$BILI_SINGLE_DIR/bilibili-subtitle.log"
   single_scope_output="$(report_bilibili_network_failure "$BILI_SINGLE_DIR" subtitle 2>&1)"
-  if printf '%s\n' "$single_scope_output" | rg -q '^failure_scope=network_preflight$' \
-    && ! printf '%s\n' "$single_scope_output" | rg -q '^failure_scope=shared_network_preflight$'; then
+  if printf '%s\n' "$single_scope_output" | grep -Eq '^failure_scope=network_preflight$' \
+    && ! printf '%s\n' "$single_scope_output" | grep -Eq '^failure_scope=shared_network_preflight$'; then
     stub_pass "bili-failure-scope-single"
   else
     stub_fail_msg "bili-failure-scope-single" "单模式网络失败范围标记不正确"
@@ -615,7 +615,7 @@ retry_action=rerun_same_unified_command'
   printf '%s\n' "$BILI_DIAGNOSTIC_CONTENT" > "$BILI_SHARED_DIR/bilibili-subtitle.log"
   printf '%s\n' "$BILI_DIAGNOSTIC_CONTENT" > "$BILI_SHARED_DIR/bilibili-whisper.log"
   shared_scope_output="$(report_bilibili_network_failure "$BILI_SHARED_DIR" auto 2>&1)"
-  if printf '%s\n' "$shared_scope_output" | rg -q '^failure_scope=shared_network_preflight$'; then
+  if printf '%s\n' "$shared_scope_output" | grep -Eq '^failure_scope=shared_network_preflight$'; then
     stub_pass "bili-failure-scope-shared"
   else
     stub_fail_msg "bili-failure-scope-shared" "双模式同因失败未标记为 shared_network_preflight"
@@ -626,7 +626,7 @@ retry_action=rerun_same_unified_command'
   printf '%s\n' "$BILI_DIAGNOSTIC_CONTENT" > "$BILI_MIXED_DIR/bilibili-subtitle.log"
   printf '%s\n' 'whisper_model_missing' > "$BILI_MIXED_DIR/bilibili-whisper.log"
   mixed_scope_output="$(report_bilibili_network_failure "$BILI_MIXED_DIR" auto 2>&1)"
-  if printf '%s\n' "$mixed_scope_output" | rg -q '^failure_scope=mixed_failures$'; then
+  if printf '%s\n' "$mixed_scope_output" | grep -Eq '^failure_scope=mixed_failures$'; then
     stub_pass "bili-failure-scope-mixed"
   else
     stub_fail_msg "bili-failure-scope-mixed" "不同失败原因被误标为共享网络失败"
@@ -646,7 +646,7 @@ retry_action=rerun_same_unified_command'
 fi
 
 # 测试 11f：client fallback 仅在 whisper 模式触发
-if rg -q 'MODE.*==.*whisper.*is_retryable' "$YOUTUBE_SCRIPT"; then
+if grep -Eq 'MODE.*==.*whisper.*is_retryable' "$YOUTUBE_SCRIPT"; then
   stub_pass "client-fallback-whisper-only"
 else
   stub_fail_msg "client-fallback-whisper-only" "client fallback 未限制仅在 whisper 模式触发"
@@ -655,23 +655,23 @@ fi
 # --- 测试 12（增强）：Agent 执行契约验证 ---
 
 # 测试 12a：SKILL.md 包含禁止额外 .srt 轮询的约束
-if rg -qi 'srt.*轮询|轮询.*srt|tail.*srt|后台.*srt|额外.*轮询|不要额外启动.*轮询' "$SKILL_DIR/SKILL.md"; then
+if grep -Eqi 'srt.*轮询|轮询.*srt|tail.*srt|后台.*srt|额外.*轮询|不要额外启动.*轮询' "$SKILL_DIR/SKILL.md"; then
   stub_pass "skill-no-srt-polling"
 else
   stub_fail_msg "skill-no-srt-polling" "SKILL.md 缺少禁止额外 .srt 轮询的约束"
 fi
 
 # 测试 12b：agents/openai.yaml 包含单命令阻塞执行约束
-if rg -qi '单前台.*阻塞|阻塞.*命令|不要.*轮询|不.*额外.*轮询|只运行.*阻塞' "$SKILL_DIR/agents/openai.yaml"; then
+if grep -Eqi '单前台.*阻塞|阻塞.*命令|不要.*轮询|不.*额外.*轮询|只运行.*阻塞' "$SKILL_DIR/agents/openai.yaml"; then
   stub_pass "openai-single-command"
 else
   stub_fail_msg "openai-single-command" "agents/openai.yaml 缺少单命令阻塞执行约束"
 fi
 
 # 测试 12b-1：Skill 与 Agent prompt 均要求先做网络权限复验，再判断代理
-if rg -q '网络权限.*重跑同一|提升后的网络权限.*重跑同一个' "$SKILL_DIR/SKILL.md" \
-  && rg -q '网络权限.*重跑同一' "$SKILL_DIR/agents/openai.yaml" \
-  && rg -q '禁止.*猜测.*7890.*7891' "$SKILL_DIR/SKILL.md"; then
+if grep -Eq '网络权限.*重跑同一|提升后的网络权限.*重跑同一个' "$SKILL_DIR/SKILL.md" \
+  && grep -Eq '网络权限.*重跑同一' "$SKILL_DIR/agents/openai.yaml" \
+  && grep -Eq '禁止.*猜测.*7890.*7891' "$SKILL_DIR/SKILL.md"; then
   stub_pass "bili-network-permission-retry"
 else
   stub_fail_msg "bili-network-permission-retry" "缺少权限复验优先或禁止猜测代理端口的执行契约"
@@ -679,7 +679,7 @@ fi
 
 # 测试 12c：输出包含关键状态字段
 for field in run_dir mode text_path log_dir whisper_profile; do
-  if ! rg -q "^echo \"$field=" "$EXTRACT_SCRIPT"; then
+  if ! grep -Eq "^echo \"$field=" "$EXTRACT_SCRIPT"; then
     stub_fail_msg "extract-output-fields" "extract_video_text.sh 未输出 $field 字段"
     break
   fi
@@ -690,14 +690,14 @@ if [[ $? -eq 0 ]]; then
 fi
 
 # 测试 12d：长视频保护输出
-if rg -q 'long_video=' "$EXTRACT_SCRIPT" && rg -q 'duration_sec=' "$EXTRACT_SCRIPT"; then
+if grep -Eq 'long_video=' "$EXTRACT_SCRIPT" && grep -Eq 'duration_sec=' "$EXTRACT_SCRIPT"; then
   stub_pass "long-video-protection"
 else
   stub_fail_msg "long-video-protection" "缺少 long_video 或 duration_sec 输出"
 fi
 
 # 测试 12e：残留 .whisper.wav 清理
-if rg -q 'whisper\.wav' "$YT_COMMON_LIB"; then
+if grep -Eq 'whisper\.wav' "$YT_COMMON_LIB"; then
   stub_pass "stale-wav-cleanup"
 else
   stub_fail_msg "stale-wav-cleanup" "缺少残留 .whisper.wav 清理逻辑"
@@ -764,7 +764,7 @@ yt_common_run_cmd() {
 YT_CURRENT_CLIENT_IDX=-1
 YT_CLIENT_TRIED=()
 
-run_with_client_fallbacks_test "/tmp/err" "https://youtube.com/watch?v=test" 2>/dev/null || true
+run_with_client_fallbacks_test "$ROOT_DIR/client-fallback.err" "https://youtube.com/watch?v=test" 2>/dev/null || true
 
 clients_tried=()
 while IFS= read -r c; do
@@ -795,7 +795,7 @@ if [[ "${AGENT_YOUTUBE_ENABLE_ANDROID_VR_FALLBACK:-0}" != "1" ]]; then
     return 1
   }
 
-  run_with_client_fallbacks_test "/tmp/err" "https://youtube.com/watch?v=test" 2>/dev/null || true
+  run_with_client_fallbacks_test "$ROOT_DIR/client-fallback-vr.err" "https://youtube.com/watch?v=test" 2>/dev/null || true
 
   clients_tried=()
   while IFS= read -r c; do
@@ -1116,7 +1116,7 @@ fi
 
 # --- 测试 6：SKILL.md 包含禁止额外 .srt 轮询的约束 ---
 SKILL_MD="$SKILL_DIR/SKILL.md"
-if rg -q '禁止额外.*轮询.*\.srt|禁止.*Wait for whisper srt|禁止.*tail.*-f|禁止额外启动.*轮询' "$SKILL_MD"; then
+if grep -Eq '禁止额外.*轮询.*\.srt|禁止.*Wait for whisper srt|禁止.*tail.*-f|禁止额外启动.*轮询' "$SKILL_MD"; then
   stub_pass "skill-prohibits-srt-polling"
 else
   stub_fail_msg "skill-prohibits-srt-polling" "SKILL.md 未找到禁止轮询 .srt 的约束"
@@ -1124,7 +1124,7 @@ fi
 
 # --- 测试 7：agents/openai.yaml 包含单命令阻塞执行约束 ---
 AGENT_YAML="$SKILL_DIR/agents/openai.yaml"
-if rg -q '单前台阻塞|不要额外启动后台轮询|不要重复启动 monitor|只运行单前台阻塞命令' "$AGENT_YAML"; then
+if grep -Eq '单前台阻塞|不要额外启动后台轮询|不要重复启动 monitor|只运行单前台阻塞命令' "$AGENT_YAML"; then
   stub_pass "agent-single-command-contract"
 else
   stub_fail_msg "agent-single-command-contract" "agents/openai.yaml 未找到单命令阻塞执行约束"
@@ -1134,7 +1134,7 @@ fi
 EXTRACT_SCRIPT="$SKILL_DIR/scripts/extract_video_text.sh"
 STATUS_FIELDS_OK=1
 for field in "run_dir=" "mode=" "text_path=" "log_dir=" "whisper_profile=" "duration_sec=" "long_video=" "estimated_risk="; do
-  if ! rg -q "echo.*${field}" "$EXTRACT_SCRIPT"; then
+  if ! grep -Eq "echo.*${field}" "$EXTRACT_SCRIPT"; then
     STATUS_FIELDS_OK=0
     stub_fail_msg "output-status-fields" "extract_video_text.sh 未输出字段: $field"
     break
@@ -1146,13 +1146,13 @@ fi
 
 # --- 测试 9：残留 .whisper.wav 不会被误删 ---
 WHISPER_HELPER="$SKILL_DIR/scripts/lib/omlx_transcribe.sh"
-if rg -q 'rm -f.*out_dir.*\.whisper\.wav' "$SKILL_DIR/scripts/lib/yt_dlp_common.sh"; then
+if grep -Eq 'rm -f.*out_dir.*\.whisper\.wav' "$SKILL_DIR/scripts/lib/yt_dlp_common.sh"; then
   stub_fail_msg "no-aggressive-wav-cleanup" "yt_dlp_common.sh 仍存在通配符删除 .whisper.wav"
 else
   stub_pass "no-aggressive-wav-cleanup"
 fi
 
-if rg -q '复用已有.*whisper.*转写结果|existing_wav.*existing_srt' "$SKILL_DIR/scripts/lib/yt_dlp_common.sh"; then
+if grep -Eq '复用已有.*whisper.*转写结果|existing_wav.*existing_srt' "$SKILL_DIR/scripts/lib/yt_dlp_common.sh"; then
   stub_pass "whisper-reuse-residual"
 else
   stub_fail_msg "whisper-reuse-residual" "yt_dlp_common.sh 未找到复用已有转写结果的逻辑"
@@ -1162,14 +1162,14 @@ fi
 # accurate 不复用 fast 已由 omlx-asr-contract 实际执行公共流程与 HTTP 请求验证。
 
 # --- 测试 11：install_deps.sh 默认不要求 accurate 模型 ---
-if rg -q "REQUIRE_ACCURATE=0" "$SKILL_DIR/scripts/install_deps.sh"; then
+if grep -Eq "REQUIRE_ACCURATE=0" "$SKILL_DIR/scripts/install_deps.sh"; then
   stub_pass "install-deps-fast-default"
 else
   stub_fail_msg "install-deps-fast-default" "install_deps.sh 默认 REQUIRE_ACCURATE 不为 0"
 fi
 
 # --- 测试 12：长视频时长探测覆盖 auto 模式 ---
-if rg -q 'MODE.*==.*"whisper".*||.*MODE.*==.*"auto"' "$EXTRACT_SCRIPT"; then
+if grep -Fq '"$MODE" == "whisper" || "$MODE" == "auto"' "$EXTRACT_SCRIPT"; then
   stub_pass "duration-detect-auto"
 else
   stub_fail_msg "duration-detect-auto" "extract_video_text.sh 时长探测未覆盖 auto 模式"
@@ -1273,13 +1273,14 @@ fi
 # --- 测试 19：lint prompt contract 正例 ---
 if [[ -f "$LINT_PROMPT" && -f "$MOCK_DIR/no_timestamps.txt" ]]; then
   lint_prompt="$(bash "$SUMMARY_SCRIPT" "https://test" "测试" "300" "$MOCK_DIR/no_timestamps.txt" 80000 2>&1)"
-  echo "$lint_prompt" > /tmp/lint-test-prompt.md
-  if bash "$LINT_PROMPT" /tmp/lint-test-prompt.md > /dev/null 2>&1; then
+  lint_prompt_file="$ROOT_DIR/lint-test-prompt.md"
+  echo "$lint_prompt" > "$lint_prompt_file"
+  if bash "$LINT_PROMPT" "$lint_prompt_file" > /dev/null 2>&1; then
     stub_pass "lint-prompt-contract-valid"
   else
     stub_fail_msg "lint-prompt-contract-valid" "lint 正例失败"
   fi
-  rm -f /tmp/lint-test-prompt.md
+  rm -f "$lint_prompt_file"
 fi
 
 # --- 测试 20：lint summary result 正例/反例 ---

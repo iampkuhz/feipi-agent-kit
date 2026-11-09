@@ -41,12 +41,11 @@ bash tests/release_gate.sh --strict
 
 ## 输出
 
-- `tmp/ppt-skill-v2-run/release/default/release-report.md` — 默认模式可读报告
-- `tmp/ppt-skill-v2-run/release/default/release-report.json` — 默认模式结构化报告
-- `tmp/ppt-skill-v2-run/release/strict/release-report.md` — 严格模式可读报告
-- `tmp/ppt-skill-v2-run/release/strict/release-report.json` — 严格模式结构化报告
+- 默认目录为仓库 `tmp/ppt-skill-v2-run/release-default.<随机后缀>/`，其中包含可读报告、JSON 报告、日志和产物。
+- 严格模式使用独立的 `release-strict.<随机后缀>/` 目录。
+- 运行结束时会打印完整输出路径；设置 `FEIPI_PPT_RELEASE_OUTPUT_DIR` 可指定其他输出父目录。
 
-> default 和 strict 输出隔离到不同子目录，防止并发运行互相覆盖。
+> 每次运行创建新的独立目录，防止并发或重复运行互相覆盖。
 
 ## 缺依赖环境
 

@@ -11,11 +11,14 @@ INIT_SCRIPT="$SKILL_DIR/scripts/init_skill.sh"
 VALIDATE_SCRIPT="$SKILL_DIR/scripts/validate.sh"
 
 TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/feipi-skill-govern-test.XXXXXX")"
-REPO_FLAT_DIR="$REPO_ROOT/skills/feipi-video-read-youtube"
+REPO_FLAT_DIR="$REPO_ROOT/skills/feipi-video-read-youtube-flat-test-$$-$RANDOM"
+REPO_FLAT_DIR_CREATED=0
 
 cleanup() {
   rm -rf "$TMP_ROOT"
-  rm -rf "$REPO_FLAT_DIR"
+  if [[ "$REPO_FLAT_DIR_CREATED" -eq 1 ]]; then
+    rm -rf "$REPO_FLAT_DIR"
+  fi
 }
 trap cleanup EXIT
 
@@ -35,6 +38,7 @@ run_case() {
     "$SKILL_DIR/scripts/init_skill_internal.sh"
     "$SKILL_DIR/scripts/quick_validate_internal.sh"
     "$SKILL_DIR/scripts/validate.sh"
+    "$SKILL_DIR/scripts/check_portability.py"
     "$SKILL_DIR/references/naming-conventions.md"
     "$SKILL_DIR/references/skill-layering-policy.md"
     "$SKILL_DIR/references/workflow.md"
@@ -46,6 +50,7 @@ run_case() {
     "$SKILL_DIR/references/quality-checklist.md"
     "$SKILL_DIR/references/repo-constraints.md"
     "$SKILL_DIR/references/anti-patterns.md"
+    "$SKILL_DIR/tests/test_portability.py"
     "$SKILL_DIR/templates/SKILL.template.md"
     "$SKILL_DIR/templates/tests-run.template.sh"
     "$SKILL_DIR/evals/cases.json"
@@ -62,11 +67,27 @@ run_case() {
       [[ -d "$gen_dir/references" ]]
       [[ -d "$gen_dir/assets" ]]
       [[ -x "$gen_dir/tests/run.sh" ]]
-      ! rg -q 'make[[:space:]]+validate[[:space:]]+DIR=|make[[:space:]]+test[[:space:]]+SKILL=' "$gen_dir/SKILL.md"
-      ! rg -Fq '{{' "$gen_dir/SKILL.md" "$gen_dir/agents/openai.yaml" "$gen_dir/tests/run.sh"
-      ! rg -Fq '<skill-name>' "$gen_dir/SKILL.md" "$gen_dir/agents/openai.yaml" "$gen_dir/tests/run.sh"
+      ! grep -Eq 'make[[:space:]]+validate[[:space:]]+DIR=|make[[:space:]]+test[[:space:]]+SKILL=' "$gen_dir/SKILL.md"
+      ! grep -Fq '{{' "$gen_dir/SKILL.md" "$gen_dir/agents/openai.yaml" "$gen_dir/tests/run.sh"
+      ! grep -Fq '<skill-name>' "$gen_dir/SKILL.md" "$gen_dir/agents/openai.yaml" "$gen_dir/tests/run.sh"
       bash "$VALIDATE_SCRIPT" "$gen_dir" >/dev/null
       bash "$gen_dir/tests/run.sh" >/dev/null
+      ;;
+    reject-missing-option-value)
+      set +e
+      output="$(bash "$INIT_SCRIPT" video-read-youtube --layer 2>&1)"
+      code=$?
+      set -e
+      [[ "$code" -ne 0 ]]
+      grep -Fq -- "--layer 缺少参数值" <<<"$output"
+      ;;
+    reject-unsupported-layer)
+      set +e
+      output="$(bash "$INIT_SCRIPT" video-read-youtube --layer platform --target "$TMP_ROOT/platform" 2>&1)"
+      code=$?
+      set -e
+      [[ "$code" -ne 0 ]]
+      grep -Fq "不支持的 layer" <<<"$output"
       ;;
     reject-v1-name)
       set +e
@@ -110,8 +131,9 @@ run_case() {
     validate-detects-flat-repo-path)
       bash "$INIT_SCRIPT" "video-read-youtube" --layer integration --target "$TMP_ROOT/flat-source" >/dev/null
       gen_dir="$TMP_ROOT/flat-source/integration/feipi-video-read-youtube"
-      rm -rf "$REPO_FLAT_DIR"
+      [[ ! -e "$REPO_FLAT_DIR" ]]
       cp -R "$gen_dir" "$REPO_FLAT_DIR"
+      REPO_FLAT_DIR_CREATED=1
       set +e
       output="$(bash "$VALIDATE_SCRIPT" "$REPO_FLAT_DIR" 2>&1)"
       code=$?
@@ -130,13 +152,30 @@ run_case() {
           -name 'governance-report.template.md' -o \
           -name 'anti-pattern.template.md' \
         \) | grep -q .
-      ! rg -n 'assets/governance/' \
+      ! grep -En 'assets/governance/' \
         "$SKILL_DIR/SKILL.md" \
         "$SKILL_DIR/references/"*.md
       ;;
     legacy-rule-scan)
-      ! rg -n 'feipi-<action>-<target\.\.\.>|domain-action-object|prefix-domain-action-object' "${normative_files[@]}"
-      ! rg -n 'action 白名单|第二段固定|web：前端与页面|ops：运维与发布|automate：自动化流程' "${normative_files[@]}"
+      ! grep -En 'feipi-<action>-<target\.\.\.>|domain-action-object|prefix-domain-action-object' "${normative_files[@]}"
+      ! grep -En 'action 白名单|第二段固定|web：前端与页面|ops：运维与发布|automate：自动化流程' "${normative_files[@]}"
+      ;;
+    registry-validator-command-arguments)
+      python3 - "$REPO_ROOT/scripts/harness/validate_registry.py" <<'PY'
+import importlib.util
+import sys
+spec = importlib.util.spec_from_file_location("validate_registry", sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+command = "bash skills/authoring/feipi-skill-govern/scripts/validate.sh skills/authoring/feipi-health-maintain-family-records"
+expected = "skills/authoring/feipi-skill-govern/scripts/validate.sh"
+assert module.validation_script_path(command) == expected
+assert module.validation_script_path("bash 'path with spaces/validate.sh' --strict") == "path with spaces/validate.sh"
+assert module.validation_script_path("python3 -c 'print(1)'") == ""
+PY
+      ;;
+    portability-checker-tests)
+      python3 "$SKILL_DIR/tests/test_portability.py" >/dev/null
       ;;
     *)
       echo "未知测试项：$case_name" >&2
@@ -154,7 +193,11 @@ for case_name in \
   validate-detects-maintenance-command \
   validate-detects-flat-repo-path \
   governance-temp-artifacts-absent \
-  legacy-rule-scan
+  legacy-rule-scan \
+  reject-missing-option-value \
+  reject-unsupported-layer \
+  registry-validator-command-arguments \
+  portability-checker-tests
 do
   TOTAL=$((TOTAL + 1))
   if run_case "$case_name"; then

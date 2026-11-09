@@ -42,7 +42,7 @@ class ToolTests(unittest.TestCase):
         self.state = self.base / 'state.json'
         self.state.write_text(json.dumps({'engine': True, 'container': False, 'image': False, 'running': False}))
         self.calls = self.base / 'calls.jsonl'
-        self.env = {'PATH': f'{self.bin}:/usr/bin:/bin', 'HOME': str(self.base / 'home'),
+        self.env = {'PATH': f'{self.bin}{os.pathsep}{os.defpath}', 'HOME': str(self.base / 'home'),
                     'STATE': str(self.state), 'CALLS': str(self.calls), 'ARCHIVE': str(self.archive),
                     'http_proxy': 'http://127.0.0.1:1', 'https_proxy': 'http://127.0.0.1:1'}
         stub = f'''#!{sys.executable}
@@ -66,7 +66,7 @@ def done(code=0, output=''):
     print(output)
     sys.exit(code)
 if args[:3] == ['system','connection','list']:
-    done(output=json.dumps([{{'Default': True, 'URI': os.environ.get('CONNECTION', 'unix:///tmp/podman.sock')}}]))
+    done(output=json.dumps([{{'Default': True, 'URI': os.environ.get('CONNECTION', 'unix://' + str(pathlib.Path(os.environ['STATE']).with_name('podman.sock')))}}]))
 if args == ['info']:
     if not s['engine']:
         print('Error: connection refused', file=sys.stderr)
