@@ -55,6 +55,25 @@ class InstallOutputTests(unittest.TestCase):
         self.assertEqual(result.returncode == 0, success, result.stdout + result.stderr)
         return result
 
+    def env_without_executable(self, executable):
+        path_parts = []
+        for index, path_entry in enumerate(self.env["PATH"].split(os.pathsep)):
+            directory = Path(path_entry)
+            candidate = directory / executable
+            if candidate.is_file() and os.access(candidate, os.X_OK):
+                shadow = self.base / f"path-without-{executable}-{index}"
+                shadow.mkdir()
+                for item in directory.iterdir():
+                    if item.name == executable or not item.is_file() or not os.access(item, os.X_OK):
+                        continue
+                    (shadow / item.name).symlink_to(item)
+                path_parts.append(str(shadow))
+            else:
+                path_parts.append(path_entry)
+        env = dict(self.env, PATH=os.pathsep.join(path_parts))
+        self.assertIsNone(shutil.which(executable, path=env["PATH"]))
+        return env
+
     def assert_counts(self, output, added=0, updated=0, skipped=0, warnings=0):
         self.assertIn(f"总计：新增 {added} · 更新 {updated} · 跳过 {skipped} · 警告 {warnings}", output)
 
@@ -82,6 +101,16 @@ class InstallOutputTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('未注册', result.stderr)
         self.assertFalse(self.codex.exists())
+
+    def test_install_succeeds_without_ripgrep(self):
+        env = self.env_without_executable("rg")
+        result = subprocess.run(
+            ["make", "install-skills", "AGENT=codex"],
+            cwd=self.repo, env=env, text=True, capture_output=True, timeout=30,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue((self.codex / "skills/feipi-one/SKILL.md").is_file())
+        self.assertTrue((self.codex / "shared/resource.txt").is_file())
 
     def test_new_repeat_and_updated_entries(self):
         first = self.run_make("install-skills", "AGENT=codex")

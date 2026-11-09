@@ -256,9 +256,14 @@ collect_shared_roots() {
   local root_name=""
   local scan_root="${SELECTED_SKILL_PATH:-$SRC_ROOT}"
 
-  # rg 的 1 表示无匹配，是合法的空依赖列表；真正的扫描错误继续上抛。
-  { rg -o --no-filename '\$REPO_ROOT/[A-Za-z0-9._/-]+' "$scan_root" -g '*.sh' \
-      -g '!**/tests/**' -g '!**/evals/**' -g '!**/node_modules/**' || [[ "$?" -eq 1 ]]; } \
+  # 不依赖目标机器未必预装的 ripgrep，使用基础系统工具递归扫描脚本。
+  find "$scan_root" \
+    \( -type d \( -name tests -o -name evals -o -name node_modules \) -prune \) -o \
+    \( -type f -name '*.sh' -exec sh -c '
+      pattern=$1
+      shift
+      grep -hEo "$pattern" "$@" || [ "$?" -eq 1 ]
+    ' sh '\$REPO_ROOT/[A-Za-z0-9._/-]+' {} + \) \
     | sed -E 's#^\$REPO_ROOT/##' \
     | cut -d'/' -f1 \
     | sort -u \
