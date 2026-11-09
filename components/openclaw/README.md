@@ -37,11 +37,13 @@ make deploy
 
 微信使用腾讯官方 `@tencent-weixin/openclaw-weixin` 插件。部署后运行 `make weixin-login`，手机微信扫码确认，再向 ClawBot 发送“请只回复：微信接入成功”。扫码凭据保存在 `~/.env` 所在 vault；微信与 Telegram 私聊会话隔离。详细步骤及验收边界见[微信入口](handbook/deployment.md#10-微信入口)。
 
-Telegram 提供 `/housing` 和 `/growth`，没有 `housing_review`。成长日记的规则、文字、原始媒体单独放在 `/Users/zhehan/Documents/life/child-growth-diary`；使用方式见该目录 `README.md`。MCP 服务统一定义在 `openclaw.json#mcp.servers`。
+Telegram 提供 `/housing`、`/growth` 和 `/health`，没有 `housing_review`。成长日记的规则、文字、原始媒体单独放在 `/Users/zhehan/Documents/life/child-growth-diary`；使用方式见该目录 `README.md`。MCP 服务统一定义在 `openclaw.json#mcp.servers`。
 
 `/housing 装修 <原话和链接>` 先保存收件，再自动提取 B站视频或小红书视频/图文，补充摘要、关键词和可追溯证据。只保存链接、提取原文及必要图片/关键帧，不下载完整原视频；实际读取受限时回执明确报告部分完成或失败。资料保存在独立住宅装修库的 `00-Inbox` 和专属 `40-Assets/housing-<记录ID>/`，不进本配置仓库。`/housing 查找 灯带 散热` 查询记录及提取全文；`/housing 重新提取 <记录ID>` 重试，`/housing 复核 YYYY-MM` 只读汇总。三项 skill 的源码分别来自住宅装修库和 Agent Kit，由 `skill-list/` 安装，OpenClaw 只维护路由与安装声明。
 
 ### 成长日记接入与验收
+
+`/health` 定向使用 Agent Kit 中的 `feipi-health-maintain-family-records`，维护 `/Users/zhehan/Documents/life/家庭健康`。示例：`/health 更新奶奶头疼的进展：……`、`/health 归档这些体检报告`（附文件）、`/health 查询某成员历年报告`。照片说明或文件说明中带上命令，保留原消息与附件；持续事件在同一记录追加，监测数据按需记录。该入口走 Agent 读取 skill 并操作本地资料，不新增收件插件。源码修改后用工作台按 skill 定向实拷到 Codex/OpenClaw；配置 apply 并重启 Gateway 后生效。资料和来源只在健康库维护，不进本配置仓库。
 
 `feipi-growth-diary` 插件代码随独立成长资料库的 skill 安装，配置仅在本仓库 `openclaw.json` 声明。收件走 Gateway 官方 `before_dispatch` 接入点，先调用日记脚本保存原件，再独立分析图片或用本地 large-v3 转写。具体用法与原件限制维护在 `/Users/zhehan/Documents/life/child-growth-diary/README.md`。
 

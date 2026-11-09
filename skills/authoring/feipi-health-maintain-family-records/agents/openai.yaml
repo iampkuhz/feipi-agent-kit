@@ -1,0 +1,5 @@
+version: 1
+interface:
+  display_name: "家庭健康资料维护"
+  short_description: "整理全家体检与就医材料，按事件更新健康记录、问题进展和偶尔测量的数据"
+  default_prompt: "使用 $feipi-health-maintain-family-records，先读取家庭健康资料库规则和相关成员档案，再按我的要求查询或更新资料，保留原件、来源与核验范围。"

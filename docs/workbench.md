@@ -37,6 +37,17 @@ Mac 的 Podman VM 与桌面初始化是独立、有状态操作，按 `component
 
 `make install` 保留为兼容实拷安装命令；推荐有回退批次的 `workbench apply skills`。`make *-up/restart` 已转到运行副本，首次先 `apply services`。组件内部脚本是底层能力，不再作为日常源码挂载入口。
 
+## 单个 Skill 发布
+
+只更新一个客户端中的一个 skill，保留其他已安装入口及未发布源码：
+
+```bash
+./workbench apply skills --agent codex --skill feipi-health-maintain-family-records
+./workbench apply skills --agent openclaw --skill feipi-health-maintain-family-records
+```
+
+仍先验证完整注册表，再备份被选 skill 和直接共享依赖，随后实拷；不清理其他已退役入口。底层安装器也支持 `--skill <name>`，日常更新优先使用带备份的工作台。省略筛选参数时保持原有安装范围。
+
 ## 两个方向的具体场景
 
 Zsh 调好了别名：`diff mac` → 打开私有差异文件 → `capture mac --select zsh/.zsh_config/20-aliases.zsh` → 检查 Git diff → `develop mac test` → `apply mac`。回收只支持已列出的文件；新增配置文件先明确加入源码受管范围。

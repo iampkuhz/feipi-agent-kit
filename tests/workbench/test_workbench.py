@@ -11,6 +11,29 @@ spec.loader.exec_module(wb)
 
 
 class Recovery(unittest.TestCase):
+    def test_targeted_skill_publish_backs_up_only_selected_client_and_skill(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            name = 'feipi-test-maintain-records'
+            source = root/'skills/authoring'/name
+            (source/'scripts').mkdir(parents=True)
+            (source/'SKILL.md').write_text('fixture')
+            home = root/'home'
+            codex = home/'.codex'
+            with patch.object(wb, 'ROOT', root), patch.object(wb, 'HOME', home), \
+                 patch.dict(wb.os.environ, {'CODEX_HOME':str(codex)}), \
+                 patch.object(wb, 'mappings', return_value={}), patch.object(wb, 'backup', return_value=root/'backup') as backup, \
+                 patch.object(wb, 'run') as run, patch.object(wb, 'receipt'), patch('builtins.print'):
+                wb.apply('skills', agent='codex', skill=name)
+                backup.assert_called_once_with('skills', [codex/'skills'/name])
+                run.assert_called_once_with(['bash', root/'scripts/install_skills.sh', '--copy', '--agent', 'codex', '--skill', name])
+
+    def test_skill_selection_rejects_other_components_and_unsafe_names(self):
+        with self.assertRaisesRegex(ValueError, '只适用'):
+            wb.apply('mac', agent='codex')
+        with self.assertRaisesRegex(ValueError, '无效'):
+            wb.apply('skills', skill='../../escape')
+
     def test_multica_diff_detects_runtime_code_without_expanding_capture(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)

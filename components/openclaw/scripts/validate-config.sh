@@ -92,7 +92,7 @@ for runtime_root in "${runtime_roots[@]}"; do
 done
 
 jq -e '
-  (.channels.telegram.customCommands | map(.command)) == ["housing", "growth"]
+  (.channels.telegram.customCommands | map(.command)) == ["housing", "growth", "health"]
   and (.channels.telegram.direct["7026716907"].systemPrompt | contains("/housing"))
   and (.channels.telegram.direct["7026716907"].systemPrompt | contains("$feipi-housing-capture-inbox"))
   and (.channels.telegram.direct["7026716907"].systemPrompt | contains("$feipi-video-read-url"))
@@ -101,6 +101,9 @@ jq -e '
   and (.channels.telegram.direct["7026716907"].systemPrompt | contains("不下载完整原视频"))
   and (.channels.telegram.direct["7026716907"].systemPrompt | contains("$feipi-growth-record-diary"))
   and (.channels.telegram.direct["7026716907"].systemPrompt | contains("/Users/zhehan/Documents/life/child-growth-diary/AGENTS.md"))
+  and (.channels.telegram.direct["7026716907"].systemPrompt | contains("/health"))
+  and (.channels.telegram.direct["7026716907"].systemPrompt | contains("$feipi-health-maintain-family-records"))
+  and (.channels.telegram.direct["7026716907"].systemPrompt | contains("/Users/zhehan/Documents/life/家庭健康/AGENTS.md"))
   and (.agents | has("list") | not)
   and (.agents.entries.main.identity.name == "feipi_claw")
   and (.agents.defaults | has("workspace") | not)

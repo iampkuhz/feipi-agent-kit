@@ -58,6 +58,31 @@ class InstallOutputTests(unittest.TestCase):
     def assert_counts(self, output, added=0, updated=0, skipped=0, warnings=0):
         self.assertIn(f"总计：新增 {added} · 更新 {updated} · 跳过 {skipped} · 警告 {warnings}", output)
 
+    def test_single_skill_preserves_other_entries_and_skips_unrelated_dependencies(self):
+        self.run_make('install', 'AGENT=codex')
+        other = self.codex/'skills/feipi-two/SKILL.md'
+        other.write_text('local unpublished content')
+        stale = self.codex/'skills/feipi-retired'
+        stale.mkdir()
+        shutil.copy2(self.codex/'skills/feipi-one/.feipi-agent-kit-source', stale/'.feipi-agent-kit-source')
+        shutil.rmtree(self.codex/'shared')
+        (self.repo/'skills/integration/feipi-one/scripts/run.sh').write_text('# no shared dependency\n')
+        result = subprocess.run(['bash', 'scripts/install_skills.sh', '--agent', 'codex', '--copy', '--skill', 'feipi-one'],
+                                cwd=self.repo, env=self.env, text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+        self.assertEqual(other.read_text(), 'local unpublished content')
+        self.assertTrue(stale.exists())
+        self.assertFalse((self.codex/'shared').exists())
+        self.assertFalse(self.openclaw.exists())
+        self.assertNotIn('feipi-two', result.stdout)
+
+    def test_unknown_selected_skill_fails_before_target_creation(self):
+        result = subprocess.run(['bash', 'scripts/install_skills.sh', '--agent', 'codex', '--skill', 'missing'],
+                                cwd=self.repo, env=self.env, text=True, capture_output=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('未注册', result.stderr)
+        self.assertFalse(self.codex.exists())
+
     def test_new_repeat_and_updated_entries(self):
         first = self.run_make("install-links", "AGENT=codex")
         self.assert_counts(first.stdout, added=3)

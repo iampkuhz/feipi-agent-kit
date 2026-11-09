@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "name": "feipi-health-maintain-family-records",
+  "homepage": "https://github.com/iampkuhz/feipi-agent-kit/tree/main/skills/authoring/feipi-health-maintain-family-records",
+  "source": {
+    "type": "git-subdirectory",
+    "repository": "/Users/zhehan/Documents/tools/llm/feipi-agent-kit",
+    "ref": "main",
+    "path": "skills/authoring/feipi-health-maintain-family-records"
+  },
+  "setup": {
+    "useLocalWorkingTree": true
+  }
+}

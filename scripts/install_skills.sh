@@ -39,6 +39,7 @@ TARGET_DIR=""
 VERBOSE=false
 COLOR_MODE=auto
 COPY_USER=false
+SKILL_NAME=""
 
 # 在实际输出的文件描述符上判断 TTY，重定向的 stdout/stderr 不混入 ANSI。
 color_enabled() {
@@ -97,10 +98,11 @@ print_counts() {
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -h|--help)
-      echo "用法: $0 [--agent <name>] [--dir <path>] [--verbose] [--color auto|always|never]"
+      echo "用法: $0 [--agent <name>] [--skill <name>] [--dir <path>] [--verbose] [--color auto|always|never]"
       echo ""
       echo "选项:"
       echo "  --agent <name>  指定 agent 类型（codex | qwen | qoder | claudecode | openclaw）"
+      echo "  --skill <name>  只安装该 skill 及其直接共享依赖，不清理其他入口"
       echo "  --dir <path>    指定目标路径"
       echo "  --copy          用户级安装也使用实拷（日常工作台默认）；不随源码编辑变化"
       echo "  --verbose       显示逐项跳过、保留原因和验证详情"
@@ -133,6 +135,14 @@ while [[ $# -gt 0 ]]; do
         exit 1
       fi
       TARGET_DIR="$1"
+      ;;
+    --skill)
+      shift
+      if [[ $# -eq 0 || "$1" == -* || -n "$SKILL_NAME" ]]; then
+        status_line failed "--skill 需要一个名称，且不能重复。" >&2
+        exit 1
+      fi
+      SKILL_NAME="$1"
       ;;
     --verbose)
       VERBOSE=true
@@ -244,9 +254,10 @@ find_existing_agents() {
 
 collect_shared_roots() {
   local root_name=""
+  local scan_root="${SELECTED_SKILL_PATH:-$SRC_ROOT}"
 
   # rg 的 1 表示无匹配，是合法的空依赖列表；真正的扫描错误继续上抛。
-  { rg -o --no-filename '\$REPO_ROOT/[A-Za-z0-9._/-]+' "$SRC_ROOT" -g '*.sh' \
+  { rg -o --no-filename '\$REPO_ROOT/[A-Za-z0-9._/-]+' "$scan_root" -g '*.sh' \
       -g '!**/tests/**' -g '!**/evals/**' -g '!**/node_modules/**' || [[ "$?" -eq 1 ]]; } \
     | sed -E 's#^\$REPO_ROOT/##' \
     | cut -d'/' -f1 \
@@ -644,6 +655,22 @@ if ! validate_registry_consistency "$_tmp_skills_registry" "$_tmp_skills_collect
   exit 1
 fi
 
+# 完整注册表校验后再缩小安装范围；未知名称必须在任何目标写入前失败。
+SELECTED_SKILL_PATH=""
+if [[ -n "$SKILL_NAME" ]]; then
+  while IFS= read -r skill_path; do
+    if [[ "$(basename "$skill_path")" == "$SKILL_NAME" ]]; then
+      SELECTED_SKILL_PATH="$skill_path"
+      break
+    fi
+  done < "$_tmp_skills_collected"
+  if [[ -z "$SELECTED_SKILL_PATH" ]]; then
+    status_line failed "未注册的 skill：$SKILL_NAME" >&2
+    exit 1
+  fi
+  printf '%s\n' "$SELECTED_SKILL_PATH" > "$_tmp_skills_collected"
+fi
+
 # ===== 安装前汇总；明细随实际结果输出，避免重复技能清单 =====
 _skill_count="$(wc -l < "$_tmp_skills_collected" | tr -d ' ')"
 status_line passed "注册表及目录一致 · ${_skill_count} 个技能"
@@ -871,7 +898,7 @@ install_skills() {
     done < <(collect_all_skills "$SRC_ROOT")
   fi
 
-  if ! cleanup_retired_skills "$dest_root" "${skill_paths[@]}"; then
+  if [[ -z "$SKILL_NAME" ]] && ! cleanup_retired_skills "$dest_root" "${skill_paths[@]}"; then
     status_line failed "清理旧入口失败：$dest_root" >&2
     return 1
   fi

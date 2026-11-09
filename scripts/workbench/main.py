@@ -242,7 +242,16 @@ def receipt(component, pairs=None):
         'note': '包含未提交工作，以文件摘要为准；不代表真实功能验收通过。'})
 
 
-def apply(component):
+def apply(component, agent=None, skill=None):
+    if (agent or skill) and component != 'skills':
+        raise ValueError('--agent/--skill 只适用于 apply skills')
+    skill_args = []
+    if agent:
+        skill_args += ['--agent', agent]
+    if skill:
+        if not skill.startswith('feipi-') or any(c not in 'abcdefghijklmnopqrstuvwxyz0123456789-' for c in skill):
+            raise ValueError('无效 skill 名称')
+        skill_args += ['--skill', skill]
     if component == 'openclash':
         run(['python3', ROOT/'components/openclash/router.py', 'apply'])
         return
@@ -258,7 +267,39 @@ def apply(component):
                 raise ValueError('先合并现有目录再切换，未覆盖：' + str(path))
         paths = [RUNTIME/'mac', *links, *[t for _, t in desktop]]
     elif component == 'skills':
-        paths = [HOME/client/'skills' for client in ['.codex', '.claude', '.qwen', '.qoder', '.openclaw', '.agents'] if (HOME/client).is_dir()]
+        clients = {'codex': '.codex', 'claudecode': '.claude', 'qwen': '.qwen', 'qoder': '.qoder', 'openclaw': '.openclaw', '': '.agents'}
+        selected = [agent] if agent else list(clients)
+        roots = []
+        for name in selected:
+            if name == 'codex':
+                base = Path(os.environ.get('CODEX_HOME', str(HOME/'.codex')))
+            elif name == 'openclaw':
+                base = Path(os.environ.get('OPENCLAW_HOME', str(HOME/'.openclaw')))
+            else:
+                base = HOME/clients[name]
+            if agent or base.is_dir():
+                roots.append(base/'skills')
+        if not roots:
+            roots = [HOME/'.agents/skills']
+        paths = roots
+        if skill:
+            sources = list((ROOT/'skills').glob('*/'+skill))
+            if len(sources) != 1 or not (sources[0]/'SKILL.md').is_file():
+                raise ValueError('未找到唯一 skill：'+skill)
+            # 与安装器一致，只扫描被选 skill 的运行脚本中的直接共享依赖。
+            shared = set()
+            for script in sources[0].rglob('*.sh'):
+                if any(x in ('tests', 'evals', 'node_modules') for x in script.relative_to(sources[0]).parts):
+                    continue
+                for name in re.findall(r'\$REPO_ROOT/([A-Za-z0-9._-]+)', script.read_text()):
+                    if name != 'skills' and not name.startswith('.') and (ROOT/name).exists():
+                        shared.add(name)
+            paths = [p/skill for p in roots] + [p.parent/name for p in roots for name in sorted(shared)]
+        if agent or skill:
+            receipt_client = 'claude' if agent == 'claudecode' else agent
+            pairs = {name: pair for name, pair in pairs.items()
+                     if (not agent or name.split('/')[0] == receipt_client)
+                     and (not skill or name.split('/')[1] == skill)}
     elif component == 'services':
         paths = [RUNTIME/'services', PRIVATE/'services/crawl4ai.env']
     elif component == 'multica':
@@ -288,7 +329,7 @@ def apply(component):
                     target.unlink()
                 shutil.copy2(src, target)
         elif component == 'skills':
-            run(['bash', ROOT/'scripts/install_skills.sh', '--copy'])
+            run(['bash', ROOT/'scripts/install_skills.sh', '--copy', *skill_args])
         elif component == 'services':
             # 一次性收纳旧的忽略文件；后续以 HOME 私有副本为准，发布源码不会删除它。
             old_env = ROOT/'tools/crawl/crawl4ai/env/.env.local'
@@ -445,6 +486,9 @@ def main():
                             nargs='?' if action == 'doctor' else None, default='all')
         if action == 'capture':
             parser.add_argument('--select', action='append', default=[])
+        if action == 'apply':
+            parser.add_argument('--agent', choices=('codex', 'claudecode', 'qwen', 'qoder', 'openclaw'))
+            parser.add_argument('--skill')
     parser = sub.add_parser('restore'); parser.add_argument('batch')
     parser = sub.add_parser('service'); parser.add_argument('component'); parser.add_argument('args', nargs=argparse.REMAINDER)
     parser = sub.add_parser('private'); parser.add_argument('args', nargs=argparse.REMAINDER)
@@ -477,7 +521,7 @@ def main():
     elif a.action == 'capture':
         capture(a.component, a.select)
     elif a.action == 'apply':
-        apply(a.component)
+        apply(a.component, a.agent, a.skill)
     elif a.action == 'install':
         install(a.component)
     elif a.action == 'restore':

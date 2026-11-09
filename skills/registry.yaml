@@ -35,6 +35,17 @@ skills:
     validation: null
     status: stable
 
+  - name: feipi-health-maintain-family-records
+    path: skills/authoring/feipi-health-maintain-family-records
+    layer: authoring
+    description: 家庭健康资料归档、事件维护、问题跟踪与按需监测
+    clients: [codex, openclaw]
+    entry: SKILL.md
+    validation:
+      type: script
+      command: bash skills/authoring/feipi-skill-govern/scripts/validate.sh skills/authoring/feipi-health-maintain-family-records
+    status: stable
+
   # --- diagram layer ---
   - name: feipi-drawio-generate-diagram
     path: skills/diagram/feipi-drawio-generate-diagram
