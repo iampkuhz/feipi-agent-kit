@@ -63,7 +63,6 @@ feipi-<domain>-<action>-<object...>
 - `feipi-video-automate-summary`
 
 更合理的命名方向：
-- `feipi-dingtalk-send-webhook`
 - `feipi-openclaw-configure-runtime`
 - `feipi-video-summarize-url`
 
@@ -94,7 +93,6 @@ feipi-<domain>-<action>-<object...>
 - `feipi-video-read-url`
 - `feipi-video-summarize-url`
 - `feipi-plantuml-generate-diagram`
-- `feipi-dingtalk-send-webhook`
 - `feipi-openclaw-configure-runtime`
 - `feipi-report-generate-brief`
 

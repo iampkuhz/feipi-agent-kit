@@ -16,8 +16,6 @@ declare -a STALE_PATH_MAP=(
   "tools/search/searxng-mcp|已退役（请删除或标注[历史]）"
   "skills/feipi-plantuml-diagram/|skills/authoring/feipi-plantuml-generate-*/"
   "skills/feipi-video-read-url/|skills/authoring/feipi-video-read-url/"
-  "feipi-automate-dingtalk-webhook|feipi-dingtalk-send-webhook"
-  "feipi-web-dingtalk-webhook|feipi-dingtalk-send-webhook"
 )
 
 # --- 1. 死链检测：扫描 .md 文件中的相对路径引用 ---

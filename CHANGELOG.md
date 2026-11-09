@@ -1,6 +1,7 @@
 # 变更记录
 
 ## 2026-11-09
+- feipi-dingtalk-send-webhook v6：移出技能及分发清单
 - Makefile skills 安装目标统一命名为 `install-skills`；`install-links` 保留为兼容别名
 
 ## 2026-11-06

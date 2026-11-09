@@ -90,17 +90,6 @@ skills:
     validation: null
     status: stable
 
-  - name: feipi-dingtalk-send-webhook
-    path: skills/integration/feipi-dingtalk-send-webhook
-    layer: integration
-    description: 钉钉群机器人 webhook 消息发送
-    clients: [claude, codex]
-    entry: SKILL.md
-    validation:
-      type: script
-      command: bash skills/integration/feipi-dingtalk-send-webhook/scripts/validate.sh
-    status: compatibility
-
   - name: feipi-video-read-url
     path: skills/integration/feipi-video-read-url
     layer: integration
