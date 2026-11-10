@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""从当前目录定位 Multica 项目，按需读取任务，显式启用仓库协作。"""
+"""查询 Multica 项目与任务，定位并显式启用仓库协作。"""
 import argparse
 import json
 import os
 from pathlib import Path
 import re
+import shutil
 import stat
 import subprocess
 import sys
@@ -54,7 +55,11 @@ def cli(config, *args):
     if not in_task():
         env['MULTICA_PERSONAL_PROFILE'] = config['profile']
     command = os.environ.get('MULTICA_TASK_CLI', str(Path.home() / '.local/bin/multica-task'))
-    result = subprocess.run([command, *map(str, args), '--output', 'json'],
+    return run_json([command], args, env)
+
+
+def run_json(command, args, env=None):
+    result = subprocess.run([*command, *map(str, args), '--output', 'json'],
                             capture_output=True, text=True, env=env, timeout=30)
     if result.returncode:
         # 原始错误可能含服务端正文，不转抄凭据或未知输出。
@@ -115,7 +120,7 @@ def locate(config, directory, key=None):
             'enabled': keys == [name]}
 
 
-def context(config, directory, key=None):
+def bound_project(config, directory, key=None):
     value = locate(config, directory, key)
     # 检查当前 CLI 工作区，而非仅证明能够读取另一个指定工作区。
     workspace = cli(config, 'workspace', 'get')
@@ -127,32 +132,107 @@ def context(config, directory, key=None):
     value.update(workspace_id=workspace['id'], project_title=project.get('title'),
                  workspace_url=config['app_url'].rstrip('/') + '/' + quote(workspace['slug'], safe=''))
     value['project_url'] = value['workspace_url'] + '/projects/' + quote(value['project_id'], safe='')
+    if not in_task():
+        value['profile'] = config['profile']
     value['notice'] = '项目身份已核实；复用以上 ID/URL，不为定位项目扫描客户端、会话、记忆或凭据目录。主动协作仍须遵守仓库限定的客户端和工作范围。'
-    return value
+    return value, project
 
 
-def issue_summary(ctx, issue):
-    if issue.get('project_id') != ctx['project_id'] or issue.get('workspace_id') != ctx['workspace_id']:
-        raise ContextError('Issue 不属于当前项目或工作区；拒绝关联。')
-    result = {k: issue.get(k) for k in ('id', 'identifier', 'title', 'status', 'assignee_id', 'parent_issue_id', 'updated_at')}
-    result['url'] = ctx['workspace_url'] + '/issues/' + quote(issue['id'], safe='')
+def context(config, directory, key=None):
+    return bound_project(config, directory, key)[0]
+
+
+def native_workspace(profile, workspace_id):
+    if in_task():
+        raise ContextError('后台任务只可通过当前目录绑定查看项目；不能使用个人工作区入口。')
+    binary = os.environ.get('MULTICA_CLI_BIN') or shutil.which('multica')
+    if not binary:
+        raise ContextError('找不到 multica；安装 CLI 并加入 PATH，或设置现有 MULTICA_CLI_BIN。')
+    command = [binary] + (['--profile', profile] if profile else [])
+    if workspace_id:
+        command += ['--workspace-id', workspace_id]
+    workspace = run_json(command, ('workspace', 'get'))
+    if not isinstance(workspace, dict) or not workspace.get('id') or (workspace_id and workspace['id'] != workspace_id):
+        raise ContextError('无法核实所选工作区的身份。')
+    workspace = {k: workspace.get(k) for k in ('id', 'name', 'slug')}
+    pinned = [binary] + (['--profile', profile] if profile else []) + ['--workspace-id', workspace['id']]
+    return workspace, lambda *args: run_json(pinned, args)
+
+
+PROJECT_FIELDS = ('id', 'title', 'status', 'lead_id', 'lead_type', 'start_date',
+                  'due_date', 'issue_count', 'done_count', 'resource_count', 'updated_at')
+
+
+def project_summary(item, workspace_id, project_id=None):
+    if (not isinstance(item, dict) or not item.get('id') or item.get('workspace_id') != workspace_id
+            or (project_id is not None and item['id'] != project_id)):
+        raise ContextError('服务端返回的项目身份与请求范围不一致。')
+    return {k: item.get(k) for k in PROJECT_FIELDS}
+
+
+def catalog(workspace, query, status=None):
+    args = ('--status', status) if status else ()
+    rows = query('project', 'list', *args)
+    if not isinstance(rows, list):
+        raise ContextError('原生 CLI 没有返回预期的项目清单。')
+    return {'workspace': workspace, 'projects': [project_summary(p, workspace['id']) for p in rows]}
+
+
+def overview(ctx, item, query, limit, offset, status, resources, full_description):
+    summary = project_summary(item, ctx['workspace_id'], ctx['project_id'])
+    summary['description'], summary['description_truncated'] = clip(
+        item.get('description'), sys.maxsize if full_description else 1600)
+    if ctx.get('project_url'):
+        summary['url'] = ctx['project_url']
+    page = issue_page(query, ctx, limit, offset, status)
+    result = {'workspace_id': ctx['workspace_id'], 'project': summary,
+              'issue_page': {'issues': [issue_summary(ctx, row) for row in page['issues']],
+                             'total': page.get('total'), 'offset': offset, 'status_filter': status,
+                             'has_more': page['has_more'], 'next_offset': page['next_offset']}}
+    if resources:
+        rows = query('project', 'resource', 'list', ctx['project_id'])
+        if not isinstance(rows, list):
+            raise ContextError('原生 CLI 没有返回预期的项目资源清单。')
+        result['resources'] = []
+        for row in rows:
+            if (not isinstance(row, dict) or not row.get('id') or row.get('project_id') != ctx['project_id']
+                    or row.get('workspace_id') != ctx['workspace_id']):
+                raise ContextError('服务端返回的资源不属于当前项目或工作区。')
+            result['resources'].append({k: row.get(k) for k in ('id', 'resource_type', 'label', 'resource_ref')})
     return result
 
 
-def find(config, ctx, query, limit, offset):
+def issue_summary(ctx, issue):
+    if (not isinstance(issue, dict) or not issue.get('id') or issue.get('project_id') != ctx['project_id']
+            or issue.get('workspace_id') != ctx['workspace_id']):
+        raise ContextError('Issue 不属于当前项目或工作区；拒绝关联。')
+    result = {k: issue.get(k) for k in ('id', 'identifier', 'title', 'status', 'assignee_id', 'parent_issue_id', 'updated_at')}
+    if ctx.get('workspace_url'):
+        result['url'] = ctx['workspace_url'] + '/issues/' + quote(issue['id'], safe='')
+    return result
+
+
+def issue_page(query, ctx, limit, offset, status=None):
     fields = 'id,identifier,title,status,assignee_id,parent_issue_id,updated_at,project_id,workspace_id'
-    page = cli(config, 'issue', 'list', '--project', ctx['project_id'], '--fields', fields,
-               '--limit', limit, '--offset', offset)
+    args = ('--status', status) if status else ()
+    page = query('issue', 'list', '--project', ctx['project_id'], '--fields', fields,
+                 '--limit', limit, '--offset', offset, *args)
+    if not isinstance(page, dict) or not isinstance(page.get('issues'), list) or not isinstance(page.get('has_more'), bool):
+        raise ContextError('原生 CLI 没有返回完整的 Issue 分页信息。')
+    if page['has_more'] and not page['issues']:
+        raise ContextError('分页返回空页但仍声明更多数据，不能确认查询完整。')
+    return {**page, 'next_offset': offset + len(page['issues']) if page['has_more'] else None}
+
+
+def find(config, ctx, query, limit, offset):
+    page = issue_page(lambda *args: cli(config, *args), ctx, limit, offset)
     rows = page['issues']
     # 不把模糊匹配或一页无结果视为确定不存在；不自动创建或合并 Issue。
     matches = [issue_summary(ctx, item) for item in rows
                if not query or query.casefold() in ((item.get('title') or '') + ' ' + (item.get('identifier') or '')).casefold()]
-    more = bool(page.get('has_more'))
-    if more and not rows:
-        raise ContextError('分页返回空页但仍声明更多数据，不能确认查询完整。')
     return {'project_url': ctx['project_url'], 'issues': matches, 'match_scope': 'title-and-identifier',
-            'scanned': len(rows), 'offset': offset, 'has_more': more,
-            'next_offset': offset + len(rows) if more else None,
+            'scanned': len(rows), 'offset': offset, 'has_more': page['has_more'],
+            'next_offset': page['next_offset'],
             'notice': '标题匹配只用于找候选；分页未读完不能认定不存在，候选需 read 核对范围。'}
 
 
@@ -231,6 +311,32 @@ def enable(ctx, apply=False):
     return result
 
 
+def full_uuid(value):
+    try:
+        return str(uuid.UUID(value))
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError('需要完整 UUID；先查清单核对目标。') from exc
+
+
+def project_query(args):
+    if args.action == 'overview' and not args.project_id:
+        if args.profile or args.workspace_id:
+            raise ContextError('按目录查询使用机器绑定；指定 profile 或工作区时须提供项目 UUID。')
+        config = machine()
+        ctx, item = bound_project(config, args.directory or '.', args.project)
+        query = lambda *params: cli(config, *params)
+    else:
+        if args.action == 'overview' and (args.directory or args.project):
+            raise ContextError('项目 UUID 与目录绑定二选一。')
+        workspace, query = native_workspace(args.profile, args.workspace_id)
+        if args.action == 'projects':
+            return catalog(workspace, query, args.status)
+        ctx = {'workspace_id': workspace['id'], 'project_id': args.project_id}
+        item = query('project', 'get', args.project_id)
+    return overview(ctx, item, query, args.limit, args.offset, args.issue_status,
+                    args.resources, args.full_description)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='action', required=True)
@@ -249,19 +355,36 @@ def main():
             p.add_argument('--full-description', action='store_true')
         if action == 'enable':
             p.add_argument('--apply', action='store_true', help='默认只预览；显式追加仓库入口，不创建项目或派发任务')
+    projects = sub.add_parser('projects', help='查询本机 CLI 工作区的项目清单')
+    projects.add_argument('--status', help='项目状态键')
+    summary = sub.add_parser('overview', help='按项目 UUID 或当前目录查看项目与一页任务')
+    summary.add_argument('project_id', nargs='?', type=full_uuid, metavar='PROJECT_UUID')
+    summary.add_argument('--directory', help='目录绑定模式的实际工作目录，默认当前目录')
+    summary.add_argument('--project', help='目录绑定模式的机器项目键')
+    summary.add_argument('--limit', type=int, default=10, choices=range(1, 51), metavar='1..50')
+    summary.add_argument('--offset', type=int, default=0)
+    summary.add_argument('--issue-status', help='只过滤当前页的 Issue 查询，不改变项目总计')
+    summary.add_argument('--resources', action='store_true', help='按需查看附加资源')
+    summary.add_argument('--full-description', action='store_true')
+    for p in (projects, summary):
+        p.add_argument('--profile', help='本机 CLI profile，省略时沿用原生默认')
+        p.add_argument('--workspace-id', type=full_uuid, help='工作区 UUID，省略时核对当前工作区')
     a = parser.parse_args()
     if getattr(a, 'offset', 0) < 0:
         raise ContextError('offset 不能为负。')
-    config = machine()
-    ctx = context(config, a.directory, a.project)
-    if a.action == 'context':
-        result = ctx
-    elif a.action == 'find':
-        result = find(config, ctx, a.query, a.limit, a.offset)
-    elif a.action == 'read':
-        result = read(config, ctx, a.issue, a.thread, a.limit, a.full_description)
+    if a.action in ('projects', 'overview'):
+        result = project_query(a)
     else:
-        result = enable(ctx, a.apply)
+        config = machine()
+        ctx = context(config, a.directory, a.project)
+        if a.action == 'context':
+            result = ctx
+        elif a.action == 'find':
+            result = find(config, ctx, a.query, a.limit, a.offset)
+        elif a.action == 'read':
+            result = read(config, ctx, a.issue, a.thread, a.limit, a.full_description)
+        else:
+            result = enable(ctx, a.apply)
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 

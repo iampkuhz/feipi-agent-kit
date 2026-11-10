@@ -1,5 +1,5 @@
-version: 3
+version: 4
 interface:
-  display_name: "Multica 任务协作"
-  short_description: "定位当前仓库的 Multica 项目，规范查询、录入、进展、交接和持久交付。"
-  default_prompt: "请使用 $feipi-multica-manage-tasks，先用项目上下文入口定位实际目录、项目 ID/URL 与启用状态，区分讨论、记录、当前聊天执行和后台派发。查询先看摘要，分页或截断时按需展开；按短模板通过 multica-work 回写，记录不能启动执行。复用固定 request-id，pending 先 recover；后台沿用完整任务身份和真实触发 parent。核实产物、验证和 Issue 状态，保留项目验收规则。"
+  display_name: "Multica 项目与任务协作"
+  short_description: "用本机 CLI 管理 Multica 项目与资源，协作处理 Issue、派发和验收。"
+  default_prompt: "请使用 $feipi-multica-manage-tasks，先区分项目管理和 Issue 协作。查看项目清单、进度和资源时核实工作区与项目；明确要求修改时按原生 CLI 操作并读回。任务协作先核对实际仓库绑定，按用户意图记录、执行、派发或提交验收。"

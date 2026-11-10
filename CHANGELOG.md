@@ -1,5 +1,8 @@
 # 变更记录
 
+## 2026-11-10
+- feipi-multica-manage-tasks v4：增加本机 CLI 项目清单、概览、建项、更新与资源管理
+
 ## 2026-11-09
 - feipi-xiaohongshu-read-note v4：测试路径改用系统接口生成
 - feipi-skill-govern v7：补齐路径与双平台校验

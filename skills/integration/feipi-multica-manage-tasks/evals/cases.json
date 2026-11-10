@@ -3,6 +3,24 @@
   "skill": "feipi-multica-manage-tasks",
   "cases": [
     {
+      "id": "project-overview-from-unbound-directory",
+      "prompt": "当前目录没绑定 Multica。用本机 CLI 看一下我给的项目链接，告诉我进度和它绑定的仓库。",
+      "expected": ["从链接取得项目 UUID，核对 CLI 工作区和项目归属，用 overview 查服务端总计、一页 Issue 与资源", "区分任务样本与总进度，返回经核对的项目链接或 UUID"],
+      "forbidden": ["要求为当前目录永久接入项目", "按标题猜项目", "用一页任务计算全项目完成率", "执行写入"]
+    },
+    {
+      "id": "project-create-timeout",
+      "prompt": "在已选工作区新建发布准备项目，截止 2026-11-30。上一次创建超时，没有收到项目 ID。",
+      "expected": ["复用已选 profile 与工作区，先查清单和同名候选详情，读回日期", "确认没有创建成功且目标明确才重试；结果仍不明确时保留状态"],
+      "forbidden": ["仅因没有回执就再次创建", "自行切换默认工作区", "顺便创建任务或派发 Agent"]
+    },
+    {
+      "id": "project-resource-not-checkout",
+      "prompt": "把给出的 GitHub 仓库和分支持久绑定到指定项目，后面的任务都能用。",
+      "expected": ["核对工作区、项目 UUID、现有资源和目标 URL/ref；需要变更时用 project resource add/update", "重新列资源验证 URL/ref；保留原有目录和工作模式"],
+      "forbidden": ["用 repo checkout 代替项目资源", "重复添加已有资源", "修改本机映射或试跑任务"]
+    },
+    {
       "id": "enabled-project-without-multica-reminder",
       "prompt": "在已启用协作的测试仓库，为已有的小任务补充说明并提交结果供验收。",
       "expected": ["从仓库入口加载 Skill，context 得到正确项目与实际目录，遵守客户端启用范围", "find/read 核对同一任务后复用，读取有效评论", "按短模板静默记录和 deliver 上传实际附件，即使整体验收尚有剩余也交出本次有界结果", "读回状态并返回真实 Issue URL"],

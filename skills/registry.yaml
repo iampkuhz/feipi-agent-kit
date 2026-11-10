@@ -84,7 +84,7 @@ skills:
   - name: feipi-multica-manage-tasks
     path: skills/integration/feipi-multica-manage-tasks
     layer: integration
-    description: Multica 任务记录、派发、交接与验收
+    description: 本机 CLI 管理 Multica 项目与资源，协作处理任务、派发、交接与验收
     clients: [codex, qoder, openclaw]
     entry: SKILL.md
     validation: null

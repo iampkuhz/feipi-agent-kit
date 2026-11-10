@@ -6,6 +6,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+import uuid
 from unittest.mock import patch
 
 SCRIPT = Path(__file__).resolve().parents[1] / 'scripts/project.py'
@@ -146,6 +147,68 @@ class Project(unittest.TestCase):
             project.cli(self.config, 'workspace', 'get')
             self.assertNotIn('MULTICA_PERSONAL_PROFILE', run.call_args.kwargs['env'])
             self.assertEqual(run.call_args.kwargs['env']['MULTICA_TASK_ID'], 'run')
+
+    def test_native_catalog_pins_workspace_and_rejects_foreign_result(self):
+        workspace_id = str(uuid.uuid4())
+        selected = {'id': workspace_id, 'name': '目标工作区', 'settings': {'irrelevant': 'data'}}
+        item = {'id': 'project', 'title': '目标项目', 'workspace_id': workspace_id,
+                'description': '此字段不进入清单', 'status': 'in_progress'}
+        with patch.dict(os.environ, {'MULTICA_CLI_BIN': 'fixture-multica'}), patch.object(
+                project, 'run_json', side_effect=[selected, [item], [{**item, 'workspace_id': 'other'}]]) as call:
+            workspace, query = project.native_workspace('isolated', None)
+            result = project.catalog(workspace, query, 'in_progress')
+            self.assertEqual(result['projects'][0]['title'], '目标项目')
+            self.assertNotIn('description', result['projects'][0])
+            self.assertNotIn('settings', result['workspace'])
+            self.assertEqual(call.call_args.args, (
+                ['fixture-multica', '--profile', 'isolated', '--workspace-id', workspace_id],
+                ('project', 'list', '--status', 'in_progress')))
+            with self.assertRaises(project.ContextError):
+                project.catalog(workspace, query)
+
+    def test_native_scope_never_falls_back_after_workspace_mismatch_or_in_task(self):
+        with patch.dict(os.environ, {'MULTICA_CLI_BIN': 'fixture-multica'}), patch.object(
+                project, 'run_json', return_value={'id': 'another-workspace'}) as run:
+            with self.assertRaises(project.ContextError):
+                project.native_workspace('isolated', 'target-workspace')
+            run.assert_called_once()
+        with patch.dict(os.environ, {'MULTICA_TASK_ID': 'run'}), patch.object(project, 'run_json') as run:
+            with self.assertRaises(project.ContextError):
+                project.native_workspace('personal', None)
+            run.assert_not_called()
+
+    def test_overview_distinguishes_project_totals_from_filtered_page(self):
+        ctx = self.ctx()
+        item = {'id': 'project', 'workspace_id': 'workspace', 'description': 'x' * 2000,
+                'issue_count': 100, 'done_count': 30}
+        issue = {'id': 'issue', 'identifier': 'DEMO-1', 'status': 'todo',
+                 'project_id': 'project', 'workspace_id': 'workspace'}
+        resource = {'id': 'resource', 'project_id': 'project', 'workspace_id': 'workspace'}
+
+        def query(*args):
+            if args[:2] == ('issue', 'list'):
+                self.assertEqual(args[2:4], ('--project', 'project'))
+                self.assertEqual(args[-2:], ('--status', 'todo'))
+                return {'issues': [issue], 'has_more': True, 'total': 40}
+            self.assertEqual(args, ('project', 'resource', 'list', 'project'))
+            return [resource]
+
+        out = project.overview(ctx, item, query, 1, 3, 'todo', True, False)
+        self.assertEqual(out['project']['issue_count'], 100)
+        self.assertEqual(out['project']['done_count'], 30)
+        self.assertTrue(out['project']['description_truncated'])
+        self.assertEqual(out['issue_page']['next_offset'], 4)
+        self.assertEqual(out['issue_page']['total'], 40)
+        self.assertEqual(out['issue_page']['issues'][0]['url'], 'http://localhost:3000/my-space/issues/issue')
+        self.assertEqual(out['resources'][0]['id'], 'resource')
+
+        for wrong in ({**item, 'id': 'other-project'}, {**item, 'workspace_id': 'other'}):
+            with patch.object(project, 'issue_page') as read, self.assertRaises(project.ContextError):
+                project.overview(ctx, wrong, query, 1, 3, 'todo', True, False)
+            read.assert_not_called()
+        resource['project_id'] = 'other-project'
+        with self.assertRaises(project.ContextError):
+            project.overview(ctx, item, query, 1, 3, 'todo', True, False)
 
     def test_enable_preview_backup_idempotency_and_release_separation(self):
         path = self.repo / 'AGENTS.md'
