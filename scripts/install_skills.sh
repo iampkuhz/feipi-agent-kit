@@ -342,10 +342,24 @@ except OSError as error:
 PYEOF
 }
 
+# 读取 skill agents/openai.yaml 中的顶层整数版本号。
+get_skill_version() {
+  local metadata="$1/agents/openai.yaml"
+  [[ -f "$metadata" ]] || return 0
+  awk '
+    /^version:[[:space:]]*[0-9]+[[:space:]]*$/ {
+      sub(/^version:[[:space:]]*/, "")
+      sub(/[[:space:]]*$/, "")
+      print
+      exit
+    }
+  ' "$metadata"
+}
+
 # 返回 0 表示新增/更新，2 表示跳过，其他状态表示失败；ITEM_STATUS 区分结果。
 finish_staged_install() {
   local staging="$1" dest="$2" label="$3"
-  local comparison_status
+  local comparison_status version_detail="" old_version new_version
   if installation_trees_equal "$staging" "$dest"; then
     rm -rf "$staging" || return 1
     ITEM_STATUS=skipped
@@ -364,10 +378,20 @@ finish_staged_install() {
   ITEM_STATUS=installed
   if [[ -e "$dest" || -L "$dest" ]]; then
     ITEM_STATUS=updated
+    # 仅从已安装的实文件读取旧版本，避免链接模式把源码当前版本误当成旧版本。
+    if [[ -f "$staging/SKILL.md" && -f "$staging/agents/openai.yaml" \
+      && -f "$dest/agents/openai.yaml" && ! -L "$dest/agents" \
+      && ! -L "$dest/agents/openai.yaml" ]]; then
+      old_version="$(get_skill_version "$dest")"
+      new_version="$(get_skill_version "$staging")"
+      if [[ -n "$old_version" && -n "$new_version" ]]; then
+        version_detail="（v${old_version} → v${new_version}）"
+      fi
+    fi
     rm -rf "$dest" || return 1
   fi
   mv "$staging" "$dest" || return 1
-  status_line "$ITEM_STATUS" "$label"
+  status_line "$ITEM_STATUS" "$label$version_detail"
   return 0
 }
 

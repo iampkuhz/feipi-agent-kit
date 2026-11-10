@@ -132,6 +132,20 @@ class InstallOutputTests(unittest.TestCase):
         self.assertIn("[更新] feipi-one", changed.stdout)
         self.assertEqual(dest.read_bytes(), source.read_bytes())
 
+    def test_copy_install_reports_skill_version_transition(self):
+        metadata = self.repo / "skills/integration/feipi-one/agents/openai.yaml"
+        metadata.parent.mkdir(parents=True)
+        metadata.write_text("version: 1\n", encoding="utf-8")
+        self.run_make("install", "AGENT=codex")
+
+        metadata.write_text("version: 2\n", encoding="utf-8")
+        updated = self.run_make("install", "AGENT=codex")
+
+        self.assertIn("[更新] feipi-one（v1 → v2）", updated.stdout)
+        self.assert_counts(updated.stdout, updated=1, skipped=2)
+        installed_metadata = self.codex / "skills/feipi-one/agents/openai.yaml"
+        self.assertEqual(installed_metadata.read_text(encoding="utf-8"), "version: 2\n")
+
     def test_verbose_shows_skip_and_preservation_reasons(self):
         self.run_make("install-skills", "AGENT=codex")
         foreign = self.codex / "skills/foreign-skill"
