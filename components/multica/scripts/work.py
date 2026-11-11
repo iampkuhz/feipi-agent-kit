@@ -53,14 +53,14 @@ def cli(*args, with_cursor=False):
         # 不抄未知服务正文；保留可操作的错误类别与步骤。
         error = result.stderr.lower()
         kind, next_step = 'cli', '核对原生命令帮助及服务状态'
-        for needle, category, advice in (
-                ('unauthorized', 'authentication', '核对所选身份'),
-                ('forbidden', 'permission', '核对目标权限'),
-                ('unknown flag', 'unsupported', '核对 CLI 版本和子命令帮助'),
-                ('unknown command', 'unsupported', '核对 CLI 版本和子命令帮助'),
-                ('connection refused', 'connection', '核对服务地址和连通性'),
-                ('not found', 'not-found', '核对 UUID 和工作区')):
-            if needle in error:
+        for needles, category, advice in (
+                (('unauthorized', 'not signed in', 'not authenticated', 'task token was rejected', '尚未登录', 'task token 已被拒绝'), 'authentication', '核对所选身份；后台不回退个人凭据'),
+                (('forbidden', 'not have permission', '无权访问'), 'permission', '核对目标权限'),
+                (('unknown flag', 'unknown command'), 'unsupported', '核对 CLI 版本和子命令帮助'),
+                (('connection refused', 'could not reach', '无法访问 multica'), 'connection', '核对服务地址和连通性'),
+                (('request conflict', '请求冲突'), 'conflict', '读回目标字段、评论与附件，核对并发变更'),
+                (('not found', '未找到请求的资源'), 'not-found', '核对 UUID 和工作区')):
+            if any(needle in error for needle in needles):
                 kind, next_step = category, advice
                 break
         raise AdaptError('Multica ' + ' '.join(args[:2]) + ' 失败 [' + kind + ']；' + next_step + '。')
@@ -168,8 +168,6 @@ def comment(issue, body, parent=None, attachments=()):
         args += ['--parent', parent]
     for attachment in attachments:
         args += ['--attachment', attachment]
-    if attachments:
-        args += ['--allow-external-file']
     result = cli(*args)
     path.unlink()  # 未知/失败时保留文件，不用清理的成功掩盖写入失败。
     return result
@@ -207,6 +205,8 @@ def run(args):
     if args.action not in ('status', 'recover') and not (args.request_id or '').strip():
         raise AdaptError('request-id 不能为空。')
     principal = scope(args)
+    if task_context() and args.action in ('record', 'dispatch', 'bind'):
+        raise AdaptError('后台只发布当前任务结果或明确 handoff；不建立新的本机执行归属。')
     SCOPE['project_id'] = args.project
     item = None if args.action == 'record' else checked_issue(args.issue, args.project)
     if item:
@@ -252,8 +252,6 @@ def run(args):
                 raise AdaptError('找不到当前 Run；不猜线程或回退个人身份。')
             if current.get('trigger_comment_id') and args.parent != current['trigger_comment_id']:
                 raise AdaptError('必须回复当前 Run 的 trigger_comment_id。合并多线程请用平台给定的原生回复路径。')
-            if args.action in ('record', 'dispatch', 'bind'):
-                raise AdaptError('后台只发布当前任务结果或明确 handoff；不建立新的本机执行归属。')
             if not old:
                 prior = (thread_comments(args.issue, args.parent) if args.parent else
                          cli('issue', 'comment', 'list', args.issue, '--roots-only', '--summary'))
@@ -262,6 +260,10 @@ def run(args):
         agent = None
         if args.action in ('dispatch', 'handoff') and not old:
             agent = preflight(args.issue, args.agent, handoff, args.action == 'handoff')
+        elif args.action in ('dispatch', 'handoff') and not old['steps'].get('comment'):
+            # 崩溃可能发生在无启动分派已完成、评论步骤尚未登记的间隙。
+            # 即将补发首次评论时重新核实活动运行，不能借旧回执绕过派发保护。
+            preflight(args.issue, old['agent']['id'], handoff, args.action == 'handoff')
         if args.action == 'bind' and not old and cli('issue', 'runs', args.issue, '--active'):
             raise AdaptError('已有后台任务，不能备注为当前聊天处理。')
         record = old or {'schema': 2, 'request_id': rid, 'principal': principal, 'operation': operation,

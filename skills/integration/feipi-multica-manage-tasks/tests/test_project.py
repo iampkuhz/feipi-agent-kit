@@ -31,6 +31,8 @@ class Project(unittest.TestCase):
         self.config_file.write_text(json.dumps(self.config))
         clean = {k: v for k, v in os.environ.items() if not k.startswith('MULTICA_')}
         clean.update(MULTICA_MACHINE_CONFIG=str(self.config_file), MULTICA_ENTRY_BACKUPS=str(self.base / 'backups'))
+        # 确定性测试拦截 subprocess，不要求宿主安装 Multica。
+        clean['MULTICA_CLI_BIN'] = str(self.base / 'fixture-multica')
         patcher = patch.dict(os.environ, clean, clear=True)
         patcher.start()
         self.addCleanup(patcher.stop)
@@ -167,6 +169,13 @@ class Project(unittest.TestCase):
                 ('project', 'list', '--status', 'in_progress')))
             with self.assertRaises(project.ContextError):
                 project.catalog(workspace, query)
+
+    def test_bound_config_cannot_send_task_credentials_to_another_server(self):
+        env = dict(zip(project.TASK_FIELDS, ['mat_task', 'run', 'agent', 'workspace', 'http://localhost:8080']))
+        with patch.dict(os.environ, env), patch.object(project.subprocess, 'run') as run:
+            with self.assertRaisesRegex(project.ContextError, '不能切换'):
+                project.cli({**self.config, 'server_url':'https://other.invalid'}, 'workspace', 'get')
+            run.assert_not_called()
 
     def test_native_scope_never_falls_back_after_workspace_mismatch_or_in_task(self):
         with patch.dict(os.environ, {'MULTICA_CLI_BIN': 'fixture-multica'}), patch.object(

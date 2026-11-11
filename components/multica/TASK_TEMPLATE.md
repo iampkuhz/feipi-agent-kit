@@ -14,9 +14,9 @@
 
 来源标识：外部请求的稳定标识；重试时先检查是否已录入。
 
-执行方式：仅记录 / Codex Builder / OpenClaw Assistant。未明确执行时保持未分派。
+执行方式：仅记录 / 当前聊天处理 / 平台已核实的 Agent UUID。未明确执行时保持未分派。
 
-交付先进入 Review，由用户验收。不能只记录会被回收的临时工作目录。
+发布实际材料或已有提交/PR，不强制附件。按整单实际情况申请验收，部分成果不自动改为 Review；发布材料不代表验收通过。不能只记录会被回收的临时工作目录。
 
 ## 跨工具交接包 handoff.json
 
@@ -28,9 +28,10 @@
   "acceptance": "验证步骤和标准",
   "artifacts": ["已有提交、附件或文件"],
   "remaining": ["剩余工作、失败层和接手建议"],
-  "required_commands": ["git"],
+  "required_executables": ["git"],
+  "validation_commands": ["git diff HEAD --check"],
   "required_mcp": []
 }
 ```
 
-只有明确要求后台执行时调用 multica-work dispatch；执行者用逻辑键绑定准确 runtime。model、OpenClaw Agent ID、LiteLLM 路由分别记录。桌面 MCP 未实际在后台验证时不得列为可用能力。进度用 note；需要下一角色运行时用 handoff。
+只有明确要求后台执行时才派发；从平台核实 Agent UUID、归属和活动运行，默认使用官方 CLI。`multica-work dispatch` 是可选回执入口，需要显式项目 UUID。实际执行端核对 cwd、可执行文件和 MCP；未验证能力保持待验证，不把桌面配置当作后台证据。后台遵守当前平台最终评论与 parent 契约；需要下一角色运行时在最终交接中明确 mention，不另发过程评论。

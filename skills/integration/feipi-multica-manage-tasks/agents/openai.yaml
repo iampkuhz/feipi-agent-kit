@@ -1,4 +1,4 @@
-version: 5
+version: 6
 interface:
   display_name: "Multica 项目与任务协作"
   short_description: "用本机 CLI 管理 Multica 项目与资源，协作处理 Issue、派发和验收。"

@@ -33,6 +33,7 @@ class Workflow(unittest.TestCase):
             self.addCleanup(patcher.stop)
         patcher = patch.dict(os.environ, {k:v for k,v in os.environ.items() if not k.startswith('MULTICA_')}, clear=True)
         patcher.start(); self.addCleanup(patcher.stop)
+        os.environ['MULTICA_CLI_BIN'] = str(self.root/'fixture-multica')
         cwd = patch.object(Path, 'cwd', return_value=self.root)
         cwd.start(); self.addCleanup(cwd.stop)
 
@@ -62,6 +63,7 @@ class Workflow(unittest.TestCase):
         if a[:3] == ('issue', 'comment', 'add'):
             self.writes.append(a)
             self.assertNotIn('--content-stdin',a)
+            self.assertNotIn('--allow-external-file',a)
             file=Path(a[a.index('--content-file')+1])
             self.assertEqual(file.parent,self.root)
             row=dict(id='comment-'+str(len(self.comments)),content=file.read_text(),
@@ -173,6 +175,36 @@ class Workflow(unittest.TestCase):
         work.run(args)
         self.assertEqual(sum(x[:2]==('issue','update') for x in self.writes),1)
 
+    def test_unknown_comment_without_remote_evidence_is_not_resent(self):
+        args=self.args(); self.fail_comment_after=True
+        with self.assertRaises(base.AdaptError): work.run(args)
+        self.comments=[]
+        with self.assertRaisesRegex(base.AdaptError,'无法确认'): work.run(args)
+        self.assertEqual(len(self.writes),1)
+        self.assertEqual(self.receipts()[0]['steps']['comment']['state'],'pending')
+
+    def test_dispatch_crash_before_comment_rechecks_activity_before_continuing(self):
+        args=self.args('dispatch',agent=self.agents[0]['id'],packet=self.packet())
+        work.run(args)
+        file=next((self.state/'requests').glob('v2-*.json'))
+        receipt=json.loads(file.read_text())
+        del receipt['steps']['comment']
+        receipt['state']='pending'
+        base.private_write(file,receipt)
+        self.comments=[]; self.writes=[]
+        self.runs=[dict(id='another-active-run')]
+        with self.assertRaisesRegex(base.AdaptError,'活动 run'): work.run(args)
+        self.assertEqual(self.writes,[])
+
+    def test_one_run_cannot_publish_second_final_using_new_request_id(self):
+        valid=dict(zip(work.TASK_FIELDS,['mat_fixture','run','agent','workspace','http://fixture.invalid']))
+        with patch.dict(os.environ,valid):
+            self.runs=[dict(id='run',trigger_comment_id='trigger')]
+            work.run(self.args(parent='trigger'))
+            with self.assertRaisesRegex(base.AdaptError,'已发布最终评论'):
+                work.run(self.args(parent='trigger',request_id='another'))
+        self.assertEqual(len(self.comments),1)
+
     def test_foreign_status_change_and_changed_content_are_not_overwritten(self):
         args=self.args(status='in_review'); self.fail_status_before=True
         with self.assertRaises(base.AdaptError): work.run(args)
@@ -237,11 +269,15 @@ class Workflow(unittest.TestCase):
             self.assertIn('--before-id',call.call_args.args)
 
     def test_native_transport_redacts_failure_and_requires_content_file(self):
-        with patch.object(work.subprocess,'run',return_value=subprocess.CompletedProcess([],1,'','forbidden secret-value')):
-            with self.assertRaises(base.AdaptError) as error:
-                NATIVE_CLI('issue','get','issue')
-            self.assertIn('[permission]',str(error.exception))
-            self.assertNotIn('secret-value',str(error.exception))
+        for message,category in [('forbidden','permission'), ('You do not have permission','permission'),
+                                 ('Your session has expired or you are not signed in','authentication'),
+                                 ('This task token was rejected','authentication'), ('unknown flag','unsupported'),
+                                 ('Could not reach the Multica server','connection'), ('Request conflict','conflict')]:
+            with self.subTest(message=message), patch.object(work.subprocess,'run',return_value=subprocess.CompletedProcess([],1,'',message+' secret-value')):
+                with self.assertRaises(base.AdaptError) as error:
+                    NATIVE_CLI('issue','get','issue')
+                self.assertIn('['+category+']',str(error.exception))
+                self.assertNotIn('secret-value',str(error.exception))
 
 
 if __name__ == '__main__':

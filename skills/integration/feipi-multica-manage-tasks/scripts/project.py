@@ -28,7 +28,7 @@ def in_task():
     return any(os.environ.get(k) for k in TASK_FIELDS[:-1] + ('MULTICA_TASK_CONFIG_ROOT', 'MULTICA_DAEMON_PORT'))
 
 
-def task_identity(profile=None, workspace_id=None):
+def task_identity(profile=None, workspace_id=None, server_url=None):
     if not in_task():
         return
     missing = [k for k in TASK_FIELDS if not os.environ.get(k)]
@@ -36,8 +36,9 @@ def task_identity(profile=None, workspace_id=None):
         raise ContextError('任务身份不完整：' + ', '.join(missing) + '；不回退个人身份。')
     if not os.environ['MULTICA_TOKEN'].startswith('mat_'):
         raise ContextError('任务上下文必须使用任务凭据；不回退个人身份。')
-    if profile or (workspace_id and workspace_id != os.environ['MULTICA_WORKSPACE_ID']):
-        raise ContextError('任务上下文不能切换个人 profile 或工作区。')
+    if (profile or (workspace_id and workspace_id != os.environ['MULTICA_WORKSPACE_ID'])
+            or (server_url and server_url.rstrip('/') != os.environ['MULTICA_SERVER_URL'].rstrip('/'))):
+        raise ContextError('任务上下文不能切换个人 profile、服务或工作区。')
 
 
 def machine():
@@ -63,7 +64,7 @@ def machine():
 
 
 def cli(config, *args):
-    task_identity(workspace_id=config.get('workspace_id'))
+    task_identity(workspace_id=config.get('workspace_id'), server_url=config.get('server_url'))
     binary = os.environ.get('MULTICA_CLI_BIN') or shutil.which('multica')
     if not binary:
         raise ContextError('找不到官方 multica CLI；请安装并加入 PATH，或设置 MULTICA_CLI_BIN。')
@@ -84,15 +85,15 @@ def run_json(command, args, env=None):
     if result.returncode:
         error = result.stderr.lower()
         kind, advice = 'cli', '核对该子命令帮助和服务状态'
-        for pattern, category, next_step in (
-                ('unauthorized', 'authentication', '核对当前身份登录或任务凭据'),
-                ('forbidden', 'permission', '核对当前身份对目标项目的权限'),
-                ('unknown flag', 'unsupported', '核对已安装 CLI 版本和子命令帮助'),
-                ('unknown command', 'unsupported', '核对已安装 CLI 版本和子命令帮助'),
-                ('connection refused', 'connection', '检查所选服务地址和连通性'),
-                ('no server configured', 'configuration', '选择已配置的 CLI profile'),
-                ('not found', 'not-found', '核对目标 UUID 和所属工作区')):
-            if pattern in error:
+        for patterns, category, next_step in (
+                (('unauthorized', 'not signed in', 'not authenticated', 'task token was rejected', '尚未登录', 'task token 已被拒绝'), 'authentication', '核对当前身份；后台不回退个人凭据'),
+                (('forbidden', 'not have permission', '无权访问'), 'permission', '核对当前身份对目标项目的权限'),
+                (('unknown flag', 'unknown command'), 'unsupported', '核对已安装 CLI 版本和子命令帮助'),
+                (('connection refused', 'could not reach', '无法访问 multica'), 'connection', '检查所选服务地址和连通性'),
+                (('request conflict', '请求冲突'), 'conflict', '读回目标并核对并发变更'),
+                (('no server configured',), 'configuration', '选择已配置的 CLI profile'),
+                (('not found', '未找到请求的资源'), 'not-found', '核对目标 UUID 和所属工作区')):
+            if any(pattern in error for pattern in patterns):
                 kind, advice = category, next_step
                 break
         raise ContextError('Multica ' + ' '.join(args[:2]) + ' 失败 [' + kind + ']（退出码 '

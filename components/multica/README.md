@@ -14,7 +14,7 @@
 
 ## 适配与配置管理（2026-10-31）
 
-已实现 `multica-ops plan/apply/verify/doctor` 和 `multica-work` 统一交互。日常操作以 [适配操作手册](docs/adaptation-runbook.md) 为准；Mac mini 单主机切换见 [迁移流程](docs/mac-mini-migration.md)。声明与机器绑定分开；共享 Skill 由 Agent Kit 维护。
+`multica-ops plan/apply/verify/doctor` 管理本机部署。普通项目与任务操作默认使用官方 `multica`；`multica-work` 仅为可选本机操作回执，不读取受管 Agent 名单或机器映射。日常操作以 [适配操作手册](docs/adaptation-runbook.md) 为准；Mac mini 单主机切换见 [迁移流程](docs/mac-mini-migration.md)。声明与机器绑定分开；共享 Skill 由 Agent Kit 维护。
 
 任务预检失败可在缺口解除后复用原 request-id；真实请求结果不明仍保留 pending，先 recover 核对运行、评论与附件。实机验收将身份、目录、探针版本、评论线程和下载附件绑定到最新执行；doctor 的静态通过不替代当前运行证据。
 
@@ -24,24 +24,24 @@
 multica-service ps
 curl -fsS http://localhost:8080/readyz
 multica-task daemon status
-multica-task issue list
-multica-task issue get <任务编号>
-multica-task issue runs <任务编号>
+multica --profile "$profile" --workspace-id "$workspace_id" issue list --project "$project_id"
+multica --profile "$profile" --workspace-id "$workspace_id" issue get "$issue_id"
+multica --profile "$profile" --workspace-id "$workspace_id" issue runs "$issue_id"
 ```
 
 网页为 `http://localhost:3000`。`multica-task` 在普通终端、Codex 或 OpenClaw 中使用本机 personal profile；在 Multica 管理的任务内沿用注入的任务认证，不复制个人 token。
 
 **当前没有配置 SMTP/Resend，不会发送验证码邮件。** 页面请求登录码后，在本机终端运行 `multica-service logs --tail 30 backend`，读取自己邮箱对应的一次性验证码并填入页面。保持 production 模式，不使用固定验证码。首次账户已建立，注册已关闭并限制为本人的邮箱；以后需要真正邮件投递时再单独配置邮件服务凭据。
 
-创建任务时用 stdin 提供完整目标、范围、来源、验收与交付：
+创建任务前核对工作区与项目，正文写清目标、范围、来源、验收与交付。以下个人 profile 示例只用于交互终端；后台直接使用注入身份。派发与回执的完整核对步骤见 [Skill 操作参考](../../skills/integration/feipi-multica-manage-tasks/references/operations.md)。
 
 ```bash
-multica-task issue create --title "任务标题" --description-stdin < task.md
-multica-work dispatch <任务编号> --agent codex-builder --packet handoff.json --request-id <本次固定标识>
-multica-work note <任务编号> --body-file progress.md --request-id <本次固定标识>
+multica --profile "$profile" --workspace-id "$workspace_id" issue create --project "$project_id" --title "任务标题" --description-file ./task.md
+# 可选回执；agent_id 从平台查询，不是本机逻辑键
+multica-work dispatch "$issue_id" --project "$project_id" --profile "$profile" --agent "$agent_id" --packet ./handoff.json --request-id "$request_id"
 ```
 
-未明确要求后台执行的事项先不指定 Agent；仅记录负责人时使用 `issue assign ... --no-start`。同一事项避免同时在 Codex 客户端和后台 Agent 中重复执行。任务正常交付先进入 Review，再由用户验收。
+未明确要求后台执行的事项先不指定 Agent；仅记录负责人时使用 `issue assign ... --no-start`。同一事项避免同时在 Codex 客户端和后台 Agent 中重复执行。发布材料与改变状态分开，按整单实际完成情况申请验收；后台遵守当前运行环境的一轮最终评论和线程规则。
 
 ## 配置与秘密
 

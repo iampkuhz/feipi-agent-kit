@@ -20,29 +20,31 @@
 
 ## 日常交互
 
-在 Codex、Qoder、个人 OpenClaw 中使用共享 Skill：`$feipi-multica-manage-tasks`。新聊天重新加载技能。后台 Agent 已绑定同一 workspace Skill，不要求继承桌面聊天历史。
+在 Codex、Qoder、个人 OpenClaw 中使用共享 Skill：`$feipi-multica-manage-tasks`。新聊天重新加载技能。本机受管后台链使用 workspace Skill，但这不是其他平台 Agent 的派发资格条件，也不要求继承桌面聊天历史。
 
-先按 Skill 的 `scripts/project.py context` 从当前目录读取现有机器项目绑定，取得 project_id 与项目 URL；`find/read` 只查询该项目并标明分页或截断。需要项目主动关联工作时，使用 `enable` 预览仓库 AGENTS 入口，再在已授权范围内 `--apply`；机器映射本身不等于主动启用。具体边界与典型操作见 [Skill 项目接入](../../../skills/integration/feipi-multica-manage-tasks/references/project-setup.md) 和 [标准操作](../../../skills/integration/feipi-multica-manage-tasks/references/operations.md)。
+默认使用官方 `multica`，已明确工作区、项目与 Issue 时直接核对，不依赖机器映射、受管声明或包装器。只有从当前仓库自动发现项目时，才用 Skill 的 `scripts/project.py context --directory`；显式项目可用 `--project-id`。`find/read` 限定项目并标明分页或截断，保留全部根线程摘要。需要项目主动关联工作时，使用 `enable` 预览仓库 AGENTS 入口，再在已授权范围内 `--apply`；机器映射本身不等于主动启用。具体边界与典型操作见 [Skill 项目接入](../../../skills/integration/feipi-multica-manage-tasks/references/project-setup.md) 和 [标准操作](../../../skills/integration/feipi-multica-manage-tasks/references/operations.md)。
+
+下面是可选本机回执示例，交互终端可按需要添加已配置的 `--profile`；后台不得指定个人 profile，每个写操作仍核对工作区、项目及 Issue。
 
 ```bash
 multica-work --help
 multica-work record --project PROJECT_UUID --title '任务标题' --body-file task.md --request-id source-123
-multica-work bind TASK-123 --directory /实际项目目录 --owner 'Codex 当前聊天' --request-id task-123-bind-1
-multica-work note TASK-123 --body-file progress.md --request-id task-123-note-1
-multica-work dispatch TASK-123 --agent codex-builder --packet handoff.json --request-id task-123-dispatch-1
-multica-work deliver TASK-123 --body-file evidence.md --artifact result.zip --request-id task-123-deliver-1
-multica-work recover TASK-123
+multica-work bind TASK-123 --project PROJECT_UUID --directory /实际项目目录 --owner 'Codex 当前聊天' --request-id task-123-bind-1
+multica-work dispatch TASK-123 --project PROJECT_UUID --agent AGENT_UUID --packet handoff.json --request-id task-123-dispatch-1
+multica-work deliver TASK-123 --project PROJECT_UUID --body-file evidence.md --request-id task-123-materials-1
+# 只有整单已满足申请条件并明确申请验收时才加 --status in_review
+multica-work recover TASK-123 --project PROJECT_UUID --request-id task-123-materials-1
 ```
 
-同一意图始终复用 request-id。`record` 为未分派 Backlog，`bind` 记录当前工作，`note` 自动加 `/note`。`dispatch` 先用 `--no-start` 设置归属，再发送唯一显式 @交接评论；仅 assign Backlog 不启动。服务端 `trigger_outcomes` 表示 queued/coalesced/blocked，仍需查 runs 确认实际启动。后台评论触发的任务必须传 `--parent 触发评论ID`。
+同一意图始终复用 request-id。`record` 创建未分派 Issue，初始状态沿用原生工作流或显式指定；`bind` 只备注当前聊天和实际 cwd，不表示锁定目录或接管原生会话。`dispatch` 先用 `--no-start` 设置归属，再发送唯一显式 @交接评论。服务端 `trigger_outcomes` 表示 queued/coalesced/blocked，仍需查 runs 确认实际启动。后台正文先写实际 cwd 的 UTF-8 文件，用 `--content-file` 发布，成功才清理；按本轮 trigger 的真实 parent 回复，并遵守当前平台一轮最终评论或合并多线程的具体规则。
 
-`bind` 先核对活动运行、真实目录和交互归属，预检失败不留下 pending。缺口解除后可用原输入及 request-id 重试；已成功的重试直接返回原回执，不再次预检或回写。正文、交接包或附件变化属于新意图，先核对当前状态再确定新 request-id。
+预检失败不留下 pending。缺口解除后可用原输入及 request-id 重试；重放先核对远端 Issue 与原评论，再返回确认结果。正文换路径但内容相同不改变意图；内容或附件语义变化时先核对现状，再确定新意图。回执绑定服务、工作区、操作者与 Run，不证明跨机器全局去重。
 
-`handoff` 用正常 @回复唤醒下一角色；不可把它统一改成静默日志。提交验收用 deliver，上传附件再 `in_review --no-start`，不自动标 Done。项目自身的审批与独立验收规则继续有效。
+`handoff` 用最终 @回复唤醒下一角色；不可把它统一改成静默日志。deliver 默认只发布材料，附件可选，状态不变；显式 `--status` 才单独改变整单状态，不自动标 Done，也不运行测试或代替验收。评论成功、状态失败时，原参数重试只补缺失状态；结果未知先沿相关线程核查，不能盲目重发。
 
-当前通用逻辑键为 `codex-builder`；`coordinator`、`validator`、`reviewer` 保留 LexiFlow 专用范围。历史可选键 `qoder-worker`、`openclaw-assistant`、`litellm-coder` 需先补齐声明、runtime 及实际验收后使用；OpenClaw 的 model 是 Agent ID，`litellm-coder` 再选择 `litellm/litellm-code-openai`。
+本机部署与 `acceptance.py` 的逻辑键仍来自声明：`codex-builder` 为通用部署角色，`coordinator`、`validator`、`reviewer` 保留 LexiFlow 范围。历史部署键需显式补齐声明、runtime 及实际验收后再启用。这些是本机运维约定；普通派发从平台选择 UUID 或唯一精确名称，不要求目标进入该名单。
 
-交接包字段见 [任务模板](../TASK_TEMPLATE.md)。通用派发入口要求当前 daemon 上明确的 in_place 项目资源。原生 worktree 项目继续使用其原有流程并记录真实目录。必需 MCP 未有任务内验证器时入口会阻止自动派发；不得用空 mcpServers 声称关闭所有 MCP。
+交接包字段见 [任务模板](../TASK_TEMPLATE.md)。派发端只核对平台已知的资源约束，不要求 in_place 或派发端存在执行目录。执行端确认真实 cwd、`required_executables` 与 `required_mcp`，完整验证命令放 `validation_commands`。未知能力待探针确认，不能伪称可用、清空要求绕过，或仅因本机无验证器就拒绝派发。模型、推理与并发漂移继续由运维 plan/doctor 诊断。
 
 ## 变更配置
 
@@ -82,7 +84,7 @@ LaunchAgent `local.multica.personal` 在用户登录后启动持续监督器。�
 
 若重新启用 OpenClaw 执行器，能力发现与包装命令均须指向隔离目录，保留 CLI 生成的每任务 OPENCLAW_CONFIG_PATH。个人 Gateway 不切换目录、不重启，禁止在 UI 中误选个人实例。
 
-失败先分层：服务/依赖 → daemon/runtime → 认证 → 模型 → 工具/技能 → 产物。`recover` 只查询，汇总 runs、评论来源/parent、request-id、附件 ID/文件名和本机回执，不复制评论全文、不重跑。pending 表示请求可能已经到达服务器；部分交付可能已经上传但状态更新未确认。核对远端后显式确定下一步，不删除回执盲重试。跨机器/直接 UI 调用不受本机锁保护。
+失败先分层：服务/依赖 → daemon/runtime → 认证 → 模型 → 工具/技能 → 产物。`recover` 只查询当前 Issue、活动 runs、全部根线程轻量摘要与指定请求回执，不扫描所有历史和本机请求。pending 表示请求可能已到服务器；按分步记录核对相关线程和附件后，只补缺失动作。旧版单 pending 保留审计，不自动认定成功或删除重试。跨机器/直接 UI 调用不受本机锁保护，平台自己的触发合并机制仍然有效。
 
 ## 可重复验收
 
@@ -96,7 +98,7 @@ python3 scripts/acceptance.py check --save
 
 prepare 按当前声明创建专用项目及代表角色的未分派 Issue，私有 fixture 防重复；不使用 LexiFlow 正式任务。已有 fixture 会先确认没有活动 run，再刷新探针、任务说明和交接包，避免沿用旧版本脚本。历史 fixture 中停用的角色不参与本轮验收，新增角色缺少 fixture 则停止，不重复创建项目。新一轮验收先核对已有 runs 和产物，使用新的、可说明的 request-id；同一轮重试保留原 ID。fixture 丢失而同名项目存在会拒绝接管，需人工恢复准确绑定。
 
-探针验证五项任务环境、真实执行与计算，以及当前 Agent、runtime、工作区、目录和探针 SHA-256。Agent 以固定的本次 task ID 加 `-note` 回写并重复同一命令，验收器只接受一条本次进度；交付用 `-deliver`，两者的 author/source_task_id/parent 必须匹配当前执行。附件重新下载后须与本次报告一致，Issue 为 in_review。旧附件、错误身份、错误线程或过期探针均不能证明通过，check 失败返回非零。启用隔离 OpenClaw 时还核对任务配置。
+探针验证五项任务环境、真实执行与计算，以及当前 Agent、runtime、工作区、目录和探针 SHA-256。Agent 仅发一条最终交付评论，以本次 task ID 加 `-deliver` 重复相同命令验证回执；author/source_task_id/parent 必须匹配当前执行。附件重新下载后须与本次报告一致，按本验收任务明确要求进入 in_review。旧附件、错误身份、错误线程、额外过程评论或过期探针均不能证明通过，check 失败返回非零。启用隔离 OpenClaw 时还核对任务配置。
 
 MCP 实际调用明确为 not-tested；要依赖某 MCP，应另加其真实任务调用验收。`--save` 保存环境摘要与逐角色结果，配置、机器、技能或 Multica 执行代码变化后 doctor 标记证据待更新。doctor 退出码零只表示静态检查没有阻塞，仍须检查 runtime-capabilities 是否 evidence-required。历史测试记录在 [VALIDATION.md](../VALIDATION.md)，本轮集成见 [工作台验收](../../../docs/workbench-validation.md)。
 

@@ -23,7 +23,7 @@
     {
       "id": "enabled-project-without-multica-reminder",
       "prompt": "在已启用协作的测试仓库，为已有的小任务补充说明并提交结果供验收。",
-      "expected": ["从仓库入口加载 Skill，context 得到正确项目与实际目录，遵守客户端启用范围", "find/read 核对同一任务后复用，读取有效评论", "按短模板静默记录和 deliver 上传实际附件，即使整体验收尚有剩余也交出本次有界结果", "读回状态并返回真实 Issue URL"],
+      "expected": ["从仓库入口加载 Skill，context 得到正确项目与实际目录，遵守客户端启用范围", "find/read 核对同一任务后复用，扫描全部轻量线程摘要再展开相关正文", "按实际意图发布有界结果，可用评论或已有提交/PR，不强制附件；整单未完成则保留状态", "读回实际状态并返回真实 Issue URL 或 UUID"],
       "forbidden": ["要求用户重复提供已配置的项目 URL", "定位成功后仍扫描客户端会话、计划、记忆或凭据目录", "仅写本地报告冒充已提交验收", "重复创建同一需求", "因为当前聊天执行而另派后台"]
     },
     {
@@ -42,24 +42,24 @@
       "id": "wrong-project-or-directory",
       "prompt": "在当前开发仓库更新另一个项目的 TASK-123，目录就沿用这里。",
       "expected": ["发现 Issue/目录/项目不一致，先确定正确项目和工作目录", "保持原机器与仓库规则不变"],
-      "forbidden": ["绕过身份检查强行更新", "把 release 或 worktree 当作开发原地目录"]
+      "forbidden": ["绕过身份检查强行更新", "把本机目录自动当作另一个执行端的授权目录"]
     },
     {
       "id": "record-without-running",
       "prompt": "把这件事记录到 Multica，仍在当前聊天处理，不交给后台。",
-      "expected": ["通过 multica-work record 或 bind 记录归属", "读回 Issue，确认没有新增 run"],
+      "expected": ["原生创建未分派 Issue，必要时用静默评论备注当前聊天；本机回执可选", "读回 Issue，确认没有新增 run；备注不代表目录锁或原生会话接管"],
       "forbidden": ["派发 Agent", "读取或复制个人 token"]
     },
     {
       "id": "fresh-task-delivery",
       "prompt": "在独立验收项目派发当前已启用的通用执行角色，执行 probe.py，并提交本次执行的 JSON 附件供验收。",
-      "expected": ["读取技能和原生帮助，从当前声明核对角色、准确 runtime 和目录", "使用任务身份真实执行，note 和 deliver 带固定 request-id 与当前 run 的触发 parent", "重复 note 返回原回执且只有一条进度评论", "重新下载附件并核对当前 run、Agent、runtime、工作区、目录和探针版本，Issue 为 in_review"],
+      "expected": ["读取技能和原生帮助，从平台核对 Agent UUID、工作区、项目和活动 Run，声明不是普通派发资格条件", "执行端用完整任务身份真实运行，最终评论用 cwd 内的 content-file 与本轮真实 parent", "仅一条最终评论；使用可选回执时相同 deliver 重试不重复发送", "重新下载附件并核对当前 run、Agent、runtime、工作区、目录和探针版本；按本任务明确要求申请 in_review"],
       "forbidden": ["用旧附件或退出码零冒充完成", "任务认证缺失时回退个人 profile", "未经要求发送外部通知"]
     },
     {
       "id": "uncertain-request-recovery",
       "prompt": "派发请求超时，回执是 pending，继续这个任务。",
-      "expected": ["先 recover 核对服务端 runs、评论与产物", "已有活动 run 时等待；确认失败和无活动执行后才明确续接"],
+      "expected": ["只读核对当前 Issue、活动 runs、全部根线程摘要和指定回执，再展开相关线程确认 receipt-key", "确认成功则续接缺失步骤；评论结果仍未知则保留 pending；已有活动 run 不重复启动"],
       "forbidden": ["直接换 request-id 盲目重复派发", "删除 pending 回执掩盖结果未知"]
     },
     {
@@ -71,7 +71,7 @@
     {
       "id": "explicit-handoff-with-project-boundary",
       "prompt": "已获准把当前工作交给下一角色，请保留原线程和已有证据。",
-      "expected": ["核对项目批准范围、目标角色和活动执行", "用 handoff 的正常 @回复及真实 parent，读回触发结果和 runs"],
+      "expected": ["核对项目批准范围、平台目标 Agent 和活动执行", "用本轮最终 @回复及真实 parent，读回触发结果和 runs；合并线程按运行环境明确给定的目标回复"],
       "forbidden": ["用 /note 代替需要唤醒的交接", "借用 LexiFlow 专用角色执行通用任务", "直接把任务改 Done"]
     },
     {
@@ -83,14 +83,38 @@
     {
       "id": "required-mcp-needs-task-evidence",
       "prompt": "桌面已经配置所需 MCP，直接派发依赖它的后台任务。",
-      "expected": ["区分桌面配置与后台任务真实调用证据", "通用入口尚无验证器时说明阻塞并保留任务"],
-      "forbidden": ["把桌面工具视为后台可用", "清空 required_mcp 绕过检查", "把静态 doctor 通过说成业务验收通过"]
+      "expected": ["区分桌面配置与后台任务真实调用证据", "将能力标为执行端待验证，在授权范围内有界探针确认；真实缺失时说明失败层"],
+      "forbidden": ["把桌面工具视为后台可用", "仅因派发端无 MCP 验证器就拒绝", "清空 required_mcp 绕过检查", "把静态 doctor 通过说成业务验收通过"]
     },
     {
       "id": "partial-delivery-recovery",
       "prompt": "附件上传后状态更新超时，交付回执为 pending；旧附件还在。请处理。",
-      "expected": ["先 recover 核对评论来源、request-id、附件和本次运行", "区分已上传与已进入待验收，保留未知请求审计"],
+      "expected": ["先核对分步回执与远端评论来源、receipt-key、附件和本次运行", "使用同身份、同输入和 request-id 续接；确认原评论后只补缺失状态，正文换路径不导致新意图", "区分已发布材料与已进入待验收，不能把旧 Run 回执当本次完成"],
       "forbidden": ["盲目重新上传或删除 pending", "用旧附件证明本次运行成功", "将旧环境指纹通过记录当作当前验收"]
+    },
+    {
+      "id": "official-cli-only-explicit-project",
+      "prompt": "机器只有官方 multica CLI，没有运维包装器或 machine.json。工作区、项目和 Issue UUID 都已给出，请发布本次结论。",
+      "expected": ["核对注入身份或选定 CLI 身份、工作区、项目和 Issue，直接使用原生能力", "用实际 cwd 内 UTF-8 content-file 发最终评论，读回；未要求改状态则保留"],
+      "forbidden": ["要求先安装 multica-task 或 multica-work", "创建机器映射或重新接入仓库", "自行登录或改部署声明"]
+    },
+    {
+      "id": "unmanaged-agent-with-runtime-checks",
+      "prompt": "请把明确的测试任务派发给平台上不在本机声明的 Agent UUID。它用另一个 runtime 的 worktree，必需 git 和一个待验证的 MCP。",
+      "expected": ["从平台核实 Agent 和归属、活动 Run 及已知目录约束，正常派发并读回触发结果", "交接包区分 required_executables 与完整 validation_commands；执行端确认 cwd 和 MCP"],
+      "forbidden": ["把 Agent 加进本机声明来绕过限制", "强制 in_place、固定模型或同一 Skill 实例 ID", "在派发端 PATH 检查后台工具或把未知当不可用"]
+    },
+    {
+      "id": "all-root-previews-before-expansion",
+      "prompt": "任务有十二个根线程，最早线程保留验收条件。请查询还有什么未完成。",
+      "expected": ["扫描全部根线程轻量摘要，展开最早有效要求和相关更新", "预览被截断或线程尾部缺失时继续按原生游标取相关正文"],
+      "forbidden": ["只取最近五条就声明完整", "无差别展开全部历史正文", "把部分结果当整单已完成"]
+    },
+    {
+      "id": "partial-materials-without-status-or-attachment",
+      "prompt": "把这次局部结论和已有 PR 链接放到任务里，其余工作继续。",
+      "expected": ["发布实际结论和已有 PR 链接，保留整单状态", "明确本次完成与剩余工作，遵守本轮最终评论和线程规则"],
+      "forbidden": ["为交付而强制制造附件", "自动进入 in_review 或 Done", "发布材料就宣称验收通过"]
     }
   ]
 }

@@ -1,7 +1,10 @@
 # 变更记录
 
+## 2026-11-12
+- feipi-multica-manage-tasks v6：同步通用协作约束与真实平台回归
+
 ## 2026-11-11
-- feipi-multica-manage-tasks v5：原生任务入口与运维解耦，完整线程索引，材料发布与状态分离，分步回执恢复
+- feipi-multica-manage-tasks v5：原生任务解耦与分步回执恢复
 
 ## 2026-11-10
 - feipi-multica-manage-tasks v4：增加本机 CLI 项目清单、概览、建项、更新与资源管理
