@@ -14,7 +14,7 @@ python3 "$SKILL_DIR/scripts/project.py" overview --directory "$actual_directory"
 ```
 
 - 看工作区：`projects` 先核对工作区身份，再列项目 UUID、状态、负责人 ID、计划日期、任务总数和完成数。若目标不在当前工作区，用 `multica workspace list --output json` 找用户指定的工作区，再用 `--workspace-id`；不改变默认工作区。多个候选时请用户指出目标，不对同名项目写入。
-- 看项目：项目 UUID 或链接中的 UUID 可直接用；用户说“这个仓库的项目”时用目录模式，沿用 [仓库绑定](project-setup.md)。没有唯一绑定时可以列工作区项目辅助确认，但不能从仓库名称、Git origin 或列表顺序推断归属。后台仅使用当前任务的已绑定目录查询，不切换到个人 CLI。
+- 看项目：项目 UUID 或链接中的 UUID 可直接用；用户说“这个仓库的项目”时用目录模式，沿用 [仓库绑定](project-setup.md)。没有唯一绑定时可以列工作区项目辅助确认，但不能从仓库名称、Git origin 或列表顺序推断归属。后台可使用当前平台任务明确的项目和工作区，不要求本机目录映射，也不切换到个人 CLI。
 - 看进度：项目 `done_count / issue_count` 是服务端总计，默认的一页 Issue 是明细样本。按需用 `--issue-status`（当前项目实际状态键）、`--offset`（用返回的 `next_offset`）扩展；`has_more` 为真不能宣称清单完整。没有证据时不把未完成任务判为阻塞。具体 Issue 的执行线程与回执见 [任务操作](operations.md)。
 - 看上下文：`--resources` 才拉附加资源；预览被截断时按需加 `--full-description`。映射确认了 Web 地址时返回链接；无已核实地址时返回工作区和项目 UUID，或保留用户提供且匹配该 UUID 的链接。不要用 API 地址拼 Web 链接。
 

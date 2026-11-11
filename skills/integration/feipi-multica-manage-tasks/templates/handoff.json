@@ -5,6 +5,7 @@
   "acceptance": "可执行的通过标准",
   "artifacts": [],
   "remaining": [],
-  "required_commands": [],
+  "required_executables": [],
+  "validation_commands": [],
   "required_mcp": []
 }

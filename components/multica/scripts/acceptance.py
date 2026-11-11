@@ -51,15 +51,16 @@ def prepare_files(root, keys):
     for key in keys:
         body = ('仅执行本目录的适配验收。先读取共享 feipi-multica-manage-tasks 技能及 AGENTS.md，阅读所用原生命令帮助。\n'
                 '1. 实际运行 `python3 probe.py '+key+'`；不得修改探针或伪造报告。\n'
-                '2. 使用 multica-work note 回写进度，request-id 固定为当前 MULTICA_TASK_ID 加 -note；完全相同的命令重复一次，核对 replayed_receipt=true。\n'
-                '3. 将实际执行命令、重试回执与结果写入 '+key+'-result.md。\n'
-                '4. 使用 multica-work deliver 上传 '+key+'.json 和结果说明，request-id 固定为当前 MULTICA_TASK_ID 加 -deliver；进入 in_review，不设 Done。\n'
-                '评论触发时从本 Issue runs 找到本 MULTICA_TASK_ID 的 trigger_comment_id，note 和 deliver 都传真实 --parent。\n'
+                '2. 将实际执行命令与结果写入 '+key+'-result.md，不另发过程评论。\n'
+                '3. 仅发布一条最终评论：multica-work deliver 显式传本任务 project UUID 和 --status in_review，上传 '+key+'.json，request-id 为当前 MULTICA_TASK_ID 加 -deliver；不设 Done。\n'
+                '4. 完全相同的 deliver 命令重复一次，核对 replayed_receipt=true 且仍只有一条最终评论。\n'
+                '从本 Issue runs 找到当前 MULTICA_TASK_ID 的 trigger_comment_id，deliver 传真实 --parent；后台不传个人 profile。\n'
                 '这次不要求 MCP 调用，报告中保留 not-tested；不推测桌面工具后台可用。禁止委派、外部消息和访问任何凭据。\n')
         (root / (key+'-task.md')).write_text(body)
         handoff = {'objective':body,'scope':'仅当前验收目录与此 Issue；按 AGENTS.md；不委派，不发送外部消息',
-                   'directory':str(root),'acceptance':'probe 真实执行；任务身份与评论线程正确；重复 note 仅一次副作用；本次 JSON 可重新下载；in_review',
-                   'artifacts':[], 'remaining':['执行本角色验收'], 'required_commands':['python3','multica-work','multica-task'],'required_mcp':[]}
+                   'directory':str(root),'acceptance':'probe 真实执行；身份与线程正确；最终评论重试仅一次；本次 JSON 可下载；in_review',
+                   'artifacts':[], 'remaining':['执行本角色验收'], 'required_executables':['python3','multica-work','multica'],
+                   'validation_commands':['python3 probe.py '+key], 'required_mcp':[]}
         private_write(root / (key+'-packet.json'), handoff)
 
 
@@ -91,9 +92,10 @@ def prepare():
         body = root / (key + '-task.md')
         args = type('Args', (), {})()
         args.action='record'; args.project=project['id']; args.title='适配验收：'+key
+        args.profile=m['profile'];args.workspace_id=m['workspace_id'];args.server_url=m['server_url']
         args.body_file=str(body);args.request_id='adaptation-v1-record-'+key;args.parent=None
         result = work.run(args)
-        fixture['issues'][key] = result['issue_id']
+        fixture['issues'][key] = result['result']['id']
         private_write(INDEX, fixture)
     return fixture
 
@@ -120,9 +122,6 @@ def check():
         current = [c for c in comments if c.get('source_task_id') == latest.get('id')
                    and c.get('author_type') == 'agent' and c.get('author_id') == expected['agent_id']
                    and c.get('parent_id') == latest.get('trigger_comment_id')]
-        progress = [c for c in current if ('request-id: '+str(latest.get('id'))+'-note') in c.get('content', '').splitlines()
-                    and c.get('content', '').startswith('/note\n')
-                    and not c.get('attachments')]
         deliveries = [c for c in current if ('request-id: '+str(latest.get('id'))+'-deliver') in c.get('content', '').splitlines()
                       and c.get('content', '').startswith('/note\n')]
         verified = False
@@ -138,9 +137,8 @@ def check():
                 verified |= bool(report) and downloaded == report
         results[key] = {'issue_id':issue,'runs':[{k:r.get(k) for k in ['id','status','agent_id','runtime_id','workspace_id','work_dir','trigger_comment_id']} for r in runs],
                         'issue_status':issue_data.get('status'),'probe':report,'attachment_verified':verified,
-                        'expected': expected, 'progress_verified': len(progress) == 1,
-                        'delivery_verified': len(deliveries) == 1,
-                        'comment_ids': [c['id'] for c in progress + deliveries],
+                        'expected': expected, 'delivery_verified': len(deliveries) == 1 and len(current) == 1,
+                        'comment_ids': [c['id'] for c in deliveries],
                         'attachment_count':sum(len(c.get('attachments') or []) for c in comments)}
     return results
 
@@ -154,7 +152,7 @@ def passed(value):
             and report.get('token_kind') == 'task' and report.get('calculation') == 5
             and value['issue_status'] == 'in_review' and value.get('attachment_verified', False)
             and latest.get('id') == report.get('task_id') and latest.get('status') == 'completed'
-            and bool(expected) and value.get('progress_verified', False) and value.get('delivery_verified', False)
+            and bool(expected) and value.get('delivery_verified', False)
             and all(report.get(k) == expected.get(k) for k in ['agent_key','agent_id','workspace_id','cwd','probe_sha256'])
             and all(latest.get(k) == expected.get(k) for k in ['agent_id','runtime_id','workspace_id'])
             and latest.get('work_dir') == expected.get('cwd'))
@@ -183,7 +181,9 @@ def main():
         fixture=read_json(INDEX)
         if not fixture: raise AdaptError('先 prepare')
         args=type('Args',(),{})()
-        args.action='dispatch'; args.issue=fixture['issues'][a.agent];args.agent=a.agent
+        m=machine()
+        args.action='dispatch'; args.issue=fixture['issues'][a.agent];args.agent=m['agents'][a.agent]
+        args.project=fixture['project_id'];args.profile=m['profile'];args.workspace_id=m['workspace_id'];args.server_url=m['server_url']
         args.packet=str(Path(fixture['root'])/(a.agent+'-packet.json'));args.request_id=a.request_id;args.parent=None
         result=work.run(args)
     print(json.dumps(result,ensure_ascii=False,indent=2))

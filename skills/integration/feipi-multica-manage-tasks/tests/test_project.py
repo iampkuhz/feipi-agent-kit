@@ -141,12 +141,14 @@ class Project(unittest.TestCase):
             with self.assertRaises(project.ContextError) as error:
                 project.cli(self.config, 'workspace', 'get')
             self.assertNotIn('secret-token', str(error.exception))
-            self.assertEqual(run.call_args.kwargs['env']['MULTICA_PERSONAL_PROFILE'], 'isolated')
+            self.assertIn('--profile', run.call_args.args[0])
+            self.assertIn('isolated', run.call_args.args[0])
+            self.assertNotIn('multica-task', run.call_args.args[0][0])
         env = dict(zip(project.TASK_FIELDS, ['mat_test', 'run', 'agent', 'workspace', 'http://localhost:8080']))
         with patch.dict(os.environ, env), patch.object(project.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, '{}', '')) as run:
             project.cli(self.config, 'workspace', 'get')
-            self.assertNotIn('MULTICA_PERSONAL_PROFILE', run.call_args.kwargs['env'])
-            self.assertEqual(run.call_args.kwargs['env']['MULTICA_TASK_ID'], 'run')
+            self.assertNotIn('--profile', run.call_args.args[0])
+            self.assertIsNone(run.call_args.kwargs['env'])  # 完整继承任务环境。
 
     def test_native_catalog_pins_workspace_and_rejects_foreign_result(self):
         workspace_id = str(uuid.uuid4())
@@ -274,10 +276,10 @@ class Project(unittest.TestCase):
                      'created_at': '2026-11-%02d' % n} for n in range(1, 9)]
         with patch.object(project, 'cli', side_effect=[self.issue(description='d' * 3000),
                                                      [{'id': 'run', 'status': 'running', 'error_message': 'private'}], comments]) as cli:
-            result = project.read(self.config, ctx, 'TASK-1')
+            result = project.read(self.config, ctx, 'TASK-1', with_runs=True)
         self.assertEqual(len(result['description']), 1600)
         self.assertTrue(result['description_truncated'])
-        self.assertEqual(len(result['comments']), 5)
+        self.assertEqual(len(result['comments']), 8)
         self.assertTrue(result['comments_may_be_incomplete'])
         self.assertEqual(result['comments'][0]['id'], '8')
         self.assertEqual(cli.call_args_list[1].args[1:], ('issue', 'runs', 'issue', '--active'))
@@ -286,12 +288,25 @@ class Project(unittest.TestCase):
 
     def test_read_expands_selected_thread_with_bounded_native_tail(self):
         ctx = self.ctx()
-        with patch.object(project, 'cli', side_effect=[self.issue(description='d' * 3000), [], []]) as cli:
+        with patch.object(project, 'cli', side_effect=[self.issue(description='d' * 3000), []]) as cli:
             result = project.read(self.config, ctx, 'TASK-1', 'thread', 3, True)
         self.assertEqual(len(result['description']), 3000)
         self.assertFalse(result['description_truncated'])
         self.assertEqual(cli.call_args.args[-4:], ('--thread', 'thread', '--tail', '3'))
         self.assertTrue(result['comments_may_be_incomplete'])
+
+    def test_explicit_project_needs_only_native_cli_and_full_task_identity_is_accepted(self):
+        with patch.object(project, 'native_workspace', return_value=(
+                {'id': 'workspace'}, lambda *args: {'id': 'project', 'workspace_id': 'workspace'})):
+            config, ctx = project.explicit_project('isolated', 'workspace', 'project')
+        self.assertTrue(config['_explicit'])
+        self.assertEqual(ctx['source'], 'explicit-platform-project')
+        env = dict(zip(project.TASK_FIELDS, ['mat_task', 'run', 'agent', 'workspace', 'http://localhost:8080']))
+        with patch.dict(os.environ, env), patch.object(project, 'run_json', return_value={'id': 'workspace'}) as call:
+            workspace, query = project.native_workspace(None, 'workspace')
+            query('project', 'get', 'project')
+            self.assertNotIn('--profile', call.call_args.args[0])
+            self.assertEqual(workspace['id'], 'workspace')
 
 
 if __name__ == '__main__':

@@ -1,4 +1,6 @@
-# 项目定位与启用
+# 从本地仓库发现项目（可选）
+
+平台已提供明确项目、Issue 或任务上下文时，直接使用原生 CLI 或查询辅助入口的 `--project-id`，无需 machine.json 和固定格式的仓库入口。以下机器映射只用于“当前仓库对应哪个项目”的自动发现；不能成为全部查询、写入或派发的前提。
 
 ## 配置只保留一个来源
 
@@ -23,7 +25,7 @@
 }
 ```
 
-这只是字段示例，不能覆盖现有 machine.json，daemon、runtime、Agent 和其他项目字段须保留。尚无绑定时，使用 `multica-task project list/get` 与 `project resource list` 核对现有项目；用户明确要求接入后，按 Multica 运维流程备份并补充对应 projects 项。没有唯一匹配时集中询问项目归属，不按同名或相同 Git origin 自动接管。新建项目须有相应意图，不能因查询失败就创建。
+这只是字段示例，不能覆盖现有 machine.json，daemon、runtime、Agent 和其他项目字段须保留。尚无绑定时，使用官方 `multica project list/get` 与 `project resource list` 核对项目；用户只要求本次平台操作时使用明确的 ID 即可。只有要求永久自动发现时才按运维流程备份并补充 projects。没有唯一匹配时集中询问项目归属，不按同名或相同 Git origin 自动接管。新建项目须有相应意图，不能因查询失败就创建。
 
 每次 context 校验当前 CLI 工作区与项目 UUID，返回项目 URL、实际目录用途和 enabled。项目 URL 来自现有 app_url、服务端 workspace slug 和项目 UUID，不猜 URL 中的工作区名称。任务身份优先，缺任务字段或与本机映射冲突时停止，不回退个人 profile。
 
@@ -49,7 +51,7 @@ Multica 项目键：`project-key`
 Codex 按仓库协作规则加载 `feipi-multica-manage-tasks`。
 ```
 
-开发目录、release 目录分别启用，主仓库启用不自动授权发布仓库。原生 Git worktree 通过 git-common-dir 找回项目，同时保留实际工作目录；项目键不会把 worktree 冒充原地目录，也不会绕过 multica-work 的派发限制。嵌套 Git 仓库必须有自己的绑定。
+开发目录、release 目录分别启用，主仓库启用不自动授权发布仓库。原生 Git worktree 通过 git-common-dir 找回项目，同时保留实际工作目录；项目键不会把 worktree 冒充原地目录。嵌套 Git 仓库必须独立确认归属。已选定的平台项目不因缺少这些本机入口而被拒绝。
 
 ## 常见失败
 

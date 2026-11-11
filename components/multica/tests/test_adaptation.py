@@ -145,13 +145,6 @@ class Bindings(unittest.TestCase):
             self.assertEqual(http.call_count, 1)
             self.assertNotIn('openclaw-isolated', [v['check'] for v in result['checks']])
 
-    def test_dispatch_rejects_runtime_and_model_drift_before_execution(self):
-        m={'agents':{'worker':'a'},'runtimes':{'codex':{'id':'r'}}}
-        c={'agents':[{'key':'worker','runtime':'codex','model':'fixed'}]}
-        for actual in [{'id':'a','runtime_id':'another-known-runtime','model':'fixed'}, {'id':'a','runtime_id':'r','model':'unexpected'}]:
-            with patch.object(work,'machine',return_value=m), patch.object(work,'read_json',return_value=c), patch.object(work,'cli',return_value=actual) as fake:
-                with self.assertRaises(base.AdaptError): work.preflight('issue','worker',{})
-                self.assertEqual(fake.call_count,1)
     def test_idle_audit_reads_later_pages(self):
         with patch.object(base,'cli',side_effect=[([{'status':'completed'}],'next'),([{'status':'running'}],None)]) as fake:
             self.assertEqual([r['status'] for r in base.agent_runs('agent')],['completed','running'])
@@ -176,62 +169,7 @@ class Bindings(unittest.TestCase):
             self.assertNotEqual(before['SKILL.md'], after['SKILL.md'])
 
 
-class Receipts(unittest.TestCase):
-    def setUp(self):
-        self.temp = tempfile.TemporaryDirectory()
-        self.patches = [patch.object(base, 'STATE', Path(self.temp.name)), patch.object(work, 'STATE', Path(self.temp.name)), patch.object(work, 'machine', return_value={'server_url':'local', 'workspace_id':'w'})]
-        for p in self.patches: p.start()
-    def tearDown(self):
-        for p in self.patches: p.stop()
-        self.temp.cleanup()
-    def test_duplicate_has_one_side_effect(self):
-        called = []
-        def mutate(): called.append(1); return {'id':'run1'}
-        work.once('stable', {'issue':'i'}, mutate)
-        result = work.once('stable', {'issue':'i'}, mutate)
-        self.assertTrue(result['replayed_receipt'])
-        self.assertEqual(called, [1])
-        with self.assertRaises(base.AdaptError): work.once('stable', {'issue':'other'}, mutate)
-    def test_lost_response_never_replayed(self):
-        called = []
-        def mutate(): called.append(1); raise base.AdaptError('response lost')
-        with self.assertRaises(base.AdaptError): work.once('stable', {}, mutate)
-        with self.assertRaises(base.AdaptError): work.once('stable', {}, mutate)
-        self.assertEqual(called, [1])
-    def test_read_only_preflight_failure_does_not_poison_request_id(self):
-        called = []
-        def reject(): raise base.AdaptError('runtime offline')
-        def mutate(): called.append(1); return {'id':'run1'}
-        with self.assertRaises(base.AdaptError):
-            work.once('retry-ready', {}, mutate, reject)
-        self.assertEqual(called, [])
-        self.assertEqual(work.once('retry-ready', {}, mutate)['id'], 'run1')
-        self.assertTrue(work.once('retry-ready', {}, mutate, reject)['replayed_receipt'])
-        self.assertEqual(called, [1])
-    def test_note_always_silent_and_preserves_parent(self):
-        import argparse
-        path = Path(self.temp.name) / 'note.md'; path.write_text('@agent completed')
-        calls = []
-        def fake(*args, **kwargs): calls.append((args, kwargs)); return {'id':'comment'}
-        with patch.object(work, 'cli', side_effect=fake):
-            work.run(argparse.Namespace(action='note', issue='i', body_file=str(path), parent='trigger', request_id='note'))
-        self.assertEqual(len(calls), 1)
-        self.assertTrue(calls[0][1]['stdin'].startswith('/note\n'))
-        self.assertEqual(calls[0][0][-2:], ('--parent', 'trigger'))
-    def test_dispatch_backlog_uses_one_explicit_comment(self):
-        import argparse
-        calls = []
-        def fake(*args, **kwargs): calls.append((args,kwargs)); return {'id':'comment','trigger_outcomes':[{'status':'queued'}]}
-        data = dict(objective='probe',scope='here',directory=self.temp.name,acceptance='pass',artifacts=[],remaining=[],required_commands=[],required_mcp=[])
-        path=Path(self.temp.name)/'packet.json';path.write_text(json.dumps(data))
-        args=argparse.Namespace(action='dispatch',issue='i',agent='worker',packet=str(path),request_id='dispatch',parent=None)
-        with patch.object(work,'preflight',return_value={'id':'a','name':'Worker'}), patch.object(work,'cli',side_effect=fake), patch.object(work,'task_context',return_value=False):
-            work.run(args); work.run(args)
-        self.assertEqual(len(calls),2)
-        self.assertEqual(calls[0][0][-1], '--no-start')
-        self.assertIn('(mention://agent/a)',calls[1][1]['stdin'])
-        self.assertFalse(calls[1][1]['stdin'].startswith('/note'))
-
+# 通用任务与回执的行为反例统一在 test_workflow.py；运维漂移继续由 Reconcile 验证。
 
 class Reconcile(unittest.TestCase):
     def test_readback_idempotence_and_ui_runtime_drift(self):

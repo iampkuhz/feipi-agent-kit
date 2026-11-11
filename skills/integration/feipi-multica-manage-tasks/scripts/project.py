@@ -25,7 +25,19 @@ KEY_LINE = re.compile(r'^Multica 项目键：`([a-z0-9_-]+)`\s*$', re.MULTILINE)
 
 
 def in_task():
-    return any(os.environ.get(k) for k in TASK_FIELDS[:-1] + ('MULTICA_TASK_CONFIG_ROOT',))
+    return any(os.environ.get(k) for k in TASK_FIELDS[:-1] + ('MULTICA_TASK_CONFIG_ROOT', 'MULTICA_DAEMON_PORT'))
+
+
+def task_identity(profile=None, workspace_id=None):
+    if not in_task():
+        return
+    missing = [k for k in TASK_FIELDS if not os.environ.get(k)]
+    if missing:
+        raise ContextError('任务身份不完整：' + ', '.join(missing) + '；不回退个人身份。')
+    if not os.environ['MULTICA_TOKEN'].startswith('mat_'):
+        raise ContextError('任务上下文必须使用任务凭据；不回退个人身份。')
+    if profile or (workspace_id and workspace_id != os.environ['MULTICA_WORKSPACE_ID']):
+        raise ContextError('任务上下文不能切换个人 profile 或工作区。')
 
 
 def machine():
@@ -51,19 +63,40 @@ def machine():
 
 
 def cli(config, *args):
-    env = dict(os.environ)
-    if not in_task():
-        env['MULTICA_PERSONAL_PROFILE'] = config['profile']
-    command = os.environ.get('MULTICA_TASK_CLI', str(Path.home() / '.local/bin/multica-task'))
-    return run_json([command], args, env)
+    task_identity(workspace_id=config.get('workspace_id'))
+    binary = os.environ.get('MULTICA_CLI_BIN') or shutil.which('multica')
+    if not binary:
+        raise ContextError('找不到官方 multica CLI；请安装并加入 PATH，或设置 MULTICA_CLI_BIN。')
+    command = [binary]
+    if not in_task() and config.get('profile'):
+        command += ['--profile', config['profile']]
+    if config.get('server_url'):
+        command += ['--server-url', config['server_url']]
+    if config.get('_explicit'):
+        command += ['--workspace-id', config['workspace_id']]
+    return run_json(command, args)
 
 
 def run_json(command, args, env=None):
+    task_identity()
     result = subprocess.run([*command, *map(str, args), '--output', 'json'],
                             capture_output=True, text=True, env=env, timeout=30)
     if result.returncode:
-        # 原始错误可能含服务端正文，不转抄凭据或未知输出。
-        raise ContextError('Multica ' + ' '.join(args[:2]) + ' 查询失败（退出码 ' + str(result.returncode) + '）。')
+        error = result.stderr.lower()
+        kind, advice = 'cli', '核对该子命令帮助和服务状态'
+        for pattern, category, next_step in (
+                ('unauthorized', 'authentication', '核对当前身份登录或任务凭据'),
+                ('forbidden', 'permission', '核对当前身份对目标项目的权限'),
+                ('unknown flag', 'unsupported', '核对已安装 CLI 版本和子命令帮助'),
+                ('unknown command', 'unsupported', '核对已安装 CLI 版本和子命令帮助'),
+                ('connection refused', 'connection', '检查所选服务地址和连通性'),
+                ('no server configured', 'configuration', '选择已配置的 CLI profile'),
+                ('not found', 'not-found', '核对目标 UUID 和所属工作区')):
+            if pattern in error:
+                kind, advice = category, next_step
+                break
+        raise ContextError('Multica ' + ' '.join(args[:2]) + ' 失败 [' + kind + ']（退出码 '
+                           + str(result.returncode) + '）；' + advice + '。')
     try:
         return json.loads(result.stdout)
     except ValueError as exc:
@@ -143,8 +176,9 @@ def context(config, directory, key=None):
 
 
 def native_workspace(profile, workspace_id):
+    task_identity(profile, workspace_id)
     if in_task():
-        raise ContextError('后台任务只可通过当前目录绑定查看项目；不能使用个人工作区入口。')
+        workspace_id = os.environ['MULTICA_WORKSPACE_ID']
     binary = os.environ.get('MULTICA_CLI_BIN') or shutil.which('multica')
     if not binary:
         raise ContextError('找不到 multica；安装 CLI 并加入 PATH，或设置现有 MULTICA_CLI_BIN。')
@@ -230,7 +264,7 @@ def find(config, ctx, query, limit, offset):
     # 不把模糊匹配或一页无结果视为确定不存在；不自动创建或合并 Issue。
     matches = [issue_summary(ctx, item) for item in rows
                if not query or query.casefold() in ((item.get('title') or '') + ' ' + (item.get('identifier') or '')).casefold()]
-    return {'project_url': ctx['project_url'], 'issues': matches, 'match_scope': 'title-and-identifier',
+    return {'project_url': ctx.get('project_url'), 'issues': matches, 'match_scope': 'title-and-identifier',
             'scanned': len(rows), 'offset': offset, 'has_more': page['has_more'],
             'next_offset': page['next_offset'],
             'notice': '标题匹配只用于找候选；分页未读完不能认定不存在，候选需 read 核对范围。'}
@@ -241,17 +275,18 @@ def clip(value, limit):
     return text[:limit], len(text) > limit
 
 
-def read(config, ctx, issue, thread=None, limit=5, full_description=False):
+def read(config, ctx, issue, thread=None, limit=5, full_description=False, with_runs=False):
     item = cli(config, 'issue', 'get', issue)
     value = issue_summary(ctx, item)
     value['description'], value['description_truncated'] = clip(item.get('description'),
                                                                sys.maxsize if full_description else 1600)
-    runs = cli(config, 'issue', 'runs', item['id'], '--active')
-    value['active_runs'] = [{k: run.get(k) for k in ('id', 'agent_id', 'status', 'trigger_comment_id', 'started_at')} for run in runs]
+    if with_runs:
+        runs = cli(config, 'issue', 'runs', item['id'], '--active')
+        value['active_runs'] = [{k: run.get(k) for k in ('id', 'agent_id', 'status', 'trigger_comment_id', 'started_at')} for run in runs]
     args = ('--thread', thread, '--tail', str(limit)) if thread else ('--roots-only', '--summary')
     comments = cli(config, 'issue', 'comment', 'list', item['id'], *args)
     comments.sort(key=lambda c: (c.get('last_activity_at') or c.get('created_at') or '', c['id']), reverse=True)
-    selected = comments if thread else comments[:limit]
+    selected = comments  # 根索引保留所有轻量摘要；limit 仅限制展开线程的回复。
     value['comments'] = []
     for c in selected:
         text, truncated = clip(c.get('content'), 1600 if thread else 360)
@@ -259,8 +294,8 @@ def read(config, ctx, issue, thread=None, limit=5, full_description=False):
                                                           'created_at', 'last_activity_at', 'reply_count')},
                                   'content': text, 'content_truncated': truncated or bool(c.get('content_truncated')),
                                   'attachments': [{k: a.get(k) for k in ('id', 'filename')} for a in c.get('attachments') or []]})
-    value['comments_mode'] = 'thread-tail' if thread else 'root-previews'
-    value['comments_may_be_incomplete'] = bool(thread) or len(comments) > limit or any(
+    value['comments_mode'] = 'thread-tail' if thread else 'all-root-previews'
+    value['comments_may_be_incomplete'] = bool(thread) or any(
         c.get('content_truncated') or c.get('reply_count') for c in value['comments'])
     value['read_more'] = '按评论 ID 使用 read ISSUE --thread ID；完整需求用 --full-description；完整线程/更早评论用原生 CLI 游标。'
     return value
@@ -337,6 +372,17 @@ def project_query(args):
                     args.resources, args.full_description)
 
 
+def explicit_project(profile, workspace_id, project_id):
+    workspace, query = native_workspace(profile, workspace_id)
+    item = query('project', 'get', project_id)
+    project_summary(item, workspace['id'], project_id)
+    config = {'profile': profile, 'workspace_id': workspace['id'], '_explicit': True}
+    if in_task():
+        config['server_url'] = os.environ['MULTICA_SERVER_URL']
+    return config, {'workspace_id': workspace['id'], 'project_id': project_id,
+                    'enabled': False, 'source': 'explicit-platform-project'}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='action', required=True)
@@ -344,6 +390,10 @@ def main():
         p = sub.add_parser(action)
         p.add_argument('--directory', default='.', help='实际工作目录，默认当前目录')
         p.add_argument('--project', help='机器 projects 中的逻辑键；仍核对目录归属')
+        if action != 'enable':
+            p.add_argument('--project-id', type=full_uuid, help='明确的平台项目 UUID；无需目录映射')
+            p.add_argument('--profile', help='已配置的 CLI profile；后台不允许切换')
+            p.add_argument('--workspace-id', type=full_uuid, help='明确的工作区 UUID')
         if action == 'find':
             p.add_argument('--query', default='', help='当前页的标题/编号包含匹配，不是语义去重')
             p.add_argument('--limit', type=int, default=50, choices=range(1, 101), metavar='1..100')
@@ -353,6 +403,7 @@ def main():
             p.add_argument('--thread', help='需要展开的评论线程 ID')
             p.add_argument('--limit', type=int, default=5, choices=range(1, 21), metavar='1..20')
             p.add_argument('--full-description', action='store_true')
+            p.add_argument('--runs', action='store_true', help='按需读取活动运行')
         if action == 'enable':
             p.add_argument('--apply', action='store_true', help='默认只预览；显式追加仓库入口，不创建项目或派发任务')
     projects = sub.add_parser('projects', help='查询本机 CLI 工作区的项目清单')
@@ -375,14 +426,21 @@ def main():
     if a.action in ('projects', 'overview'):
         result = project_query(a)
     else:
-        config = machine()
-        ctx = context(config, a.directory, a.project)
+        if getattr(a, 'project_id', None):
+            if a.project:
+                raise ContextError('平台项目 UUID 与本机项目键二选一。')
+            config, ctx = explicit_project(a.profile, a.workspace_id, a.project_id)
+        else:
+            if getattr(a, 'profile', None) or getattr(a, 'workspace_id', None):
+                raise ContextError('显式 profile/工作区需配合 --project-id，或使用已有目录绑定。')
+            config = machine()
+            ctx = context(config, a.directory, a.project)
         if a.action == 'context':
             result = ctx
         elif a.action == 'find':
             result = find(config, ctx, a.query, a.limit, a.offset)
         elif a.action == 'read':
-            result = read(config, ctx, a.issue, a.thread, a.limit, a.full_description)
+            result = read(config, ctx, a.issue, a.thread, a.limit, a.full_description, a.runs)
         else:
             result = enable(ctx, a.apply)
     print(json.dumps(result, ensure_ascii=False, indent=2))

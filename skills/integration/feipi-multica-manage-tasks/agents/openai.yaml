@@ -1,5 +1,5 @@
-version: 4
+version: 5
 interface:
   display_name: "Multica 项目与任务协作"
   short_description: "用本机 CLI 管理 Multica 项目与资源，协作处理 Issue、派发和验收。"
-  default_prompt: "请使用 $feipi-multica-manage-tasks，先区分项目管理和 Issue 协作。查看项目清单、进度和资源时核实工作区与项目；明确要求修改时按原生 CLI 操作并读回。任务协作先核对实际仓库绑定，按用户意图记录、执行、派发或提交验收。"
+  default_prompt: "请使用 $feipi-multica-manage-tasks，以官方 CLI 核对身份、工作区、项目和 Issue，按用户意图查询、修改、派发或发布结果。明确项目无需本机运维映射；遵守当前平台的最终评论和线程契约，材料发布与整单状态分开，未知结果先核对再重试。"

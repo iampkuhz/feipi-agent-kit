@@ -32,8 +32,8 @@ class Evidence(unittest.TestCase):
         (self.root / (self.key+'.json')).write_text(json.dumps(self.report))
         self.runs = [{'id': 'run', 'status': 'completed', 'agent_id': 'agent', 'runtime_id': 'runtime',
                       'workspace_id': 'workspace', 'work_dir': str(self.root), 'trigger_comment_id': 'trigger'}]
-        self.comments = [self.comment('progress', 'note'), self.comment('delivery', 'deliver')]
-        self.comments[1]['attachments'] = [{'id': 'attachment', 'filename': self.key+'.json'}]
+        self.comments = [self.comment('delivery', 'deliver')]
+        self.comments[0]['attachments'] = [{'id': 'attachment', 'filename': self.key+'.json'}]
         for target, name, value in [(acceptance, 'STATE', self.root/'state'), (acceptance, 'INDEX', self.index),
                                     (acceptance, 'machine', lambda: self.machine), (acceptance, 'active_agents', lambda: [self.key]),
                                     (acceptance, 'cli', self.native)]:
@@ -61,7 +61,7 @@ class Evidence(unittest.TestCase):
     def test_complete_current_task_evidence_passes(self):
         value = self.value()
         self.assertTrue(acceptance.passed(value))
-        self.assertEqual(value['comment_ids'], ['progress', 'delivery'])
+        self.assertEqual(value['comment_ids'], ['delivery'])
 
     def test_report_identity_directory_and_probe_version_must_match(self):
         good = self.value()
@@ -85,17 +85,17 @@ class Evidence(unittest.TestCase):
                 self.assertFalse(acceptance.passed(self.value()))
                 self.comments = original
 
-    def test_duplicate_progress_or_missing_current_request_marker_fails(self):
+    def test_duplicate_final_or_missing_current_request_marker_fails(self):
         self.comments.append(copy.deepcopy(self.comments[0]))
         self.assertFalse(acceptance.passed(self.value()))
         self.comments.pop()
         self.comments[0]['content'] = '只有旧的完成说明'
         self.assertFalse(acceptance.passed(self.value()))
 
-    def test_non_silent_comment_and_prefix_request_marker_cannot_certify_progress(self):
-        self.comments[0]['content'] = '普通回复\nrequest-id: run-note'
+    def test_non_silent_comment_and_prefix_request_marker_cannot_certify_final(self):
+        self.comments[0]['content'] = '普通回复\nrequest-id: run-deliver'
         self.assertFalse(acceptance.passed(self.value()))
-        self.comments[0]['content'] = '/note\nrequest-id: run-note-other'
+        self.comments[0]['content'] = '/note\nrequest-id: run-deliver-other'
         self.assertFalse(acceptance.passed(self.value()))
 
     def test_old_attachment_content_cannot_replace_current_report(self):
