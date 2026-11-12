@@ -25,6 +25,8 @@ Skill 根目录的 `maintenance/` 是源码维护专用目录，包含非空 `RE
 - `expected`：必须出现的行为；
 - `forbidden`：不得出现的行为。
 
+涉及内容质量时，用原始材料独立制定判定标准，保留能暴露业务损失的输入。存在 fixtures 时注明准备方法；评估者只获得请求、当前 Skill 和原始材料，不提前看到预期答案或修复提示。实际产物、遗漏和验证覆盖由审阅者核对，不能用 cases.json 能解析或关键词匹配宣称语义通过。治理 Skill 的运行方法见其 `evals/README.md`。
+
 ## 加载与安装
 
 - 普通 skill 的 `SKILL.md` 不引用 `tests/`、`evals/` 或开发命令。

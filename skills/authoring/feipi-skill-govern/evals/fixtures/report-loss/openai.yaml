@@ -1,0 +1,5 @@
+version: 1
+interface:
+  display_name: "问题报告"
+  short_description: "根据问题清单生成本地报告与用户通知文本。"
+  default_prompt: "使用 $feipi-issues-build-report 生成问题报告和本地通知。"

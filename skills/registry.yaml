@@ -9,7 +9,7 @@ skills:
   - name: feipi-skill-govern
     path: skills/authoring/feipi-skill-govern
     layer: authoring
-    description: Skill 治理（命名、触发、验证边界）
+    description: Skill 治理（功能交付契约、业务效果及工程边界）
     clients: [claude, codex]
     entry: SKILL.md
     validation:

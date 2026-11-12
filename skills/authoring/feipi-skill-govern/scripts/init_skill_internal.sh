@@ -261,7 +261,7 @@ sed \
 
 DISPLAY_NAME="$TITLE"
 SHORT_DESCRIPTION="使用中文完成目标任务，并输出可核验交付结果。"
-DEFAULT_PROMPT="请先确认用户目标、输入、边界和成功标准，再按 Explore -> Plan -> Implement -> Verify 执行；默认只读取必要上下文，优先复用本 skill 本地 scripts、references、assets，输出需包含验证步骤、验证结果和剩余风险。"
+DEFAULT_PROMPT="请使用 \$$SKILL_NAME 完成目标任务；按入口的功能规约交付可核对的业务结果，输入不足时说明具体缺口，并如实区分已验证结果和未验证项。"
 
 sed \
   -e "s/{{DISPLAY_NAME}}/$DISPLAY_NAME/g" \
@@ -280,3 +280,4 @@ sed \
 chmod +x "$ROOT_DIR/tests/run.sh"
 
 echo "已初始化: $(relative_display_path "$ROOT_DIR")"
+echo "这是待完善的脚手架；请补齐功能规约、业务案例与实际验证，结构通过不代表业务可用。"

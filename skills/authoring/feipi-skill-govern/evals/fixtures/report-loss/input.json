@@ -1,0 +1,23 @@
+[
+  {
+    "skill": "feipi-notes-collect-pages",
+    "problem": "分页响应的 continuation 被忽略，只处理第一页",
+    "impact": "第二页的三条笔记未进入归档",
+    "status": "open",
+    "reason": "尚未修复分页处理"
+  },
+  {
+    "skill": "feipi-notes-collect-pages",
+    "problem": "附件说明被当作标题合并，同名附件丢失",
+    "impact": "两份不同附件仅保留一份",
+    "status": "fixed",
+    "reason": "本轮已按附件 ID 分别归档并核对两份文件"
+  },
+  {
+    "skill": "feipi-mail-fetch-messages",
+    "problem": "缺少邮箱读取凭据，无法取得邮件正文",
+    "impact": "无法确认摘要是否完整",
+    "status": "unknown",
+    "reason": "需要有效凭据后才能验证，当前不能判定已修复"
+  }
+]

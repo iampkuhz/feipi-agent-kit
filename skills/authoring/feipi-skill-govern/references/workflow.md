@@ -1,97 +1,49 @@
-# 工作流与执行边界
+# 验证与纠偏
 
-## 总原则
+本文件负责怎样证明结果及怎样定位失败；阶段与交付契约见 [governance-process.md](governance-process.md)。
 
-- 先规则后实现：先锁定真规则和边界，再修改文件。
-- 目标收敛：默认只治理一个目标 skill。
-- 治理优先：先修命名、触发、执行、脚本归位、验证闭环，再做纯文案整理。
-- 验证优先：没有结构校验、行为校验和旧规则残留搜索，就不算完成。
+## 修改前确定预期
 
-## 执行顺序
+从用户目标和原始输入独立制定成功案例与失败案例，写明输入、应保留的信息、应有行为和可接受的不足。已有测试和当前输出都是待检查对象，不能反过来定义正确结果。用户纠正过的每项业务损失加入回归案例。
 
-1. Scope
-- 判断任务是否真的是 skill 治理任务。
-- 锁定 `target_skill` 或用户明确要求的 registry 全集、`task_type`、`allowed_shared_files`。
-- 默认不扩散到其他 skills；用户明确要求全仓审计时，按 registry 全集执行并分组收口。
+## 三类证据分别判断
 
-2. Step 1 基线审计
-- 先读目标源码 `<target_skill>/maintenance/README.md` 与 `<target_skill>/maintenance/terminology.md`；缺失项纳入本次修复，先明确业务对象及名称边界。
-- 读取 `SKILL.md`、`agents/openai.yaml`、直接使用到的 `references/`、`scripts/`、`assets/`、`templates/`。
-- 按授权范围递归检查脚本与测试代码中的绝对路径、临时路径、平台专属命令和未声明依赖。
-- 输出问题清单，标记命名、layer、触发、执行、资源、脚本归位、验证状态。
+| 类型 | 检查什么 | 有效证据 | 不能推出的结论 |
+|---|---|---|---|
+| 技术 / technical | 确定性逻辑、结构、格式、引用、输入绑定、打包安装 | 真实命令及结果、正反例、实际安装内容 | 单测成功不能证明分析正确；报告存在不能证明内容完整 |
+| 语义 / semantic | Agent 是否理解输入并交付足够完整、准确的业务结果 | 真实 Agent 执行产物与来源逐项核对，记录遗漏、误判与不确定性 | 关键词、固定标题、模拟答复或用例 JSON 解析成功不能证明效果通过 |
+| 链路 / integration | 实际输入经功能、脚本、报告到用户可见结果的传递 | 实际接口或隔离环境的完整调用及最终产物；授权后外部接收证据 | dry-run、本地模拟发送不能证明真实服务收到；中间结果正确不能证明下游没有丢失 |
 
-3. Step 1.5 命名与归位评审
-- 仅在命名、路径、layer 有争议时进入此步。
-- 严格按 `domain -> action -> object -> layer` 决策。
-- 若旧 rename 结论来自 action-first 规则，只能记录为待重审，不能直接沿用。
+每类结论记录通过、失败、未验证或不适用，并给出证据或具体原因。不适用是能力边界判断，不能拿来替代执行失败。一个结果可同时提供多类证据，但分别说明支持哪项结论。
 
-4. Step 2 定点修复
-- 新建或本次治理的目标补齐源码维护入口与术语表，设计资料按需保存；业务运行必需内容仍放 `references/`，不批量迁移其他 Skill。
-- 先改最影响结果稳定性的文件。
-- 触发问题：优先改 frontmatter、`agents/openai.yaml`。
-- 执行问题：优先改 `SKILL.md`、直接关联的 `references/`。
-- 资源和脚本问题：优先改本地 `scripts/`、`assets/`、`templates/`，不要继续把仓库级包装器当核心依赖。
-- 全仓审计修复时，按 skill 分组修改，更新每个受影响 skill 的版本和 `CHANGELOG.md`。
-- 临时治理文档：只输出到仓库根 `tmp/` 或系统临时目录，禁止写回 skill 内部。
+简单改动按实际影响选择验证；涉及语义能力的改动要做真实 Agent 效果评估。给独立评估者现实请求、当前 skill 和最小原始材料，隐藏预期答案与修复提示；在隔离工作区执行，依据实际产物复核。无法运行时明确未验证环节，不能用单测降格替代。
 
-5. Step 3 验证与收口
-- 结构校验：`bash scripts/validate.sh <skill-dir> --require-maintenance`。
-- 行为校验：`bash tests/run.sh` 或更贴近目标 skill 的本地 test。
-- 平台/路径校验：`python3 scripts/check_portability.py <skill-dir>`；全仓由 `python3 scripts/harness/validate_skill_layout.py` 调用。
-- 旧规则残留搜索：搜索旧命名文本、过时模板占位符、旧入口依赖。
-- 版本与记录：按 `references/version-changelog-policy.md` 收口。
+## 信息完整性链路
 
-## 文件与问题映射
+逐项追踪“来源 → 功能结果 → 报告 → 用户通知”。检查具体内容：问题是什么、影响什么、修复或未解决的结果、证据与限制。稳定 ID 便于引用，但 ID 和 Skill 名称都不代替问题内容。
 
-- 命名 / layer 问题：
-  改 `references/naming-conventions.md`、`references/skill-layering-policy.md`、相关脚本校验逻辑。
-- 误触发 / 漏触发：
-  改 frontmatter 与 `agents/openai.yaml`。
-- 执行边界不清：
-  改 `SKILL.md` 与 `references/governance-process.md`。
-- 模板漂移：
-  改 `templates/` 与 `references/governance-artifacts.md` 的字段约束，不把临时治理文档提交进 skill。
-- 本地闭环不足：
-  改 `scripts/init_skill*.sh`、`scripts/validate.sh`、`tests/run.sh`。
+对有摘要、去重或重排的功能，检查各来源的独有信息是否保留，证据不足是否准确表达。回归至少覆盖完整输入、业务内容遗漏、部分失败；恢复功能还要覆盖过期输入与缺交。
 
-## 共享文件边界
+外部服务以实际协议验证成功和失败响应，不能因 HTTP 成功或进程退出零就声称业务成功。需要用户授权的外发未获授权时，只完成可独立验证部分，报告待发送内容与缺少的授权；用户已有授权则继续执行。不涉及外部服务的能力用本地真实调用验证，不人为新增通知渠道。
 
-- 默认只允许修改目标 skill 自身文件。
-- 仅当模板、脚本或共享规则与目标 skill 直接绑定时，才允许连带修改对应共享文件。
-- README、CHANGELOG 只有在入口、命令、版本或治理说明直接变化时才同步。
-- 发现其他 skill 的问题时，记录到待重审清单，不顺手扩散修改。
+## 失败定位后再修改
 
-## 失败处理
+| 证据显示的断点 | 先检查与修改 | 需要复验的消费者 |
+|---|---|---|
+| 预期缺失或相互矛盾 | 对应功能规约 | 实现、模板、评估预期 |
+| 原始材料缺少事实或有冲突 | 材料及不足表达 | 分析结果、报告和通知 |
+| 材料齐全，Agent 漏交或误判 | 功能提示、上下文与交付 | 分析产物及其下游 |
+| Agent 已交付，程序丢字段或错误聚合 | 脚本处理及数据契约 | 报告生成、展示与通知 |
+| 数据齐全，最终不可见或表达失真 | 展示、摘要或通知模板 | 用户实际看到的结果 |
 
-- 目标不清：默认收敛到用户明确点名的 skill。
-- 与无关改动冲突：先停下来缩小影响面，不回滚别人的改动。
-- 无法验证：写清阻塞点、未覆盖环节和风险。
-- 历史流程已失真：暂停后续 Step 2x，回到 Step 1 重新建基线。
+同一问题可跨环节，但先找首次信息丢失的位置。不要一律向总入口追加提示词，也不要为了让旧测试变绿而删除用户要求。修复后按真实依赖复验；无关检查不反复全量执行。
 
-## 命令边界
+脚本放在业务分析之后补充，只做确定性校验。结构性缺交、格式错误、引用失效与哈希不符可以自动报错；分析是否完整和结论是否正确由业务证据判断。交接检查通过只说明记录满足契约。
 
-### 仓库根目录执行
+## 本仓库的必要检查
 
-```bash
-bash skills/authoring/feipi-skill-govern/scripts/validate.sh skills/authoring/feipi-skill-govern --require-maintenance
-bash skills/authoring/feipi-skill-govern/scripts/init_skill.sh feipi-video-read-youtube --layer integration
-```
-
-### 当前 skill 目录执行
-
-```bash
-bash scripts/validate.sh . --require-maintenance
-bash tests/run.sh
-```
-
-说明：
-- `scripts/validate.sh` 是主结构校验入口。
-- `tests/run.sh` 是主行为校验入口。
-- 仓库级 `make` 只能包装本地脚本，不可替代本地入口。
-
-## 最低验证矩阵
-
-- 结构校验：目录位置、命名结构、frontmatter、`agents/openai.yaml`、脚本存在性。
-- 行为校验：至少覆盖一条真实动作链，例如初始化临时 skill 或运行目标 skill 的本地测试。
-- dry-run / 非破坏性验证：优先使用临时目录、只读搜索、占位符扫描。
-- 旧引用残留搜索：检查旧命名文本、旧 action-first 规则、旧 make 依赖是否残留在规范文件和模板中。
+- 本次治理目标：从治理 Skill 目录运行 `bash scripts/validate.sh "$target_skill" --require-maintenance`，并执行目标实际受影响的测试。
+- 路径/平台：`python3 scripts/check_portability.py "$target_skill"`，覆盖脚本和测试；静态通过与平台实测分列。
+- 模板/初始化：生成临时 skill，核对功能交付规约和失败表达；初始化通过只证明脚手架可生成。
+- 全 registry 的结构与安装验收：仓库根运行 `python3 scripts/harness/validate_skill_layout.py`。改变共享校验器或分发内容时执行，不能只测自身支持全仓结论。
+- 按本次变化搜索旧规则、过时引用和模板残留；更新版本与 CHANGELOG。具体技术检查不能代替上面的业务验收。

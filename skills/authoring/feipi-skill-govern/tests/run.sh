@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # feipi-skill-govern 自测入口。
-# 目标：除了校验自身结构，还验证初始化、命名规则、layer 归位以及“临时治理产物不回流到 skill 内部”的约束。
+# 确定性回归；真实 Agent 效果评估按 evals/README.md 单独执行。
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -40,10 +40,12 @@ run_case() {
     "$SKILL_DIR/scripts/validate.sh"
     "$SKILL_DIR/scripts/check_portability.py"
     "$SKILL_DIR/scripts/validate_resources.py"
+    "$SKILL_DIR/scripts/check_delivery.py"
     "$SKILL_DIR/references/naming-conventions.md"
     "$SKILL_DIR/references/skill-layering-policy.md"
     "$SKILL_DIR/references/workflow.md"
     "$SKILL_DIR/references/governance-process.md"
+    "$SKILL_DIR/references/governance-artifacts.md"
     "$SKILL_DIR/references/frontmatter-policy.md"
     "$SKILL_DIR/references/reassessment-backlog.md"
     "$SKILL_DIR/references/version-changelog-policy.md"
@@ -64,16 +66,16 @@ run_case() {
     init-generated-skill)
       bash "$INIT_SCRIPT" "video-read-youtube" --resources "references,assets" --layer integration --target "$TMP_ROOT/skills" >/dev/null
       gen_dir="$TMP_ROOT/skills/integration/feipi-video-read-youtube"
-      [[ -d "$gen_dir" ]]
-      [[ -d "$gen_dir/references" ]]
-      [[ -d "$gen_dir/assets" ]]
-      [[ -x "$gen_dir/tests/run.sh" ]]
-      [[ -s "$gen_dir/maintenance/README.md" ]]
-      [[ -s "$gen_dir/maintenance/terminology.md" ]]
-      ! grep -Fq '{{' "$gen_dir/maintenance/README.md" "$gen_dir/maintenance/terminology.md"
-      ! grep -Eq 'make[[:space:]]+validate[[:space:]]+DIR=|make[[:space:]]+test[[:space:]]+SKILL=' "$gen_dir/SKILL.md"
-      ! grep -Fq '{{' "$gen_dir/SKILL.md" "$gen_dir/agents/openai.yaml" "$gen_dir/tests/run.sh"
-      ! grep -Fq '<skill-name>' "$gen_dir/SKILL.md" "$gen_dir/agents/openai.yaml" "$gen_dir/tests/run.sh"
+      [[ -d "$gen_dir" ]] || return 1
+      [[ -d "$gen_dir/references" ]] || return 1
+      [[ -d "$gen_dir/assets" ]] || return 1
+      [[ -x "$gen_dir/tests/run.sh" ]] || return 1
+      [[ -s "$gen_dir/maintenance/README.md" ]] || return 1
+      [[ -s "$gen_dir/maintenance/terminology.md" ]] || return 1
+      ! grep -Fq '{{' "$gen_dir/maintenance/README.md" "$gen_dir/maintenance/terminology.md" || return 1
+      ! grep -Eq 'make[[:space:]]+validate[[:space:]]+DIR=|make[[:space:]]+test[[:space:]]+SKILL=' "$gen_dir/SKILL.md" || return 1
+      ! grep -Fq '{{' "$gen_dir/SKILL.md" "$gen_dir/agents/openai.yaml" "$gen_dir/tests/run.sh" || return 1
+      ! grep -Fq '<skill-name>' "$gen_dir/SKILL.md" "$gen_dir/agents/openai.yaml" "$gen_dir/tests/run.sh" || return 1
       bash "$VALIDATE_SCRIPT" "$gen_dir" --require-maintenance >/dev/null
       bash "$gen_dir/tests/run.sh" >/dev/null
       ;;
@@ -82,7 +84,7 @@ run_case() {
       output="$(bash "$INIT_SCRIPT" video-read-youtube --layer 2>&1)"
       code=$?
       set -e
-      [[ "$code" -ne 0 ]]
+      [[ "$code" -ne 0 ]] || return 1
       grep -Fq -- "--layer 缺少参数值" <<<"$output"
       ;;
     reject-unsupported-layer)
@@ -90,7 +92,7 @@ run_case() {
       output="$(bash "$INIT_SCRIPT" video-read-youtube --layer platform --target "$TMP_ROOT/platform" 2>&1)"
       code=$?
       set -e
-      [[ "$code" -ne 0 ]]
+      [[ "$code" -ne 0 ]] || return 1
       grep -Fq "不支持的 layer" <<<"$output"
       ;;
     reject-v1-name)
@@ -98,7 +100,7 @@ run_case() {
       output="$(bash "$INIT_SCRIPT" "read-youtube-video" --layer integration --target "$TMP_ROOT/legacy" 2>&1)"
       code=$?
       set -e
-      [[ "$code" -ne 0 ]]
+      [[ "$code" -ne 0 ]] || return 1
       grep -Fq "旧 action-first" <<<"$output"
       ;;
     reject-low-signal-action)
@@ -106,7 +108,7 @@ run_case() {
       output="$(bash "$INIT_SCRIPT" "dingtalk-web-webhook" --layer integration --target "$TMP_ROOT/bad-action" 2>&1)"
       code=$?
       set -e
-      [[ "$code" -ne 0 ]]
+      [[ "$code" -ne 0 ]] || return 1
       grep -Fq "低语义词" <<<"$output"
       ;;
     validate-detects-placeholder)
@@ -118,7 +120,7 @@ run_case() {
       output="$(bash "$VALIDATE_SCRIPT" "$gen_dir" 2>&1)"
       code=$?
       set -e
-      [[ "$code" -ne 0 ]]
+      [[ "$code" -ne 0 ]] || return 1
       grep -Fq "未替换模板占位符" <<<"$output"
       ;;
     validate-detects-maintenance-command)
@@ -129,24 +131,24 @@ run_case() {
       output="$(bash "$VALIDATE_SCRIPT" "$gen_dir" 2>&1)"
       code=$?
       set -e
-      [[ "$code" -ne 0 ]]
+      [[ "$code" -ne 0 ]] || return 1
       grep -Fq "repo 维护命令" <<<"$output"
       ;;
     validate-detects-flat-repo-path)
       bash "$INIT_SCRIPT" "video-read-youtube" --layer integration --target "$TMP_ROOT/flat-source" >/dev/null
       gen_dir="$TMP_ROOT/flat-source/integration/feipi-video-read-youtube"
-      [[ ! -e "$REPO_FLAT_DIR" ]]
+      [[ ! -e "$REPO_FLAT_DIR" ]] || return 1
       cp -R "$gen_dir" "$REPO_FLAT_DIR"
       REPO_FLAT_DIR_CREATED=1
       set +e
       output="$(bash "$VALIDATE_SCRIPT" "$REPO_FLAT_DIR" 2>&1)"
       code=$?
       set -e
-      [[ "$code" -ne 0 ]]
+      [[ "$code" -ne 0 ]] || return 1
       grep -Fq "skills/<layer>/<skill-name>" <<<"$output"
       ;;
     governance-temp-artifacts-absent)
-      [[ ! -d "$SKILL_DIR/assets/governance" ]]
+      [[ ! -d "$SKILL_DIR/assets/governance" ]] || return 1
       ! find "$SKILL_DIR" -type f \
         \( \
           -name 'step-1-audit.template.md' -o \
@@ -155,14 +157,14 @@ run_case() {
           -name 'rename-plan.template.md' -o \
           -name 'governance-report.template.md' -o \
           -name 'anti-pattern.template.md' \
-        \) | grep -q .
+        \) | grep -q . || return 1
       ! grep -En 'assets/governance/' \
         "$SKILL_DIR/SKILL.md" \
-        "$SKILL_DIR/references/"*.md
+        "$SKILL_DIR/references/"*.md || return 1
       ;;
     legacy-rule-scan)
-      ! grep -En 'feipi-<action>-<target\.\.\.>|domain-action-object|prefix-domain-action-object' "${normative_files[@]}"
-      ! grep -En 'action 白名单|第二段固定|web：前端与页面|ops：运维与发布|automate：自动化流程' "${normative_files[@]}"
+      ! grep -En 'feipi-<action>-<target\.\.\.>|domain-action-object|prefix-domain-action-object' "${normative_files[@]}" || return 1
+      ! grep -En 'action 白名单|第二段固定|web：前端与页面|ops：运维与发布|automate：自动化流程' "${normative_files[@]}" || return 1
       ;;
     registry-validator-command-arguments)
       python3 - "$REPO_ROOT/scripts/harness/validate_registry.py" <<'PY'
@@ -184,12 +186,23 @@ PY
     resource-boundary-tests)
       python3 "$SKILL_DIR/tests/test_resources.py"
       ;;
+    delivery-and-harness-tests)
+      python3 "$SKILL_DIR/tests/test_delivery.py"
+      ;;
     *)
       echo "未知测试项：$case_name" >&2
       return 1
       ;;
   esac
 }
+
+# 单独进程中执行，避免 if 调用函数使 Bash 的 errexit 在整个函数内失效。
+if [[ "${1:-}" == "--case" ]]; then
+  [[ $# -eq 2 ]] || exit 1
+  run_case "$2"
+  exit 0
+fi
+[[ $# -eq 0 ]] || exit 1
 
 for case_name in \
   validate-self \
@@ -205,10 +218,11 @@ for case_name in \
   reject-unsupported-layer \
   registry-validator-command-arguments \
   portability-checker-tests \
-  resource-boundary-tests
+  resource-boundary-tests \
+  delivery-and-harness-tests
 do
   TOTAL=$((TOTAL + 1))
-  if run_case "$case_name"; then
+  if bash "$SCRIPT_DIR/run.sh" --case "$case_name"; then
     echo "[PASS] $case_name"
     PASSED=$((PASSED + 1))
   else
@@ -222,4 +236,4 @@ if [[ "$FAILED" -ne 0 ]]; then
   exit 1
 fi
 
-echo "测试通过：feipi-skill-govern"
+echo "确定性回归通过：feipi-skill-govern；Agent 效果与实际链路需单独核对"

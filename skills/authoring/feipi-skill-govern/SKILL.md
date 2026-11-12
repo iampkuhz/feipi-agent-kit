@@ -1,165 +1,62 @@
 ---
 name: feipi-skill-govern
-description: 用于治理 repo 内 skill 的命名、触发、执行、模板、脚本与验证边界；在创建、重构、自检或审计 skill 时使用。若任务是普通业务执行而非 skill 工程，不要误用本 skill。
+description: 用于创建、重构或审计 skill，建立功能交付契约并验证用户目标是否实现，同时治理命名、触发、资源与脚本边界；普通业务执行不使用。
 ---
 
-# Skill 工程治理（中文）
+# Skill 工程治理
 
-## 核心目标
+把用户目标落实到可核对的业务结果。结构正确、脚本退出成功和文件存在各自只证明对应的技术事实。
 
-- 让 `feipi-skill-govern` 成为后续 skill 治理的唯一正确入口，先修规则真源，再修脚本、模板与验证闭环。
-- 输出必须可追溯：问题清单、修复清单、验证结果、剩余风险、待重审项缺一不可。
-- 默认只治理目标 skill 与直接共享文件，不把发现的所有问题捆成一次无边界大动作。
-- 当用户明确要求审计或修复全部 skills 时，该明确范围优先；按 skill 分组审计和修复，并同步各自版本及变更记录。
+## 入口与范围
 
-## 适用场景
+- 适用于创建、重构、治理、自检 skill；普通业务执行不触发。
+- 从请求确定 `target_skill`、`task_type`（create / refactor / govern / self-audit）、允许修改的直接共享文件。用户明确要求全仓时按 registry 全集分组执行；否则只处理目标，不顺手改其他 skills。
+- 沿用会话中已有授权。仅要求分析或讨论时交付判断、依据与方案，不实施；已授权修改时自行完成必要调查、修复与验证。
+- 先读目标源码 `<target_skill>/maintenance/README.md` 与 `<target_skill>/maintenance/terminology.md`，缺失时纳入修复；再按实际调用关系读取入口、规约、模板、脚本和消费者。
 
-- 新建 repo 内 skill，并确定 `domain -> action -> object -> layer`。
-- 重构已有 skill 的命名、layer、触发文案、执行流程、模板、脚本或验证方式。
-- 审计某个 skill 或 `feipi-skill-govern` 自身，清理旧规则、旧模板、旧校验残留。
-- 用户明确要求对全部 skills 或仓库级 skill 脚本做跨平台/路径审计。
-- 产出 Step 1、Step 1.5、Step 2 报告、rename plan、governance report 与待重审清单。
+## 执行导航
 
-## 不适用场景
+1. 按 [治理流程与功能契约](references/governance-process.md) 建立需求、问题和失败案例，再审计、修复、验收。它是阶段顺序与阶段交付的唯一真源；只有涉及命名或归位才进入 Step 1.5。
+2. 需要跨阶段恢复或交接时，按 [治理记录](references/governance-artifacts.md) 保存绑定本轮输入的正式中间结果。交接实际内容或明确不足，不用文件名、目标名称或“已完成”代替结果。
+3. 按 [验证与纠偏](references/workflow.md) 分别验证确定性逻辑、Agent 分析效果及真实接口链路。先定位失败所属模块，再修改及复验必要消费者。
+4. 收口前逐项核对 [质量清单](references/quality-checklist.md)，同步版本和变更记录，交付问题、修复、验证证据、未解决项。只在需要时给出待重审项与重启建议。
 
-- 普通业务任务、代码开发、数据处理或内容生成，本次目标不是治理 skill。
-- 仅使用某个 skill 完成一次用户需求，而不是创建、重构或审计 skill 本身。
-- 发现其他 skill 也有问题时顺手大范围改名；此时只记录到待重审清单。
+## 设计边界
 
-## 先确认什么
+- 每个独立业务功能说明输入、规约、交付内容、消费者、完成条件和失败结果；简单功能可就地说明，不为凑目录拆文件。
+- 总入口负责选择功能和编排调用；运行规约在对应 `references/`，源码维护入口只记录职责及依赖地图，不复制运行规则。
+- 用户指出的问题成为回归案例。预期从用户需求与原始材料独立推导，核对“来源 → 功能结果 → 报告 → 用户通知”，不照抄当前实现输出作为正确答案。
+- 涉及语义能力，必须检查真实 Agent 的产物与证据；单测、dry-run、关键词或中间文件存在不能替代效果评估。外部发送仍须有用户授权，未发送与未验证如实报告。
+- 脚本只自动检查确定性事实，例如缺交、格式、引用、输入绑定和一致性；不让脚本冒充业务判断。
 
-1. 必填
-- `target_skill`：本次要治理的目标 skill，或新建 skill 的目标能力；用户明确要求全仓治理时记录为 registry 全集。
-- `task_type`：`create` / `refactor` / `govern` / `self-audit`。
-- `success_criteria`：本次要消除的失真点，例如旧命名、误触发、模板漂移、验证不闭环。
+## 按需规则
 
-2. 按需确认
-- `allowed_shared_files`：允许同步修改的共享文件；默认仅限确实共享的仓库根文件，如 `.env.example`、`README.md`、`CHANGELOG.md`。目标 skill 自己的 `templates/`、`scripts/`、`references/`、`assets/` 属于本地资源，不应继续挂在仓库公共目录。
-- `current_name` / `current_layer`：已有 skill 的当前名称与目录位置。
-- `validation_env`：是否能运行本地脚本、临时目录初始化、dry-run 校验。
+| 情况 | 读取 |
+|---|---|
+| 命名、layer、迁移 | [命名](references/naming-conventions.md)、[分层](references/skill-layering-policy.md)；命名按 domain → action → object → layer，`feipi-skill-govern` 为保留特例 |
+| 新建或修改资源布局 | [开发资料与安装边界](references/development-layout.md)、[仓库约束](references/repo-constraints.md)、[frontmatter](references/frontmatter-policy.md) |
+| 更新收口 | [版本与变更记录](references/version-changelog-policy.md)；同日同 skill 只升版一次、合并一条摘要 |
+| 历史规则冲突 | [反模式](references/anti-patterns.md)、[待重审清单](references/reassessment-backlog.md)；旧 action-first 结论重新评审 |
 
-## 输入与输出
+## 本地工具
 
-1. 输入
-- 用户目标、目标 skill 路径或名称、已知问题、历史 rename 结论。
-- 现有 `SKILL.md`、`agents/openai.yaml`、`references/`、`scripts/`、`assets/`、`templates/`。
+以下命令从治理 Skill 源码目录执行；在仓库根执行时加 skill 路径前缀。安装后的运行脚本不依赖源码测试，`tests/run.sh` 仅用于源码自测。仓库级包装器不能成为唯一入口。
 
-2. 输出
-- 问题清单：哪些文件残留旧规则、违反了什么。
-- 修复结果：改了什么、为什么这样改、边界控制在哪里。
-- 验证结果：主验证入口、执行命令、通过/失败、剩余风险。
-- 治理产物：Step 1 / Step 1.5 / Step 2 / Step 3 的临时工作文档、待重审清单。
-
-## 决策顺序
-
-1. 先判断本次是不是治理型任务；若不是，不触发本 skill。
-2. 锁定唯一目标 skill 与允许改动的直接共享文件。
-3. 若涉及命名或归位，严格按 `domain -> action -> object -> layer` 决策。
-4. 判断问题落在哪层：触发层、执行层、资源层、脚本归位层、验证层。
-5. 只改最小有效改动集；发现其他 skill 问题只登记，不扩散执行。
-6. 检查路径来源、外部命令前置条件、临时目录清理方式及 macOS/Linux 差异。
-7. 完成本地验证、旧规则残留搜索、版本与变更记录同步，再关闭。
-
-## 默认策略
-
-- 默认只改一个目标 skill；只有目标就是 `feipi-skill-govern` 时，才允许同时改它自己的 `references/`、`scripts/`、`assets/`、`templates/` 与直接关联入口文件。
-- `feipi-skill-govern` 是治理型 skill，不是普通业务 skill；触发说明必须写清“什么时候该用、什么时候不该用”。
-- 命名真源统一是 `feipi-<domain>-<action>-<object...>`，`feipi-skill-govern` 是保留特例。
-- layer 只负责目录分层，不进入 skill 主语法，不为单个 skill 临时发明新 layer。
-- 仓库级脚本或 `make` 只能作为包装器；主流程必须可通过当前 skill 本地脚本闭环执行。
-- 仓库根目录不再保留给多个 skill 兜底的公共 `templates/`；模板要么放在 `feipi-skill-govern/templates/`，要么放在目标 skill 自己的 `templates/` 或 `assets/`。
-- 若发现历史 rename 建议是按旧规则得出的，只记录到待重审清单，不在本次顺手重命名其他 skills。
-- 运行内容与开发内容分层：普通 skill 的 `SKILL.md` 不引用 `tests/` 或 `evals/`；只有本 Skill Creator 在创建、维护、评估或审计 skill 时读取这些目录。
-- `tests/` 保存确定性脚本测试、集成测试和 fixtures，统一入口为 `tests/run.sh`；`evals/` 保存真实 Agent 行为用例、判定标准和基线，不保存运行产物。
-- `tests/`、`evals/` 都是源码维护目录，安装器必须排除；评估输出写入仓库 `tmp/`，不能回流到 skill。
-- 创建或迁移开发资料时按需读取 `references/development-layout.md`。源码维护目录与测试、评估目录均递归排除出安装包；普通运行内容不得依赖源码维护资料。
-- Skill 脚本从自身位置推导仓库与资源路径，不写开发者目录或应用安装目录的绝对路径。
-- 临时产物用唯一临时目录，优先采用 `mktemp`、`tempfile`、Node `os.tmpdir()` 等系统接口，并只清理本次创建的目录。
-- macOS/Linux 共用脚本兼容 Bash 3.2 与 BSD/GNU 工具差异；可选平台工具通过 `command -v`、平台检测或参数发现，且不能成为隐式必需依赖。
-- Skill 的安装与校验不能隐式依赖 ripgrep；优先用基础 `grep`、Python 标准库或明确的依赖预检。
-
-## 执行流程（治理态）
-
-1. Step 1：基线审计
-- 先读目标源码 `<target_skill>/maintenance/README.md` 和 `<target_skill>/maintenance/terminology.md`，明确业务对象与命名边界；不存在时记录缺口，并在本次治理中补齐。这里指目标源码，不是已安装治理 Skill 自身的运行依赖。
-- 读取目标 skill 的入口文件和直接资源。
-- 用户要求全仓审计时，按 registry 逐项遍历 skill 中的脚本和测试代码，排除 `node_modules`、缓存、构建产物等第三方内容。
-- 产出问题清单，标记命名、layer、触发、执行、资源、脚本归位、验证七类状态。
-- 检查开发者/系统绝对路径、固定共享临时路径、Bash 版本语法、BSD/GNU 命令差异和未声明的外部命令依赖。
-- 产物必须写到仓库根 `tmp/` 或系统临时目录，不得写回 skill 内部目录。
-
-2. Step 1.5：命名与归位评审
-- 只有涉及命名、layer 或路径时进入此步。
-- 先定 `target_domain`，再定 `target_action`，再定 `target_object`，最后定 `target_layer`。
-- 产出 rename review 与 rename plan 草稿；统一放到仓库根 `tmp/` 或系统临时目录。
-
-3. Step 2：定点修复
-- 默认只修改目标 skill 与直接共享文件；用户明确授权全仓范围时，可修改审计发现的各 skill，并按责任分组记录。
-- 同步修触发配置、`SKILL.md`、`references/`、`scripts/`、`assets/`、`templates/` 的一致性。
-- 新增或本次治理的目标补齐维护入口与术语表；架构和设计资料按需放在源码维护目录，业务执行必需知识仍放 `references/`。不批量迁移其他 Skill。
-- 若发现仓库根目录残留的公共模板或运行时脚本，优先迁回目标 skill 内部；无法证明仍被现役 skill 使用时，直接删除。
-- Step 2 检查清单属于临时执行文档，只能写到 `tmp/` 或系统临时目录。
-
-4. Step 3：验证与收口
-- 本次治理目标用 `bash scripts/validate.sh <目标源码目录> --require-maintenance` 做结构校验，再做行为校验与旧规则残留搜索。
-- 运行目标 skill 的 `scripts/check_portability.py`；全仓范围运行仓库级 skill 布局校验。静态检查不能替代在目标操作系统上的真实执行。
-- 输出 governance report、validation status 与待重审清单。
-- governance report 属于临时治理文档，不得沉淀回当前 skill。
-
-## 失败处理
-
-- 缺少 `target_skill` 或边界不清时，默认收敛到用户明确点名的唯一目标 skill。
-- 若共享文件变更会影响无关 skills，先停下来缩小范围或把影响写入风险，不直接扩散执行。
-- 若本地脚本无法验证，必须明确阻塞点、受影响环节与未验证风险。
-- 若发现旧命名结论已污染后续步骤，暂停后续步骤，从 Step 1 重新建立基线。
-
-## 资源导航
-
-- `references/naming-conventions.md`：命名规范 v2 与命名决策顺序。
-- `references/skill-layering-policy.md`：layer 的职责、边界与禁忌（含目录判定）。
-- `references/workflow.md`：执行顺序、边界、失败处理、验证矩阵。
-- `references/governance-process.md`：Step 1 / Step 1.5 / Step 2 / Step 3 的治理流程（含产物落位）。
-- `references/version-changelog-policy.md`：版本号递增与 CHANGELOG 极简记录规则。
-- `references/quality-checklist.md`：交付前核查清单。
-- `scripts/check_portability.py`：检查固定机器路径、固定临时路径与常见 Bash/BSD/GNU 不兼容项。
-- `references/reassessment-backlog.md`：既有治理结论待重审清单。
-- 其他规则见 `references/repo-constraints.md`、`references/frontmatter-policy.md`、`references/anti-patterns.md`。
-
-## 语言与中文要求
-
-- `SKILL.md` 的 `description` 与正文使用中文。
-- `agents/openai.yaml` 的 `display_name`、`short_description`、`default_prompt` 使用中文。
-- `references/` 默认中文；脚本与配置注释统一中文。
-- 技术术语可保留英文，但需附中文解释。详见 `rules/global/language.md`。
-
-## 历史来源说明
-
-当前规则真源以仓库 `AGENTS.md` 与本 skill 自身文档、脚本、模板为准。历史参考资料（OpenAI skill-creator、Claude Code Best Practices、`feipi-gen-skills` 旧规则）只提供背景，不替代当前规则真源。若旧文档仍提到 `feipi-gen-skills`、action-first 命名或历史 rename 结论，以本 skill 当前 v2 规则为准。
-
-## 主入口与包装器
-
-1. 当前 skill 目录执行
 ```bash
-bash scripts/validate.sh . --require-maintenance
+bash scripts/init_skill.sh report-generate-brief --layer authoring --target "$target_root"
+bash scripts/validate.sh "$target_skill" --require-maintenance
+python3 scripts/check_portability.py "$target_skill"
 bash tests/run.sh
 ```
 
-仓库根目录需对全部已注册 skill 验收时，使用仓库级 skill 布局校验器。
+- `init_skill.sh` 生成待完善的脚手架，不代表业务功能已可用。
+- `validate.sh` 是结构校验；`check_portability.py` 静态扫描脚本和测试，不能证明已在双平台实测。
+- `tests/run.sh` 是治理 Skill 的确定性回归入口。治理目标的行为评估按其实际能力设计，不能用治理自测替代。
+- `scripts/check_delivery.py` 按治理记录契约检查交接完整性；只报告技术检查结果。
 
-2. 仓库根目录执行
-```bash
-bash skills/authoring/feipi-skill-govern/scripts/validate.sh skills/authoring/feipi-skill-govern --require-maintenance
-bash skills/authoring/feipi-skill-govern/scripts/init_skill.sh feipi-video-read-youtube --layer integration
-```
+## 跨平台与分发
 
-说明：
-- `scripts/validate.sh` 是结构校验主入口。
-- `tests/run.sh` 是开发回归与旧规则残留搜索入口。
-- `scripts/init_skill.sh` 是新建 skill 的本地脚手架入口；仓库级 `make` 只可作为包装器，不是唯一真源。
-
-## 验收标准
-
-1. 命名、layer、触发、执行、资源、脚本归位、验证七类规则与模板一致。
-2. 仅修改目标 skill 与直接共享文件，无无边界扩散。
-3. 本地验证、dry-run 或临时产物验证至少完成一条真实动作链。
-4. 已输出问题清单、修复清单、规则摘要、待重审清单与重启建议。
+- 路径从脚本位置、显式参数或系统接口推导，不写开发者机器绝对路径；临时产物写到唯一的仓库 `tmp/` 子目录或系统临时目录，只清理本次创建的路径。
+- 安装、校验兼容 macOS Bash 3.2/BSD 与 Linux Bash/GNU；外部依赖先探测，不隐式依赖 `rg`。未实测的平台单列。
+- 运行知识保留在 `references/`；普通 skill 运行内容不依赖源码维护资料、测试或评估目录。创建和治理时按需读取目标 `tests/`、`evals/`，安装时递归排除开发资料。
+- 中文维护，保留必要技术名称。临时治理报告和评估运行产物不写回 skill 源码。

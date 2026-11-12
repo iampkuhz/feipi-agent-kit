@@ -1,0 +1,1 @@
+请优化 skills/integration/feipi-issues-build-report。它生成的报告和用户通知信息不够用，原始材料是 input.json。请依据报告规约修复并深入验证，范围仅这个 Skill，允许在此工作区修改与执行代码。只生成本地通知，不外发，不进行 Git 操作。最终说明改了哪里、依据和验证结果，并把答复保存为 reply.txt。

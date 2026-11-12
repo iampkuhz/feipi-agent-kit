@@ -53,7 +53,7 @@ Mac、Skills 和服务定义默认使用实拷运行副本；Multica 继续使�
 | Skill | 用途 |
 |-------|------|
 | [feipi-health-maintain-family-records](skills/authoring/feipi-health-maintain-family-records/SKILL.md) | 家庭报告归档、健康事件、问题跟踪与按需监测；[双端使用与维护](docs/family-health-skill.md) |
-| `feipi-skill-govern` | Skill 的创建、重构、自检与治理；源码维护资料独立，安装时递归排除 |
+| `feipi-skill-govern` | Skill 创建、重构与审计；功能交付契约、分层验收与源码维护资料隔离 |
 | [feipi-multica-manage-tasks](skills/integration/feipi-multica-manage-tasks/SKILL.md) | 本机 CLI 管理项目与资源；任务记录、派发、交接与验收。[设计依据](docs/multica-project-skill.md) |
 | `feipi-video-read-url` | 视频 URL 取证、本地音视频提取与总结、覆盖复核；领域流程由调用方维护 |
 | `feipi-xiaohongshu-read-note` | 小红书图文/视频笔记、顺序原图与独立来源证据提取（依赖同级视频 skill） |

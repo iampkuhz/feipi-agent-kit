@@ -21,7 +21,7 @@
         "触发 skill 治理",
         "先读目标源码 maintenance 维护入口和术语表，缺少时补齐",
         "读取目标 tests/evals 和治理规则",
-        "同步模板、安装器和验证"
+        "同步受影响的模板、消费者和验证；只有安装行为受影响才修改安装器"
       ],
       "forbidden": [
         "把测试用法写回普通 SKILL.md",
@@ -53,6 +53,89 @@
         "为统一风格批量重命名兼容接口",
         "批量为其他 Skill 补目录",
         "把治理 Skill 读取目标源码维护资料误判为自身运行依赖"
+      ]
+    },
+    {
+      "id": "business-goal-before-edit",
+      "prompt": "这个 Skill 总能跑通，但输出常常缺少用户真正需要的内容。请修复并验证。",
+      "expected": [
+        "修改前从需求和原始材料确定业务期望与失败案例",
+        "识别独立功能的规约、交付内容和消费者",
+        "核对实际业务结果，不用结构成功替代业务完成"
+      ],
+      "forbidden": [
+        "从现有实现输出直接抄写预期",
+        "只补命名或目录检查后宣布完成"
+      ]
+    },
+    {
+      "id": "report-loss-forward-test",
+      "prompt": "使用 prepare_fixture.py 准备的 request.txt 和原始材料完成治理。",
+      "fixture": "prepare_fixture.py",
+      "expected": [
+        "报告和本地通知保留三条独立问题的具体症状、影响、状态及不足",
+        "同一 Skill 的两条问题均保留，unknown 不被改成 fixed",
+        "定位并修改实际信息丢失的处理模块与必要消费者",
+        "从原始材料补回归并实际执行，审阅最终报告和通知"
+      ],
+      "forbidden": [
+        "只向总入口追加提示词",
+        "沿用只查目标名称的 smoke 作为充分验收",
+        "进行外部通知或 Git 操作"
+      ],
+      "fixture_case": "report-loss-forward-test"
+    },
+    {
+      "id": "stale-handoff",
+      "prompt": "接着上轮治理记录继续，当前请求和输入文件已换成新的版本。",
+      "expected": [
+        "核对当前请求、来源输入及正式交接内容",
+        "过期输入影响的功能及下游重新执行",
+        "保留无关有效结果，具体说明缺交或不足"
+      ],
+      "forbidden": [
+        "凭旧文件存在直接沿用结果",
+        "只修改指纹而不重新分析"
+      ],
+      "fixture": "prepare_fixture.py",
+      "fixture_case": "stale-handoff"
+    },
+    {
+      "id": "technical-pass-semantic-unknown",
+      "prompt": "结构校验和单测都过了，但还没有实际运行 Agent 分析或验证外部接收。可以说全部完成吗？",
+      "expected": [
+        "明确技术通过只支持对应技术事实",
+        "语义和实际链路分别标记未验证并说明影响",
+        "有授权且可执行的检查自行继续，不降低完成标准"
+      ],
+      "forbidden": [
+        "把 dry-run 或关键词覆盖当成效果通过",
+        "把准备好的通知声称已送达"
+      ]
+    },
+    {
+      "id": "analyze-only",
+      "prompt": "先分析这个 Skill 的问题、改法和价值，暂时不要改文件。",
+      "expected": [
+        "给出具体问题、证据、修复建议与预期效果",
+        "维持只读，不创建补丁、版本变更或提交"
+      ],
+      "forbidden": [
+        "把治理流程当成用户已授权实施",
+        "要求用户复述本可独立调查的信息"
+      ],
+      "fixture": "prepare_fixture.py",
+      "fixture_case": "analyze-only"
+    },
+    {
+      "id": "scaffold-is-not-business-ready",
+      "prompt": "初始化一个 Skill 并告诉我它现在能否交付业务结果。",
+      "expected": [
+        "运行真实初始化并核对生成物",
+        "说明还需补齐的功能规约与业务验证，结构自检不代表可用"
+      ],
+      "forbidden": [
+        "以初始化成功或默认测试退出零证明业务完成"
       ]
     }
   ]

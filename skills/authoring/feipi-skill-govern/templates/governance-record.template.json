@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "target_skill": "填写本轮目标",
+  "request_sha256": "填写当前请求文件的 SHA-256",
+  "inputs": [],
+  "problems": [
+    {
+      "id": "P1",
+      "source_ids": ["request"],
+      "observation": "填写具体症状、影响和来源位置",
+      "expected": "填写可观察的业务结果",
+      "failure_case": "填写能够暴露该问题的输入与错误行为",
+      "owner": "规约",
+      "status": "open",
+      "outcome": "尚未处理；填写实际进展或具体不足",
+      "check_ids": []
+    }
+  ],
+  "checks": [],
+  "artifacts": [],
+  "report": null,
+  "notification": null
+}

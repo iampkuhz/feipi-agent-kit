@@ -1,128 +1,51 @@
-# Skill 治理流程
+# 治理流程与功能契约
 
-## 适用范围
+本文件负责治理阶段、业务交付和消费者关系。验证方法在 [workflow.md](workflow.md)，交接字段在 [governance-artifacts.md](governance-artifacts.md)，不在其他入口复制阶段规则。
 
-本流程只用于治理 skill 本身，不用于普通业务任务。
+## 开始前：把目标变成可观察的结果
 
-适用：
-- 新建 skill
-- 重构 skill
-- 审计 skill
-- 自检 `feipi-skill-govern`
+从用户请求及原始材料记录范围和期望行为。每个问题有稳定 ID、具体症状、来源、期望结果和一个能暴露问题的失败案例。不要把“通过校验”“补一份文件”当作业务目标。
 
-不适用：
-- 普通业务需求
-- 没有目标 skill 的开放式”顺手都改一下”
+例如用户说“报告只保留 Skill 名称，丢了具体问题”，预期应是报告和用户摘要均能读到每条具体问题、影响、处理结果及未解决原因；仅检查名称还在会复制原缺陷。修改前用原始输入确定这些信息，修改后逐项比对。
 
-## 阶段总览
+沿调用链识别目标 Skill 的独立功能，为每个功能写清：
 
-### Step 1：基线审计
+| 要素 | 必须回答的问题 |
+|---|---|
+| 输入与规约 | 消费哪份材料，遵循哪条业务规则，输入不足如何表达？ |
+| 交付内容 | 下游需要哪些实际内容，哪些信息不得丢失？ |
+| 消费者 | 哪个功能、脚本、报告或用户消费结果？ |
+| 完成与失败 | 用什么可观察事实判断完成；不完整、无证据、依赖失败如何交付？ |
 
-目标：
-- 建立当前问题基线。
-- 区分哪些是命名 / layer 问题，哪些是触发、执行、资源、脚本、验证问题。
+同一份规约由对应功能维护，入口只链接及编排；维护资料指明所有者与消费者，不再复述规约。需要恢复执行的链路用正式记录交接，单步简单任务可在同一报告中完成，无需另建框架。
 
-输出：
-- Step 1 基线审计文档（临时文件）
+## 治理功能的交付契约
 
-必须填写的核心字段：
-- `current_name`
-- `current_layer`
-- `rule_violation`
-- `script_localization_status`
-- `validation_status`
+| 功能 / 阶段 | 输入 | 标准交付 | 消费者与完成条件 |
+|---|---|---|---|
+| Step 1 基线审计 | 用户目标、原始材料、目标源码及当前运行路径 | 逐项问题：来源、症状、影响、期望、失败案例、所属环节；无问题也记录检查范围与依据 | Step 2 及验收；每项都能定位到材料或行为，既检查结构规则也检查业务损失 |
+| Step 1.5 命名与归位评审（条件阶段） | 有命名、layer、路径问题的基线 | 命名判断、理由、旧新名称/路径、调用者和迁移影响；不需改名时注明不适用 | Step 2；按 domain → action → object → layer 决策，不复用未经重审的旧 action-first 结论 |
+| Step 2 修复或创建 | 已明确的期望、失败案例、阶段交付及授权范围 | 问题到所属模块的变更映射、实际修复结果、必要消费者同步、具体不足 | Step 3；功能规约、实现与消费者一致；不能用增加总入口提示词掩盖局部缺陷 |
+| Step 3 验证与交付 | 修改结果、独立预期、原始输入 | 逐问题证据和结论，技术/语义/链路覆盖、报告及用户摘要、未解决项 | 用户或后续维护者；能从原始问题追到最终结果，不只证明中间步骤运行成功 |
 
-### Step 1.5：命名与归位评审
+审计同时按命名、layer、触发、执行、资源、脚本归位、验证检查治理约束；脚本和测试代码均纳入路径、依赖、临时目录与平台检查。全仓授权按 registry 全集逐项检查，排除第三方依赖和构建缓存。
 
-进入条件：
-- 当前名称不符合 `feipi-<domain>-<action>-<object...>`
-- 当前目录未按 layer 归位
-- 已有 rename 结论来自旧的 action-first 规则
+## 执行与恢复
 
-输出：
-- Step 1.5 rename review 文档（临时文件）
-- rename plan 文档（临时文件）
+1. 先读目标源码 `<target_skill>/maintenance/README.md` 与 `<target_skill>/maintenance/terminology.md`，再读实际调用到的文件；缺少维护资料时补齐，不批量迁移无关目标。
+2. 建立上述需求及问题基线。仅分析任务到此交付结论和建议；已授权修复继续执行。
+3. 按问题进入必要功能，更新所属规约、模板、实现与必要消费者。命名无变化就跳过 Step 1.5。
+4. 按验证规约检查实际产出、失败路径及用户报告；保存证据后再补缺交、格式和一致性自动检查。
+5. 按版本策略同步记录。问题、修复、验证、未解决项交给用户，相关外部动作按已有授权执行。
 
-必须填写的核心字段：
-- `current_name`
-- `target_name`
-- `target_layer`
-- `target_domain`
-- `target_action`
-- `target_object`
-- `rename_reason`
-- `rule_violation`
+跨阶段恢复先核对请求和输入指纹、目标源码现状、最近成功的实际交付。输入变化使依赖该输入的下游结果失效；重新运行受影响功能，保留无关有效结果。缺交或失败时交付具体不足和影响，禁止沿用“文件存在”认定成功。
 
-### Step 2：定点修复
+治理真源变化时，旧 Step 2C / Step 2D 或 rename plan 先回到基线，必要时重做 Step 1.5；不因历史计划已经存在就继续执行。
 
-目标：
-- 只修改目标 skill 与直接共享文件。
-- 让触发、执行、资源、脚本、验证重新对齐。
+## 产物与范围
 
-输出：
-- Step 2 execution checklist（临时文件）
+阶段记录、rename plan、governance report 和实际评估结果写到唯一的仓库 `tmp/` 子目录或系统临时目录，不提交到任意 skill 内部。源码中只保留可复用的规约、模板及用例。
 
-必须做到：
-- 不无边界扩散到其他 skills
-- 不继续使用旧命名真源
-- 不把仓库级包装器当作唯一运行前提
+命名阶段按需保留 `current_name`、`current_layer`、`target_name`、`target_layer`、`target_domain`、`target_action`、`target_object`、`rename_reason`、`rule_violation`；不涉及命名时不强填改名字段。结构状态和脚本归位状态不能代表业务验收。
 
-### Step 3：验证与收口
-
-目标：
-- 证明这次治理不是只改文案，而是真正可运行、可验证、可追溯。
-
-输出：
-- governance report（临时文件）
-- `references/reassessment-backlog.md` 中的新增待重审项
-
-临时产物落位：
-- 统一写到仓库根 `tmp/` 或系统临时目录。
-- 禁止写回任意 skill 的 `assets/`、`references/`、`templates/` 或其他内部目录。
-- 若需要示例文件名，优先使用 `tmp/<skill-name>-step1-audit.md`、`tmp/<skill-name>-rename-plan.md`、`tmp/<skill-name>-governance-report.md`。
-
-## 治理产物落位与字段
-
-### 落位规则
-
-Step 1 基线审计、Step 1.5 rename review/rename plan、Step 2 checklist、governance report 都属于临时治理产物。
-这些文件只能写到仓库根 `tmp/` 或系统临时目录，禁止提交到任意 skill 的 `assets/`、`references/`、`templates/` 或其他内部目录。
-
-推荐命名：`tmp/<skill-name>-step1-audit.md`、`tmp/<skill-name>-rename-plan.md`、`tmp/<skill-name>-governance-report.md`。
-
-### 通用字段
-
-以下字段应在相关临时文档中按需出现并保持同名：
-`current_name`、`target_name`、`target_layer`、`target_domain`、`target_action`、`target_object`、`rename_reason`、`rule_violation`、`script_localization_status`、`validation_status`、`current_layer`。
-
-### 使用原则
-
-临时文档只提供治理过程记录，不替代真实分析与验证。旧 rename 结论若不符合 v2，必须通过 Step 1.5 重审，不能直接复用历史结论。
-
-## 暂停与重启规则
-
-- 若治理真源发生变化，历史上尚未执行完的 Step 2C / Step 2D 一律暂停。
-- 重新开始时，必须先回到 Step 1，再视情况进入 Step 1.5。
-- 历史 rename plan 若基于旧规则，直接作废，不得跳过 Step 1.5 继续执行。
-
-## 单个 skill 的标准治理顺序
-
-1. 先读目标源码 `<target_skill>/maintenance/README.md` 与 `<target_skill>/maintenance/terminology.md`，明确业务对象、命名边界，再读当前入口文件；缺少维护资料时在本次治理中补齐。
-2. 输出 Step 1 基线审计。
-3. 若涉及命名或路径，输出 Step 1.5 评审与 rename plan。
-4. 执行 Step 2 定点修复。
-5. 执行结构校验、行为校验、旧规则残留搜索。
-6. 产出 governance report，并把无关 skill 问题写入待重审清单。
-
-## 可以保留的旧成果
-
-- 已形成共识的 layer 分层思想。
-- 中文维护要求。
-- 版本与 changelog 的同日合并规则。
-- “本地脚本优先，仓库级脚本仅作包装器”的方向。
-
-## 必须重审的旧成果
-
-- 所有基于旧 action-first 命名产出的 rename 建议。
-- 所有把 `web`、`ops`、`automate` 当核心 action 的命名结论。
-- 所有未经过 Step 1.5 重新评审的历史命名方案。
+其他 Skill 的问题列为待重审；有实际新问题才更新待重审清单，不制造无意义记录。共享修改影响其他消费者时沿真实依赖验证，不无边界扩散。
