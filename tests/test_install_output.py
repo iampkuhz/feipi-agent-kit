@@ -22,7 +22,7 @@ class InstallOutputTests(unittest.TestCase):
         self.base = Path(self.temp.name)
         self.repo = self.base / "source repo"
         (self.repo / "scripts/harness").mkdir(parents=True)
-        for relative in ("Makefile", "scripts/install_skills.sh", "scripts/harness/validate_registry.py"):
+        for relative in ("Makefile", "scripts/install_skills.sh", "scripts/package_skill.py", "scripts/harness/validate_registry.py"):
             shutil.copy2(ROOT / relative, self.repo / relative)
         self.home = self.base / "home"
         self.home.mkdir()
@@ -54,6 +54,68 @@ class InstallOutputTests(unittest.TestCase):
                                 text=True, capture_output=True, timeout=30)
         self.assertEqual(result.returncode == 0, success, result.stdout + result.stderr)
         return result
+
+    def test_recursive_development_exclusion_and_repeat_install(self):
+        source = self.repo / 'skills/integration/feipi-one'
+        for parent in (source, source/'scripts/examples'):
+            for name in ('maintenance', 'tests', 'evals', 'node_modules'):
+                directory = parent/name
+                directory.mkdir(parents=True)
+                (directory/'SKILL.md').write_text('source only')
+                (directory/'dependency.sh').write_text('# $REPO_ROOT/development-only/resource.txt\n')
+        (self.repo/'development-only').mkdir()
+        (self.repo/'development-only/resource.txt').write_text('do not publish')
+        clean = source/'scripts/examples/runtime'
+        clean.mkdir()
+        (clean/'data.txt').write_text('runtime data')
+        (source/'scripts/source-notes').symlink_to(source/'maintenance')
+        (source/'scripts/runtime-alias').symlink_to(source/'scripts/examples')
+        commands = (
+            (('install-skills', 'AGENT=codex'), self.codex/'skills', True),
+            (('install', 'AGENT=openclaw'), self.openclaw/'skills', False),
+            (('install-project', f'PROJECT={self.project}'), self.project/'.agents/skills', False),
+        )
+        for command, destination, links in commands:
+            with self.subTest(command=command):
+                self.run_make(*command)
+                installed = destination/source.name
+                for directory, dirs, files in os.walk(installed, followlinks=True):
+                    self.assertFalse({'maintenance', 'tests', 'evals', 'node_modules'}.intersection(dirs+files), directory)
+                self.assertEqual((installed/'scripts/examples/runtime/data.txt').read_text(), 'runtime data')
+                self.assertFalse((installed/'scripts').is_symlink())
+                self.assertFalse((installed/'scripts/source-notes').exists())
+                self.assertFalse((installed/'scripts/runtime-alias/maintenance').exists())
+                self.assertEqual((installed/'scripts/examples/runtime').is_symlink(), links)
+                self.assertFalse((destination.parent/'development-only').exists())
+                before = (installed.stat().st_ino, (installed/'SKILL.md').stat().st_mtime_ns)
+                (source/'scripts/examples/maintenance/SKILL.md').write_text('changed source only')
+                result = self.run_make(*command)
+                self.assert_counts(result.stdout, skipped=3)
+                self.assertEqual(before, (installed.stat().st_ino, (installed/'SKILL.md').stat().st_mtime_ns))
+
+    def test_linked_directory_is_refiltered_when_maintenance_is_added(self):
+        self.run_make('install-skills', 'AGENT=codex')
+        installed = self.codex/'skills/feipi-one/scripts'
+        self.assertTrue(installed.is_symlink())
+        source = self.repo/'skills/integration/feipi-one/scripts'
+        (source/'maintenance').mkdir()
+        (source/'maintenance/private.md').write_text('source only')
+        result = self.run_make('install-skills', 'AGENT=codex')
+        self.assert_counts(result.stdout, updated=1, skipped=2)
+        self.assertFalse(installed.is_symlink())
+        self.assertFalse((installed/'maintenance').exists())
+        self.assertEqual((installed/'run.sh').read_bytes(), (source/'run.sh').read_bytes())
+
+    def test_cyclic_runtime_link_does_not_replace_existing_installation(self):
+        self.run_make('install', 'AGENT=codex')
+        installed = self.codex/'skills/feipi-one'
+        before = installed.stat().st_ino
+        source = self.repo/'skills/integration/feipi-one/scripts'
+        (source/'loop').symlink_to(source)
+        result = self.run_make('install', 'AGENT=codex', success=False)
+        self.assertIn('循环链接', result.stderr)
+        self.assertEqual(installed.stat().st_ino, before)
+        self.assertFalse((installed/'scripts/loop').exists())
 
     def env_without_executable(self, executable):
         path_parts = []

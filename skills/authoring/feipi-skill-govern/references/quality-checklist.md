@@ -7,6 +7,7 @@
 - [ ] 已锁定唯一 target_skill
 - [ ] 已锁定 allowed_shared_files
 - [ ] 已判断本次任务属于 create / refactor / govern / self-audit 之一
+- [ ] 已先读目标源码维护入口与术语表，明确业务对象及命名边界；缺失项已补齐
 
 命名与 layer
 - [ ] 已按 domain -> action -> object -> layer 决策
@@ -26,6 +27,9 @@
 资源与脚本
 - [ ] references/ 只保留需要下沉的长规则、案例、清单
 - [ ] scripts/ 只保留确定性、可复用、可验证脚本
+- [ ] 规约可用 review/rules，辅助脚本按实际操作命名，无重复前缀或暗示智能决策的名称；未批量改兼容接口
+- [ ] 源码维护资料只供维护，业务知识仍在 references；普通运行资源不依赖维护资料
+- [ ] 安装包递归排除维护、测试和评估目录，包含嵌套位置，链接模式也不透传
 - [ ] assets/ 只保留真正复用的模板或静态资源
 - [ ] tests/ 只保留确定性测试、集成测试、fixture 与 golden，入口为 tests/run.sh
 - [ ] evals/ 只保留 Agent 行为用例与判定标准，运行结果写入 tmp/
@@ -41,7 +45,7 @@
 - [ ] Step 1 / Step 1.5 / Step 2 / Step 3 文档与 rename plan 未写回 skill 内部，已落到 `tmp/` 或系统临时目录
 
 验证
-- [ ] 已运行结构校验主入口
+- [ ] 已运行结构校验主入口，本次治理目标使用 --require-maintenance
 - [ ] 已完成至少一种行为校验
 - [ ] 若改了模板或初始化逻辑，已生成临时 skill 验证
 - [ ] 已完成旧规则残留搜索
@@ -51,6 +55,6 @@
 收口
 - [ ] 已记录 current_name、target_name、target_layer、rename_reason
 - [ ] 已记录 script_localization_status 与 validation_status
-- [ ] 已按 version-policy 与 changelog-policy 收口
+- [ ] 已按 version-changelog-policy 收口
 - [ ] 已把其他 skill 的问题写入待重审清单，而不是顺手扩散修改
 ```

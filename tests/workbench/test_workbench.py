@@ -18,6 +18,9 @@ class Recovery(unittest.TestCase):
             source = root/'skills/authoring'/name
             (source/'scripts').mkdir(parents=True)
             (source/'SKILL.md').write_text('fixture')
+            (source/'maintenance').mkdir()
+            (source/'maintenance/setup.sh').write_text('# $REPO_ROOT/maintenance-only/resource.txt\n')
+            (root/'maintenance-only').mkdir()
             home = root/'home'
             codex = home/'.codex'
             with patch.object(wb, 'ROOT', root), patch.object(wb, 'HOME', home), \
@@ -27,6 +30,22 @@ class Recovery(unittest.TestCase):
                 wb.apply('skills', agent='codex', skill=name)
                 backup.assert_called_once_with('skills', [codex/'skills'/name])
                 run.assert_called_once_with(['bash', root/'scripts/install_skills.sh', '--copy', '--agent', 'codex', '--skill', name])
+
+    def test_skill_mapping_excludes_nested_maintenance(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            source = root/'skills/authoring/feipi-example-review-rules'
+            runtime = source/'references/rules.md'
+            maintenance = source/'references/examples/maintenance/design.md'
+            maintenance.parent.mkdir(parents=True)
+            runtime.write_text('runtime')
+            maintenance.write_text('source only')
+            home = root/'home'
+            (home/'.codex').mkdir(parents=True)
+            with patch.object(wb, 'ROOT', root), patch.object(wb, 'HOME', home), \
+                 patch.object(wb, 'source_files', return_value=[runtime, maintenance]):
+                pairs = wb.mappings('skills')
+            self.assertEqual(list(pairs), ['codex/feipi-example-review-rules/references/rules.md'])
 
     def test_skill_selection_rejects_other_components_and_unsafe_names(self):
         with self.assertRaisesRegex(ValueError, '只适用'):

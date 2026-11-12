@@ -1,6 +1,14 @@
-# 测试与行为评估布局
+# 源码维护、测试与行为评估布局
 
 本文件只在创建、维护、评估或审计 skill 时读取。普通业务任务不得把开发目录加入上下文。
+
+## maintenance
+
+Skill 根目录的 `maintenance/` 是源码维护专用目录，包含非空 `README.md` 维护入口和 `terminology.md` 术语表。架构、设计说明按需保存，不创建空目录或无内容文档。业务执行必需的知识仍放 `references/`。
+
+治理前先读取目标源码 `<target_skill>/maintenance/README.md` 与 `<target_skill>/maintenance/terminology.md`，明确业务对象和命名边界。新建或本次治理的目标补齐这两份资料；旧 Skill 暂不批量迁移。
+
+普通运行资源（包括说明、参考、脚本、模板和配置）不得依赖源码维护资料。治理 Skill 可显式读取目标源码的维护资料；不能把自己的维护目录当作安装后的运行依赖。
 
 ## tests
 
@@ -21,5 +29,6 @@
 
 - 普通 skill 的 `SKILL.md` 不引用 `tests/`、`evals/` 或开发命令。
 - 只有 `feipi-skill-govern` 在治理态按需读取目标 skill 的开发目录。
-- `scripts/install_skills.sh` 的链接与拷贝模式都排除 skill 根目录下的 `tests/` 和 `evals/`；用户级链接模式实拷入口文件、只链接运行目录，确保客户端能发现 skill。
-- 初始化默认创建 `tests/run.sh`；只有确有 Agent 行为用例时才创建 `evals/`，不创建空目录。
+- `scripts/install_skills.sh` 的链接、拷贝及打包内容递归排除 `maintenance/`、`tests/`、`evals/` 和 `node_modules/`，包括嵌套位置。链接模式实拷入口文件，只链接无需过滤的运行目录；需要过滤的父目录展开后再安装，确保客户端能发现 Skill 且不泄漏维护资料。
+- 初始化默认创建维护入口、术语表和 `tests/run.sh`；只有确有 Agent 行为用例时才创建 `evals/`，不创建空目录。
+- 新建与本次治理交付运行 `validate.sh <目标源码目录> --require-maintenance`。仓库级历史布局检查不带此参数，允许尚未治理的旧 Skill 暂缺维护目录；一旦存在该目录，两份维护资料都必须完整。

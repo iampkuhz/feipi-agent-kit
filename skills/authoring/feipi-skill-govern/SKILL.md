@@ -72,7 +72,7 @@ description: 用于治理 repo 内 skill 的命名、触发、执行、模板、
 - 运行内容与开发内容分层：普通 skill 的 `SKILL.md` 不引用 `tests/` 或 `evals/`；只有本 Skill Creator 在创建、维护、评估或审计 skill 时读取这些目录。
 - `tests/` 保存确定性脚本测试、集成测试和 fixtures，统一入口为 `tests/run.sh`；`evals/` 保存真实 Agent 行为用例、判定标准和基线，不保存运行产物。
 - `tests/`、`evals/` 都是源码维护目录，安装器必须排除；评估输出写入仓库 `tmp/`，不能回流到 skill。
-- 创建或迁移开发资料时按需读取 `references/development-layout.md`。
+- 创建或迁移开发资料时按需读取 `references/development-layout.md`。源码维护目录与测试、评估目录均递归排除出安装包；普通运行内容不得依赖源码维护资料。
 - Skill 脚本从自身位置推导仓库与资源路径，不写开发者目录或应用安装目录的绝对路径。
 - 临时产物用唯一临时目录，优先采用 `mktemp`、`tempfile`、Node `os.tmpdir()` 等系统接口，并只清理本次创建的目录。
 - macOS/Linux 共用脚本兼容 Bash 3.2 与 BSD/GNU 工具差异；可选平台工具通过 `command -v`、平台检测或参数发现，且不能成为隐式必需依赖。
@@ -81,6 +81,7 @@ description: 用于治理 repo 内 skill 的命名、触发、执行、模板、
 ## 执行流程（治理态）
 
 1. Step 1：基线审计
+- 先读目标源码 `<target_skill>/maintenance/README.md` 和 `<target_skill>/maintenance/terminology.md`，明确业务对象与命名边界；不存在时记录缺口，并在本次治理中补齐。这里指目标源码，不是已安装治理 Skill 自身的运行依赖。
 - 读取目标 skill 的入口文件和直接资源。
 - 用户要求全仓审计时，按 registry 逐项遍历 skill 中的脚本和测试代码，排除 `node_modules`、缓存、构建产物等第三方内容。
 - 产出问题清单，标记命名、layer、触发、执行、资源、脚本归位、验证七类状态。
@@ -95,11 +96,12 @@ description: 用于治理 repo 内 skill 的命名、触发、执行、模板、
 3. Step 2：定点修复
 - 默认只修改目标 skill 与直接共享文件；用户明确授权全仓范围时，可修改审计发现的各 skill，并按责任分组记录。
 - 同步修触发配置、`SKILL.md`、`references/`、`scripts/`、`assets/`、`templates/` 的一致性。
+- 新增或本次治理的目标补齐维护入口与术语表；架构和设计资料按需放在源码维护目录，业务执行必需知识仍放 `references/`。不批量迁移其他 Skill。
 - 若发现仓库根目录残留的公共模板或运行时脚本，优先迁回目标 skill 内部；无法证明仍被现役 skill 使用时，直接删除。
 - Step 2 检查清单属于临时执行文档，只能写到 `tmp/` 或系统临时目录。
 
 4. Step 3：验证与收口
-- 先做结构校验，再做行为校验，再做旧规则残留搜索。
+- 本次治理目标用 `bash scripts/validate.sh <目标源码目录> --require-maintenance` 做结构校验，再做行为校验与旧规则残留搜索。
 - 运行目标 skill 的 `scripts/check_portability.py`；全仓范围运行仓库级 skill 布局校验。静态检查不能替代在目标操作系统上的真实执行。
 - 输出 governance report、validation status 与待重审清单。
 - governance report 属于临时治理文档，不得沉淀回当前 skill。
@@ -138,7 +140,7 @@ description: 用于治理 repo 内 skill 的命名、触发、执行、模板、
 
 1. 当前 skill 目录执行
 ```bash
-bash scripts/validate.sh .
+bash scripts/validate.sh . --require-maintenance
 bash tests/run.sh
 ```
 
@@ -146,7 +148,7 @@ bash tests/run.sh
 
 2. 仓库根目录执行
 ```bash
-bash skills/authoring/feipi-skill-govern/scripts/validate.sh skills/authoring/feipi-skill-govern
+bash skills/authoring/feipi-skill-govern/scripts/validate.sh skills/authoring/feipi-skill-govern --require-maintenance
 bash skills/authoring/feipi-skill-govern/scripts/init_skill.sh feipi-video-read-youtube --layer integration
 ```
 

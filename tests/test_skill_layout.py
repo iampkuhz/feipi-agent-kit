@@ -2,6 +2,7 @@
 import importlib.util
 import json
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 
@@ -17,12 +18,13 @@ class DevelopmentReferenceTests(unittest.TestCase):
         self.old_root = layout.REPO_ROOT
         layout.REPO_ROOT = self.root
         self.skill = self.root/'skills/diagram/feipi-example-generate-diagram'
-        (self.skill/'tests').mkdir(parents=True)
+        subprocess.run(['bash', str(layout.SKILL_VALIDATOR.parent/'init_skill.sh'), self.skill.name,
+                        '--layer', 'diagram', '--target', str(self.root/'skills')],
+                       check=True, capture_output=True, text=True)
         (self.skill/'evals').mkdir()
         (self.skill/'tests/run.sh').write_text('#!/bin/sh\nexit 0\n')
         (self.skill/'tests/run.sh').chmod(0o755)
         (self.skill/'evals/cases.json').write_text(json.dumps({'schema_version':1,'skill':self.skill.name,'cases':[{'id':'sample','prompt':'生成图','expected':['验证'],'forbidden':['伪造']}]}))
-        (self.skill/'SKILL.md').write_text('生成并验证图包。\n')
 
     def tearDown(self):
         layout.REPO_ROOT = self.old_root
@@ -33,13 +35,23 @@ class DevelopmentReferenceTests(unittest.TestCase):
         layout.validate_source_layout([self.skill])
 
     def test_runtime_reference_still_rejected(self):
-        (self.skill/'SKILL.md').write_text('业务运行时读取 tests/fixture.json\n')
-        with self.assertRaisesRegex(AssertionError,'运行内容引用开发目录'):
+        with (self.skill/'SKILL.md').open('a') as stream:
+            stream.write('业务运行时读取 tests/fixture.json\n')
+        with self.assertRaisesRegex(AssertionError,'不得引用 tests/evals'):
             layout.validate_source_layout([self.skill])
 
     def test_runtime_json_reference_still_rejected(self):
         (self.skill/'runtime.json').write_text(json.dumps({'input':'tests/fixture.json'}))
         with self.assertRaisesRegex(AssertionError,'运行内容引用开发目录'):
+            layout.validate_source_layout([self.skill])
+
+    def test_maintenance_can_reference_source_tests(self):
+        (self.skill/'maintenance/README.md').write_text('维护时运行 tests/run.sh\n')
+        layout.validate_source_layout([self.skill])
+
+    def test_runtime_maintenance_reference_rejected(self):
+        (self.skill/'references/run.md').write_text('读取 ../maintenance/terminology.md\n')
+        with self.assertRaisesRegex(AssertionError, '运行内容引用源码维护目录'):
             layout.validate_source_layout([self.skill])
 
 

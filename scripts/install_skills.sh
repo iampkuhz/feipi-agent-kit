@@ -6,7 +6,7 @@ set -euo pipefail
 # 1. 过滤链接模式：入口文件实拷、运行目录链接到用户级 agent 目录
 # 2. 过滤拷贝模式：安装到项目目录内（<project>/.agents/skills 等）
 #
-# skill 根目录下的 tests/、evals/ 与 node_modules/ 不进入安装目标。
+# 递归排除 maintenance/、tests/、evals/ 与 node_modules/，不进入安装目标。
 # 安装来源写入隐藏标记；再次安装时只清理本仓库已退役的入口。
 #
 # 安装前自动验证：
@@ -258,7 +258,7 @@ collect_shared_roots() {
 
   # 不依赖目标机器未必预装的 ripgrep，使用基础系统工具递归扫描脚本。
   find "$scan_root" \
-    \( -type d \( -name tests -o -name evals -o -name node_modules \) -prune \) -o \
+    \( -type d \( -name maintenance -o -name tests -o -name evals -o -name node_modules \) -prune \) -o \
     \( -type f -name '*.sh' -exec sh -c '
       pattern=$1
       shift
@@ -276,70 +276,12 @@ collect_shared_roots() {
     done
 }
 
-is_skill_development_dir() {
-  case "$1" in
-    tests|evals|node_modules) return 0 ;;
-    *) return 1 ;;
-  esac
+installation_trees_equal() {
+  python3 "$SCRIPT_DIR/package_skill.py" compare "$1" "$2" "${3:-staged}"
 }
 
-installation_trees_equal() {
-  python3 - "$1" "$2" "${3:-staged}" <<'PYEOF'
-import filecmp
-import os
-from pathlib import Path
-import stat
-import sys
-
-
-def equal(left, right):
-    if not os.path.lexists(right):
-        return False
-    left_mode, right_mode = left.lstat().st_mode, right.lstat().st_mode
-    if stat.S_IFMT(left_mode) != stat.S_IFMT(right_mode):
-        return False
-    # 符号链接的权限不控制目标访问，macOS 上却会随 umask 改变。
-    if stat.S_ISLNK(left_mode):
-        return os.readlink(left) == os.readlink(right)
-    if stat.S_IMODE(left_mode) != stat.S_IMODE(right_mode):
-        return False
-    if stat.S_ISDIR(left_mode):
-        names = {child.name for child in left.iterdir()}
-        return names == {child.name for child in right.iterdir()} and all(
-            equal(left / name, right / name) for name in names
-        )
-    return stat.S_ISREG(left_mode) and filecmp.cmp(left, right, shallow=False)
-
-
-try:
-    source, destination = map(Path, sys.argv[1:3])
-    mode = sys.argv[3]
-    if mode == 'staged':
-        same = equal(source, destination)
-    else:
-        # 比较安装后的有效树，未变时不创建临时副本；保留逐字节与权限检查。
-        names = {p.name for p in source.iterdir() if p.name not in {'tests', 'evals', 'node_modules'}}
-        marker = destination / '.feipi-agent-kit-source'
-        same = (destination.is_dir() and not destination.is_symlink()
-                and stat.S_IMODE(destination.stat().st_mode) == 0o700
-                and {p.name for p in destination.iterdir()} == names | {marker.name}
-                and marker.is_file() and not marker.is_symlink()
-                and stat.S_IMODE(marker.stat().st_mode) == 0o600
-                and marker.read_bytes() == (str(source) + '\n').encode())
-        if same:
-            for name in names:
-                left, right = source / name, destination / name
-                if mode == 'link' and left.is_dir():
-                    same = right.is_symlink() and os.readlink(right) == str(left)
-                else:
-                    same = equal(left, right)
-                if not same:
-                    break
-    sys.exit(0 if same else 1)
-except OSError as error:
-    print(f"[ERROR] 无法比较安装内容：{error}", file=sys.stderr)
-    sys.exit(2)
-PYEOF
+stage_skill() {
+  python3 "$SCRIPT_DIR/package_skill.py" stage "$1" "$2" "$3"
 }
 
 # 读取 skill agents/openai.yaml 中的顶层整数版本号。
@@ -400,23 +342,12 @@ link_item() {
   local dest="$2"
   local label="$3"
 
-  # Skill 目录不能整目录软链接，否则 tests/evals 会绕过安装过滤。
+  # Skill 目录不能整目录软链接，否则源码维护与测试目录会绕过安装过滤。
   # SKILL.md 等根文件必须实拷，避免客户端忽略软链接入口；运行目录保留源码联动。
   if [[ -f "$src/SKILL.md" ]]; then
     local staging
     staging="$(mktemp -d "${dest}.tmp.XXXXXX")" || return 1
-    local entry name
-    while IFS= read -r -d '' entry; do
-      name="$(basename "$entry")"
-      if is_skill_development_dir "$name"; then
-        continue
-      fi
-      if [[ -d "$entry" ]]; then
-        ln -s "$entry" "$staging/$name" || { rm -rf "$staging"; return 1; }
-      else
-        cp -p "$entry" "$staging/$name" || { rm -rf "$staging"; return 1; }
-      fi
-    done < <(find "$src" -mindepth 1 -maxdepth 1 -print0)
+    stage_skill "$src" "$staging" link || { rm -rf "$staging"; return 1; }
     printf '%s\n' "$src" > "$staging/$INSTALL_SOURCE_MARKER" || { rm -rf "$staging"; return 1; }
     # 来源标记权限固定，避免不同 umask 使未变内容被反复判为更新。
     chmod 600 "$staging/$INSTALL_SOURCE_MARKER" || { rm -rf "$staging"; return 1; }
@@ -473,14 +404,7 @@ copy_dir() {
   if [[ -f "$src/SKILL.md" ]]; then
     local staging
     staging="$(mktemp -d "${dest}.tmp.XXXXXX")" || return 1
-    local entry name
-    while IFS= read -r -d '' entry; do
-      name="$(basename "$entry")"
-      if is_skill_development_dir "$name"; then
-        continue
-      fi
-      cp -R -p "$entry" "$staging/$name" || { rm -rf "$staging"; return 1; }
-    done < <(find "$src" -mindepth 1 -maxdepth 1 -print0)
+    stage_skill "$src" "$staging" copy || { rm -rf "$staging"; return 1; }
     printf '%s\n' "$src" > "$staging/$INSTALL_SOURCE_MARKER" || { rm -rf "$staging"; return 1; }
     chmod 600 "$staging/$INSTALL_SOURCE_MARKER" || { rm -rf "$staging"; return 1; }
     finish_staged_install "$staging" "$dest" "$label"
@@ -531,7 +455,7 @@ collect_all_skills() {
     if [[ "$is_skill" == true ]]; then
       all_skill_dirs+=("$skill_dir")
     fi
-  done < <(find "$src_root" -type d \( -name '.*' -o -name node_modules -o -name tests -o -name evals -o -name __pycache__ \) -prune -o -type d -print0)
+  done < <(find "$src_root" -type d \( -name '.*' -o -name node_modules -o -name maintenance -o -name tests -o -name evals -o -name __pycache__ \) -prune -o -type d -print0)
 
   # 第二遍：排除那些有子技能的父目录
   # 如果一个技能目录的子目录中还有其他技能目录，则排除这个父目录
@@ -903,9 +827,9 @@ install_skills() {
   heading "$label"
   printf '  目标：%s\n' "$dest_root"
   if [[ "$mode" == link ]]; then
-    printf '  模式：入口实拷、运行目录链接；排除 tests/evals/node_modules\n'
+    printf '  模式：入口实拷、运行目录链接；递归排除 maintenance/tests/evals/node_modules\n'
   else
-    printf '  模式：实拷；排除 tests/evals/node_modules\n'
+    printf '  模式：实拷；递归排除 maintenance/tests/evals/node_modules\n'
   fi
   if [[ "$VERBOSE" == true ]]; then printf '  源目录：%s\n' "$SRC_ROOT"; fi
 

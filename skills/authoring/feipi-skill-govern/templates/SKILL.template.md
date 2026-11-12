@@ -60,7 +60,7 @@ description: {{SKILL_DESCRIPTION}}
 
 ## 资源说明
 
-- `scripts/`：放可复用、确定性强的辅助脚本。
+- `scripts/`：放可复用、确定性强的辅助脚本，按实际操作命名。
 - `references/`：放按需读取的领域资料或长规则。
 - `assets/`：放输出时要用到的模板或静态文件。
 

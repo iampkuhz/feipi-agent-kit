@@ -15,6 +15,7 @@
 - 默认不扩散到其他 skills；用户明确要求全仓审计时，按 registry 全集执行并分组收口。
 
 2. Step 1 基线审计
+- 先读目标源码 `<target_skill>/maintenance/README.md` 与 `<target_skill>/maintenance/terminology.md`；缺失项纳入本次修复，先明确业务对象及名称边界。
 - 读取 `SKILL.md`、`agents/openai.yaml`、直接使用到的 `references/`、`scripts/`、`assets/`、`templates/`。
 - 按授权范围递归检查脚本与测试代码中的绝对路径、临时路径、平台专属命令和未声明依赖。
 - 输出问题清单，标记命名、layer、触发、执行、资源、脚本归位、验证状态。
@@ -25,6 +26,7 @@
 - 若旧 rename 结论来自 action-first 规则，只能记录为待重审，不能直接沿用。
 
 4. Step 2 定点修复
+- 新建或本次治理的目标补齐源码维护入口与术语表，设计资料按需保存；业务运行必需内容仍放 `references/`，不批量迁移其他 Skill。
 - 先改最影响结果稳定性的文件。
 - 触发问题：优先改 frontmatter、`agents/openai.yaml`。
 - 执行问题：优先改 `SKILL.md`、直接关联的 `references/`。
@@ -33,11 +35,11 @@
 - 临时治理文档：只输出到仓库根 `tmp/` 或系统临时目录，禁止写回 skill 内部。
 
 5. Step 3 验证与收口
-- 结构校验：`bash scripts/validate.sh <skill-dir>`。
+- 结构校验：`bash scripts/validate.sh <skill-dir> --require-maintenance`。
 - 行为校验：`bash tests/run.sh` 或更贴近目标 skill 的本地 test。
 - 平台/路径校验：`python3 scripts/check_portability.py <skill-dir>`；全仓由 `python3 scripts/harness/validate_skill_layout.py` 调用。
 - 旧规则残留搜索：搜索旧命名文本、过时模板占位符、旧入口依赖。
-- 版本与记录：按 `references/version-policy.md` 与 `references/changelog-policy.md` 收口。
+- 版本与记录：按 `references/version-changelog-policy.md` 收口。
 
 ## 文件与问题映射
 
@@ -71,14 +73,14 @@
 ### 仓库根目录执行
 
 ```bash
-bash skills/authoring/feipi-skill-govern/scripts/validate.sh skills/authoring/feipi-skill-govern
+bash skills/authoring/feipi-skill-govern/scripts/validate.sh skills/authoring/feipi-skill-govern --require-maintenance
 bash skills/authoring/feipi-skill-govern/scripts/init_skill.sh feipi-video-read-youtube --layer integration
 ```
 
 ### 当前 skill 目录执行
 
 ```bash
-bash scripts/validate.sh .
+bash scripts/validate.sh . --require-maintenance
 bash tests/run.sh
 ```
 

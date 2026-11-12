@@ -1,6 +1,7 @@
 # 变更记录
 
 ## 2026-11-12
+- feipi-skill-govern v8：增加源码维护约定与递归安装隔离
 - feipi-multica-manage-tasks v6：同步通用协作约束与真实平台回归
 
 ## 2026-11-11

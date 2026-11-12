@@ -7,7 +7,9 @@ set -euo pipefail
 usage() {
   cat <<'USAGE'
 用法:
-  bash scripts/validate.sh <skill-dir>
+  bash scripts/validate.sh <skill-dir> [--require-maintenance]
+
+新增或本次治理的 Skill 使用 --require-maintenance；历史布局检查不强制补目录。
 
 示例:
   bash scripts/validate.sh skills/authoring/feipi-skill-govern
@@ -15,7 +17,7 @@ usage() {
 USAGE
 }
 
-if [[ $# -gt 1 ]]; then
+if [[ $# -gt 2 || ( $# -eq 2 && "$2" != "--require-maintenance" ) ]]; then
   usage
   exit 1
 fi
@@ -112,6 +114,8 @@ if [[ "$(basename "$TARGET_DIR")" != "feipi-skill-govern" ]] \
   exit 1
 fi
 echo "[PASS] 运行入口未引入开发目录"
+
+python3 "$SCRIPT_DIR/validate_resources.py" "$TARGET_DIR" "${@:2}"
 
 while IFS= read -r resource_path; do
   [[ -z "$resource_path" ]] && continue

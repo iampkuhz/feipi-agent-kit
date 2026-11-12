@@ -6,6 +6,7 @@ set -euo pipefail
 # - SKILL.md
 # - agents/openai.yaml
 # - tests/run.sh
+# - <target_skill>/maintenance/README.md 与术语表
 # - 可选资源目录（references/assets）
 
 usage() {
@@ -242,7 +243,12 @@ fi
 
 RESOURCES="$(normalize_resources "$RESOURCES")"
 
-mkdir -p "$ROOT_DIR/agents" "$ROOT_DIR/scripts" "$ROOT_DIR/tests"
+mkdir -p "$ROOT_DIR/agents" "$ROOT_DIR/scripts" "$ROOT_DIR/tests" "$ROOT_DIR/maintenance"
+
+for name in README terminology; do
+  sed -e "s/{{SKILL_NAME}}/$SKILL_NAME/g" \
+    "$TEMPLATES_ROOT/maintenance-${name}.template.md" > "$ROOT_DIR/maintenance/${name}.md"
+done
 
 TITLE="${SKILL_NAME}（待补中文名）"
 DESCRIPTION="用于处理对应领域任务并输出可验证结果；在用户提出匹配场景需求时使用。"

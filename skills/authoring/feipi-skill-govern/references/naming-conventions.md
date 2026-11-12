@@ -29,6 +29,8 @@ feipi-<domain>-<action>-<object...>
 
 ## 命名决策顺序
 
+治理前先读目标源码 `<target_skill>/maintenance/README.md` 与 `<target_skill>/maintenance/terminology.md`，确定业务对象与命名边界；缺少时在本次治理中补齐。
+
 命名时严格按以下顺序判断，不要倒推：
 
 1. 先定 `domain`
@@ -48,6 +50,13 @@ feipi-<domain>-<action>-<object...>
 - 总长度建议不超过 64。
 - 名称要兼顾可读性、可区分性、可治理性。
 - 尽量避免无意义缩写；若必须缩写，需是团队已有稳定术语。
+
+## 规约与辅助脚本
+
+- 规约可以使用 `rules`；人工或 Agent 按明确标准审阅业务对象时可使用 `review`。
+- 确定性辅助脚本按 `fetch`、`get`、`parse`、`compare`、`validate`、`save`、`render` 等具体操作命名，不暗示脚本会智能理解、判断或决策。
+- 避免重复父目录或 Skill 已表达的前缀；维护术语表说明实际业务对象与边界。
+- 保留现有兼容接口，不为风格统一批量重命名。
 
 ## action 选择规则
 

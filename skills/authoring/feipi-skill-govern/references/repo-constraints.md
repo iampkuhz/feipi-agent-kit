@@ -7,10 +7,12 @@
   - `SKILL.md`
   - `agents/openai.yaml`
   - `tests/run.sh`（仅源码维护，安装时排除）
+  - 新建或本次治理的 Skill 补齐源码维护目录的非空 README 与术语表；历史 Skill 不批量迁移。
 - `references/`、`assets/`、`templates/` 按需存在；没有复用价值时不要硬加目录。
 - `tests/` 只放确定性测试、集成测试、fixture 与 golden；`evals/` 只放 Agent 行为用例、判定标准和基线。两者只由 `feipi-skill-govern` 在创建、维护、评估或审计时加载。
 - 普通 skill 的 `SKILL.md` 不得引用 `tests/`、`evals/` 或其中命令；业务运行脚本不得依赖这两个目录。
-- `scripts/install_skills.sh` 的链接和拷贝模式都必须排除 skill 根目录的 `tests/` 与 `evals/`。
+- `maintenance/` 仅供源码维护，业务知识仍放 `references/`；普通运行资源不得依赖维护资料。
+- `scripts/install_skills.sh` 的链接、拷贝和打包内容必须递归排除 `maintenance/`、`tests/`、`evals/`，包括嵌套位置。治理 Skill 只可读取明确的目标源码维护资料，不可依赖自身被排除的文件。
 - 禁止在仓库根目录保留给多个 skill 兜底的公共 `templates/`；模板必须下沉到 `feipi-skill-govern/templates/` 或目标 skill 自己的 `templates/` / `assets/`。
 - Step 1 / Step 1.5 / Step 2 / Step 3 文档、rename plan、governance report、anti-pattern 草稿都属于临时治理产物，必须写到仓库根 `tmp/` 或系统临时目录，禁止提交到 skill 内部。
 

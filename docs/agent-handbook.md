@@ -5,7 +5,7 @@
 ## Skills 管理
 
 ```bash
-# 日常安装 Skills（备份后实拷，排除 tests/evals）
+# 日常安装 Skills（备份后实拷，递归排除 maintenance/tests/evals）
 ./workbench apply skills
 
 # 查看逐项跳过/保留原因、注册表验证详情
@@ -20,8 +20,8 @@ make install-project PROJECT=/path/to/project
 # 初始化新 skill
 bash skills/authoring/feipi-skill-govern/scripts/init_skill.sh <name> --layer <layer>
 
-# 校验 skill
-bash skills/authoring/feipi-skill-govern/scripts/validate.sh <skill-path>
+# 校验新增或本次治理的 skill（历史布局检查可省略严格参数）
+bash skills/authoring/feipi-skill-govern/scripts/validate.sh <skill-path> --require-maintenance
 
 # 执行技能测试
 bash <skill-path>/tests/run.sh
@@ -35,7 +35,7 @@ bash <skill-path>/tests/run.sh
 
 OpenClaw 原生 Git 安装的纯拷贝通过 `.openclaw/source-origin.json` 确认归属：Git 仓库地址必须与本仓库 `origin` 一致，`slug` 必须与入口目录名一致，`subdirectory` 必须是 `skills/` 下对应的技能路径。HTTPS 与 SSH 地址按仓库身份匹配。其他仓库、损坏或不匹配的来源记录均保留；显式来源标记或 OpenClaw 记录优先于内部链接证据。没有任何来源或链接证据的旧版纯实拷目录仍保留。
 
-重复安装会比较过滤后的文件类型、权限、文件内容和链接目标；内容一致时计入跳过，保留现有目录和文件。变化的入口或纯拷贝资源会更新，错误链接会修复。链接模式的运行目录变化直接随源码生效，开发目录 `tests/`、`evals/` 不参与安装比较，其脚本引用的共享路径也不安装。安装失败会中止，不计入跳过。
+重复安装会比较过滤后的文件类型、权限、文件内容和链接目标；内容一致时计入跳过，保留现有目录和文件。变化的入口或纯拷贝资源会更新，错误链接会修复。`maintenance/`、`tests/`、`evals/` 在任何嵌套位置均不参与安装与比较，其脚本引用的共享路径也不安装。链接模式只链接无需过滤的运行目录，需要过滤的目录展开后再安装。安装失败会中止，不计入跳过。
 
 安装输出按 agent/项目分组，目标路径与安装模式只显示一次。默认逐项显示变更、清理删除和警告，未变更的技能及保留的其他来源入口只汇总数量；`VERBOSE=1` 展开逐项名称、跳过/保留原因和验证详情。共享路径以 `共享/` 标识，计入安装小计和总计。
 

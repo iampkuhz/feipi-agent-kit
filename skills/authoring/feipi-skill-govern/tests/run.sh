@@ -39,6 +39,7 @@ run_case() {
     "$SKILL_DIR/scripts/quick_validate_internal.sh"
     "$SKILL_DIR/scripts/validate.sh"
     "$SKILL_DIR/scripts/check_portability.py"
+    "$SKILL_DIR/scripts/validate_resources.py"
     "$SKILL_DIR/references/naming-conventions.md"
     "$SKILL_DIR/references/skill-layering-policy.md"
     "$SKILL_DIR/references/workflow.md"
@@ -58,7 +59,7 @@ run_case() {
 
   case "$case_name" in
     validate-self)
-      bash "$VALIDATE_SCRIPT" "$SKILL_DIR" >/dev/null
+      bash "$VALIDATE_SCRIPT" "$SKILL_DIR" --require-maintenance >/dev/null
       ;;
     init-generated-skill)
       bash "$INIT_SCRIPT" "video-read-youtube" --resources "references,assets" --layer integration --target "$TMP_ROOT/skills" >/dev/null
@@ -67,10 +68,13 @@ run_case() {
       [[ -d "$gen_dir/references" ]]
       [[ -d "$gen_dir/assets" ]]
       [[ -x "$gen_dir/tests/run.sh" ]]
+      [[ -s "$gen_dir/maintenance/README.md" ]]
+      [[ -s "$gen_dir/maintenance/terminology.md" ]]
+      ! grep -Fq '{{' "$gen_dir/maintenance/README.md" "$gen_dir/maintenance/terminology.md"
       ! grep -Eq 'make[[:space:]]+validate[[:space:]]+DIR=|make[[:space:]]+test[[:space:]]+SKILL=' "$gen_dir/SKILL.md"
       ! grep -Fq '{{' "$gen_dir/SKILL.md" "$gen_dir/agents/openai.yaml" "$gen_dir/tests/run.sh"
       ! grep -Fq '<skill-name>' "$gen_dir/SKILL.md" "$gen_dir/agents/openai.yaml" "$gen_dir/tests/run.sh"
-      bash "$VALIDATE_SCRIPT" "$gen_dir" >/dev/null
+      bash "$VALIDATE_SCRIPT" "$gen_dir" --require-maintenance >/dev/null
       bash "$gen_dir/tests/run.sh" >/dev/null
       ;;
     reject-missing-option-value)
@@ -177,6 +181,9 @@ PY
     portability-checker-tests)
       python3 "$SKILL_DIR/tests/test_portability.py" >/dev/null
       ;;
+    resource-boundary-tests)
+      python3 "$SKILL_DIR/tests/test_resources.py"
+      ;;
     *)
       echo "未知测试项：$case_name" >&2
       return 1
@@ -197,7 +204,8 @@ for case_name in \
   reject-missing-option-value \
   reject-unsupported-layer \
   registry-validator-command-arguments \
-  portability-checker-tests
+  portability-checker-tests \
+  resource-boundary-tests
 do
   TOTAL=$((TOTAL + 1))
   if run_case "$case_name"; then

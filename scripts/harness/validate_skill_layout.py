@@ -86,7 +86,7 @@ def validate_source_layout(skills: list[Path]) -> None:
                 if not runtime_file.is_file():
                     continue
                 relative_parts = runtime_file.relative_to(skill).parts
-                if relative_parts[0] in {"tests", "evals", "node_modules", ".git"} \
+                if any(part in {"maintenance", "tests", "evals", "node_modules", ".git"} for part in relative_parts) \
                         or "__pycache__" in relative_parts:
                     continue
                 # npm 锁文件记录第三方包的 workspace 元数据，不是 skill 的运行指令。
@@ -102,9 +102,10 @@ def assert_installed_tree(root: Path, skills: list[Path], link_mode: bool) -> No
         installed = root / source.name
         if not (installed / "SKILL.md").is_file():
             fail(f"安装后缺少 SKILL.md：{installed}")
-        for excluded in ("tests", "evals", "node_modules"):
-            if (installed / excluded).exists() or (installed / excluded).is_symlink():
-                fail(f"安装内容泄漏 {excluded}/：{installed}")
+        for directory, dirs, files in os.walk(installed, followlinks=True):
+            leaked = {"maintenance", "tests", "evals", "node_modules"}.intersection(dirs + files)
+            if leaked:
+                fail(f"安装内容泄漏开发资料 {sorted(leaked)}：{directory}")
         if link_mode and (installed / "SKILL.md").is_symlink():
             fail(f"链接模式的入口文件必须实拷：{installed / 'SKILL.md'}")
         if not link_mode and (installed / "SKILL.md").is_symlink():
@@ -112,7 +113,8 @@ def assert_installed_tree(root: Path, skills: list[Path], link_mode: bool) -> No
         if link_mode:
             runtime_dirs = [
                 entry for entry in source.iterdir()
-                if entry.is_dir() and entry.name not in {"tests", "evals", "node_modules"}
+                if entry.is_dir() and entry.name not in {"maintenance", "tests", "evals", "node_modules"}
+                and not any(p.name in {"maintenance", "tests", "evals", "node_modules"} for p in entry.rglob("*"))
             ]
             if runtime_dirs and not any((installed / entry.name).is_symlink() for entry in runtime_dirs):
                 fail(f"链接模式未保留运行目录源码联动：{installed}")
@@ -153,6 +155,7 @@ def validate_retired_entries(root: Path, link_root: Path, project: Path, env: di
     scripts = repo / "scripts"
     (scripts / "harness").mkdir(parents=True)
     shutil.copy2(INSTALLER, scripts / INSTALLER.name)
+    shutil.copy2(REPO_ROOT / "scripts/package_skill.py", scripts / "package_skill.py")
     shutil.copy2(REPO_ROOT / "scripts/harness/validate_registry.py", scripts / "harness")
     shutil.copy2(REPO_ROOT / "Makefile", repo / "Makefile")
     subprocess.run(["git", "init", "--quiet", str(repo)], check=True)
@@ -175,7 +178,7 @@ def validate_retired_entries(root: Path, link_root: Path, project: Path, env: di
             (skill / "scripts/run.sh").write_text(
                 "runtime\n# $REPO_ROOT/fixture-shared/resource.txt\n", encoding="utf-8"
             )
-        for excluded in ("tests", "evals", "node_modules"):
+        for excluded in ("maintenance", "tests", "evals", "node_modules"):
             (skill / excluded).mkdir()
         return skill
 
@@ -225,7 +228,7 @@ def validate_retired_entries(root: Path, link_root: Path, project: Path, env: di
     development_shared = repo / "development-only"
     development_shared.mkdir()
     (development_shared / "resource.txt").write_text("source only", encoding="utf-8")
-    for excluded in ("tests", "evals", "node_modules"):
+    for excluded in ("maintenance", "tests", "evals", "node_modules"):
         (current / excluded / "dependency.sh").write_text(
             "# $REPO_ROOT/development-only/resource.txt\n", encoding="utf-8"
         )

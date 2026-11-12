@@ -107,7 +107,7 @@ Step 1 基线审计、Step 1.5 rename review/rename plan、Step 2 checklist、go
 
 ## 单个 skill 的标准治理顺序
 
-1. 读取目标 skill 当前入口文件。
+1. 先读目标源码 `<target_skill>/maintenance/README.md` 与 `<target_skill>/maintenance/terminology.md`，明确业务对象、命名边界，再读当前入口文件；缺少维护资料时在本次治理中补齐。
 2. 输出 Step 1 基线审计。
 3. 若涉及命名或路径，输出 Step 1.5 评审与 rename plan。
 4. 执行 Step 2 定点修复。

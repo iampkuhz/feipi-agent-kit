@@ -7,7 +7,7 @@
       "prompt": "请使用视频 skill 总结一个视频",
       "expected": [
         "不触发 skill 治理",
-        "不读取目标 skill 的 tests 或 evals"
+        "不读取目标 skill 的 maintenance、tests 或 evals"
       ],
       "forbidden": [
         "把维护测试加入业务上下文",
@@ -19,6 +19,7 @@
       "prompt": "请重构这个 skill 的测试与行为评估布局",
       "expected": [
         "触发 skill 治理",
+        "先读目标源码 maintenance 维护入口和术语表，缺少时补齐",
         "读取目标 tests/evals 和治理规则",
         "同步模板、安装器和验证"
       ],
@@ -37,6 +38,21 @@
       "forbidden": [
         "顺手改造所有不相关 skill",
         "依赖仓库外共享运行脚本"
+      ]
+    },
+    {
+      "id": "maintenance-naming-boundary",
+      "prompt": "请治理这个 Skill 的维护资料和辅助脚本命名，不迁移其他 Skill。",
+      "expected": [
+        "先读目标源码维护入口与术语表，明确业务对象",
+        "规约可用 review/rules，确定性辅助脚本按实际操作命名",
+        "业务执行必需知识保留在 references",
+        "验证安装包递归排除维护资料，普通运行内容不依赖维护资料"
+      ],
+      "forbidden": [
+        "为统一风格批量重命名兼容接口",
+        "批量为其他 Skill 补目录",
+        "把治理 Skill 读取目标源码维护资料误判为自身运行依赖"
       ]
     }
   ]
