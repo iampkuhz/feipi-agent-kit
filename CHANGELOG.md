@@ -1,6 +1,7 @@
 # 变更记录
 
 ## 2026-11-15
+- feipi-drawio-generate-diagram v5：预检回执准确记录只读启动策略
 - feipi-plantuml-generate-diagram v14：首次启动仅监听本机地址
 - feipi-mermaid-generate-diagram v4：修复新 Mac 的 Chrome 发现与隔离运行说明
 

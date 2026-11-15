@@ -161,4 +161,5 @@ def preflight(existing_only=False):
     # 仅重试只读健康探测，渲染请求不重试；不拉镜像、不建容器、不重启。
     result = wait_ready()
     return {'renderer_url': endpoint(), 'podman_container': CONTAINER,
-            'startup_performed': started, 'startup_policy': 'podman_once', **result}
+            **result, 'startup_performed': started,
+            'startup_policy': 'existing_only' if existing_only else 'podman_once'}

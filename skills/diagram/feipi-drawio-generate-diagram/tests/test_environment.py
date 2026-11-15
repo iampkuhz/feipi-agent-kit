@@ -37,6 +37,18 @@ class EnvironmentTests(unittest.TestCase):
         self.environment.start()
         self.addCleanup(self.environment.stop)
 
+    def test_running_renderer_reports_selected_policy_without_starting(self):
+        container = copy.deepcopy(CONTAINER)
+        container['State']['Running'] = True
+        for existing_only, policy in [(True, 'existing_only'), (False, 'podman_once')]:
+            with self.subTest(existing_only=existing_only), patch.object(renderer, 'ensure_local'), \
+                 patch.object(renderer, 'podman', return_value=json.dumps([container])) as podman, \
+                 patch.object(renderer, 'wait_ready', return_value={**READY, 'startup_policy': 'untrusted'}):
+                report = renderer.preflight(existing_only)
+                self.assertEqual(policy, report['startup_policy'])
+                self.assertFalse(report['startup_performed'])
+                self.assertFalse(any(call.args[0] == 'start' for call in podman.call_args_list))
+
     def test_missing_states_only_suggest_preparation(self):
         for missing, code in [(True, 'image_missing'), (False, 'container_missing')]:
             def podman(*args, **kwargs):
