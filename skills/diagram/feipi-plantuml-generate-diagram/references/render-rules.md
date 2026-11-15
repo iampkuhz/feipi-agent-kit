@@ -11,7 +11,7 @@
 
 1. 每个批次在创建任何图 worker 前只运行一次 `scripts/preflight_renderer.sh`。只读预检使用 `--existing-only`（mindmap 入口也可传入），回执为 `startup_policy=existing_only`；探测失败不执行 Podman、不复检。默认仍为 `startup_policy=podman_once`。
 2. 每次探测连接超时不超过 1 秒、请求总超时不超过 2 秒，只渲染固定最小探针图。
-3. 首次探测若识别到明确连接权限错误，立即返回 `blocked_reason=render_access_denied`，不启动 Podman、不复检。其他不可用且目标是默认 8199 端口时，只执行一次 `podman run --rm -d -p 8199:8080 --name plantuml docker.io/plantuml/plantuml-server:jetty`；命令默认最多等待 30 秒，成功后等待 1 秒，再复检一次。
+3. 首次探测若识别到明确连接权限错误，立即返回 `blocked_reason=render_access_denied`，不启动 Podman、不复检。其他不可用且目标是默认 8199 端口时，只执行一次 `podman run --rm -d -p 127.0.0.1:8199:8080 --name plantuml docker.io/plantuml/plantuml-server:jetty`；命令默认最多等待 30 秒，成功后等待 1 秒，再复检一次。
 4. 成功时冻结唯一 `renderer_url`，后续所有图显式复用该地址，不再自动发现。
 5. 复检若遇到明确连接权限错误，同样返回 `render_access_denied`；其他失败返回 `render_server_unavailable`。不再重试、不切换地址、不创建 worker，也不停止或排查容器。
 

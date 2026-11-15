@@ -233,7 +233,7 @@ exit \"$FAKE_PODMAN_EXIT\"
         self.assertEqual(2, probe_count)
         self.assertEqual(
             [
-                "run --rm -d -p 8199:8080 --name plantuml "
+                "run --rm -d -p 127.0.0.1:8199:8080 --name plantuml "
                 "docker.io/plantuml/plantuml-server:jetty",
             ],
             commands,

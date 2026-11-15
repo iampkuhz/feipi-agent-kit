@@ -18,7 +18,7 @@ import time
 from lib.runtime_observation import RunClock, atomic_json, receipt_fields
 
 SCRIPTS = Path(__file__).resolve().parent
-PODMAN_COMMAND = ["podman", "run", "--rm", "-d", "-p", "8199:8080", "--name", "plantuml",
+PODMAN_COMMAND = ["podman", "run", "--rm", "-d", "-p", "127.0.0.1:8199:8080", "--name", "plantuml",
                   "docker.io/plantuml/plantuml-server:jetty"]
 
 
