@@ -7,6 +7,7 @@ STATE_DIR="$HOME/.openclaw"
 GLOBAL_ENV="$HOME/.env"
 MODE="deploy"
 ASSUME_YES=0
+DEPENDENCIES_ONLY=0
 
 usage() {
   cat <<'EOF'
@@ -14,6 +15,7 @@ usage() {
   scripts/deploy.sh
   scripts/deploy.sh --check
   scripts/deploy.sh --yes
+  scripts/deploy.sh --dependencies-only --yes
 
 从空的 ~/.openclaw 一次部署 OpenClaw、锁定的 provider/微信插件、受管运行文件、
 workspace 模板、managed skills 和 macOS LaunchAgent。
@@ -21,6 +23,7 @@ workspace 模板、managed skills 和 macOS LaunchAgent。
 参数：
   --check  只检查前提和当前状态
   --yes    跳过部署前确认
+  --dependencies-only  仅安装程序、provider 和 skills，不要求业务凭据、不启动 Gateway
   -h       显示帮助
 EOF
 }
@@ -33,6 +36,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --yes)
       ASSUME_YES=1
+      shift
+      ;;
+    --dependencies-only)
+      DEPENDENCIES_ONLY=1
       shift
       ;;
     -h|--help)
@@ -80,7 +87,7 @@ if ! jq -e '
   exit 1
 fi
 
-if [[ ! -f "$GLOBAL_ENV" ]]; then
+if [[ "$DEPENDENCIES_ONLY" == 0 && ! -f "$GLOBAL_ENV" ]]; then
   echo "全局环境文件不存在：$GLOBAL_ENV" >&2
   exit 1
 fi
@@ -105,13 +112,15 @@ required_env=(
   OPENCLAW_TG_BOT_TOKEN
 )
 missing_env=()
-for key in "${required_env[@]}"; do
-  if ! has_env_key "$key"; then
-    missing_env+=("$key")
-  fi
-done
-if [[ "${#missing_env[@]}" -gt 0 ]]; then
-  echo "~/.env 缺少必填变量：" >&2
+if [[ "$DEPENDENCIES_ONLY" == 0 ]]; then
+  for key in "${required_env[@]}"; do
+    if ! has_env_key "$key"; then
+      missing_env+=("$key")
+    fi
+  done
+fi
+if [[ "$DEPENDENCIES_ONLY" == 0 && "${#missing_env[@]}" -gt 0 ]]; then
+  echo "${HOME}/.env 缺少必填变量：" >&2
   printf '  - %s\n' "${missing_env[@]}" >&2
   exit 1
 fi
@@ -125,7 +134,7 @@ jq -r '.plugins | to_entries[] | "插件：\(.key) \(.value.version)"' "$REPO_DI
 echo
 
 make -C "$REPO_DIR" test
-"$REPO_DIR/scripts/install-runtime.sh" --check
+if [[ "$DEPENDENCIES_ONLY" == 0 ]]; then "$REPO_DIR/scripts/install-runtime.sh" --check; fi
 
 if [[ "$MODE" == "check" ]]; then
   if command -v openclaw >/dev/null 2>&1; then
@@ -142,7 +151,11 @@ if [[ "$ASSUME_YES" -eq 0 ]]; then
     echo "非交互部署必须显式添加 --yes。" >&2
     exit 2
   fi
-  read -r -p "确认一次部署并重启 OpenClaw Gateway？[y/N] " answer
+  if [[ "$DEPENDENCIES_ONLY" == 1 ]]; then
+    read -r -p "确认仅准备 OpenClaw 依赖？[y/N] " answer
+  else
+    read -r -p "确认一次部署并重启 OpenClaw Gateway？[y/N] " answer
+  fi
   case "$answer" in
     y|Y|yes|YES) ;;
     *)
@@ -164,28 +177,46 @@ else
   hash -r
 fi
 
-echo "[2/7] 安装受管运行文件"
-"$REPO_DIR/scripts/install-runtime.sh" --write --yes
+# 完整声明会引用尚未安装的本地插件；先用原生临时空配置准备依赖。
+# 状态目录仍是正式 ~/.openclaw，临时配置只供安装命令，不启动 Gateway 或渠道。
+# OpenClaw 以配置文件的父目录派生 npm 插件根目录，临时配置必须与正式配置同目录。
+mkdir -p "$STATE_DIR"
+bootstrap_config="$(mktemp "$STATE_DIR/.deploy-bootstrap.XXXXXX")"
+cleanup_deploy() {
+  # OpenClaw 写配置会生成 .bak/.bak.N；只清理本次唯一文件的备份族。
+  rm -f "$bootstrap_config" "$bootstrap_config".bak*
+}
+trap cleanup_deploy EXIT
+printf '{}\n' >"$bootstrap_config"
+echo "[2/7] 安装锁定 provider/微信插件"
 
 while IFS=$'\t' read -r plugin_id plugin_package required_version; do
-  current_version="$(openclaw plugins inspect "$plugin_id" --json 2>/dev/null \
+  current_version="$(OPENCLAW_CONFIG_PATH="$bootstrap_config" openclaw plugins inspect "$plugin_id" --json 2>/dev/null \
     | jq -r '.plugin.packageVersion // .plugin.version // empty' 2>/dev/null || true)"
   if [[ "$current_version" == "$required_version" ]]; then
-    echo "[3/7] $plugin_id $required_version 已安装"
+    echo "$plugin_id $required_version 已安装"
   else
-    echo "[3/7] 安装 $plugin_id $required_version"
-    openclaw plugins install "$plugin_package@$required_version" --force --pin
+    echo "安装 $plugin_id $required_version"
+    OPENCLAW_CONFIG_PATH="$bootstrap_config" openclaw plugins install "$plugin_package@$required_version" --force --pin
   fi
 done < <(jq -r '.plugins | to_entries[] | [.key, .value.package, .value.version] | @tsv' "$REPO_DIR/versions.json")
+
+echo "[3/7] 安装 managed skills（包含本地成长日记插件）"
+OPENCLAW_CONFIG_PATH="$bootstrap_config" \
+  "$REPO_DIR/scripts/bootstrap.sh" --yes
+
+if [[ "$DEPENDENCIES_ONLY" == 1 ]]; then
+  echo "依赖已准备；恢复同批状态及 env 后运行完整部署，尚未启动 Gateway。"
+  exit 0
+fi
 
 echo "[4/7] 校验配置和 SecretRef"
 # provider 安装会向运行配置写入版本 meta；仓库配置始终覆盖该生成内容。
 "$REPO_DIR/scripts/install-runtime.sh" --write --yes
 make -C "$REPO_DIR" validate
 
-echo "[5/7] 安装 managed skills"
-OPENCLAW_CONFIG_PATH="$REPO_DIR/openclaw.json" \
-  "$REPO_DIR/scripts/bootstrap.sh" --yes
+echo "[5/7] 核对受管运行文件"
+"$REPO_DIR/scripts/install-runtime.sh" --check
 
 echo "[6/7] 安装并重启 macOS LaunchAgent"
 env -u OPENCLAW_CONFIG_PATH openclaw gateway install --force

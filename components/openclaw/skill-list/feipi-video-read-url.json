@@ -4,7 +4,7 @@
   "homepage": "https://github.com/iampkuhz/feipi-agent-kit/tree/main/skills/integration/feipi-video-read-url",
   "source": {
     "type": "git-subdirectory",
-    "repository": "/Users/zhehan/Documents/tools/llm/feipi-agent-kit",
+    "repository": "../..",
     "ref": "main",
     "path": "skills/integration/feipi-video-read-url"
   },

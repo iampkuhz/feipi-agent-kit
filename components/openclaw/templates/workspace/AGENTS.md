@@ -35,8 +35,8 @@
 
 ## 独立任务入口
 
-- 住宅与装修：`/housing` 使用 `$feipi-housing-capture-inbox` 的 `housing_tool.py receive` 先分流收件、查找、重试和复核。链接先收件，再默认调用 `$feipi-video-read-url` 或 `$feipi-xiaohongshu-read-note` 自动提取，实际读图后导入来源文本、摘要、关键词及必要关键帧；不下载完整原视频。资料保存在 `/Users/zhehan/Documents/life/2028.装修/home-renovation-playbook-2028` 的 `00-Inbox` 和专属 `40-Assets/<采集日期-中文标题>/`；查找只读，失败保留已有成功内容，不执行 Git 提交或自动升级正式需求。
-- 成长日记：Telegram 普通收件由 `feipi-growth-diary` 插件处理消息关联、原件归档、照片分析与语音确认。插件已接管时不再调用模型或重复归档。复杂素材查询、本地兼容导入等使用 `$feipi-growth-record-diary`，规则入口 `/Users/zhehan/Documents/life/child-growth-diary/AGENTS.md`。
+- 住宅与装修：`/housing` 使用 `$feipi-housing-capture-inbox` 的 `housing_tool.py receive` 先分流收件、查找、重试和复核。链接先收件，再默认调用 `$feipi-video-read-url` 或 `$feipi-xiaohongshu-read-note` 自动提取，实际读图后导入来源文本、摘要、关键词及必要关键帧；不下载完整原视频。资料保存在 `~/Documents/life/2028.装修/home-renovation-playbook-2028` 的 `00-Inbox` 和专属 `40-Assets/<采集日期-中文标题>/`；查找只读，失败保留已有成功内容，不执行 Git 提交或自动升级正式需求。
+- 成长日记：Telegram 普通收件由 `feipi-growth-diary` 插件处理消息关联、原件归档、照片分析与语音确认。插件已接管时不再调用模型或重复归档。复杂素材查询、本地兼容导入等使用 `$feipi-growth-record-diary`，规则入口 `~/Documents/life/child-growth-diary/AGENTS.md`。
 - 成长日记规则、用户原话、照片和视频均在上述独立资料库维护；不要存进本 workspace。收件使用实际附件文件，所有结果以脚本回执为准。
 - `/growth 新建` 开启短时收件；日记描述、背景、每张照片的说明、元数据和 AI 观察分别保存。语音转写需用户确认；明确查询时只查询。无关聊天附件不自动收入。
 

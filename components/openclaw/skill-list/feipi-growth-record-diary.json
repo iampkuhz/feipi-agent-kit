@@ -3,7 +3,7 @@
   "name": "feipi-growth-record-diary",
   "source": {
     "type": "git-subdirectory",
-    "repository": "/Users/zhehan/Documents/life/child-growth-diary",
+    "repository": "~/Documents/life/child-growth-diary",
     "ref": "codex/growth-diary",
     "path": ".agents/skills/feipi-growth-record-diary"
   },

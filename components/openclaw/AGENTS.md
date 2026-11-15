@@ -17,7 +17,7 @@
 - 只保留非默认行为和必要安全边界，以锁定版本的官方 schema 为准。
 
 3. Git 与运行态分离
-- Git 仓库固定为 `/Users/zhehan/Documents/tools/llm/feipi-agent-kit/components/openclaw`。
+- 源码位于 Agent Kit 的 `components/openclaw`；从脚本位置推导路径，不依赖旧用户名或旧独立仓库。
 - `agents/`、`browser/`、`credentials/`、`logs/`、`memory/`、`npm/`、`plugins/`、`skills/`、`state/`、`tasks/`、`telegram/` 等运行目录不得入库。
 - 仓库只保留最终态长期文件；一次性诊断产物不入库。
 

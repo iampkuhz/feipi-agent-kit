@@ -24,7 +24,7 @@ export LITELLM_API_KEY_OPENAI="${LITELLM_API_KEY_OPENAI:-validation-placeholder}
 export OPENCLAW_GATEWAY_TOKEN="${OPENCLAW_GATEWAY_TOKEN:-validation-placeholder}"
 export OPENCLAW_TG_BOT_TOKEN="${OPENCLAW_TG_BOT_TOKEN:-validation-placeholder}"
 export CLASH_PROXY="${CLASH_PROXY:-http://127.0.0.1:7890}"
-export HOME="${HOME:-/Users/zhehan}"
+export HOME="${HOME:?需要已有用户 HOME}"
 
 jq empty "$OPENCLAW_CONFIG_PATH"
 jq empty "$REPO_DIR/versions.json"
@@ -100,10 +100,10 @@ jq -e '
   and (.channels.telegram.direct["7026716907"].systemPrompt | contains("housing_tool.py receive"))
   and (.channels.telegram.direct["7026716907"].systemPrompt | contains("不下载完整原视频"))
   and (.channels.telegram.direct["7026716907"].systemPrompt | contains("$feipi-growth-record-diary"))
-  and (.channels.telegram.direct["7026716907"].systemPrompt | contains("/Users/zhehan/Documents/life/child-growth-diary/AGENTS.md"))
+  and (.channels.telegram.direct["7026716907"].systemPrompt | contains("${HOME}/Documents/life/child-growth-diary/AGENTS.md"))
   and (.channels.telegram.direct["7026716907"].systemPrompt | contains("/health"))
   and (.channels.telegram.direct["7026716907"].systemPrompt | contains("$feipi-health-maintain-family-records"))
-  and (.channels.telegram.direct["7026716907"].systemPrompt | contains("/Users/zhehan/Documents/life/家庭健康/AGENTS.md"))
+  and (.channels.telegram.direct["7026716907"].systemPrompt | contains("${HOME}/Documents/life/家庭健康/AGENTS.md"))
   and (.agents | has("list") | not)
   and (.agents.entries.main.identity.name == "feipi_claw")
   and (.agents.defaults | has("workspace") | not)

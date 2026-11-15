@@ -204,7 +204,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-for command_name in git jq shasum; do
+for command_name in git jq shasum python3; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
     echo "未检测到命令：$command_name" >&2
     exit 1
@@ -263,7 +263,7 @@ seen_names="|"
 echo "读取 skill manifests 并下载 Git 来源..."
 
 for manifest_file in "${manifest_files[@]}"; do
-  manifest_path="${manifest_file#$REPO_DIR/}"
+  manifest_path="${manifest_file#"$REPO_DIR"/}"
   if ! jq -e '
     (if has("enabled") then .enabled else true end) as $enabled
     | .version == 1
@@ -326,6 +326,16 @@ for manifest_file in "${manifest_files[@]}"; do
     continue
   fi
 
+  # 本地来源跟随当前 HOME 或组件位置；不 eval manifest，不依赖开发者用户名。
+  # shellcheck disable=SC2088
+  case "$repository" in
+    '~/'*) repository="$HOME/${repository#\~/}" ;;
+    ./* | ../*) repository="$REPO_DIR/$repository" ;;
+  esac
+  if [[ "$repository" == /* ]]; then
+    repository="$(cd "$repository" && pwd -P)"
+  fi
+
   repo_key="$(printf '%s\n%s\n' "$repository" "$ref" | shasum -a 256 | awk '{print substr($1, 1, 20)}')"
   checkout_dir="$TEMP_ROOT/repos/$repo_key"
   if [[ "$use_local_working_tree" == "true" ]]; then
@@ -382,13 +392,14 @@ for manifest_file in "${manifest_files[@]}"; do
   # 安装包只保留运行资源；测试、评估与临时产物不分发到运行目录。
   runtime_source_dir="$TEMP_ROOT/runtime/$slug"
   mkdir -p "$runtime_source_dir"
-  cp -R "$source_dir/." "$runtime_source_dir/"
-  for development_dir in tests evals tmp; do
-    if [[ -e "$runtime_source_dir/$development_dir" || -L "$runtime_source_dir/$development_dir" ]]; then
-      find "$runtime_source_dir/$development_dir" -depth -delete
-    fi
-  done
-  find "$runtime_source_dir" -type d -name __pycache__ -prune -exec rm -rf {} +
+  python3 - "$source_dir" "$runtime_source_dir" <<'PY'
+from pathlib import Path
+import shutil
+import sys
+source, target = map(Path, sys.argv[1:])
+shutil.copytree(source, target, dirs_exist_ok=True, symlinks=True,
+                ignore=shutil.ignore_patterns('maintenance', 'tests', 'evals', 'node_modules', 'tmp', '__pycache__'))
+PY
   source_tree_hash=""
   if [[ "$use_local_working_tree" == "true" ]]; then
     source_tree_hash="$(python3 - "$runtime_source_dir" <<'PY'
