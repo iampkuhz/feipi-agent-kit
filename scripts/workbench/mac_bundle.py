@@ -18,6 +18,8 @@ FILES = (
     ('.qwen/settings.json', '.qwen/settings.json'),
     ('.qoder/.config.json', '.qoder/.config.json'),
     ('.codex/config.toml', '.codex/config.toml'),
+    ('.codex/model-catalog.selected.json', '.codex/model-catalog.selected.json'),
+    ('.codex/model-catalogs/litellm-local.json', '.codex/model-catalogs/litellm-local.json'),
     ('.claude/settings.json', '.claude/settings.json'),
     ('.omlx/settings.json', '.omlx/settings.json'),
     ('.omlx/model_settings.json', '.omlx/model_settings.json'),

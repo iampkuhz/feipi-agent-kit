@@ -61,6 +61,22 @@ class MacBundle(unittest.TestCase):
         self.assertEqual((self.new/'.env').read_text(), 'keep-existing')
         self.assertFalse((self.new/'.local/env-vault').exists())
 
+    def test_codex_catalog_referenced_by_configuration_is_restored_with_configuration(self):
+        codex = self.old/'.codex'; (codex/'model-catalogs').mkdir(parents=True)
+        catalog = codex/'model-catalog.selected.json'
+        (codex/'config.toml').write_text('model_catalog_json = "'+str(catalog)+'"\n')
+        content = json.dumps({'models': [{'slug': 'fixture-model', 'display_name': 'Fixture model'}]})
+        catalog.write_text(content)
+        (codex/'model-catalogs/litellm-local.json').write_text(content)
+        self.export()
+        proc = self.cli(self.new, 'restore-mac')
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        restored = self.new/'.codex/model-catalog.selected.json'
+        self.assertEqual(json.loads(restored.read_text()), json.loads(content))
+        self.assertIn(str(restored), (self.new/'.codex/config.toml').read_text())
+        self.assertEqual(json.loads((self.new/'.codex/model-catalogs/litellm-local.json').read_text()),
+                         json.loads(content))
+
     def test_manifest_traversal_rejected(self):
         self.export()
         path = self.bundle/'manifest.json'
