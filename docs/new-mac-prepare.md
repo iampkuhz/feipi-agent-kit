@@ -123,6 +123,9 @@ bash components/mac/bootstrap/ohmyzsh.sh install
 ./workbench apply openclaw
 ./workbench apply skills
 ./workbench apply services
+# 只准备固定程序、单个官方 Compose 和本地包装入口；账号/数据/设备绑定随后处理。
+python3 components/multica/scripts/install-native.py install
+python3 components/multica/scripts/install-runtime.py
 bash components/mac/bootstrap/neovim.sh
 RESTORE_CONFIG
 ```

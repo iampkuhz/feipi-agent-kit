@@ -507,8 +507,9 @@ def install(component, apps=False, agents=False):
         run(['bash', ROOT/'scripts/bootstrap/setup.sh'])
         apply(component)
     elif component == 'multica':
-        if not (HOME/'.config/multica-selfhost/machine.json').exists() or not shutil.which('multica'):
-            raise ValueError('先按 components/multica/docs/mac-mini-migration.md 安装锁定版本并登录/绑定本机；不复制另一台机器的 runtime 身份。随后重跑 install multica。')
+        run([sys.executable, ROOT/'components/multica/scripts/install-native.py', 'install'])
+        if not (HOME/'.config/multica-selfhost/machine.json').exists():
+            raise ValueError('固定程序与服务定义已准备；按 components/multica/docs/mac-mini-migration.md 登录/绑定本机，再重跑 install multica。不复制另一台机器的 runtime 身份。')
         apply(component)
     else:
         raise ValueError('OpenClash 在路由器 LuCI 安装锁定版本；本机先配置私有 router.json。见 components/openclash/README.md，随后 apply openclash。')

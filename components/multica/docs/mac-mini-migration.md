@@ -21,6 +21,16 @@ python3 scripts/restore-check.py ~/.local/state/multica/backups/本批次
 
 按当前 compatibility 安装固定版本 Multica 0.6.3、Codex 0.162.1，以及 Podman/Compose 和项目实际依赖；可选执行器仅在显式启用后安装对应版本。源码统一从 Agent Kit 的 components 发布，不恢复独立旧仓库作为运行来源。包含未提交更改的源码需明确传输；不能只 clone 远端旧版本。备份中的 ops-runtime 提供实际发布脚本与声明的可恢复副本。若启用 LiteLLM，按该服务流程恢复数据库、模型路由、客户端访问密钥和既有容器，确认 readiness 后实际请求编码模型。
 
+集中准备清单已执行以下两步；单独部署时在 `components/multica` 中运行。安装器仅下载官方固定 CLI 与固定提交的单个 Compose，并校验摘要，不克隆整个上游源码、不登录或启动服务。已有其他 CLI 版本或不同服务定义时停止，不自动覆盖或降级。
+
+```bash
+bash <<'PREPARE_MULTICA'
+set -euo pipefail
+python3 scripts/install-native.py install
+python3 scripts/install-runtime.py
+PREPARE_MULTICA
+```
+
 从备份 machine.reference.json 建立 `~/.config/multica-selfhost/machine.json`，0600。保留恢复数据库中的 workspace、Agent、项目及 resource UUID；更新主机名、源码和项目路径、工具包装路径、模型地址、Podman VM/容器名。role=primary。runtimes 与 daemon 的物理身份稍后重绑，不直接复用旧设备身份。
 
 按现有 `configure.py` 与安全投影流程设置服务 env，必须恢复同批 JWT/VCS 加密密钥与数据库口令。不要执行 init-secrets 生成替换值；保留原始 env vault 真源和 0600 最小投影。用锁定 digest 的 compose 创建新机空卷，先仅启动 postgres；Web/API 保持停止。

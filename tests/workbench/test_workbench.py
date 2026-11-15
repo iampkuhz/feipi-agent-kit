@@ -12,6 +12,29 @@ spec.loader.exec_module(wb)
 
 
 class Recovery(unittest.TestCase):
+    def test_multica_install_prepares_native_files_before_requesting_binding(self):
+        with tempfile.TemporaryDirectory(prefix='feipi multica install ') as directory:
+            with patch.object(wb, 'HOME', Path(directory)), patch.object(wb, 'run') as run, \
+                    patch.object(wb, 'apply') as apply, self.assertRaisesRegex(ValueError, '已准备'):
+                wb.install('multica')
+            run.assert_called_once_with([wb.sys.executable, wb.ROOT/'components/multica/scripts/install-native.py', 'install'])
+            apply.assert_not_called()
+
+    def test_multica_native_install_failure_does_not_publish_runtime(self):
+        with patch.object(wb, 'run', side_effect=subprocess.CalledProcessError(1, 'install')), \
+                patch.object(wb, 'apply') as apply, self.assertRaises(subprocess.CalledProcessError):
+            wb.install('multica')
+        apply.assert_not_called()
+
+    def test_multica_bound_install_still_uses_existing_publication_checks(self):
+        with tempfile.TemporaryDirectory(prefix='feipi multica bound ') as directory:
+            home = Path(directory); binding = home/'.config/multica-selfhost/machine.json'
+            binding.parent.mkdir(parents=True); binding.write_text('{}')
+            with patch.object(wb, 'HOME', home), patch.object(wb, 'run') as run, patch.object(wb, 'apply') as apply:
+                wb.install('multica')
+            run.assert_called_once()
+            apply.assert_called_once_with('multica')
+
     def test_startup_failure_restores_all_managed_plists_including_session_browser(self):
         with tempfile.TemporaryDirectory(prefix='feipi startup backup ') as scratch:
             root = Path(scratch); runtime = root/'runtime'; home = root/'home'
