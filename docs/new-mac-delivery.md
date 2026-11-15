@@ -118,4 +118,4 @@ oMLX 两个自启开关已按固定版本的真实界面设置：Dock 原生 Ope
 Env Vault 的开机验证使用专用无秘密 `.env`；之后真实私有配置已恢复至验证机，但真实 vault 历史和全业务重启仍需完整流程验收。本机 `kern.hv_support=1`，该 VM 为 0，Podman 在下载前明确拒绝并返回非零。2026-11-15 再次核对宿主机为 Apple M1；Tart 官方当前只支持 M3/M4 上的 Linux 虚拟机使用嵌套虚拟化，不能借此让现有 macOS 验证机运行本地 Podman。完整容器服务及实际新 Mac mini 的整机证明仍未完成。
 参考：[Tart 嵌套虚拟化边界](https://tart.run/faq/#nested-virtualization-support)、[Homebrew 无交互安装](https://docs.brew.sh/Installation#unattended-installation)、[OpenAI 固定版本 Codex 安装示例](https://developers.openai.com/cookbook/examples/codex/build_iterative_repair_loops_with_codex)。
 
-继续整机验收需要一台可原生运行 Podman 的干净 Mac，以及可用的 `ssh 新机账号@新机有线IP` 连接；该目标尚未提供。本人登录与系统权限按[集中清单](new-mac-prepare.md#一次完成授权与权限)一次准备，Codex、Qoder、Figma MCP 的新设备授权仍待完成。具备这些条件后，按同一清单执行服务冷启动、业务恢复与真实请求，再完整关机开机并登录、复跑验收任务；最终业务切换仍须排空旧机。旧机缓存镜像上的隔离容器和借旧机 LiteLLM 的请求，仅保留为相应组件证据。
+用户已明确无法额外提供干净 Mac。准备阶段继续完善已有配置、脚本和部署引导，不再把额外验收机或 SSH 连接作为准备前提；最终部署与整机验收直接在新 Mac mini 上进行，可本地操作。本人登录与系统权限按[集中清单](new-mac-prepare.md#一次完成授权与权限)在新机统一引导，Codex、Qoder、Figma MCP 的新设备授权仍待完成。机器到手后执行服务冷启动、业务恢复与真实请求，再完整关机开机并登录、复跑验收任务；最终业务切换须安排旧机停写窗口并排空任务。旧机缓存镜像上的隔离容器和借旧机 LiteLLM 的请求，仅保留为相应组件证据。面向用户的状态、资源和确认项直接在手机对话中用短清单与选择卡片呈现，完整 Markdown 保留为维护资料。
