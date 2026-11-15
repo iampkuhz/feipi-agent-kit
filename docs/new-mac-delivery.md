@@ -4,7 +4,7 @@
 
 ## 交付边界
 
-本次核对提交 `aff8b23`：Git 跟踪 898 个文件，内容合计 4,510,561 字节（4.30 MiB）；其中 `components/mac/` 为 77 文件、260,830 字节（约 255 KiB），包含配置、脚本、测试和文档。最大跟踪文件为 265,330 字节，没有超过 1 MiB 的跟踪文件。这是该版本内容的统计，不包含 Git 历史、工作区未跟踪文件或仓库外资料。
+本次核对提交 `7bb826e`：Git 跟踪 898 个文件，内容合计 4,525,063 字节（4.32 MiB）；其中 `components/mac/` 为 77 文件、265,970 字节（约 260 KiB），包含配置、脚本、测试和文档。最大跟踪文件为 265,330 字节，没有超过 1 MiB 的跟踪文件。这是该版本内容的统计，不包含 Git 历史、工作区未跟踪文件或仓库外资料。
 
 此前 GB 级迁移包是仓库外的私有资料副本，不是 Git 交付内容，也不再作为新机初始化的前置条件。后续验收关注 Git 声明是否齐全、脚本能否安装和启动、配置是否生效、实际功能能否运行；不再为普通资料目录进行打包、全量遍历、容量盘点或逐文件验收。必要目录和传输命令见 [本地目录直传](workbench.md#本地目录由用户直接传输)。数据库仍保留原生一致性导出要求，但由用户执行导出和传输，不合并成整机迁移大包。
 
@@ -26,8 +26,8 @@
 | 数据一致性 | Multica 数据库/附件/密钥同批；OpenClaw SQLite 停写恢复；旧机不发生双主 | 当前 PostgreSQL 备份已在无网络临时容器恢复；OpenClaw 在实际新 HOME 恢复、重建依赖和发布配置，4 个 SQLite、7,289 个业务文件核查通过，Gateway 未启动；完整业务切换待验 |
 | 服务冷启动 | Podman VM、本地连接、Compose、镜像拉取、健康等待、模型实际请求 | 默认本机 Podman ensure 及三服务 10 分钟就绪等待已增加；64 项工作台、18 项服务回归通过；旧机 ensure 真实通过且未重启现有 VM；完整冷启动待验 |
 | 图表和文档 | Mermaid、draw.io、PlantUML、PPT/PDF 实际生成并检查产物 | Chrome/LibreOffice 中英文 PDF 导出、字体嵌入及 PNG 渲染通过；Mermaid 原生 Chrome 的 SVG/PNG、可编辑 PPTX 与 QuickLook/CoreText 渲染及实际看图通过；旧机现有 draw.io/PlantUML 服务的中文 SVG/PNG 出图及实际看图通过；两者新机本地容器冷启动与 PowerPoint 编辑回环待验 |
-| oMLX/语音 | 安装来源、模型清单、设置恢复、首次推理 | 三个模型及完整设置已从迁移包恢复；原生应用读取迁入模型路径和自定义别名，文本及 Qwen3-ASR/SenseVoiceSmall 语音推理通过；登录后自启仍待验 |
-| 自启与重启 | Env Vault、Podman/受管服务、OpenClaw、Multica 按依赖恢复；完整重启后小任务 | Env Vault 已在干净系统真实加载、触发快照，完整关机开机后自动恢复及再次触发通过；终端 Node/Rust/Codex 复验通过。Podman 因该 VM 不支持嵌套虚拟化明确失败，其他组件待验 |
+| oMLX/语音 | 安装来源、模型清单、设置恢复、首次推理 | 三个模型及完整设置已从迁移包恢复；文本及 Qwen3-ASR/SenseVoiceSmall 语音推理通过；本轮原生 start、登录自启及重启后文本请求通过；菜单栏显示准备仍按集中清单执行 |
+| 自启与重启 | Env Vault、Podman/受管服务、OpenClaw、Multica 按依赖恢复；完整重启后小任务 | Env Vault 加载、快照及电源重启恢复通过；终端 Node/Rust/Codex 复验通过。Session Browser/oMLX 未手动启动即 HTTP 200，oMLX 控制状态及真实文本请求通过。Podman 因该 VM 不支持嵌套虚拟化明确失败，其他组件待验 |
 | 人工准备 | 所有必要 copy/export/授权命令集中成一次操作；运行中不逐项追问 | [集中清单](new-mac-prepare.md)已列出源码/配置、独立备份、用户直传、代理过渡、安装与授权；25 个文档命令块通过系统 Bash 3.2 语法检查；实体双机执行与最终切换待验 |
 | 最终端到端证明 | 干净 macOS、准确源码版本/环境指纹、逐阶段日志、真实产物、重复执行、失败恢复 | 未完成 |
 
@@ -84,7 +84,17 @@ PPT 演示入口仍引用搬迁前的样例路径与已经移除的 builder 接�
 
 已将提交 `aff8b23` 通过小型 Git 增量包复放到干净 macOS 验证机，报告 `source_dirty=false`：当前开发演示入口实际生成三页含原生文本的 PPTX，PlantUML 15 项预检回归通过。验证机这次未执行容器冷启动或 PPT 视觉验收，旧机的 LibreOffice 对照结果也不算新机证据。
 
-验证机 oMLX 原生 `start` 已真实尝试：应用进入首次 Shell PATH 确认弹窗，45 秒后 CLI 因控制 socket 尚未建立失败。进程采样定位到 `promptForShellPathExport` / `NSAlert runModal`，没有重复启动或杀进程，也没有将其归咎于模型。集中清单已补应用首次打开与原生登录自启选项；该路径尚未通过完整重启验收。
+早期验证机 oMLX 原生 `start` 已真实尝试：应用进入首次 Shell PATH 确认弹窗，45 秒后 CLI 因控制 socket 尚未建立失败。进程采样定位到 `promptForShellPathExport` / `NSAlert runModal`，没有重复启动或杀进程，也没有将其归咎于模型。当时该路径尚未通过完整重启验收，后续修复与复验见下文。
+
+后续首次启动修复：`771cedd` 在 Bash/Zsh 预留 oMLX 原生入口；`61ce740` 兼容 nvm 原生不带 `v` 的默认别名，修复新终端找不到 OpenClaw，并在安装时通过 Apple `stapler` 附加固定应用包缺失的公证票据；`7bb826e` 修复 SSH `doctor` 未探测 Homebrew 标准位置的误报。Mac 四组回归在 C/UTF-8 下通过，75 项工作台回归通过。验证机使用 `7bb826e`、`source_dirty=false`，在 Gatekeeper 开启的状态从原包重新安装 oMLX，实际执行附加票据分支并通过只读 check；新终端直接执行 OpenClaw 2026.9.2、SSH doctor 通过。原生应用 `start` 25.8 秒成功、控制接口报告 running、模型列表 HTTP 200，实际界面确认本机 8037 运行；不等同于独立 spctl 评估命令已通过，其此前拒绝与后续超时日志仍保留。
+
+`85b5333` 复用现有启动管理为已安装的 Session Browser 增加独立 loopback 任务，不经 Podman 或额外 shell。实际首次服务启动用时约 36 秒，早期 30 秒探测超时保留为失败记录；随后 HTTP 200、仅监听 127.0.0.1:8848。完整关机开机后，在未手动启动 Session Browser 的情况下再次得到 HTTP 200。OpenClaw 后安装的补全刷新已加入集中命令；恢复环境中缓存实际生成，后续新终端通过。
+
+oMLX 两个自启开关已按固定版本的真实界面设置：Dock 原生 Open at Login 有勾号，Settings → Server 的自动启动开启，JSON 确认原先 false 已变为 true。macOS 菜单栏显示提示仅关闭，未使用要求完全磁盘访问的 Auto-Fix。上述报告位于验证机 `~/.local/state/feipi-workbench/validation/first-launch.XygPwyf3/`。此前验证机 Gatekeeper 曾关闭，本轮已恢复开启；其他应用的既有安装记录不能代替默认安全策略下首次打开的验收。
+
+重启期间曾因主机可用空间降至约 116 MiB 而无法创建命令临时文件，该次重启结果不计通过。已停止验证机，仅删除本轮重新安装时保留的公开应用副本、可重建安装包及自有 Homebrew/Tart 下载缓存，可用空间恢复约 6.5 GiB。个人资料、模型和历史私有归档未做遍历或删除。
+
+清理后最终电源重启补验：仍为 `7bb826e`、`source_dirty=false`，内核启动时间已改变，Gatekeeper 开启，oMLX 自动启动设置为 true。新启动后没有执行 start 或手动启动会话浏览器：8848 页面与 8037 模型列表均 HTTP 200，控制接口 status=ok/state=running，原别名 `qwen3.5-text-fast` 的真实文本请求 HTTP 200 且结果非空。两个端口均只监听 loopback。完整报告为上述目录的 `final-reboot-report.json`；它证明这两项原生服务的后台自启和业务，不代替 Podman 冷启动、其他组件或全部 GUI/账号验收。
 
 ## 当前真实验证条件
 

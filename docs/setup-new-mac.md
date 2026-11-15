@@ -99,7 +99,14 @@ Podman 自启复用默认本机 ensure，然后分别启动 LiteLLM、SearXNG、
 加载成功只表示 LaunchAgent 注册完成；完整重启、三个服务的真实业务请求，以及 OpenClaw、Multica、
 oMLX、图表渲染服务的各自恢复与验收仍须完成。
 
-oMLX 使用应用自身的登录启动能力：首次从应用目录打开，完成 Shell PATH 提示和向导，在 Preferences 勾选 `Launch at login` 和 `Start server automatically on launch`，再运行 `omlx start --timeout 60`。这是[上游支持的原生方式](https://github.com/jundot/omlx/issues/294)，不另建同职责的 LaunchAgent。验证机的首次托管启动实际遇到 PATH 弹窗，控制 socket 尚未建立；这次失败不代表此前独立 `serve` 的模型推理失败，也不能计作登录自启已验证。
+oMLX 使用系统与应用的原生启动能力，不另建同职责的 LaunchAgent。以下路径已在固定的 0.4.4 上实际操作：
+
+1. 首次打开应用后执行 `omlx start --timeout 120`，确保设置页面能够连接服务器。
+2. 在应用 `Settings → Server` 开启 `Automatically start server on launch`；恢复的旧设置可能关闭了它。
+3. 右击 Dock 中的 oMLX，勾选 `Options → Open at Login`，核实菜单出现勾号。
+4. 完整关机、开机并登录后，只检查控制状态和实际模型请求，不能先手动 start 再称自启通过。
+
+Mac 配置已预留原生 CLI 路径，安装脚本会附加并验证 Apple 公证票据。遇到菜单栏显示提示时，可按提示进入系统设置的菜单栏选项显示 oMLX；该准备步骤不需要授予“完全磁盘访问”。原生首次 `start`、登录启动和重启后实际请求分别验收，不能互相替代。
 
 ## 配置和数据
 
