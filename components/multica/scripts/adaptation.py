@@ -69,7 +69,7 @@ def expand(value):
     return str(Path(value).expanduser())
 
 
-def cli(*args, stdin=None, with_cursor=False):
+def cli(*args, stdin=None, with_cursor=False, timeout=90):
     command = os.environ.get('MULTICA_TASK_CLI', str(Path.home() / '.local/bin/multica-task'))
     env = dict(os.environ)
     if not task_context() and MACHINE.exists():
@@ -77,7 +77,7 @@ def cli(*args, stdin=None, with_cursor=False):
     # attachment download 只写文件，不提供 --output json。
     as_json = args[:2] != ('attachment', 'download')
     result = subprocess.run([command, *map(str, args), *(['--output', 'json'] if as_json else [])], input=stdin,
-                            text=True, capture_output=True, env=env, timeout=90)
+                            text=True, capture_output=True, env=env, timeout=timeout)
     if result.returncode:
         # CLI 错误可能含请求正文；不把个人配置或服务返回原文转抄进日志。
         raise AdaptError('Multica ' + ' '.join(args[:2]) + ' 失败，退出码 ' + str(result.returncode) + '；请检查认证、权限和原生 CLI 状态。')

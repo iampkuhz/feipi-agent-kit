@@ -80,6 +80,8 @@ multica-ops doctor
 
 ## 启动、隔离与恢复
 
+新机恢复同批业务数据、登录并选择准确工作区后，使用 `multica-ops rebind --local`。它在 120 秒内等待本机原生注册，交叉核对 profile、服务、设备、系统、构建、本机原生 UUID 和同工作区唯一线上 runtime；冲突即停，未就绪超时保持原绑定，重复执行不重写一致文件。此步骤只写本机绑定，随后仍需 plan → apply → verify。已知目标 daemon 的人工精确选择继续使用 `--daemon-id`；两种方式互斥。完整首次安装命令见[迁机清单](mac-mini-migration.md)。
+
 LaunchAgent `local.multica.personal` 在用户登录后启动持续监督器。它检查/启动 machine.json 明确的 Podman VM，仅启动已存在且停止的 Multica postgres/backend/frontend 容器；API 和 Web 就绪后维护唯一 daemon，每60秒复查。缺少容器时要求显式安装，不自动创建或升级。共享 VM 启动脱离 LaunchAgent 进程组，停止监督器时保留容器。当前 Codex 流程不依赖 LiteLLM；其他模型服务由各自管理器维护。不把端口健康当作模型请求成功；Mac mini 整机重启和 FileVault 登录仍需在目标机实测。
 
 若重新启用 OpenClaw 执行器，能力发现与包装命令均须指向隔离目录，保留 CLI 生成的每任务 OPENCLAW_CONFIG_PATH。个人 Gateway 不切换目录、不重启，禁止在 UI 中误选个人实例。

@@ -121,18 +121,31 @@ RESTORE_MULTICA_RECEIPTS
 `manage-runtime.py install/start` 在写 LaunchAgent 或调用 launchctl 前检查主机角色、profile 的服务/工作区/路径/并发/升级设置及个人凭据是否存在；缺项即报错，不把失败的后台循环当成已启动。该本地检查不证明凭据仍有效，须先完成上面的原生工作区访问。
 
 ```bash
+bash <<'START_MULTICA'
+set -euo pipefail
+source ../mac/bootstrap/environment.sh
 python3 scripts/install-runtime.py
 # 仅在声明启用隔离 OpenClaw 时：
 # python3 scripts/configure-openclaw.py
 # multica-task runtime profile set-path 隔离Profile_UUID --path 新机multica-openclaw绝对路径
 # 新机并发配置为 1，禁自动升级；检查 setup 不覆盖 profile
 python3 scripts/manage-runtime.py install
-multica-task daemon status
-multica-ops rebind --daemon-id 新机Daemon_UUID
-multica-ops plan
+"$HOME/.local/bin/multica-ops" rebind --local
+"$HOME/.local/bin/multica-ops" plan
+START_MULTICA
+```
+
+`rebind --local` 在最多 120 秒内等待本机 daemon 和 runtime 注册。它核对原生 profile、服务地址、设备名、操作系统、固定版本/提交及本机生成的 `~/.multica/daemon.id`，再与同一工作区的原生注册列表和服务端唯一线上 runtime 交叉核对；存在活动任务时继续等待。身份冲突或重复 runtime 立即失败，超时不写机器绑定；重复执行已一致时不重写文件。无需手填新机 UUID，不复制或生成设备身份，不修改服务端 Agent 或项目。显式指定 `--daemon-id` 的入口仍保留，两种方式不能混用。
+
+审阅 plan 中明确受管对象的差异后，使用该次准确摘要执行下面一段；计划改变时 apply 会拒绝，不沿用旧摘要。
+
+```bash
+bash <<'APPLY_MULTICA'
+set -euo pipefail
 multica-ops apply --plan-id 审阅后的摘要
 multica-ops verify
 multica-ops doctor
+APPLY_MULTICA
 ```
 
 rebind 仅更新本机 daemon/runtime 绑定；以 provider+profile+新 daemon 唯一匹配，歧义即停。apply 再更新明确受管 Agent 与项目本地路径，保留项目其他资源。未纳管项目需逐项核对，不能随意替换数据库里的所有路径。
