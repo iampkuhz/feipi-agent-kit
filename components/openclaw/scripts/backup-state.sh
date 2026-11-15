@@ -27,15 +27,23 @@ fi
 # 保存会话/记忆/插件状态、运行声明、浏览器与 env vault；排除可重建缓存/依赖。
 # tar 保留符号链接本身，绝不跟随到不可控目录；vault 单独明确加入归档。
 python3 - "$batch" <<'PY'
-import json, pathlib, sqlite3, sys
+import contextlib, json, pathlib, sqlite3, sys
 home = pathlib.Path.home()
 paths = [home/'.openclaw/state/openclaw.sqlite', *sorted((home/'.openclaw/agents').glob('*/agent/openclaw-agent.sqlite')),
          home/'.openclaw/openclaw-weixin/ref-messages.sqlite']
 checks = {}
 for path in paths:
     if not path.exists(): continue
-    with sqlite3.connect(path.as_uri()+'?mode=ro', uri=True) as db:
-        result = db.execute('PRAGMA integrity_check').fetchall()
+    try:
+        # Gateway 已停写。WAL 数据库最后一个连接退出后可能删除辅助文件；
+        # 此时只读连接无法初始化它们，须由 SQLite 原生读写连接检查并完成 checkpoint。
+        with contextlib.closing(sqlite3.connect(path.as_uri()+'?mode=rw', uri=True)) as db:
+            result = db.execute('PRAGMA integrity_check').fetchall()
+            checkpoint = db.execute('PRAGMA wal_checkpoint(TRUNCATE)').fetchone()
+            if checkpoint[0] != 0:
+                raise SystemExit('SQLite 仍有写入或锁定，未备份：'+str(path.relative_to(home)))
+    except sqlite3.Error as error:
+        raise SystemExit('SQLite 停写检查失败：'+str(path.relative_to(home))+'；'+str(error)) from error
     if result != [('ok',)]: raise SystemExit('SQLite 完整性失败：'+str(path))
     checks[str(path.relative_to(home))] = 'ok'
 pathlib.Path(sys.argv[1], 'sqlite-integrity.json').write_text(json.dumps(checks, indent=2)+'\n')
