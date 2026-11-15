@@ -4,7 +4,7 @@
 
 ## 交付边界
 
-本次核对提交 `040e418`：Git 跟踪 888 个文件，内容合计 4,469,557 字节（4.26 MiB）；其中 `components/mac/` 为 77 文件、260,691 字节（约 255 KiB），包含配置、脚本、测试和文档。最大跟踪文件为 265,330 字节，没有超过 1 MiB 的跟踪文件。这是当前版本内容的统计，不包含 Git 历史、工作区未跟踪文件或仓库外资料。
+本次核对提交 `b5eec47`：Git 跟踪 889 个文件，内容合计 4,483,429 字节（4.28 MiB）；其中 `components/mac/` 为 77 文件、260,691 字节（约 255 KiB），包含配置、脚本、测试和文档。最大跟踪文件为 265,330 字节，没有超过 1 MiB 的跟踪文件。这是该版本内容的统计，不包含 Git 历史、工作区未跟踪文件或仓库外资料。
 
 此前 GB 级迁移包是仓库外的私有资料副本，不是 Git 交付内容，也不再作为新机初始化的前置条件。后续验收关注 Git 声明是否齐全、脚本能否安装和启动、配置是否生效、实际功能能否运行；不再为普通资料目录进行打包、全量遍历、容量盘点或逐文件验收。必要目录和传输命令见 [本地目录直传](workbench.md#本地目录由用户直接传输)。数据库仍保留原生一致性导出要求，但由用户执行导出和传输，不合并成整机迁移大包。
 
@@ -22,7 +22,7 @@
 | Neovim | 按锁恢复插件、原生构建、解析器/语言服务器与实际编辑功能 | 干净 macOS 上 31 个解析器可加载、5 个 Mason 服务安装、Lua LSP 初始化、Lua/JSON 格式化及 Markdown HTTP 预览通过；已补可重跑入口 |
 | 常用软件 | 对照旧机 Brew 清单、近期命令频率、真实应用/脚本依赖 | 共享 CLI 清单补充；17 项应用/字体已在干净系统真实安装，清单检查通过；客户端账号和系统权限待验 |
 | AI CLI/客户端 | 锁定现有兼容版本安装、登录状态、真实小任务 | 四个锁定 CLI 安装/版本检查通过；迁入设置的 Qwen 真实文件任务通过，Claude 经现有 LiteLLM 隔离转发通过；Codex/Qoder 已确认需要新机登录，整套尚未通过 |
-| 私有配置与本地资料 | 必要私有配置集中准备；目录提供直传命令；不把用户资料容量作为初始化验收指标 | 已有配置恢复能力；实际新配置包约 23 KiB，Codex 派生目录改为自动重建；主机 67 项工作台回归通过，干净 macOS 的新格式真实恢复待验；用户复制目录后核实所需功能 |
+| 私有配置与本地资料 | 必要私有配置集中准备；目录提供直传命令；不把用户资料容量作为初始化验收指标 | 实际新配置包约 23 KiB，干净 macOS 连续两次恢复通过；Codex 原生读取自动重建的三个模型，元数据摘要完全一致；主机 67 项工作台回归通过；用户复制目录后核实所需功能 |
 | 数据一致性 | Multica 数据库/附件/密钥同批；OpenClaw SQLite 停写恢复；旧机不发生双主 | 当前 PostgreSQL 备份已在无网络临时容器恢复；OpenClaw 在实际新 HOME 恢复、重建依赖和发布配置，4 个 SQLite、7,289 个业务文件核查通过，Gateway 未启动；完整业务切换待验 |
 | 服务冷启动 | Podman VM、本地连接、Compose、镜像拉取、健康等待、模型实际请求 | 默认本机 Podman ensure 及三服务 10 分钟就绪等待已增加；64 项工作台、18 项服务回归通过；旧机 ensure 真实通过且未重启现有 VM；完整冷启动待验 |
 | 图表和文档 | Mermaid、draw.io、PlantUML、PPT/PDF 实际生成并检查产物 | Chrome/LibreOffice 中英文 PDF 导出、字体嵌入及 PNG 渲染通过；Mermaid/draw.io/PlantUML/PPT 待验 |
@@ -44,6 +44,8 @@ OpenClaw 冷安装发现并修复：业务配置和本地 skill 来源写死旧 
 CLI 真实任务补验：Node 26 与 Qwen 0.12.3 内置 dispatcher 的接口不兼容，实际捕获 `UND_ERR_INVALID_ARG: invalid onError method`；CLI 错误退出码却为 0。新机 Node 基线固定为 24.22.3，已有默认版本保留，相关安装回归通过；同一迁入设置无需代理 CLI 覆写即可完成文件工具任务。机制参考 [Node 维护者的接口兼容说明](https://github.com/nodejs/node/issues/63757)。新增 `bootstrap/verify-agents.sh` 复用四个 CLI 原生非交互入口，逐项在独立目录生成并核对文件，180 秒限时，任何失败最终非零；假成功、单项失败后继续及链接产物保全均有回归。
 
 提交 `ded5b1f` 的完整 CLI 演练中，Qwen 通过，Codex 暴露模型目录 JSON 漏迁，Claude 等待未启动的本地 LiteLLM，Qoder 明确返回未登录。已补入两份 Codex 模型目录白名单，真实重新导出并恢复 12 文件配置包。使用提交 `315ce35` 复验，source_dirty=false，Codex 已能运行至官方接口鉴权，失败为未登录的 401；Claude 通过只绑定 loopback 的 SSH 转发使用旧机 LiteLLM 后，按原设置完成精确文件任务。7890 代理和 4000 LiteLLM 转发均为隔离验证条件，不能代替新 FlClash 登录或新机容器冷启动证明。Codex、Qoder、Figma MCP 的新设备授权仍须纳入集中准备。64 项工作台回归在验证机通过。恢复、推理、CLI 原生日志及逐文件摘要已集中保存于 `~/.local/state/feipi-workbench/new-mac-validation/native-state-inference-evidence-5a6vv6uc/`。
+
+按小配置交付边界补验：提交 `b5eec47` 不再导出完整 Codex 派生目录。基础配置加清单实际为 23,685 字节，已在干净 macOS 的全新隔离 HOME 中连续恢复两次，source_dirty=false；程序从锁定版内置目录重建三个模型，规范化 JSON 摘要与旧机一致，原生 `codex debug models` 成功读取迁入配置及其目录。未引用的旧 LiteLLM 目录没有生成，env vault 相对链接及 0600 权限通过。此项不需要登录、不调用模型接口，不能替代真实任务鉴权。报告保存在 `~/.local/state/feipi-workbench/new-mac-validation/configuration-native-e3jahbr1/native-restore-report.json`。
 
 集中迁移补验：新增 `workbench private prepare-migration/verify-migration/restore-sources`，复用原生数据库备份，不复制热数据目录。真实批次 `full-20261115-prepare-03` 包含基础配置 10 文件、6 个 Git 项目（含 env vault 历史和 Session Browser 两份 stash）、家庭健康 102 个原件、房地产 363 个原件、FlClash 官方 ZIP、三个 oMLX 模型及业务备份。总计 906 文件、3.98 GiB，目录权限 0700，清单和摘要通过。当前 Multica 恢复后 issue/comment/attachment/agent 分别为 119/697/307/9，与同批记录一致；LiteLLM 原生恢复成功，public schema 有 75 张表。两者均使用无网络临时容器并清理；没有据此宣称新机容器冷启动通过。
 
