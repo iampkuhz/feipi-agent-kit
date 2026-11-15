@@ -5,6 +5,18 @@
 
 ## 先准备并确认
 
+裸机还没有 Git/Python 时，先从已取得的源码目录运行系统 Bash 前置入口：
+
+```bash
+bash scripts/bootstrap/prerequisites.sh plan
+sudo -v # 首次安装所需的一次管理员授权
+bash scripts/bootstrap/prerequisites.sh install
+```
+
+它使用固定提交和 SHA-256 校验的 Homebrew 官方安装器，以无交互方式准备 CLT/Homebrew，
+再补装 Git/Python；不升级已有包，不写启动文件。缺少已有 sudo 授权会在下载安装前停止。
+当前已验证旧机 check/plan 和离线边界；干净 macOS 的冷安装仍须实测。完成此阶段不代表整个环境已验收。
+
 | 顺序 | 需要准备什么 | 怎样确认 | 谁负责 |
 | --- | --- | --- | --- |
 | 1 | 普通用户账号、可用网络/必要代理、长期保存仓库的目录 | 不用 sudo 运行整个脚本；网络与认证由自己确认 | 人工 |
