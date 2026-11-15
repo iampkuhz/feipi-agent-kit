@@ -54,8 +54,9 @@ return {
     lazy = false,
     enabled = not vim.g.vscode, -- VS Code 已负责语法高亮，避免 vscode-neovim 启动 Treesitter 装饰器
     build = ":TSUpdate",
-    config = function()
-      local ensure_installed = {
+    -- 安装入口与日常启动共用同一份解析器清单，避免冷安装漏项。
+    opts = {
+      ensure_installed = {
         "lua",
         "python",
         "typescript",
@@ -87,22 +88,18 @@ return {
         "xml",
         "yaml",
         "bash",
-      }
-
-      local ok, treesitter = pcall(require, "nvim-treesitter")
-      if not ok then
-        return
-      end
+      },
+    },
+    config = function(_, opts)
+      local treesitter = require("nvim-treesitter")
 
       -- 新版 setup：指定 parser 安装目录
       treesitter.setup({
         install_dir = vim.fn.stdpath("data") .. "/site",
       })
 
-      -- 安装 ensure_installed 列表中的 parser，失败不中断
-      pcall(function()
-        treesitter.install(ensure_installed)
-      end)
+      -- 日常启动异步补缺；bootstrap/neovim.sh 会有界等待并核实全部解析器。
+      treesitter.install(opts.ensure_installed)
 
       -- filetype → treesitter language 映射
       local ft_to_lang = {

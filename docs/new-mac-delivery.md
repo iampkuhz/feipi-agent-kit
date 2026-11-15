@@ -10,7 +10,8 @@
 | Bash 3.2 与 UTF-8 | 实际预览、来源检查及 C/UTF-8 两组回归通过 | 本轮修复并通过 |
 | 裸机前置 | 无 Git/Python 时使用系统 Bash；固定官方安装器、摘要校验、一次 sudo 授权 | 干净 macOS 26.6.2 中已真实无交互完成 CLT、Homebrew、Git、Python 安装及独立 check；完整工具链待验 |
 | 工作台编排 | install 复用组件阶段及失败传播；Node/Rust 可供后续补全使用 | 干净 macOS 上四阶段真实通过：Brew 33 项、Node 26.13.1、Rust 1.100.0、oh-my-zsh/插件/补全；重复执行及最终整机验收待做 |
-| 配置发布与来源 | 空白 HOME 首次/重复应用、33 个配置来源及内容、路径别名、冲突保全 | Mac 两种 locale 与工作台回归通过，最终整机复验待做 |
+| 配置发布与来源 | 空白 HOME 首次/重复应用、33 个配置来源及内容、路径别名、冲突保全 | 干净 macOS 首次/重复 apply、doctor、全部 33 文件检查和真实 Zsh 的 Node/npm/Rust 通过；两种 locale 离线回归通过 |
+| Neovim | 按锁恢复插件、原生构建、解析器/语言服务器与实际编辑功能 | 干净 macOS 上 31 个解析器可加载、5 个 Mason 服务安装、Lua LSP 初始化、Lua/JSON 格式化及 Markdown HTTP 预览通过；已补可重跑入口 |
 | 常用软件 | 对照旧机 Brew 清单、近期命令频率、真实应用/脚本依赖 | CLI 清单补充；16 项应用清单与 --apps 安装入口已增加，真实新机安装待验 |
 | AI CLI/客户端 | 锁定现有兼容版本安装、登录状态、真实小任务 | 干净 macOS 上 Codex 0.162.1、Qwen 0.12.3、Claude 2.1.287、Qoder 1.1.54 安装及版本检查通过；客户端应用、账号和真实任务待验 |
 | 私有资料 | 一次导出/校验/恢复；env 真源、私有配置与外部链接可恢复；不输出秘密 | 基础配置包 5 项回归通过；真实导出 10 文件，隔离 HOME 恢复及权限通过；完整业务包待补 |
@@ -29,10 +30,12 @@
 - macOS `/var` 与 `/private/var` 别名导致 doctor 误报：统一解析真实路径，增加别名回归。
 - 工作台原先直接循环四个脚本，遗漏总入口前置检查及 Node/Rust 环境激活：复用总入口的依赖阶段；统一仓库的组件入口转到工作台发布。
 - 干净系统实测发现：nvm 已安装 Node，但非交互 Bash 的 doctor 未激活它，误报缺少 Node；统一已有环境激活入口供安装、检查和 Agent CLI 使用，并让 doctor 核实 nvm default。两种 locale 的 Mac 四组回归通过，工作台新增该误报的回归；同一虚拟机复验继续进行。
+- Agent CLI 在初始补全阶段之后安装，首次终端缺少 Codex 缓存；CLI 安装后复用原补全入口刷新，不更新已有插件版本。干净系统重复安装后四个版本保留，真实 Zsh 中 Codex 及缓存通过。
+- Neovim 配置使用新版 Treesitter API，锁文件却仍固定旧 master；异常被 pcall 静默忽略，导致解析器没有安装。只更新该插件到已核对的 main 提交，显式共享解析器清单，补入已配置却遗漏安装的 Lua LSP；新增原生安装/验收入口。真实冷安装中发现 `:Lazy! restore` 可在构建失败时仍返回 0，因此现在检查任务错误和实际产物/服务，不能只看编辑器退出码。
 - 本机 Brew 清单缺少 Homebrew 管理的 Git 和 jq：本轮实际安装 Git 2.56.1、jq 1.8.2；按其依赖更新 libunistring 1.4.2 → 1.5，安装 oniguruma 6.9.10。首轮直连 GHCR 瓶包出现 TLS 错误，改用已确认可访问 GHCR 的当前代理后安装成功。共享 Brewfile 33 项现已检查通过。
 - webp 的旧安装记录仍依赖 libtiff，而当前 libtiff 依赖 webp；重装当前 webp 后记录已更新，循环告警消失。操作意外触发 Homebrew 连带升级，已中止后续升级，已发生的变更包括 jpeg-turbo、little-cms2、librsvg、Graphviz、OpenJPH、OpenEXR、JPEG XL、ImageMagick、yt-dlp 及部分图像/证书/Python 依赖；没有回滚卸载现有库。`brew missing` 通过，共享清单 check 通过；JPEG→WebP→TIFF→PNG、Graphviz SVG、PDF→PNG 实际产物通过。安装入口已额外禁用已安装 dependent 的连带升级，显式 upgrade 保留原能力。
 
-工作台 39 项回归与服务 18 项回归通过，覆盖原生自启、Env Vault 幂等/权限/保全其他暂存项、Git 环境隔离、服务失败隔离与不支持虚拟化的提前失败边界。以上覆盖程序/配置层，不包含实际新机服务、账号和重启验收。
+工作台 40 项回归与服务 18 项回归通过，覆盖原生自启、Env Vault 幂等/权限/保全其他暂存项、Git 环境隔离、服务失败隔离与不支持虚拟化的提前失败边界。以上覆盖程序/配置层，不包含实际新机服务、账号和重启验收。
 
 软件使用依据分开记录：Shell 历史覆盖 2025-08 至 2026-11，不能把全量频次当作最近使用。最近 30 天可定位 Podman 22 次、session-browser 12 次、SSH 11 次、tree/psql 各 1 次；Agent 自动调用通常不写该历史，因此还依据当前脚本依赖和运行服务补入 jq、ripgrep、PDF/Graphviz 工具、语言管理器与文档浏览器。session-browser 与相关 Java 项目仍需纳入后续完整环境恢复，不能仅安装 JDK 就认为功能已恢复。
 

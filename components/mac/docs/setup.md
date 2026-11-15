@@ -15,7 +15,8 @@ bash scripts/bootstrap/prerequisites.sh install
 
 它使用固定提交和 SHA-256 校验的 Homebrew 官方安装器，以无交互方式准备 CLT/Homebrew，
 再补装 Git/Python；不升级已有包，不写启动文件。缺少已有 sudo 授权会在下载安装前停止。
-当前已验证旧机 check/plan 和离线边界；干净 macOS 的冷安装仍须实测。完成此阶段不代表整个环境已验收。
+已在没有 CLT/Homebrew 的干净 macOS 26.6.2 arm64 中真实完成安装与独立 check。
+完成此阶段不代表整个环境已验收。
 
 | 顺序 | 需要准备什么 | 怎样确认 | 谁负责 |
 | --- | --- | --- | --- |
@@ -65,6 +66,7 @@ Node 和 Rust 相互没有安装依赖，这里固定串行以便排障；它们
 已有相同版本直接保留，其他版本先报冲突，下载摘要或执行版本不符则停止。安装不会复制认证状态，
 完成后还需在新机登录或恢复受支持的 API 配置，再执行真实小任务。
 只读核对：`bash components/mac/bootstrap/agents.sh check`；版本清单见 `config/cli-versions.json`。
+安装完成会复用 oh-my-zsh 的补装入口刷新 CLI 补全，保留已有插件版本，避免首次终端缺少 Codex 补全。
 
 工作台在任何下载安装前检查受管目录和父路径冲突；发布时再次检查并备份。以下 Stow 说明仅适用于独立组件源码链接调试。
 已有 Stow 时，源码链接模式在下载安装前检查冲突；Homebrew 阶段结束后必须再检查一次。
@@ -84,8 +86,17 @@ Node 和 Rust 相互没有安装依赖，这里固定串行以便排障；它们
 来源检查会先激活已经存在的 nvm default/Cargo 路径，不加载 `.zshrc` 或安装软件；
 工作台 doctor 也会核实不在父进程 PATH 中的 nvm Node，避免全新机器安装成功后误报缺失。
 
-Neovim 首次启动会联网下载 lazy.nvim/插件，Mason 也可能下载工具。使用 `:Lazy restore` 按锁文件恢复，
-再按需执行 `:checkhealth`，实际打开代码与 Markdown 验证预览。命令入口或链接正确不等于这些功能已通过。
+配置发布后显式执行编辑器准备：
+
+```bash
+bash components/mac/bootstrap/neovim.sh
+```
+
+入口激活已有 Node/Rust，按锁文件恢复插件并保留锁文件原文，再启动恢复后的代码。
+它核实全部插件 HEAD、Markdown 构建任务、31 个解析器的实际加载、5 个 Mason 语言服务器，
+并在真实缓冲区检查 Lua LSP 初始化、Lua/JSON 格式化及 Markdown 本机 HTTP 页面。
+任务超时或任一检查失败返回非零，保留成功安装项，可修复后重跑；不会打开浏览器或修改业务文件。
+仍可在编辑器中用 `:checkhealth` 和实际项目检查更多功能。
 私密环境变量按自己的安全备份渠道恢复，不在仓库保存真实 `.env`。
 
 HHKB/iTerm2 所需应用与字体已列入 `components/mac/Brewfile.apps`；完整新机安装需要显式安装该清单，

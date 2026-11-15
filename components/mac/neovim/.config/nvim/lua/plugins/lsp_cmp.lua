@@ -193,8 +193,9 @@ return {
       require("mason").setup()
       require("mason-lspconfig").setup({
         ensure_installed = {
-          "rust_analyzer",--[[ markdown ]]
-          "grammarly", --[[ java ]]
+          "lua_ls", -- 上方已启用的 Lua 服务也必须在新机准备。
+          "rust_analyzer",
+          "grammarly",
           "ast_grep",
           "solc",
         },
