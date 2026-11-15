@@ -160,6 +160,8 @@ OpenClaw 当前原生备份拒绝 `.env` 的绝对符号链接，因此使用标
 
 新机默认使用独立 OpenClaw 停写备份：`./workbench private restore-state openclaw "$HOME/feipi-restore/openclaw"`。它只要求 `backup openclaw` 的四个原生文件及摘要，先校验后检查 SQLite、调整 HOME 和程序链接，不依赖全量迁移清单、资料或模型包。须先恢复基础 env 并安装锁定版 OpenClaw；已有 `.openclaw` 保持原样，Gateway 不启动。
 
+Multica 小配置入口为 `./workbench private restore-state multica "$HOME/feipi-restore/multica"`。先恢复基础 env、安装固定 CLI/Compose 和运行包装入口；命令校验同批五个控制文件、版本和原密钥，生成本机 machine/server.env/匿名 Docker 配置。它保留业务 UUID，更新 HOME、仓库和程序路径，清空旧 daemon/runtime ID；已有目标拒绝覆盖。不读取数据库、附件或项目目录，不登录或启动服务；数据、防重记录和新设备注册按[组件切换手册](../components/multica/docs/mac-mini-migration.md)完成。
+
 备份目录：`~/.local/state/feipi-workbench/{backups,changes,openclaw-backups,openclash-backups}` 与 `~/.local/state/multica/backups`。不自动清理，避免删除最后可用副本。长期保留最近可恢复批次并加密复制到用户选定的外部介质；本次未配置自动外传。
 
 ## 失败后如何继续

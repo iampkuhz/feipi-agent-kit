@@ -63,6 +63,7 @@ CLI 真实任务补验：Node 26 与 Qwen 0.12.3 内置 dispatcher 的接口不�
 - 集中操作的失败传播补验：配置导出、业务备份、OpenClaw/配置恢复、最终验收四组现有命令分别在子 Bash 中执行，失败即停止，保留退出码；不改变交互终端的选项。隔离 HOME、系统 Bash 3.2 和离线替身实测四组失败均未执行后续步骤，18 个 Bash 命令块语法通过。
 - 容器来源补验（2026-11-15，源码 `f42afe5`）：通过原生 Podman 实际读取 SearXNG、Crawl4AI、PostgreSQL、LiteLLM、Multica 三项固定 digest、draw.io 基础镜像及 PlantUML 共 9 项远端索引，全部含 `linux/arm64`；已确认本地没有同名 manifest list。未拉取镜像层、未启停容器，此项只证明当次来源与架构可用，不代表冷启动完成。报告及公开元数据位于 `~/.local/state/feipi-workbench/validation/remote-manifests-1uk59biq/`。
 - 集中清单连续执行补验：首次安装在子进程中创建 nvm/全局 CLI，当前 Bash 需要再次激活 `environment.sh` 才能立即恢复 Codex 模型配置。隔离 HOME 中先复现未刷新时失败且未写入目标，再刷新后经真实工作台恢复成功；Codex 本身使用离线替身，此项不代表账号或模型请求验收。Multica 恢复清单补齐锁定镜像拉取、数据库就绪等待及已有业务表检查；系统 Bash 3.2 中用离线替身验证成功顺序和失败中止，Compose 原生帮助确认参数可用，尚未据此宣称新机容器冷启动通过。
+- Multica 本机配置恢复补齐 `workbench private restore-state multica`：仅校验同批五个小配置和原密钥，保留业务 UUID，重建新 HOME、仓库、CLI 及默认 Podman machine，清空旧设备物理 ID。原生备份同时记录原 HOME；防重记录复制命令放在 daemon 启动前。12 项新增回归覆盖真实工作台入口、摘要损坏、旧批次、密钥不一致、重复恢复、路径冲突和设备绑定边界；Multica 共 80 项、工作台 78 项回归通过，19 段 Bash 在系统 3.2 下语法通过。回归使用合成配置和 CLI 替身，不代表数据库、账号或新机容器已通过。
 - Bash 3.2 在 UTF-8 环境把变量后相邻中文标点误解析为变量名：使用明确的大括号边界；测试同时运行 C 与可用的 UTF-8 locale。
 - 原来源验证只接受源码链接：增加工作台运行副本识别，同时逐文件比较源码与副本内容；旧副本仍失败。
 - macOS `/var` 与 `/private/var` 别名导致 doctor 误报：统一解析真实路径，增加别名回归。

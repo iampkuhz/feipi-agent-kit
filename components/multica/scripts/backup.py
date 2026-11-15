@@ -77,6 +77,9 @@ def main():
         config_root = Path.home() / '.config/multica-selfhost'
         shutil.copyfile(config_root / 'machine.json', batch / 'machine.reference.json')
         (batch / 'machine.reference.json').chmod(0o600)
+        (batch / 'source-home.json').write_text(json.dumps(
+            {'schema': 1, 'source_home': str(Path.home().resolve())}, indent=2)+'\n')
+        (batch / 'source-home.json').chmod(0o600)
         receipts = Path.home() / '.local/state/multica/adaptation'
         if receipts.exists():
             shutil.copytree(receipts, batch / 'adaptation', ignore=shutil.ignore_patterns('*.lock'))

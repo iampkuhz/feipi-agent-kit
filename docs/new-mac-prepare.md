@@ -123,14 +123,15 @@ bash components/mac/bootstrap/ohmyzsh.sh install
 ./workbench apply openclaw
 ./workbench apply skills
 ./workbench apply services
-# 只准备固定程序、单个官方 Compose 和本地包装入口；账号/数据/设备绑定随后处理。
+# 准备固定程序和入口，再从同批小配置重建本机路径；账号/数据/设备注册随后处理。
 python3 components/multica/scripts/install-native.py install
 python3 components/multica/scripts/install-runtime.py
+./workbench private restore-state multica "$HOME/feipi-restore/multica"
 bash components/mac/bootstrap/neovim.sh
 RESTORE_CONFIG
 ```
 
-OpenClaw 独立备份恢复会核对固定文件摘要、原 HOME 和 SQLite，拒绝覆盖已有状态；不需要项目或模型归档。旧格式缺少原 HOME 元数据时，用当前旧机入口重新导出。Multica 数据库、附件和服务密钥恢复及新设备注册，执行[Mac mini 切换步骤](../components/multica/docs/mac-mini-migration.md)，禁止克隆旧 daemon 身份。LiteLLM 先仅启动新机空 PostgreSQL，恢复同批 `database.dump` 和原密钥，再启动代理；详见[服务恢复](setup-new-mac.md)。这两项尚待实体新机冷启动验收，不跳过数据恢复而直接启动空业务。
+OpenClaw 独立备份恢复会核对固定文件摘要、原 HOME 和 SQLite，拒绝覆盖已有状态；不需要项目或模型归档。Multica 小配置恢复核对同批五个控制文件及已恢复 env 的原密钥，自动更新 HOME、仓库和程序路径，保留业务 UUID，清空旧 daemon/runtime 绑定。两个入口均拒绝覆盖；旧格式缺少原 HOME 元数据时，用当前旧机入口重新导出。Multica 数据库、附件、防重记录恢复及新设备注册，继续执行[Mac mini 切换步骤](../components/multica/docs/mac-mini-migration.md)。LiteLLM 先仅启动新机空 PostgreSQL，恢复同批 `database.dump` 和原密钥，再启动代理；详见[服务恢复](setup-new-mac.md)。这两项尚待实体新机冷启动验收，不跳过数据恢复而直接启动空业务。
 
 ## 一次完成授权与权限
 

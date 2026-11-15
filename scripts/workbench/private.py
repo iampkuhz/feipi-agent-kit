@@ -87,8 +87,8 @@ def main():
     sources = sub.add_parser('restore-sources', help='恢复已校验迁移包中的代码和资料，拒绝覆盖')
     sources.add_argument('bundle')
     sources.add_argument('--only', action='append')
-    state = sub.add_parser('restore-state', help='从 OpenClaw 独立停写备份或旧完整包恢复状态，不覆盖、不启动服务')
-    state.add_argument('component', choices=['openclaw', 'omlx'])
+    state = sub.add_parser('restore-state', help='恢复独立停写状态或 Multica 小配置，不覆盖、不启动服务')
+    state.add_argument('component', choices=['openclaw', 'omlx', 'multica'])
     state.add_argument('bundle')
     backup = sub.add_parser('backup')
     backup.add_argument('component', choices=['openclaw', 'multica', 'openclash'])
@@ -99,6 +99,9 @@ def main():
     if a.action == 'check':
         return check()
     if a.action == 'restore-state':
+        if a.component == 'multica':
+            return subprocess.run([sys.executable, str(ROOT/'components/multica/scripts/restore-local.py'),
+                                   a.bundle, '--agent-kit', str(ROOT)]).returncode
         return subprocess.run([sys.executable, str(ROOT/'scripts/workbench/migration_state.py'),
                                a.component, a.bundle]).returncode
     if a.action in ('prepare-migration', 'verify-migration', 'restore-sources'):
