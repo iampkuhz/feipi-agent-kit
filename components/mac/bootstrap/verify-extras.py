@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import platform
 import signal
+import shutil
 import socket
 import subprocess
 import tempfile
@@ -114,9 +115,19 @@ def omlx(base, environment, models):
     endpoint = 'http://127.0.0.1:'+str(port())
     token = uuid.uuid4().hex
     headers = {'Authorization': 'Bearer '+token}
+    state = base/'omlx-state'
+    settings_home = Path.home()/'.omlx'
+    restored_settings = models == (settings_home/'models').resolve() and (settings_home/'settings.json').is_file()
+    if restored_settings:
+        # 在隔离副本中读取迁入配置，实际验证原生模型路径解析；不改动用户设置。
+        state.mkdir()
+        for name in ('settings.json', 'model_settings.json'):
+            if (settings_home/name).is_file():
+                shutil.copy2(settings_home/name, state/name)
+    model_arguments = [] if restored_settings else ['--model-dir', str(models)]
     command = [str(Path.home()/'.local/bin/omlx'), 'serve', '--host', '127.0.0.1',
-               '--port', endpoint.rsplit(':', 1)[1], '--base-path', str(base/'omlx-state'),
-               '--model-dir', str(models), '--no-cache', '--api-key', token,
+               '--port', endpoint.rsplit(':', 1)[1], '--base-path', str(state),
+               *model_arguments, '--no-cache', '--api-key', token,
                '--max-concurrent-requests', '1']
     with server(command, base/'omlx.log', environment) as process:
         available = json.loads(ready(process, endpoint+'/v1/models', headers))['data']
@@ -151,7 +162,7 @@ def omlx(base, environment, models):
                 raise RuntimeError('语音验证句识别不符：'+name+'；见私有产物。')
             transcriptions[name] = text
         (base/'omlx-transcriptions.json').write_text(json.dumps(transcriptions, indent=2)+'\n')
-    return {'text_inference': True, 'speech_models': list(transcriptions)}
+    return {'text_inference': True, 'speech_models': list(transcriptions), 'restored_settings': restored_settings}
 
 
 def main():

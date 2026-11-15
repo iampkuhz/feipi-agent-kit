@@ -141,5 +141,9 @@ python3 components/mac/bootstrap/verify-apps.py
 `fonts.conf`，保留已有 `FONTCONFIG_FILE`。非交互验收也显式使用同一配置，避免 LibreOffice
 虽能抽取 PDF 中文却没有可见字形。直接从其他环境调用 Office 转换时也应传入该配置。
 
-服务、Skills、模型及业务项目回所属仓库恢复。LiteLLM/PostgreSQL、SearxNG、Crawl4AI 由
-feipi-agent-kit 管理。完整换机和旧机退役前的人工验收仍以 [MIGRATION.md](../MIGRATION.md) 为准。
+原生应用验收使用 `python3 components/mac/bootstrap/verify-extras.py`。oMLX 模型已恢复到
+`~/.omlx/models` 且有迁入设置时，验收从设置的隔离副本解析模型路径，完成真实文本和两套语音请求，
+不改动原设置；使用其他模型目录时可传 `--model-dir`。
+
+服务、Skills、模型与业务资料按统一工作台的[恢复说明](../../../docs/workbench.md)处理；
+完整新机验收状态见[交付清单](../../../docs/new-mac-delivery.md)。
