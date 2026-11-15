@@ -94,6 +94,8 @@ Podman 自启复用默认本机 ensure，然后分别启动 LiteLLM、SearXNG、
 加载成功只表示 LaunchAgent 注册完成；完整重启、三个服务的真实业务请求，以及 OpenClaw、Multica、
 oMLX、图表渲染服务的各自恢复与验收仍须完成。
 
+oMLX 使用应用自身的登录启动能力：首次从应用目录打开，完成 Shell PATH 提示和向导，在 Preferences 勾选 `Launch at login` 和 `Start server automatically on launch`，再运行 `omlx start --timeout 60`。这是[上游支持的原生方式](https://github.com/jundot/omlx/issues/294)，不另建同职责的 LaunchAgent。验证机的首次托管启动实际遇到 PATH 弹窗，控制 socket 尚未建立；这次失败不代表此前独立 `serve` 的模型推理失败，也不能计作登录自启已验证。
+
 ## 配置和数据
 
 - **SearXNG**：复用 Git 中的 settings 和固定镜像版本；启动脚本不自动加载根 `.env`。

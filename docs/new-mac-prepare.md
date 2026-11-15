@@ -131,6 +131,7 @@ OpenClaw 独立备份恢复会核对固定文件摘要、原 HOME 和 SQLite，�
 | Qwen / Claude | 保留恢复的 API/模型设置；启用账号模式时在原生客户端登录，Claude 可用 `claude auth login` | 下方 Agent 文件任务；不为通过测试擅自换模型或 provider |
 | Multica | 新机 personal 登录、选择恢复的 workspace、注册新 daemon 并精确 rebind | 组件手册中的真实小任务、附件与重复应用检查 |
 | SSH / Git | 使用本人选择的 SSH 私钥，或新建密钥并添加到服务端授权；不覆盖已有密钥 | `ssh -T git@github.com` 或实际 Git 拉取 |
+| oMLX 原生应用 | 首次从应用目录打开，处理 Shell PATH 提示并完成向导；在 Preferences 勾选 Launch at login 和 Start server automatically on launch | 再执行 `omlx start --timeout 60`，确认模型请求；完整关机开机并登录后复验 |
 | 键盘与客户端 | Karabiner 的系统扩展/输入监控，Rectangle 辅助功能，iTerm2 Profile，以及需要的客户端登录 | 实际按键、窗口操作、终端和应用打开 |
 
 ## 准备完成后验收
