@@ -11,6 +11,12 @@ parser = argparse.ArgumentParser()
 parser.add_argument('action', choices=['install', 'start', 'stop', 'status'])
 args = parser.parse_args()
 home = Path.home()
+if args.action in ('install', 'start'):
+    from configure import require_personal_ready
+    try:
+        require_personal_ready(home)
+    except (OSError, ValueError) as error:
+        raise SystemExit('未启动 Multica：'+str(error))
 root = Path(__file__).resolve().parent.parent
 label = 'local.multica.personal'
 domain = 'gui/' + str(os.getuid())

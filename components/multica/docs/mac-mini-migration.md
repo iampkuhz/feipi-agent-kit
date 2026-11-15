@@ -34,7 +34,11 @@ PREPARE_MULTICA
 先用集中清单恢复基础 env、激活当前终端环境，再恢复 Multica 小配置。集中清单已包含下面命令；单独部署时在 `components/multica` 中执行一次：
 
 ```bash
+bash <<'RESTORE_MULTICA_CONTROLS'
+set -euo pipefail
 ../../workbench private restore-state multica "$HOME/feipi-restore/multica"
+python3 scripts/configure.py --personal-profile
+RESTORE_MULTICA_CONTROLS
 ```
 
 入口只校验同批 `source-home.json`、`machine.reference.json`、`server.env`、`versions.json` 和 `compose.pinned.yml`，不读取数据库、附件或项目目录。旧备份缺少原 HOME 记录时，用当前旧机入口重新备份。版本/镜像锁定或三项服务密钥与本机 env 不匹配时，在写入前失败；不要执行 init-secrets 生成替换值。
@@ -74,7 +78,24 @@ multica-service up -d --pull never
 RESTORE_MULTICA
 ```
 
-如果目标已有业务数据，停止此流程，不加 `--clean` 覆盖。对照旧机数据库记录数、Issue/Agent UUID、附件数量并实际下载一个附件。重建 CLI personal 登录和工作区选择；确认 server_url/workspace_id 后注册新 daemon。若启用隔离 OpenClaw，依据 `runtime profile --help` 为原 profile 设置新机包装命令路径，不创建同名重复 profile。
+如果目标已有业务数据，停止此流程，不加 `--clean` 覆盖。对照旧机数据库记录数、Issue/Agent UUID、附件数量并实际下载一个附件。随后在新机图形终端执行下面整段命令，浏览器完成本人登录；使用绑定中的服务地址和准确工作区，不运行会自动启动 daemon 的 `setup`。
+
+```bash
+bash <<'LOGIN_MULTICA'
+set -euo pipefail
+source ../mac/bootstrap/environment.sh
+python3 scripts/configure.py --personal-profile
+binding="$HOME/.config/multica-selfhost/machine.json"
+export MULTICA_PERSONAL_PROFILE="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["profile"])' "$binding")"
+workspace_id="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["workspace_id"])' "$binding")"
+multica-task login
+multica-task workspace switch "$workspace_id"
+LOGIN_MULTICA
+```
+
+`--personal-profile` 复用固定版原生 `config set`，只设置服务地址、设备名、任务根目录、并发 1 和禁自动升级；不读写 env、不复制 token、不登录或启动服务。重复执行跳过已一致字段，同名 profile 已指向其他服务时拒绝覆盖；登录后重跑保留原生 token 和其他设置。原生 login 会重置默认工作区，所以最后必须 `workspace switch` 到恢复的 UUID，并通过服务器权限验证。0.6.3 的 `auth status` 在未登录或 token 失效时也会返回 0，不能作为脚本登录门禁。SSH 登录回调按原生 CLI 提示使用本地转发；令牌方式在交互终端使用 `multica-task login --token` 提示输入，随后仍须准确切换工作区。
+
+若启用隔离 OpenClaw，依据 `runtime profile --help` 为原 profile 设置新机包装命令路径，不创建同名重复 profile。
 
 启动新机 daemon 前，恢复同批 adaptation/requests 防重记录；由用户执行以下复制命令，已有目标时停止。备份没有该目录则无需复制。该步骤不复制 CLI 登录/设备身份。
 
@@ -96,6 +117,8 @@ RESTORE_MULTICA_RECEIPTS
 ## 4. 重建能力并重绑
 
 发布运行副本，使用 Agent Kit 工作台安装完整技能并重新认证工具。当前默认只绑定 Codex；若启用隔离 OpenClaw，才生成并校验其候选配置。项目资源目标目录须先存在。
+
+`manage-runtime.py install/start` 在写 LaunchAgent 或调用 launchctl 前检查主机角色、profile 的服务/工作区/路径/并发/升级设置及个人凭据是否存在；缺项即报错，不把失败的后台循环当成已启动。该本地检查不证明凭据仍有效，须先完成上面的原生工作区访问。
 
 ```bash
 python3 scripts/install-runtime.py

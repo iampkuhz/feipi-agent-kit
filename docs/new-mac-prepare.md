@@ -127,6 +127,7 @@ bash components/mac/bootstrap/ohmyzsh.sh install
 python3 components/multica/scripts/install-native.py install
 python3 components/multica/scripts/install-runtime.py
 ./workbench private restore-state multica "$HOME/feipi-restore/multica"
+python3 components/multica/scripts/configure.py --personal-profile
 bash components/mac/bootstrap/neovim.sh
 RESTORE_CONFIG
 ```
@@ -142,7 +143,7 @@ OpenClaw 独立备份恢复会核对固定文件摘要、原 HOME 和 SQLite，�
 | Figma MCP | `codex mcp login figma`；服务名以本机配置为准 | 新机真实读取有权限的设计资源，未授权不计通过 |
 | Qoder | 启动 `qodercli`，执行 `/login` | 下方 Agent 文件任务 |
 | Qwen / Claude | 保留恢复的 API/模型设置；启用账号模式时在原生客户端登录，Claude 可用 `claude auth login` | 下方 Agent 文件任务；不为通过测试擅自换模型或 provider |
-| Multica | 新机 personal 登录、选择恢复的 workspace、注册新 daemon 并精确 rebind | 组件手册中的真实小任务、附件与重复应用检查 |
+| Multica | 先恢复业务数据，再执行[组件手册的原生登录和 workspace switch 命令](../components/multica/docs/mac-mini-migration.md#3-恢复数据只在新机空数据库执行)，然后注册新 daemon 并精确 rebind | 不能用 `auth status` 的退出码证明登录；须通过工作区访问、真实小任务、附件与重复应用检查 |
 | SSH / Git | 使用本人选择的 SSH 私钥，或新建密钥并添加到服务端授权；不覆盖已有密钥 | `ssh -T git@github.com` 或实际 Git 拉取 |
 | oMLX 原生应用 | 首次打开后执行 `omlx start --timeout 120`；在 `Settings → Server` 开启 `Automatically start server on launch`；Dock 右键 `Options → Open at Login` 核实勾号；菜单栏显示提示走系统设置 | 确认模型请求；完整关机开机并登录后直接复验，不先手动 start |
 | 键盘与客户端 | Karabiner 的系统扩展/输入监控，Rectangle 辅助功能，iTerm2 Profile，以及需要的客户端登录 | 实际按键、窗口操作、终端和应用打开 |

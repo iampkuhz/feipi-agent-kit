@@ -67,6 +67,8 @@ python3 ~/Documents/tools/llm/feipi-agent-kit/components/multica/scripts/manage-
 
 停止请使用上述 stop；单独 `multica-task daemon stop` 会被守护重新拉起。stop 保留 Web/API。需要维护配置或升级时，先排空运行中的任务。更新本目录 bin、镜像锁定或后台启动脚本后，执行 `scripts/install-runtime.py` 发布运行副本；更新启动定义时先 stop，再运行 `scripts/manage-runtime.py install`。
 
+新机先执行 `python3 scripts/configure.py --personal-profile` 准备原生 CLI 本地设置，再登录并准确 `workspace switch`；完整命令见[迁机手册](docs/mac-mini-migration.md)。install/start 会先核对配置和凭据存在性，缺项不加载 LaunchAgent；stop/status 不依赖登录状态。原生 `auth status` 的成功退出不能证明认证有效。
+
 原 Gateway 可通过 `multica-task` 录入和查询。以下为历史可选 OpenClaw 执行方案：`OpenClaw Assistant` 绑定 `OpenClaw Multica` 自定义 runtime，使用独立状态目录 `~/.local/share/multica/openclaw-state`。`scripts/configure-openclaw.py` 从声明组件读取原模型定义，再合并 LiteLLM 角色；从全局 `~/.env` 只投影三项所需 provider 变量，不复制原渠道、插件或个人记忆。隔离执行端关闭 memory 插件，避免无关 embedding 请求。原 Gateway 不切换入口、不重启。
 
 ## 历史可选方案：LiteLLM Agent
