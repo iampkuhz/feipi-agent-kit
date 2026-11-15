@@ -49,6 +49,8 @@ multica-work dispatch "$issue_id" --project "$project_id" --profile "$profile" -
 
 服务使用单独的 Docker 匿名认证配置，同时保留本机 Compose plugin 路径。它不覆盖 `~/.docker/config.json` 中其他服务的认证。Compose 进程只继承必要的路径与本机 Docker socket，避免 shell 中其他项目的 POSTGRES_PASSWORD、端口等覆盖本服务投影。仅接受不展开秘密的 `config --quiet/--images/--services`；不要将真实 env 或展开的 Compose 配置粘贴到聊天。
 
+新 Mac 的共享 Brewfile 同时安装 `docker` 和 `docker-compose`，通过 Docker API 使用本机 Podman，无需 Docker Desktop。生成隔离配置时自动发现 Homebrew Compose 插件目录，空白 HOME 也可运行。入口按机器绑定读取运行中 Podman 的实际 Unix socket，不依赖旧机 `/var/run/docker.sock` helper；显式 `DOCKER_HOST` 也只接受存在的本机 Unix socket，不切换远端引擎。
+
 若 Podman 服务端直接拉取慢，可以只为一次拉取设置指向宿主代理的 HTTP_PROXY/HTTPS_PROXY；不更改容器引擎的全局代理。实际拉取结果和本机验收见 `VALIDATION.md`。
 
 ## 运维与迁移

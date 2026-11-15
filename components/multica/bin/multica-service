@@ -14,8 +14,9 @@ if [[ "${1:-}" == config && " ${*:2} " != *" --quiet "* && " ${*:2} " != *" --im
   echo 'Use config --quiet, --images, or --services; expanded config contains secrets.' >&2
   exit 2
 fi
+docker_host="$(python3 "$multica_ops_root/scripts/container_engine.py")"
 exec env -i PATH="$PATH" HOME="$HOME" TMPDIR="${TMPDIR:-/tmp}" \
-  DOCKER_HOST="${DOCKER_HOST:-unix:///var/run/docker.sock}" \
+  DOCKER_HOST="$docker_host" \
   docker --config "$HOME/.config/multica-selfhost/docker-public" compose --project-name multica \
   --env-file "$HOME/.config/multica-selfhost/server.env" \
   -f "$HOME/.local/share/multica/server/docker-compose.selfhost.yml" \

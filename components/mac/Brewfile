@@ -58,4 +58,7 @@ brew "whisper.cpp"
 # 本地服务运行时
 brew "podman"
 brew "podman-compose"
+# Multica 固定使用 Docker CLI/Compose 协议连接本机 Podman，不安装 Docker Desktop。
+brew "docker"
+brew "docker-compose"
 # 完整新机的软件界面入口见 Brewfile.apps；本机附加选择仍放 Brewfile.local。

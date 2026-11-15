@@ -11,6 +11,7 @@ import re
 import secrets
 import shlex
 import tempfile
+from container_engine import public_config
 
 SECRET_MAP = {
     'JWT_SECRET': 'MULTICA_SELFHOST_JWT_SECRET',
@@ -114,11 +115,7 @@ def main():
         public_docker = directory / 'docker-public'
         public_docker.mkdir(mode=0o700, exist_ok=True)
         public_docker.chmod(0o700)
-        docker_config = Path.home() / '.docker/config.json'
-        plugins = json.loads(docker_config.read_text()).get('cliPluginsExtraDirs', []) if docker_config.exists() else []
-        atomic_private_write(public_docker / 'config.json', json.dumps({
-            'auths': {}, 'cliPluginsExtraDirs': plugins,
-        }) + '\n')
+        atomic_private_write(public_docker / 'config.json', json.dumps(public_config()) + '\n')
         print('Generated private server.env; secret values were not printed.')
 
 
