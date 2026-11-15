@@ -14,8 +14,8 @@
 | Neovim | 按锁恢复插件、原生构建、解析器/语言服务器与实际编辑功能 | 干净 macOS 上 31 个解析器可加载、5 个 Mason 服务安装、Lua LSP 初始化、Lua/JSON 格式化及 Markdown HTTP 预览通过；已补可重跑入口 |
 | 常用软件 | 对照旧机 Brew 清单、近期命令频率、真实应用/脚本依赖 | 共享 CLI 清单补充；17 项应用/字体已在干净系统真实安装，清单检查通过；客户端账号和系统权限待验 |
 | AI CLI/客户端 | 锁定现有兼容版本安装、登录状态、真实小任务 | 干净 macOS 上 Codex 0.162.1、Qwen 0.12.3、Claude 2.1.287、Qoder 1.1.54 安装及版本检查通过；客户端应用、账号和真实任务待验 |
-| 私有资料 | 一次导出/校验/恢复；env 真源、私有配置与外部链接可恢复；不输出秘密 | 基础配置包 5 项回归通过；真实导出 10 文件，隔离 HOME 恢复及权限通过；完整业务包待补 |
-| 数据一致性 | Multica 数据库/附件/密钥同批；OpenClaw SQLite 停写恢复；旧机不发生双主 | 复用现有备份能力，完整新机恢复待验 |
+| 私有资料 | 一次导出/校验/恢复；env 真源、私有配置与外部链接可恢复；不输出秘密 | 基础配置恢复通过；集中准备入口已真实导出 906 文件、3.98 GiB 完整业务包并通过清单/摘要；完整新机恢复待验 |
+| 数据一致性 | Multica 数据库/附件/密钥同批；OpenClaw SQLite 停写恢复；旧机不发生双主 | 当前 Multica 与 LiteLLM 备份已在无网络临时 PostgreSQL 实际恢复；OpenClaw 4 个 SQLite 停写检查通过；完整新机业务恢复待验 |
 | 服务冷启动 | Podman VM、本地连接、Compose、镜像拉取、健康等待、模型实际请求 | 默认本机 Podman ensure 及三服务 10 分钟就绪等待已增加；43 项工作台、18 项服务回归通过；旧机 ensure 真实通过且未重启现有 VM；完整冷启动待验 |
 | 图表和文档 | Mermaid、draw.io、PlantUML、PPT/PDF 实际生成并检查产物 | Chrome/LibreOffice 中英文 PDF 导出、字体嵌入及 PNG 渲染通过；Mermaid/draw.io/PlantUML/PPT 待验 |
 | oMLX/语音 | 安装来源、模型清单、设置恢复、首次推理 | 固定原生应用、三个当前模型已在干净 macOS 真实启动，文本及 Qwen3-ASR/SenseVoiceSmall 语音推理通过；完整配置/模型迁移包待补 |
@@ -28,6 +28,10 @@
 原生应用补验：FlClash for oixCloud 0.9.3、oMLX 0.4.4、Session Browser 0.5.2 官方发布包已核对摘要，DMG 身份、版本及签名通过；干净 macOS 首次安装与重复保留通过。Session Browser 已用合成 Codex 会话完成原生扫描、索引和 HTTP 页面验证；oMLX 已用当前三个模型完成文本与两套语音请求。语音输入由系统 say 生成，不读取个人资料；验收使用独立数据目录、随机 loopback 端口并清理自有进程。已用提交 `8665934` 再次复放安装与全部功能验收，报告 source_dirty=false。代理账号/节点同步尚未完成，不能将应用安装通过表述为代理可用。
 
 OpenClaw 冷安装发现并修复：业务配置和本地 skill 来源写死旧 HOME；首次插件安装被尚不存在的成长日记插件路径阻断；安装清单还指向 `94fcd48` 已删除的专利 skill。配置改用原生 HOME 插值，本地来源使用 HOME/组件相对路径，删除失效声明。依赖用同一状态目录中的临时空配置先准备，再发布完整声明；原生 npm 插件安装目录由配置父目录决定，不能把临时配置放系统临时目录。新增仅准备依赖模式，不要求业务凭据、不启动 Gateway。干净 macOS 已真实安装 OpenClaw 2026.9.2、Qwen provider 2026.9.2、微信插件 2.4.10 和 8 项 skills；两项插件在临时配置移除后仍可检查，新 HOME 解析通过。递归分发排除开发目录，C/UTF-8 路径及内容回归、全 10 项 registry 安装边界检查通过；完整私有状态恢复、业务请求和重启尚未完成。
+
+集中迁移补验：新增 `workbench private prepare-migration/verify-migration/restore-sources`，复用原生数据库备份，不复制热数据目录。真实批次 `full-20261115-prepare-03` 包含基础配置 10 文件、6 个 Git 项目（含 env vault 历史和 Session Browser 两份 stash）、家庭健康 102 个原件、房地产 363 个原件、FlClash 官方 ZIP、三个 oMLX 模型及业务备份。总计 906 文件、3.98 GiB，目录权限 0700，清单和摘要通过。当前 Multica 恢复后 issue/comment/attachment/agent 分别为 119/697/307/9，与同批记录一致；LiteLLM 原生恢复成功，public schema 有 75 张表。两者均使用无网络临时容器并清理；没有据此宣称新机容器冷启动通过。53 项工作台回归通过，新增测试使用真实 Git/stash/补丁和 SQLite/tar。代码和原件的整包恢复演练继续进行。
+
+真实备份还发现：Gateway 停止后微信 SQLite 会删除 WAL 辅助文件，原只读检查因此失败。已改为停写后的原生读写检查与 WAL checkpoint；损坏、锁定仍报错，退出时恢复 Gateway。当前 4 个数据库完整性检查及备份通过，失败测试也验证恢复启动与不输出秘密。模型采用标准 gzip 低压缩级别，减少大模型打包耗时；未打完的测试批次带 `INCOMPLETE`，不能用于恢复。
 
 ## 本轮发现与修复
 

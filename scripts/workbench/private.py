@@ -77,6 +77,14 @@ def main():
     for action in ('export-mac', 'verify-mac', 'restore-mac'):
         bundle = sub.add_parser(action)
         bundle.add_argument('bundle')
+    prepare = sub.add_parser('prepare-migration', help='集中备份基础配置、业务数据、项目和模型')
+    prepare.add_argument('bundle')
+    prepare.add_argument('--proxy-backup', required=True)
+    migration = sub.add_parser('verify-migration', help='完整迁移包清单、字节与项目归档校验')
+    migration.add_argument('bundle')
+    sources = sub.add_parser('restore-sources', help='恢复已校验迁移包中的代码和资料，拒绝覆盖')
+    sources.add_argument('bundle')
+    sources.add_argument('--only', action='append')
     backup = sub.add_parser('backup')
     backup.add_argument('component', choices=['openclaw', 'multica', 'openclash'])
     verify = sub.add_parser('verify')
@@ -85,6 +93,14 @@ def main():
     a = p.parse_args()
     if a.action == 'check':
         return check()
+    if a.action in ('prepare-migration', 'verify-migration', 'restore-sources'):
+        args = [a.action.removesuffix('-migration'), a.bundle]
+        if a.action == 'prepare-migration':
+            args += ['--proxy-backup', a.proxy_backup]
+        if a.action == 'restore-sources':
+            for name in a.only or []:
+                args += ['--only', name]
+        return subprocess.run([sys.executable, str(ROOT/'scripts/workbench/migration.py'), *args]).returncode
     if a.action.endswith('-mac'):
         return subprocess.run([sys.executable, str(ROOT/'scripts/workbench/mac_bundle.py'),
                                a.action.removesuffix('-mac'), a.bundle]).returncode
