@@ -8,7 +8,7 @@ source "$REPO_ROOT/tools/lib/podman.sh"
 
 printf '%s\n' 'Feipi Agent Kit 新机检查（只读）'
 if ! command -v python3 >/dev/null 2>&1; then
-  echo '请先通过 ./workbench install mac 安装 Python 3.10+。' >&2
+  echo '裸机先运行 bash scripts/bootstrap/prerequisites.sh install，再通过 ./workbench install mac 安装完整依赖。' >&2
   exit 1
 fi
 python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else "需要 Python 3.10+")'

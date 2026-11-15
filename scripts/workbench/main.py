@@ -418,8 +418,30 @@ def services_ready():
         return False
 
 
+def wait_service(component, endpoint):
+    """首次迁移/浏览器准备可能较慢；有界等待健康检查，不反复重建。"""
+    deadline = time.monotonic()+600
+    attempt = 0
+    while time.monotonic() < deadline:
+        try:
+            with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(endpoint, timeout=3) as response:
+                if response.status == 200:
+                    print(component+' readiness 已通过；业务能力需真实请求验证。')
+                    break
+        except OSError:
+            pass
+        if attempt % 10 == 0:
+            print('等待 '+component+' 首次初始化及服务就绪…', flush=True)
+        time.sleep(2)
+        attempt += 1
+    else:
+        raise ValueError(component+' 未在 10 分钟内就绪；保留运行状态供 service '+component+' logs 检查，不重复重建数据库。')
+
+
 def service(component, args):
-    if component in SERVICE_SCRIPTS:
+    if component == 'podman':
+        run([sys.executable, ROOT/'tools/runtime/podman.py', *args])
+    elif component in SERVICE_SCRIPTS:
         script = RUNTIME/'services/tools'/SERVICE_SCRIPTS[component]
         if not script.exists():
             raise ValueError('尚未安装运行定义：先 ./workbench apply services')
@@ -427,20 +449,11 @@ def service(component, args):
         if component == 'crawl4ai' and (PRIVATE/'services/crawl4ai.env').is_file():
             environment.setdefault('CRAWL4AI_ENV_FILE', str(PRIVATE/'services/crawl4ai.env'))
         run(['bash', script, *args], env=environment)
-        if component == 'litellm' and (args[:1] or ['up'])[0] in ('up', 'start', 'restart', 'recreate'):
-            for attempt in range(60):
-                try:
-                    with urllib.request.build_opener(urllib.request.ProxyHandler({})).open('http://localhost:4000/health/readiness', timeout=3) as response:
-                        if response.status == 200:
-                            print('LiteLLM readiness 已通过；模型能力需真实请求验证。')
-                            break
-                except OSError:
-                    pass
-                if attempt % 10 == 0:
-                    print('等待 LiteLLM 数据库迁移及服务就绪…', flush=True)
-                time.sleep(2)
-            else:
-                raise ValueError('LiteLLM 未在期限内就绪；保留运行状态供 service litellm logs 检查，不重复重建数据库。')
+        endpoints = {'litellm': 'http://localhost:4000/health/readiness',
+                     'searxng': 'http://127.0.0.1:8873/healthz',
+                     'crawl4ai': 'http://127.0.0.1:11235/health'}
+        if component in endpoints and (args[:1] or ['up'])[0] in ('up', 'start', 'restart', 'recreate'):
+            wait_service(component, endpoints[component])
     elif component == 'openclaw':
         run(['openclaw', 'gateway', *args])
     elif component == 'multica':
@@ -448,7 +461,7 @@ def service(component, args):
     elif component == 'openclash':
         run(['python3', ROOT/'components/openclash/router.py', *args])
     else:
-        raise ValueError('支持 litellm/searxng/crawl4ai/otel/openclaw/multica/openclash')
+        raise ValueError('支持 podman/litellm/searxng/crawl4ai/otel/openclaw/multica/openclash')
 
 
 def mac_preflight():

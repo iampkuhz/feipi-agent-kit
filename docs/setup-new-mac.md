@@ -5,11 +5,10 @@
 ## 首次准备
 
 ```bash
-# 在本仓库执行 ./workbench install mac，再准备 Podman。
-# macOS 仅首次且尚无 machine 时执行 init；已有 machine 不要重复创建。
-podman machine list
-podman machine init
-podman machine start
+# 裸机先运行 bash scripts/bootstrap/prerequisites.sh install；随后 install mac。
+# 自动创建或启动唯一默认本机 machine；已有运行实例不会重启，不切换连接。
+./workbench service podman ensure
+./workbench service podman check
 
 # 只检查依赖、默认本地连接和服务定义，不安装或启动任何服务。
 make setup
@@ -17,6 +16,7 @@ make setup
 ```
 
 已有运行中的 Podman machine 时跳过 init/start。连接不是本机时脚本报错，不接管远端环境；缺 provider 时安装 `podman-compose`，不要求 Docker Desktop。
+`ensure` 对首次镜像下载最多等待 15 分钟，启动最多 5 分钟，随后有界等待引擎；失败不删除虚拟机。
 
 ## 按需启动
 
@@ -29,6 +29,8 @@ make setup
 | draw.io | `bash tools/diagram/drawio/drawio.sh ensure` | 同脚本 `status` | `http://127.0.0.1:8200/health` |
 
 前四项均可使用 `make <服务>-down/restart/logs`；日志入口最多显示最后 50 行（LiteLLM 保留其原有日志入口）。重建、重启与停止都是显式动作，检查失败不会自动停止其他服务。
+通过工作台启动 LiteLLM、SearXNG、Crawl4AI 后，最多等待 10 分钟的本地 HTTP 健康检查；
+超时返回非零并保留运行状态，不重复重建。健康检查通过仍需实际模型、搜索和抓取请求验收。
 
 draw.io 已有独立的固定源码快照与构建流程，继续复用，不导出旧镜像。PlantUML 继续使用其 skill 的有界预检合同，不在此引入另一套渲染编排。
 

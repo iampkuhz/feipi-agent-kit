@@ -70,13 +70,13 @@ elif args == ['--version']:
         self.assertNotEqual(p.returncode, 0)
         self.assertNotIn("检查通过", p.stdout)
 
-    def test_make_searxng_uses_podman_wrapper(self):
+    def test_make_searxng_status_uses_podman_wrapper(self):
         installed = self.run_script("workbench", "apply", "services")
         self.assertEqual(installed.returncode, 0, installed.stderr)
-        p = subprocess.run(["/usr/bin/make", "searxng-up"], cwd=ROOT, env=self.env,
+        p = subprocess.run(["/usr/bin/make", "searxng-status"], cwd=ROOT, env=self.env,
                            capture_output=True, text=True, timeout=20)
         self.assertEqual(p.returncode, 0, p.stderr)
-        self.assertTrue(any(row["args"][:1] == ["compose"] and row["args"][-2:] == ["up", "-d"]
+        self.assertTrue(any(row["args"][:1] == ["compose"] and row["args"][-1:] == ["ps"]
                             for row in self.calls()))
 
     def test_crawl_clean_copy_uses_template_and_real_up_action(self):

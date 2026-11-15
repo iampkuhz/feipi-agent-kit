@@ -15,7 +15,7 @@
 | AI CLI/客户端 | 锁定现有兼容版本安装、登录状态、真实小任务 | 待完整自动部署与验收 |
 | 私有资料 | 一次导出/校验/恢复；env 真源、私有配置与外部链接可恢复；不输出秘密 | 基础配置包 5 项回归通过；真实导出 10 文件，隔离 HOME 恢复及权限通过；完整业务包待补 |
 | 数据一致性 | Multica 数据库/附件/密钥同批；OpenClaw SQLite 停写恢复；旧机不发生双主 | 复用现有备份能力，完整新机恢复待验 |
-| 服务冷启动 | Podman VM、本地连接、Compose、镜像拉取、健康等待、模型实际请求 | 待自动编排与验收 |
+| 服务冷启动 | Podman VM、本地连接、Compose、镜像拉取、健康等待、模型实际请求 | 默认本机 Podman ensure 及三服务 10 分钟就绪等待已增加；28 项工作台、18 项服务回归通过；旧机 ensure 真实通过且未重启现有 VM；完整冷启动待验 |
 | 图表和文档 | Mermaid、draw.io、PlantUML、PPT/PDF 实际生成并检查产物 | 待新机验收 |
 | oMLX/语音 | 安装来源、模型清单、设置恢复、首次推理 | 待补 |
 | 自启与重启 | Env Vault、Podman/受管服务、OpenClaw、Multica 按依赖恢复；完整重启后小任务 | 旧机入口已盘点，待补并验收 |
@@ -38,6 +38,6 @@
 
 当前主机为 Apple M1、16 GiB 内存，可用磁盘约 77 GiB，未预装 macOS VM 工具。已查询 Tart 官方文档：当前主机不能提供 Podman 所需的嵌套虚拟化，因此即便虚拟机内基础软件通过，也不能据此声称整套本地容器服务已经在干净 Mac 验收。仍推进可独立完成的软件/恢复/服务交付，并寻找真实可用的整机验收路径。
 
-Tart 手动下载首次经当前代理请求 GitHub API 返回 403；限定该下载使用直连后成功，Tart 2.41.1 归档通过官方 release 校验和。干净镜像 `ghcr.io/cirruslabs/macos-tahoe-vanilla:latest` 正在下载（24 GB 压缩层），尚未启动虚拟机或运行新机安装。验证工具和镜像保存于仓库外 `~/.local/state/feipi-workbench/new-mac-validation/`，关闭自动清理其他镜像。
+Tart 手动下载首次经当前代理请求 GitHub API 返回 403；限定该下载使用直连后成功，Tart 2.41.1 归档通过官方 release 校验和。干净镜像 `ghcr.io/cirruslabs/macos-tahoe-vanilla@sha256:eeec54bfe1f076e27786c5d92b89187a05b1d109b5071eb2dcdf02d596e34640` 已下载并启动，2 CPU / 4 GiB。实际为 macOS 26.6.2 arm64，未安装 CLT/Homebrew。已复制干净的 621a438 源码快照；固定 Homebrew 安装器摘要通过，正在真实无交互安装 CLT，尚未宣称前置安装成功。验证工具、镜像和日志保存于仓库外 `~/.local/state/feipi-workbench/new-mac-validation/`，关闭自动清理其他镜像。
 
 参考：[Tart 嵌套虚拟化边界](https://tart.run/faq/#nested-virtualization-support)、[Homebrew 无交互安装](https://docs.brew.sh/Installation#unattended-installation)、[OpenAI 固定版本 Codex 安装示例](https://developers.openai.com/cookbook/examples/codex/build_iterative_repair_loops_with_codex)。
