@@ -25,7 +25,7 @@ for required_command in git brew stow nvim tree-sitter shellcheck shfmt python3 
   if command -v "$required_command" >/dev/null 2>&1; then
     echo "入口已发现：$required_command ($(command -v "$required_command"))；未运行核验版本。"
   else
-    echo "PATH 中未发现：$required_command（不等于机器上一定未安装）" >&2
+    echo "PATH 中未发现：${required_command}（不等于机器上一定未安装）" >&2
     result=1
   fi
 done

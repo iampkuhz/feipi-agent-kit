@@ -15,16 +15,16 @@ write_completion_cache() (
   # 即使生成了一半才失败，也只污染临时文件；不再用 || true 吞掉失败。
   "$@" >"$temporary" 2>"$error_log" || status=$?
   if [[ "$status" != 0 || ! -s "$temporary" ]]; then
-    echo "补全更新失败：$target（退出码 $status，或输出为空）；原缓存保留。" >&2
+    echo "补全更新失败：${target}（退出码 ${status}，或输出为空）；原缓存保留。" >&2
     return 1
   fi
   # -f 禁用用户启动文件，-n 仅解析语法；不加载生成的补全函数。
   if ! zsh -f -n "$temporary" 2>"$error_log"; then
-    echo "补全语法检查失败：$target；原缓存保留。" >&2
+    echo "补全语法检查失败：${target}；原缓存保留。" >&2
     return 1
   fi
   if [[ -L "$target" || (-e "$target" && ! -f "$target") ]]; then
-    echo "补全目标类型已变化：$target；未替换。" >&2
+    echo "补全目标类型已变化：${target}；未替换。" >&2
     return 1
   fi
   mv -f -- "$temporary" "$target" || return 1

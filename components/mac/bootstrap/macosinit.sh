@@ -19,6 +19,13 @@ if [[ "$MODE" == verify ]]; then
     echo "未核实：来源验证需要 Git。" >&2
     exit 1
   }
+  # 工作台在 HOME 中使用独立运行副本；仍逐项核对链接及源码内容，避免旧副本被误判通过。
+  config_root="$REPO_ROOT"
+  runtime_root="$HOME/.local/share/feipi-workbench/mac"
+  if [[ "$HOME/.zshrc" -ef "$runtime_root/zsh/.zshrc" ]]; then
+    config_root="$runtime_root"
+    echo "验证工作台运行副本及其与源码的一致性。"
+  fi
   # Git 是配置清单的来源，不再手工抽查四个文件。缓存/日志不应纳入 Git；
   # 若 Stow 忽略了某个已跟踪配置，此处应报缺失，不能把它当成已安装。
   # NUL 分隔兼容带空格的路径；pipefail 保证 Git 读取失败也会传递为非零。
@@ -31,7 +38,7 @@ if [[ "$MODE" == verify ]]; then
       if [[ ! -f "$REPO_ROOT/$source_path" ]]; then
         echo "来源缺失或类型异常：$source_path" >&2
         result=1
-      elif [[ "$target_path" -ef "$REPO_ROOT/$source_path" ]]; then
+      elif [[ "$target_path" -ef "$config_root/$source_path" ]] && cmp -s "$REPO_ROOT/$source_path" "$config_root/$source_path"; then
         echo "来源正确：${source_path#*/}"
       else
         result=1
@@ -42,7 +49,7 @@ if [[ "$MODE" == verify ]]; then
         else
           echo "配置缺失：$target_path" >&2
         fi
-        echo "  预期来源：$REPO_ROOT/$source_path" >&2
+        echo "  预期来源：$config_root/${source_path}（内容应与源码一致）" >&2
       fi
     done
     if [[ "$count" == 0 ]]; then
@@ -51,7 +58,7 @@ if [[ "$MODE" == verify ]]; then
     fi
     echo "已核对 $count 个受 Git 跟踪的配置来源；不验证运行时效果。"
     if [[ "$result" != 0 ]]; then
-      echo "下一步：核对并人工处理冲突，再执行 bash bootstrap/macosinit.sh install；未改动文件。" >&2
+      echo "下一步：workbench diff mac 查看差异；应用源码用 workbench apply mac；未改动文件。" >&2
     fi
     exit "$result"
   )

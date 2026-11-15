@@ -55,6 +55,24 @@ run_linker "$test_home"
 run_linker "$test_home" verify
 echo "通过：全量来源验证发现错误链接与缺失，不修改目标。"
 
+# 工作台链接到运行副本也必须通过；副本过期或缺失模块必须失败。
+test_home="$TEST_ROOT/runtime-home"
+runtime_root="$test_home/.local/share/feipi-workbench/mac"
+mkdir -p "$runtime_root" "$test_home/.config"
+cp -R "$REPO_ROOT/zsh" "$REPO_ROOT/neovim" "$runtime_root/"
+ln -s "$runtime_root/zsh/.zshrc" "$test_home/.zshrc"
+ln -s "$runtime_root/zsh/.zsh_config" "$test_home/.zsh_config"
+ln -s "$runtime_root/zsh/bin" "$test_home/bin"
+ln -s "$runtime_root/neovim/.config/nvim" "$test_home/.config/nvim"
+run_linker "$test_home" verify
+printf '\n# stale runtime\n' >>"$runtime_root/zsh/.zsh_config/62-nvm.zsh"
+if run_linker "$test_home" verify; then
+  echo "过期运行副本不应通过来源校验。" >&2
+  exit 1
+fi
+grep -q '62-nvm.zsh' "$TEST_ROOT/output.log"
+echo "通过：工作台运行副本来源正确，过期内容不会误判通过。"
+
 # 只读预检面对缺失 HOME 也不能偷偷创建父目录。
 if run_linker "$TEST_ROOT/readonly/missing" check; then
   echo "缺失 HOME 的检查不应成功。" >&2

@@ -258,13 +258,11 @@ def apply(component, agent=None, skill=None):
     base = ROOT/'components'/component
     pairs = mappings(component)
     if component == 'mac':
+        mac_preflight()
         links = {HOME/'.zshrc': RUNTIME/'mac/zsh/.zshrc', HOME/'.zsh_config': RUNTIME/'mac/zsh/.zsh_config',
                  HOME/'bin': RUNTIME/'mac/zsh/bin', HOME/'.config/nvim': RUNTIME/'mac/neovim/.config/nvim'}
         desktop = [(s, t) for n, (s, t) in pairs.items() if n.startswith(('desktop/', 'qwen/'))]
         # 目录中可能含用户文件，正常实目录需先人工合并，不自动删掉。
-        for path in links:
-            if path.is_dir() and not path.is_symlink():
-                raise ValueError('先合并现有目录再切换，未覆盖：' + str(path))
         paths = [RUNTIME/'mac', *links, *[t for _, t in desktop]]
     elif component == 'skills':
         clients = {'codex': '.codex', 'claudecode': '.claude', 'qwen': '.qwen', 'qoder': '.qoder', 'openclaw': '.openclaw', '': '.agents'}
@@ -371,7 +369,7 @@ def doctor(component):
                 print(('发现' if found else '缺少')+': '+command+((' → '+found) if found else '；先 workbench install mac'))
                 failed |= not bool(found)
             live = HOME/'.zshrc'
-            if RUNTIME not in live.resolve().parents:
+            if RUNTIME.resolve() not in live.resolve().parents:
                 print('日常 Zsh 仍未使用运行副本；先 diff/capture，再 apply mac。')
                 failed = True
         elif name == 'skills':
@@ -453,13 +451,35 @@ def service(component, args):
         raise ValueError('支持 litellm/searxng/crawl4ai/otel/openclaw/multica/openclash')
 
 
-def install(component):
+def mac_preflight():
+    """安装和发布复用同一配置边界，先发现冲突再下载安装。"""
+    for relative in ('.zshrc', '.zsh_config', 'bin', '.config/nvim'):
+        path = HOME/relative
+        if path.is_dir() and not path.is_symlink():
+            raise ValueError('先合并现有目录再切换，未覆盖：' + str(path))
+    # 非目录父路径会让安装中途失败，预检不创建任何目录。
+    for relative in ('.config', '.local', '.local/share', 'Library', 'Library/Application Support'):
+        path = HOME/relative
+        if path.exists() and not path.is_dir():
+            raise ValueError('配置父路径被文件占用，未安装：' + str(path))
+
+
+def install(component, apps=False):
+    if apps and component != 'mac':
+        raise ValueError('--apps 只适用于 install mac')
     if component == 'mac':
         # 复用安装器的依赖阶段；配置由工作台应用，避免重新链接研发目录。
         base = ROOT/'components/mac/bootstrap'
-        for stage in ['brew', 'node', 'rust', 'ohmyzsh']:
-            print('安装阶段：'+stage, flush=True)
-            run(['bash', base/(stage+'.sh'), 'install'])
+        mac_preflight()
+        run(['bash', base/'run.sh', 'install', '--dependencies-only'])
+        if apps:
+            brew = shutil.which('brew')
+            if not brew:
+                brew = next((str(path) for path in (Path('/opt/homebrew/bin/brew'), Path('/usr/local/bin/brew')) if path.is_file()), None)
+            if not brew:
+                raise ValueError('依赖阶段后仍未发现 Homebrew，未安装应用。')
+            run([brew, 'bundle', 'install', '--no-upgrade', '--file', base.parent/'Brewfile.apps'],
+                env=dict(os.environ, HOMEBREW_NO_AUTO_UPDATE='1'))
         print('依赖已准备；下一步 diff/capture/apply mac。')
     elif component == 'openclaw':
         run(['bash', ROOT/'components/openclaw/scripts/deploy.sh', '--yes'])
@@ -489,6 +509,8 @@ def main():
         if action == 'apply':
             parser.add_argument('--agent', choices=('codex', 'claudecode', 'qwen', 'qoder', 'openclaw'))
             parser.add_argument('--skill')
+        if action == 'install':
+            parser.add_argument('--apps', action='store_true', help='Mac 同时安装完整应用清单')
     parser = sub.add_parser('restore'); parser.add_argument('batch')
     parser = sub.add_parser('service'); parser.add_argument('component'); parser.add_argument('args', nargs=argparse.REMAINDER)
     parser = sub.add_parser('private'); parser.add_argument('args', nargs=argparse.REMAINDER)
@@ -510,6 +532,9 @@ def main():
     elif a.action == 'doctor':
         return doctor(a.component)
     elif a.action == 'plan':
+        if a.component == 'mac':
+            mac_preflight()
+            run(['bash', ROOT/'components/mac/bootstrap/run.sh', 'plan', '--dependencies-only'])
         print('组件：'+a.component+'\n来源：'+str(ROOT)+'\n以下为实际受管目标；私有资料原位保留；应用前逐项备份。')
         for name, (_, target) in mappings(a.component).items():
             print(name+' → '+str(target))
@@ -523,7 +548,7 @@ def main():
     elif a.action == 'apply':
         apply(a.component, a.agent, a.skill)
     elif a.action == 'install':
-        install(a.component)
+        install(a.component, apps=a.apps)
     elif a.action == 'restore':
         restore(a.batch)
     elif a.action == 'service':

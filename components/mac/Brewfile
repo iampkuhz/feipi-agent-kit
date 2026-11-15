@@ -16,6 +16,19 @@ brew "tree-sitter-cli"
 # Python 为脚本提供基础解释器；项目环境由 uv 管理，不全局恢复旧机 pip 包。
 brew "python"
 brew "uv"
+# OpenClaw 部署、服务配置和诊断直接调用 jq；不能依赖其他软件偶然带入。
+brew "jq"
+# 当前终端、研发与数据库维护常用工具，统一在新机补齐。
+brew "ripgrep"
+brew "tree"
+brew "tmux"
+brew "git-filter-repo"
+brew "libpq"
+# Zsh 已加载 Python/Ruby 多版本管理器；不复制旧机的解释器或虚拟环境。
+brew "pyenv"
+brew "rbenv"
+# Go 项目与命令行构建使用；Node 和 Rust 仍由各自 bootstrap 管理。
+brew "go"
 
 # 脚本与配置质量检查
 brew "shellcheck"
@@ -27,6 +40,10 @@ brew "stylua"
 # Node 不在 Homebrew 重复安装；bootstrap/node.sh 先准备 Node，再补装 Yarn/Prettier。
 brew "pdf2svg"
 brew "imagemagick"
+# 技能的 PDF 文本/页面处理和 Graphviz 渲染需要真实命令入口。
+brew "poppler"
+brew "graphviz"
+brew "exiftool"
 brew "grip"
 brew "wget"
 
@@ -39,4 +56,4 @@ brew "whisper-cpp"
 # 本地服务运行时
 brew "podman"
 brew "podman-compose"
-# GUI 软件和 Java/多版本管理器按需写入 Brewfile.local，默认不安装 Docker Desktop。
+# 完整新机的软件界面入口见 Brewfile.apps；本机附加选择仍放 Brewfile.local。

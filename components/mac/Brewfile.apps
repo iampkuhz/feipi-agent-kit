@@ -1,0 +1,21 @@
+# 完整个人工作环境的应用清单，由新机部署显式安装；日常补 CLI 不重复触发 GUI 安装。
+# Chrome 为 Mermaid/PPT 提供浏览器，LibreOffice 为文档验证提供命令行转换。
+cask "google-chrome"
+cask "libreoffice"
+# 当前工作终端、键盘、窗口与既有 Profile 字体。
+cask "iterm2"
+cask "karabiner-elements"
+cask "rectangle"
+cask "font-jetbrains-mono"
+cask "font-jetbrains-mono-nerd-font"
+# 常用客户端；Codex CLI 由锁定版本的客户端安装入口管理，避免随 GUI 升级。
+cask "chatgpt"
+cask "codex-app"
+cask "visual-studio-code"
+cask "intellij-idea"
+cask "obsidian"
+cask "notion"
+cask "telegram"
+cask "wechat"
+# Java 项目需要真实 JDK，不能仅检查 macOS 自带的 java 占位入口。
+cask "temurin"

@@ -26,6 +26,10 @@ fi
 if [[ "$stage" == macosinit:check && "${TEST_FAIL_AFTER_BREW:-0}" == 1 ]] && grep -qx brew:install "$TEST_COMPLETED"; then
   /bin/sh -c 'exit 43'
 fi
+if [[ "$stage" == ohmyzsh:install && "${TEST_REQUIRE_RUNTIME:-0}" == 1 ]]; then
+  [[ "$(node --version)" == TEST_NODE_READY ]]
+  [[ "$(rustup --version)" == TEST_RUST_READY ]]
+fi
 printf '%s\n' "$stage" >> "$TEST_COMPLETED"
 STAGE
 done
@@ -60,9 +64,11 @@ run_entry() {
   : >"$TEST_ROOT/completed"
   # env -i 不继承用户 BASH_ENV、工具目录或凭据；HOME 只传给这个测试子进程。
   env -i HOME="$test_home" PATH="$TEST_ROOT/bin:/usr/bin:/bin" \
+    LANG="${TEST_LOCALE:-C}" LC_ALL="${TEST_LOCALE:-C}" \
     TEST_CALLS="$TEST_ROOT/calls" TEST_COMPLETED="$TEST_ROOT/completed" \
     TEST_FORBIDDEN="$TEST_ROOT/forbidden" TEST_FAIL_STAGE="${test_fail_stage:-}" \
     TEST_FAIL_AFTER_BREW="${test_fail_after_brew:-0}" \
+    TEST_REQUIRE_RUNTIME="${test_require_runtime:-0}" \
     TEST_CLT_STATUS="${test_clt_status:-0}" TEST_UID="${test_uid:-501}" \
     /bin/bash "$TEST_ROOT/repo/bootstrap/run.sh" "$@" >"$TEST_ROOT/output" 2>&1
 }
@@ -169,3 +175,22 @@ run_entry
 [[ "$(head -n 1 "$TEST_ROOT/calls")" == brew:install ]]
 grep -qx macosinit:check "$TEST_ROOT/calls"
 echo "通过：首次没有 Stow 时仍执行 Homebrew 后的强制复检。"
+
+# 工作台只安装四个依赖阶段；已安装 Node/Rust 的环境必须传到补全生成子进程。
+mkdir -p "$test_home/.nvm/test-bin" "$test_home/.cargo/bin"
+cat >"$test_home/.nvm/nvm.sh" <<'NVM'
+nvm() { export PATH="$HOME/.nvm/test-bin:$PATH"; }
+NVM
+printf '#!/bin/sh\necho TEST_NODE_READY\n' >"$test_home/.nvm/test-bin/node"
+printf '#!/bin/sh\necho TEST_RUST_READY\n' >"$test_home/.cargo/bin/rustup"
+chmod +x "$test_home/.nvm/test-bin/node" "$test_home/.cargo/bin/rustup"
+test_require_runtime=1
+run_entry install --dependencies-only
+printf 'brew:install\nnode:install\nrust:install\nohmyzsh:install\n' >"$TEST_ROOT/expected"
+cmp "$TEST_ROOT/expected" "$TEST_ROOT/calls"
+grep -q '依赖安装阶段完成' "$TEST_ROOT/output"
+test_fail_stage=node:install
+status=0
+run_entry install --dependencies-only || status=$?
+[[ "$status" == 42 && "$(tail -n 1 "$TEST_ROOT/calls")" == node:install ]]
+echo "通过：工作台四阶段不建立源码链接，补全继承 Node/Rust，失败立即停止。"

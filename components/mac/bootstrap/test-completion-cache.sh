@@ -55,6 +55,7 @@ done
 chmod +x "$TEST_ROOT/bin/"*
 cp "$TEST_ROOT/original" "$test_zsh/cache/completions/_helm"
 env -i HOME="$test_home" PATH="$TEST_ROOT/bin:/usr/bin:/bin" \
+  LANG="${TEST_LOCALE:-C}" LC_ALL="${TEST_LOCALE:-C}" \
   /bin/bash "$REPO_ROOT/bootstrap/ohmyzsh.sh" install >"$TEST_ROOT/output" 2>&1
 cmp "$TEST_ROOT/original" "$test_zsh/cache/completions/_helm"
 grep -q '补全更新失败/跳过 1 项' "$TEST_ROOT/output"

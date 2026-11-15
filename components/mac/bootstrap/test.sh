@@ -8,7 +8,7 @@ if [[ $# -gt 0 ]]; then
 fi
 for required in bash zsh git stow shellcheck shfmt; do
   command -v "$required" >/dev/null 2>&1 || {
-    echo "缺少测试工具：$required；未自动安装。" >&2
+    echo "缺少测试工具：${required}；未自动安装。" >&2
     exit 2
   }
 done
@@ -20,14 +20,23 @@ shfmt -i 2 -d bootstrap/*.sh
 TEST_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-tests.XXXXXX")"
 trap 'rm -rf "$TEST_ROOT"' EXIT
 mkdir -p "$TEST_ROOT/home" "$TEST_ROOT/tmp"
-for suite in test-links test-node test-bootstrap test-completion-cache; do
-  echo "验证：$suite"
-  # 只给测试子进程传入隔离目录；清除凭据、代理、BASH_ENV 与 Git 用户钩子配置。
-  env -i HOME="$TEST_ROOT/home" TMPDIR="$TEST_ROOT/tmp" PATH="$PATH" \
-    NVM_DIR="$TEST_ROOT/home/.nvm" CARGO_HOME="$TEST_ROOT/home/.cargo" \
-    RUSTUP_HOME="$TEST_ROOT/home/.rustup" ZSH="$TEST_ROOT/home/.oh-my-zsh" \
-    XDG_CONFIG_HOME="$TEST_ROOT/home/.config" XDG_CACHE_HOME="$TEST_ROOT/home/.cache" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
-    bash "$REPO_ROOT/bootstrap/$suite.sh"
+# C 与实际可用的 UTF-8 都要覆盖；系统 Bash 3.2 的变量解析会受语言环境影响。
+utf8_locale="$(locale -a | grep -Ei '^(en_US[.]utf-?8|C[.]utf-?8)$' | sed -n '1p')"
+if [[ -z "$utf8_locale" ]]; then
+  echo "缺少 UTF-8 locale，无法验证实际终端条件。" >&2
+  exit 2
+fi
+for test_locale in C "$utf8_locale"; do
+  for suite in test-links test-node test-bootstrap test-completion-cache; do
+    echo "验证：${suite}（${test_locale}）"
+    # 只给测试子进程传入隔离目录；清除凭据、代理、BASH_ENV 与 Git 用户钩子配置。
+    env -i HOME="$TEST_ROOT/home" TMPDIR="$TEST_ROOT/tmp" PATH="$PATH" \
+      LANG="$test_locale" LC_ALL="$test_locale" TEST_LOCALE="$test_locale" \
+      NVM_DIR="$TEST_ROOT/home/.nvm" CARGO_HOME="$TEST_ROOT/home/.cargo" \
+      RUSTUP_HOME="$TEST_ROOT/home/.rustup" ZSH="$TEST_ROOT/home/.oh-my-zsh" \
+      XDG_CONFIG_HOME="$TEST_ROOT/home/.config" XDG_CACHE_HOME="$TEST_ROOT/home/.cache" \
+      GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
+      bash "$REPO_ROOT/bootstrap/$suite.sh"
+  done
 done
 echo "离线验证通过；真实下载、终端启动与 GUI/业务功能仍需在新机验收。"

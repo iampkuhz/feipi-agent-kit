@@ -11,7 +11,7 @@
 - `desktop/`：HHKB/Karabiner 和 iTerm2 的小型 JSON 配置；不保存应用缓存、源码或凭据。
 
 ## 构建、测试与开发命令
-- `bash bootstrap/run.sh`：新 Mac 初始化；先检查 macOS、CLT、Homebrew，再按 Homebrew、Node/npm、Rust、oh-my-zsh、配置链接的顺序执行。
+- `bash bootstrap/run.sh`：统一仓库中转到 workbench install/apply mac；独立组件保留源码链接模式。工作台复用 `run.sh install --dependencies-only` 的四个依赖阶段和环境激活。
 - `bash bootstrap/run.sh plan`：只读预览，共用实际执行的阶段顺序；缺少 Stow/HOME 时链接检查标为未核实，不自动准备。已知阻塞非零，0 不代表未核实项通过。
 - `bash bootstrap/macosinit.sh check|install`：Zsh/Neovim 唯一链接入口；整体模拟后执行 Stow，正确链接可重复使用，冲突不覆盖。
 - `bash bootstrap/macosinit.sh verify`：只读验证默认包内全部 Git 跟踪文件的实际来源；不同于安装前 Stow 冲突模拟，不检查运行时缓存或可选 Qwen。
@@ -34,7 +34,7 @@
 - 注释尽量多，可以连续多行都有注释。但是对于非常简单、重复出现的格式，不需要重复注释
 
 ## 测试与验证
-- `bash bootstrap/test.sh`：统一离线入口，要求已有 Stow/Zsh/Git/ShellCheck/shfmt；隔离测试环境，缺依赖不安装。
+- `bash bootstrap/test.sh`：统一离线入口，要求已有 Stow/Zsh/Git/ShellCheck/shfmt；在 C 与可用 UTF-8 locale 分别隔离回归，缺依赖不安装。
 - `bash bootstrap/test-bootstrap.sh`、`bash bootstrap/test-completion-cache.sh`：替身验证计划零安装、阶段顺序与失败传播，以及补全生成失败时保全旧缓存。
 - `bash bootstrap/test-links.sh`：在临时 HOME 中离线验证首次/重复安装、正确旧链接与冲突保全。
 - `bash bootstrap/test-node.sh`：离线验证 NVM/Node/npm/npx 首次懒加载后保留 nvm 函数，以及无 nvm 时的系统 Node 回退。

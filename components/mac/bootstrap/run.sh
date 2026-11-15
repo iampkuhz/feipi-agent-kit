@@ -4,14 +4,28 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODE="${1:-install}"
-if [[ $# -gt 1 || ("$MODE" != install && "$MODE" != plan) ]]; then
+dependencies_only=0
+if [[ "${2:-}" == --dependencies-only ]]; then dependencies_only=1; fi
+if [[ $# -gt 2 || ($# == 2 && "$dependencies_only" == 0) || ("$MODE" != install && "$MODE" != plan) ]]; then
   echo "用法：bash bootstrap/run.sh [plan|install]；日常检查用 bash bootstrap/check.sh。" >&2
   exit 2
+fi
+# 统一仓库中由工作台备份、发布运行副本；保留独立组件的源码链接调试和隔离测试。
+workbench_entry="$REPO_ROOT/../../workbench"
+if [[ "$dependencies_only" == 0 && -f "$workbench_entry" ]]; then
+  if [[ "$MODE" == plan ]]; then exec bash "$workbench_entry" plan mac; fi
+  bash "$workbench_entry" install mac
+  exec bash "$workbench_entry" apply mac
 fi
 # 顺序只有这一处定义，预览和执行共用；Node/Rust 先于依赖它们生成补全的 oh-my-zsh。
 stages=(brew node rust ohmyzsh macosinit)
 labels=(Homebrew Node/npm Rust oh-my-zsh 配置链接)
 results=(未执行 未执行 未执行 未执行 未执行)
+if [[ "$dependencies_only" == 1 ]]; then
+  stages=(brew node rust ohmyzsh)
+  labels=(Homebrew Node/npm Rust oh-my-zsh)
+  results=(未执行 未执行 未执行 未执行)
+fi
 brew_command=""
 
 check_prerequisites() {
@@ -48,14 +62,14 @@ check_prerequisites() {
     fi
   fi
   if [[ -n "$brew_command" ]]; then
-    echo "[已发现] Homebrew：$brew_command（预检不执行 brew）"
+    echo "[已发现] Homebrew：${brew_command}（预检不执行 brew）"
   else
     echo "[阻塞] 请先按 https://brew.sh/ 安装 Homebrew。" >&2
     result=1
   fi
   for required_command in git curl; do
     if command -v "$required_command" >/dev/null 2>&1; then
-      echo "[已发现] $required_command：$(command -v "$required_command")"
+      echo "[已发现] ${required_command}：$(command -v "$required_command")"
     else
       echo "[阻塞] 缺少前置命令：$required_command" >&2
       result=1
@@ -75,7 +89,7 @@ show_plan() {
   echo
   echo "安装计划（只读，不执行安装、升级、下载或用户启动配置）："
   for index in "${!stages[@]}"; do
-    printf '[%s/5] %s：bash bootstrap/%s.sh install\n' "$((index + 1))" "${labels[$index]}" "${stages[$index]}"
+    printf '[%s/%s] %s：bash bootstrap/%s.sh install\n' "$((index + 1))" "${#stages[@]}" "${labels[$index]}" "${stages[$index]}"
   done
   echo "共享依赖：$REPO_ROOT/Brewfile（不在预览中解析 Ruby 或核验包版本）"
   if [[ -f "$REPO_ROOT/Brewfile.local" ]]; then
@@ -94,12 +108,14 @@ show_plan() {
   echo "oh-my-zsh：补装主题/插件并更新补全；失败的补全保留旧缓存。"
   echo "配置目标：${HOME:-<未设置>} 下的 Zsh/Neovim；冲突不接管。"
   # 缺 Stow 或 HOME 时只标记未核实；安装完成 Homebrew 后还会强制复检。
-  if [[ -n "${HOME:-}" && "$HOME" == /* && "$HOME" != / && -d "$HOME" ]] && command -v stow >/dev/null 2>&1; then
+  if [[ "$dependencies_only" == 1 ]]; then
+    echo "配置由 workbench apply mac 备份后发布到运行副本；不建立源码链接。"
+  elif [[ -n "${HOME:-}" && "$HOME" == /* && "$HOME" != / && -d "$HOME" ]] && command -v stow >/dev/null 2>&1; then
     bash "$REPO_ROOT/bootstrap/macosinit.sh" check || result=1
   else
     echo "[未核实] 链接冲突：需要已有 HOME 和 PATH 中的 Stow；没有为预览创建或安装。"
   fi
-  echo "独立可选：desktop.sh 只恢复 HHKB/iTerm2；不在这五步中自动执行。"
+  echo "桌面应用由 install mac --apps 安装，配置由 apply mac 备份后恢复；独立组件可用 desktop.sh。"
   echo "仍需人工确认：安装网络/代理可用；没有执行联网探测。"
   if [[ "$result" == 0 ]]; then
     echo "预览结束：未发现已检查范围内的阻塞；未核实项不代表通过。"
@@ -142,7 +158,7 @@ if ! command -v brew >/dev/null 2>&1; then
 fi
 current_step="安装前链接冲突预检"
 retry="bash bootstrap/macosinit.sh check"
-if command -v stow >/dev/null 2>&1 && [[ -d "$HOME" ]]; then
+if [[ "$dependencies_only" == 0 ]] && command -v stow >/dev/null 2>&1 && [[ -d "$HOME" ]]; then
   bash "$REPO_ROOT/bootstrap/macosinit.sh" check
 fi
 
@@ -151,7 +167,7 @@ for index in "${!stages[@]}"; do
   current_step="${labels[$index]}"
   retry="bash bootstrap/${stages[$index]}.sh install"
   results[index]=执行中
-  printf '[%s/5] %s\n' "$((index + 1))" "$current_step"
+  printf '[%s/%s] %s\n' "$((index + 1))" "${#stages[@]}" "$current_step"
   if [[ "${stages[$index]}" == ohmyzsh ]]; then
     # 前面的 Node 子进程无法改变父进程 PATH；为补全重新激活同一个 default。
     if [[ -s "${NVM_DIR:-$HOME/.nvm}/nvm.sh" ]]; then
@@ -168,12 +184,16 @@ for index in "${!stages[@]}"; do
   bash "$REPO_ROOT/bootstrap/${stages[$index]}.sh" install
   results[index]=完成
   current_index=-1
-  if [[ "${stages[$index]}" == brew ]]; then
+  if [[ "${stages[$index]}" == brew && "$dependencies_only" == 0 ]]; then
     current_step="Homebrew 后链接冲突复检"
     retry="bash bootstrap/macosinit.sh check"
     mkdir -p "$HOME"
     bash "$REPO_ROOT/bootstrap/macosinit.sh" check
   fi
 done
-echo "初始化完成。新开终端后执行 bash bootstrap/check.sh 和 bash bootstrap/brew.sh check。"
+if [[ "$dependencies_only" == 1 ]]; then
+  echo "依赖安装阶段完成；配置仍需 workbench apply mac 发布。"
+else
+  echo "初始化完成。新开终端后执行 bash bootstrap/check.sh 和 bash bootstrap/brew.sh check。"
+fi
 echo "GUI、编辑器插件和业务服务仍需按 docs/setup.md 与 MIGRATION.md 人工验收。"

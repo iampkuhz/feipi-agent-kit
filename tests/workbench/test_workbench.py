@@ -11,6 +11,46 @@ spec.loader.exec_module(wb)
 
 
 class Recovery(unittest.TestCase):
+    def test_mac_doctor_accepts_canonical_target_under_home_alias(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d).resolve()
+            home = root/'home'; home.mkdir()
+            alias = root/'home-alias'; alias.symlink_to(home)
+            runtime = alias/'.local/share/feipi-workbench'
+            target = runtime/'mac/zsh/.zshrc'
+            target.parent.mkdir(parents=True); target.write_text('fixture')
+            (home/'.zshrc').symlink_to(target.resolve())
+            state = root/'state'; state.mkdir(); (state/'mac.json').write_text('{}')
+            with patch.object(wb, 'HOME', alias), patch.object(wb, 'RUNTIME', runtime), \
+                 patch.object(wb, 'STATE', state), patch.object(wb, 'differences', return_value=[]), \
+                 patch.object(wb.shutil, 'which', return_value='/mock/bin'), patch('builtins.print'):
+                self.assertEqual(wb.doctor('mac'), 0)
+
+    def test_mac_install_uses_shared_orchestration_and_rejects_conflict_first(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d); home = root/'home'; home.mkdir()
+            with patch.object(wb, 'ROOT', root), patch.object(wb, 'HOME', home), \
+                 patch.object(wb, 'run') as run, patch('builtins.print'):
+                wb.install('mac')
+                run.assert_called_once_with(['bash', root/'components/mac/bootstrap/run.sh', 'install', '--dependencies-only'])
+                run.reset_mock()
+                (home/'bin').mkdir()
+                with self.assertRaisesRegex(ValueError, '先合并'):
+                    wb.install('mac')
+                run.assert_not_called()
+
+    def test_mac_apps_install_is_explicit_and_does_not_upgrade(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d); home = root/'home'; home.mkdir()
+            with patch.object(wb, 'ROOT', root), patch.object(wb, 'HOME', home), \
+                 patch.object(wb, 'run') as run, patch.object(wb.shutil, 'which', return_value='/mock/brew'), \
+                 patch('builtins.print'):
+                wb.install('mac', apps=True)
+                self.assertEqual(run.call_args_list[-1].args[0], ['/mock/brew', 'bundle', 'install', '--no-upgrade', '--file', root/'components/mac/Brewfile.apps'])
+                self.assertEqual(run.call_args_list[-1].kwargs['env']['HOMEBREW_NO_AUTO_UPDATE'], '1')
+                with self.assertRaisesRegex(ValueError, '只适用于'):
+                    wb.install('services', apps=True)
+
     def test_targeted_skill_publish_backs_up_only_selected_client_and_skill(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
