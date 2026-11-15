@@ -154,6 +154,7 @@ OpenClaw 独立备份恢复会核对固定文件摘要、原 HOME 和 SQLite，�
 bash <<'VERIFY_MAC'
 # 子 Bash 失败即停止，不改动当前交互终端的选项；本人 env 沿用原生 Shell 求值。
 set -eo pipefail
+umask 077
 source components/mac/bootstrap/environment.sh
 ./workbench doctor mac
 ./develop mac run -- bash bootstrap/check.sh
@@ -162,6 +163,21 @@ python3 components/mac/bootstrap/verify-extras.py
 # 仅加载本人已审核的本地 env，不输出密钥。
 set -a; source "$HOME/.env"; set +a
 ./develop mac run -- bash bootstrap/verify-agents.sh
+# 原生 headless 执行使用现有配置和模型；不启动 Gateway、不向渠道投递。
+# 与会话、记忆和业务 workspace 隔离，核对原生结果及文件工具的精确产物。
+openclaw_probe="$(mktemp -d "$HOME/.local/state/feipi-workbench/validation/openclaw-agent.XXXXXXXX")"
+mkdir "$openclaw_probe/workspace" "$openclaw_probe/state"
+printf 'OpenClaw 私有验收日志：%s\n' "$openclaw_probe"
+openclaw agent exec --config "$HOME/.openclaw/openclaw.json" \
+  --cwd "$openclaw_probe/workspace" --state-dir "$openclaw_probe/state" \
+  --timeout 90 --json \
+  '这是一项本地初始化验收。请使用文件写入工具，在当前目录创建 proof.txt，内容精确为 OPENCLAW_NEW_MAC_NATIVE_OK_7b0d4f92 并在末尾添加一个换行。不要读取其他文件，不要发送消息，不要委派任务。完成后只回复 OPENCLAW_NEW_MAC_NATIVE_OK_7b0d4f92，不附加其他文字。' \
+  > "$openclaw_probe/result.json" 2> "$openclaw_probe/request.log"
+jq -e '.ok == true and .status == "ok" and .final == "OPENCLAW_NEW_MAC_NATIVE_OK_7b0d4f92"' \
+  "$openclaw_probe/result.json" > /dev/null
+[[ -f "$openclaw_probe/workspace/proof.txt" && ! -L "$openclaw_probe/workspace/proof.txt" ]]
+printf 'OPENCLAW_NEW_MAC_NATIVE_OK_7b0d4f92\n' | cmp - "$openclaw_probe/workspace/proof.txt"
+printf 'OpenClaw 模型请求及文件工具通过。\n'
 VERIFY_MAC
 ```
 

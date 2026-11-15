@@ -21,7 +21,7 @@
 | 配置发布与来源 | 空白 HOME 首次/重复应用、33 个配置来源及内容、路径别名、冲突保全 | 干净 macOS 首次/重复 apply、doctor、全部 33 文件检查和真实 Zsh 的 Node/npm/Rust 通过；两种 locale 离线回归通过 |
 | Neovim | 按锁恢复插件、原生构建、解析器/语言服务器与实际编辑功能 | 干净 macOS 上 31 个解析器可加载、5 个 Mason 服务安装、Lua LSP 初始化、Lua/JSON 格式化及 Markdown HTTP 预览通过；已补可重跑入口 |
 | 常用软件 | 对照旧机 Brew 清单、近期命令频率、真实应用/脚本依赖 | 共享 CLI 清单补充；17 项应用/字体已在干净系统真实安装，清单检查通过；客户端账号和系统权限待验 |
-| AI CLI/客户端 | 锁定现有兼容版本安装、登录状态、真实小任务 | 四个锁定 CLI 安装/版本检查通过；迁入设置的 Qwen 真实文件任务通过，Claude 经现有 LiteLLM 隔离转发通过；Codex/Qoder 已确认需要新机登录，整套尚未通过 |
+| AI CLI/客户端 | 锁定现有兼容版本安装、登录状态、真实小任务 | 四个锁定 CLI 安装/版本检查通过；迁入设置的 Qwen 真实文件任务通过，Claude 经现有 LiteLLM 隔离转发通过；OpenClaw 原生 headless 文件任务经同类转发通过，未启动 Gateway；Codex/Qoder 已确认需要新机登录，整套尚未通过 |
 | 私有配置与本地资料 | 必要私有配置集中准备；目录提供直传命令；不把用户资料容量作为初始化验收指标 | 实际新配置包约 23 KiB，干净 macOS 连续两次恢复通过；Codex 原生读取自动重建的三个模型，元数据摘要完全一致；主机 70 项工作台回归通过；用户复制目录后核实所需功能 |
 | 数据一致性 | Multica 数据库/附件/密钥同批；OpenClaw SQLite 停写恢复；旧机不发生双主 | 当前 PostgreSQL 备份已在无网络临时容器恢复；OpenClaw 在实际新 HOME 恢复、重建依赖和发布配置，4 个 SQLite、7,289 个业务文件核查通过，Gateway 未启动；完整业务切换待验 |
 | 服务冷启动 | Podman VM、本地连接、Compose、镜像拉取、健康等待、模型实际请求 | 默认本机 Podman ensure 及三服务 10 分钟就绪等待已增加；64 项工作台、18 项服务回归通过；旧机 ensure 真实通过且未重启现有 VM；完整冷启动待验 |
@@ -36,6 +36,8 @@
 原生应用补验：FlClash for oixCloud 0.9.3、oMLX 0.4.4、Session Browser 0.5.2 官方发布包已核对摘要，DMG 身份、版本及签名通过；干净 macOS 首次安装与重复保留通过。Session Browser 已用合成 Codex 会话完成原生扫描、索引和 HTTP 页面验证；oMLX 已用当前三个模型完成文本与两套语音请求。语音输入由系统 say 生成，不读取个人资料；验收使用独立数据目录、随机 loopback 端口并清理自有进程。已用提交 `8665934` 再次复放安装与全部功能验收，报告 source_dirty=false。代理账号/节点同步尚未完成，不能将应用安装通过表述为代理可用。
 
 OpenClaw 冷安装发现并修复：业务配置和本地 skill 来源写死旧 HOME；首次插件安装被尚不存在的成长日记插件路径阻断；安装清单还指向 `94fcd48` 已删除的专利 skill。配置改用原生 HOME 插值，本地来源使用 HOME/组件相对路径，删除失效声明。依赖用同一状态目录中的临时空配置先准备，再发布完整声明；原生 npm 插件安装目录由配置父目录决定，不能把临时配置放系统临时目录。新增仅准备依赖模式，不要求业务凭据、不启动 Gateway。干净 macOS 已真实安装 OpenClaw 2026.9.2、Qwen provider 2026.9.2、微信插件 2.4.10 和 8 项 skills；两项插件在临时配置移除后仍可检查，新 HOME 解析通过。递归分发排除开发目录，C/UTF-8 路径及内容回归、全 10 项 registry 安装边界检查通过；业务请求和重启尚未完成。
+
+OpenClaw 模型与文件工具补验：macOS 26.6.2 验证机、源码 `d495853`、`source_dirty=false`（与 `ed9baa9` 中组件内容一致），使用已恢复且与仓库摘要一致的配置、实际 OpenClaw 2026.9.2 和 Node 24.22.3，执行原生 `agent exec --config ... --cwd ... --state-dir ... --timeout 90 --json`。独立 workspace/state 中沿用配置模型，无 model/provider 覆写；通过 loopback SSH 反向转发访问旧机 LiteLLM，返回 provider=qwen、model=litellm-code-openai、ok=true、status=ok。首次精确文本校验通过；另一个独立目录的实际文件任务调用 write 一次、失败零次，proof.txt 的字节和末尾换行完全匹配，最终文本亦匹配。Gateway LaunchAgent 始终未加载，未向渠道投递；仅证明恢复的本机程序、配置、模型和文件工具调用链，未证明新机 LiteLLM 冷启动、Gateway/渠道或全业务重启。日志及报告位于 `~/.local/state/feipi-workbench/new-mac-validation/openclaw-agent-mdmtz2ll/`，文件任务位于其 `file-task/`。集中验收清单已补入同一原生命令、JSON/精确文本与文件字节判定；失败即停止，日志留在独立私有目录。
 
 原生状态恢复已补验：`restore-state openclaw` 先检查同版本 npm 程序，恢复 SQLite、会话、记忆和资料，重建随 HOME/程序位置变化的链接。旧 BSD tar 的根 AppleDouble 元数据经格式检查后跳过，新备份禁用该附加元数据；未知外部链接、损坏数据库和已有目标均保全失败。实际验证机恢复后重建依赖、`workbench apply openclaw`、原生 runtime/config 检查通过，Qwen、微信和成长日记插件均 loaded；`launchctl` 确认 Gateway 未加载。7,289 个业务文件内容一致；两个 Agent 数据库和微信引用库共 115 张表逐行一致，主状态库 108 张表中的 104 张保留全部原行，其余四张仅在原生命令运行后更新配置、健康检查、诊断和版本元数据。WAL/SHM 按 SQLite 语义核对，不要求瞬态辅助文件字节相同。Node 24 下又完成依赖、runtime 和 config 检查。
 
