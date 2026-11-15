@@ -59,7 +59,8 @@ CLI 真实任务补验：Node 26 与 Qwen 0.12.3 内置 dispatcher 的接口不�
 
 ## 本轮发现与修复
 
-- 集中操作的失败传播补验：配置导出、业务备份、OpenClaw/配置恢复、最终验收四组现有命令分别在子 Bash 中执行，失败即停止，保留退出码；不改变交互终端的选项。隔离 HOME、系统 Bash 3.2 和离线替身实测四组失败均未执行后续步骤，17 个 Bash 命令块语法通过。
+- Multica 新机前置原先只有版本声明，没有实际安装入口。新增固定 CLI/单个官方 Compose 的摘要校验与安装，并接入 `workbench install multica` 和集中清单；不要求复制旧 CLI 或整份上游源码。78 项工作台、68 项 Multica 回归通过。干净 macOS 26.6.2 使用 `234dd0c`、`source_dirty=false`，从 CLI/Compose 均不存在的状态真实下载安装，重复安装和只读 check 后文件 inode、mtime、摘要保持不变，运行副本 check 及 `multica-task --version` 通过，权限分别为 0755/0600。缺少本机绑定时工作台明确返回非零；没有生成 personal 登录、machine.json 或 LaunchAgent。Gatekeeper 保持开启，原机现用 0.8.2 的程序摘要与版本未变；仓库 0.6.3 兼容基线未升级。证据位于 `~/.local/state/feipi-workbench/new-mac-validation/multica-native-48xjo8n9/`。此项证明固定程序与定义准备，不代表容器、账号或业务切换通过。
+- 集中操作的失败传播补验：配置导出、业务备份、OpenClaw/配置恢复、最终验收四组现有命令分别在子 Bash 中执行，失败即停止，保留退出码；不改变交互终端的选项。隔离 HOME、系统 Bash 3.2 和离线替身实测四组失败均未执行后续步骤，18 个 Bash 命令块语法通过。
 - 容器来源补验（2026-11-15，源码 `f42afe5`）：通过原生 Podman 实际读取 SearXNG、Crawl4AI、PostgreSQL、LiteLLM、Multica 三项固定 digest、draw.io 基础镜像及 PlantUML 共 9 项远端索引，全部含 `linux/arm64`；已确认本地没有同名 manifest list。未拉取镜像层、未启停容器，此项只证明当次来源与架构可用，不代表冷启动完成。报告及公开元数据位于 `~/.local/state/feipi-workbench/validation/remote-manifests-1uk59biq/`。
 - 集中清单连续执行补验：首次安装在子进程中创建 nvm/全局 CLI，当前 Bash 需要再次激活 `environment.sh` 才能立即恢复 Codex 模型配置。隔离 HOME 中先复现未刷新时失败且未写入目标，再刷新后经真实工作台恢复成功；Codex 本身使用离线替身，此项不代表账号或模型请求验收。Multica 恢复清单补齐锁定镜像拉取、数据库就绪等待及已有业务表检查；系统 Bash 3.2 中用离线替身验证成功顺序和失败中止，Compose 原生帮助确认参数可用，尚未据此宣称新机容器冷启动通过。
 - Bash 3.2 在 UTF-8 环境把变量后相邻中文标点误解析为变量名：使用明确的大括号边界；测试同时运行 C 与可用的 UTF-8 locale。
