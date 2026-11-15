@@ -36,6 +36,25 @@ for first_command in nvm node npm npx; do
   echo "通过：首次调用 ${first_command} 后仍可使用 nvm 与 node。"
 done
 
+# 新机原生 nvm 会把 default 写成 24.22.3；新终端应直接找到全局 CLI，
+# 不需要先执行 node 来触发懒加载。也保留带 v 的旧配置和多级 LTS 别名。
+mkdir -p "$TEST_ROOT/.nvm/alias/lts" "$TEST_ROOT/.nvm/versions/node/v24.22.3/bin"
+cp "$TEST_ROOT/system/node" "$TEST_ROOT/.nvm/versions/node/v24.22.3/bin/openclaw"
+printf 'lts/krypton\n' >"$TEST_ROOT/.nvm/alias/lts/*"
+printf '24.22.3\n' >"$TEST_ROOT/.nvm/alias/lts/krypton"
+for default_alias in 24.22.3 v24.22.3 'lts/*'; do
+  printf '%s\n' "$default_alias" >"$TEST_ROOT/.nvm/alias/default"
+  HOME="$TEST_ROOT" NVM_DIR="$TEST_ROOT/.nvm" zsh -f -c '
+    source "$1/zsh/.zsh_config/00-core.zsh"
+    source "$1/zsh/.zsh_config/09-nvm-path.zsh"
+    source "$1/zsh/.zsh_config/62-nvm.zsh"
+    [[ "$(command -v openclaw)" == "$NVM_DIR/versions/node/v24.22.3/bin/openclaw" ]] || exit 1
+    [[ "$(openclaw --version)" == "openclaw --version" ]] || exit 1
+    [[ "$NVM_BIN" == "$NVM_DIR/versions/node/v24.22.3/bin" ]] || exit 1
+  ' -- "$REPO_ROOT"
+done
+echo "通过：新终端直接使用带 v、不带 v 和多级别名的 nvm 默认全局 CLI。"
+
 # 没有 nvm 时，node/npm/npx 仍应落到系统版本；nvm 自身要明确报缺失。
 HOME="$TEST_ROOT" NVM_DIR="$TEST_ROOT/missing-nvm" PATH="$TEST_ROOT/system:$PATH" \
   zsh -f -c '

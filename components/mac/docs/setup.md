@@ -54,7 +54,11 @@ DMG 检查应用身份、版本和代码签名；保留已有安装，不借初�
 这个入口只用系统工具。代理首次登录、节点同步和系统权限必须在准备阶段完成。
 不要把旧机 `HTTP_PROXY=127.0.0.1:7890` 当作新机已经具备代理服务。
 
-安装后用 `bash components/mac/bootstrap/desktop-extras.sh check` 检查实际签名及 CLI 入口。
+oMLX 固定包的应用缺少随包公证票据；安装入口使用 CLT 的 Apple `stapler` 附加并验证
+原有票据，已有有效票据时保留。获取失败则停止，不关闭 Gatekeeper、不移除隔离属性。
+此步骤不影响可在 CLT 前安装 FlClash 的入口。
+安装后用 `bash components/mac/bootstrap/desktop-extras.sh check` 只读检查实际签名、
+oMLX 公证票据及 CLI 入口；实际启动仍需单独验收。
 `session-browser serve` 使用官方自包含 Java runtime，`omlx` 使用应用自带 CLI；
 两者的 HOME 配置、会话数据、模型和真实业务请求另行恢复验收。
 非交互脚本先 `source components/mac/bootstrap/environment.sh`；它和交互 Zsh 都预留 `~/.omlx/bin`，优先使用应用原生入口，尚未打开应用时回退到 `~/.local/bin`。原生入口由 oMLX 创建并读取其数据目录设置；不会为此向 shell 启动文件追加另一份配置。
@@ -113,6 +117,7 @@ Node 和 Rust 相互没有安装依赖，这里固定串行以便排障；它们
 
 来源检查会先激活已经存在的 Homebrew、nvm default/Cargo 路径，不加载 `.zshrc` 或安装软件；SSH/非交互 Bash 的 PATH 缺少 Homebrew 时会探测 macOS 标准安装位置。
 工作台 doctor 也会核实不在父进程 PATH 中的 nvm Node，避免全新机器安装成功后误报缺失。
+交互 Zsh 同时识别 nvm 默认别名中的 `24.22.3` 与 `v24.22.3`，让全局 CLI 在新终端直接可用。
 
 恢复私有设置并准备当前终端的环境变量后，可执行真实 Agent 文件任务：
 

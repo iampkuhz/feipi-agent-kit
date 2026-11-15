@@ -31,6 +31,10 @@ _nvm_resolve_default_version() {
     if [[ "$_ref" == v<->* ]]; then
       print -r -- "$_ref"
       return 0
+    elif [[ "$_ref" == <->.<->.<-> ]]; then
+      # nvm 原生 alias default 也会保存不带 v 的完整版本，目录名仍带 v。
+      print -r -- "v$_ref"
+      return 0
     fi
 
     # 如果不是版本号，就继续按 alias/<name> 追踪下一跳。

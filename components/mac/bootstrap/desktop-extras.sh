@@ -129,6 +129,21 @@ while IFS=$'\t' read -r name version kind payload bundle_id sha url; do
     temp_dir=""
     echo "${actual_name}：已安装 ${version}（SHA-256 已校验）。"
   fi
+  if [[ "${actual_name}" == omlx ]]; then
+    # 当前固定 DMG 的应用没有附带公证票据；从 Apple 附加原有票据，
+    # 不重新签名、不降低 Gatekeeper，也不删除隔离属性。只读 check 不修复。
+    if ! xcode-select -p >/dev/null 2>&1 || ! xcrun --find stapler >/dev/null 2>&1; then
+      echo 'oMLX 公证票据检查需要 CLT；先运行 scripts/bootstrap/prerequisites.sh install。' >&2
+      exit 1
+    fi
+    if ! xcrun stapler validate "${target}" >/dev/null 2>&1; then
+      if [[ "${mode}" == check ]]; then
+        echo 'oMLX 缺少有效公证票据；运行 desktop-extras.sh install omlx 后复验。' >&2
+        exit 1
+      fi
+      xcrun stapler staple "${target}"
+    fi
+  fi
   # 原生 runtime 用 $0 定位自身，不能直接将 bin/run 符号链接到另一个目录。
   if [[ "${actual_name}" == session-browser || "${actual_name}" == omlx ]]; then
     launcher="${HOME}/.local/bin/${actual_name}"
