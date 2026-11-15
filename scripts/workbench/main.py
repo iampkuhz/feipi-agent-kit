@@ -370,6 +370,9 @@ def doctor(component):
         if name == 'mac':
             for command in ['brew', 'git', 'zsh', 'nvim', 'node', 'python3', 'podman']:
                 found = shutil.which(command)
+                if not found:
+                    # SSH/launchd 不读取交互 PATH；只读探测 Homebrew 原生位置，避免误报需重装。
+                    found = shutil.which(command, path='/opt/homebrew/bin:/usr/local/bin')
                 if command == 'node' and not found and (Path(os.environ.get('NVM_DIR', str(HOME/'.nvm')))/'nvm.sh').is_file():
                     checked = subprocess.run(['bash', str(ROOT/'components/mac/bootstrap/environment.sh'), 'check'],
                                              capture_output=True, text=True, timeout=30)

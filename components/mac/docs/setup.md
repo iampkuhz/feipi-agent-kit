@@ -117,6 +117,7 @@ Node 和 Rust 相互没有安装依赖，这里固定串行以便排障；它们
 
 来源检查会先激活已经存在的 Homebrew、nvm default/Cargo 路径，不加载 `.zshrc` 或安装软件；SSH/非交互 Bash 的 PATH 缺少 Homebrew 时会探测 macOS 标准安装位置。
 工作台 doctor 也会核实不在父进程 PATH 中的 nvm Node，避免全新机器安装成功后误报缺失。
+SSH 中缺少交互 PATH 时，doctor 还会只读探测 `/opt/homebrew/bin` 和 `/usr/local/bin`，不要求重复安装已有软件。
 交互 Zsh 同时识别 nvm 默认别名中的 `24.22.3` 与 `v24.22.3`，让全局 CLI 在新终端直接可用。
 
 恢复私有设置并准备当前终端的环境变量后，可执行真实 Agent 文件任务：

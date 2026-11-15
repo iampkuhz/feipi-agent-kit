@@ -40,11 +40,26 @@ class Recovery(unittest.TestCase):
             with patch.object(wb, 'HOME', home), patch.object(wb, 'RUNTIME', runtime), \
                     patch.object(wb, 'STATE', state), patch.object(wb, 'differences', return_value=[]), \
                     patch.dict(wb.os.environ, {'NVM_DIR': str(nvm)}), \
-                    patch.object(wb.shutil, 'which', side_effect=lambda name: None if name == 'node' else '/mock/'+name), \
+                    patch.object(wb.shutil, 'which', side_effect=lambda name, **kwargs: None if name == 'node' else '/mock/'+name), \
                     patch.object(wb.subprocess, 'run', return_value=SimpleNamespace(returncode=0, stdout='/nvm/bin/node\nv26.13.1\n11.20.0\n')) as run, \
                     patch('builtins.print'):
                 self.assertEqual(wb.doctor('mac'), 0)
                 self.assertEqual(run.call_args.args[0], ['bash', str(wb.ROOT/'components/mac/bootstrap/environment.sh'), 'check'])
+
+    def test_mac_doctor_finds_homebrew_tools_outside_ssh_path(self):
+        with tempfile.TemporaryDirectory(prefix='feipi ssh doctor ') as scratch:
+            home = Path(scratch); runtime = home/'runtime'; target = runtime/'mac/zsh/.zshrc'
+            target.parent.mkdir(parents=True); target.write_text('fixture')
+            (home/'.zshrc').symlink_to(target)
+            state = home/'state'; state.mkdir(); (state/'mac.json').write_text('{}')
+            def which(name, path=None):
+                if name in ['brew', 'nvim', 'podman']:
+                    return '/opt/homebrew/bin/'+name if path and '/opt/homebrew/bin' in path.split(':') else None
+                return '/usr/bin/'+name
+            with patch.object(wb, 'HOME', home), patch.object(wb, 'RUNTIME', runtime), \
+                    patch.object(wb, 'STATE', state), patch.object(wb, 'differences', return_value=[]), \
+                    patch.object(wb.shutil, 'which', side_effect=which), patch('builtins.print'):
+                self.assertEqual(wb.doctor('mac'), 0)
 
     def test_mac_doctor_accepts_canonical_target_under_home_alias(self):
         with tempfile.TemporaryDirectory() as d:
