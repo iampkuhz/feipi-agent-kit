@@ -96,6 +96,8 @@ mkdir -p "$HOME/Documents/tools/llm"
 git clone --depth 1 https://github.com/iampkuhz/feipi-agent-kit.git "$HOME/Documents/tools/llm/feipi-agent-kit"
 cd "$HOME/Documents/tools/llm/feipi-agent-kit"
 ./workbench install mac --apps --agents
+# 安装发生在子进程；刷新当前 Bash，才能找到本轮新建的 nvm default 和 Codex。
+source components/mac/bootstrap/environment.sh
 ./workbench apply mac
 ./workbench private verify-mac "$HOME/feipi-mac-private"
 ./workbench private restore-mac "$HOME/feipi-mac-private"

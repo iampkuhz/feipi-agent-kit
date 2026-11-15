@@ -27,15 +27,35 @@ python3 scripts/restore-check.py ~/.local/state/multica/backups/本批次
 
 ## 3. 恢复数据（只在新机空数据库执行）
 
-先 `backup.py --verify 本批次`，确认 volumes 是新机空卷。以同版本 PostgreSQL 17 恢复：
+在 `components/multica` 中执行，备份默认已由用户直传到 `~/feipi-restore/multica`。先核对同批备份，再显式拉取锁定 digest 的镜像；全新机器没有旧机镜像，不能直接以 `--pull never` 冷启动。以同版本 PostgreSQL 17 恢复，等待数据库就绪并确认没有业务表后才导入：
 
 ```bash
+bash <<'RESTORE_MULTICA'
+set -euo pipefail
+multica_batch="$HOME/feipi-restore/multica"
+python3 scripts/backup.py --verify "$multica_batch"
+running_services="$(multica-service ps --status running --services backend frontend)"
+[[ -z "$running_services" ]] || {
+  echo 'Web/API 正在运行；先停写，未恢复。' >&2; exit 1;
+}
+multica-service pull
 multica-service up -d --pull never postgres
-multica-service exec -T postgres pg_restore -U multica -d multica --exit-on-error < 本批次/database.dump
+for ((attempt=0; attempt<60; attempt++)); do
+  if multica-service exec -T postgres pg_isready -U multica -d multica > /dev/null 2>&1; then
+    break
+  fi
+  sleep 2
+done
+multica-service exec -T postgres pg_isready -U multica -d multica > /dev/null
+tables="$(multica-service exec -T postgres psql -U multica -d multica -Atc \
+  "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'")"
+[[ "$tables" == 0 ]] || { echo '目标库已有业务表，未覆盖。' >&2; exit 1; }
+multica-service exec -T postgres pg_restore -U multica -d multica --exit-on-error < "$multica_batch/database.dump"
 # 创建停止的 backend 容器并写入同批附件；不启动 Web/API 写入
-multica-service create backend
-multica-service cp 本批次/uploads/. backend:/app/data/uploads/
+multica-service create --pull never backend
+multica-service cp "$multica_batch/uploads/." backend:/app/data/uploads/
 multica-service up -d --pull never
+RESTORE_MULTICA
 ```
 
 如果目标已有业务数据，停止此流程，不加 `--clean` 覆盖。对照旧机数据库记录数、Issue/Agent UUID、附件数量并实际下载一个附件。重建 CLI personal 登录和工作区选择；确认 server_url/workspace_id 后注册新 daemon。若启用隔离 OpenClaw，依据 `runtime profile --help` 为原 profile 设置新机包装命令路径，不创建同名重复 profile。
