@@ -66,6 +66,16 @@ class MigrationProjects(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(git(target, 'rev-parse', 'HEAD'), git(self.source, 'rev-parse', 'HEAD'))
 
+    def test_bundle_including_init_default_branch_restores_all_branches(self):
+        probe = self.base/'default branch probe'; probe.mkdir()
+        git(probe, 'init', '--quiet')
+        default = git(probe, 'symbolic-ref', '--short', 'HEAD').decode().strip()
+        if default != 'main':
+            git(self.source, 'branch', default)
+        export_project(self.source, self.bundle, self.old)
+        target = restore_project(self.bundle, self.new, self.old)
+        self.assertEqual(git(target, 'rev-parse', default), git(self.source, 'rev-parse', default))
+
     def test_all_stashes_and_order_are_preserved(self):
         for value in ('first stash', 'second stash'):
             (self.source/'tracked').write_text(value)

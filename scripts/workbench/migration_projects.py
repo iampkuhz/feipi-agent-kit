@@ -175,7 +175,9 @@ def restore_project(project, home, old_home):
     try:
         git(stage, 'init', '--quiet')
         # 全部 refs 包括本地分支、远端跟踪和 stash；不把 bundle 本身保留为 origin。
-        git(stage, 'fetch', '--quiet', str(project/'repository.bundle'), '+refs/*:refs/*')
+        # stage 是本次新建、尚未 checkout 的空仓库；导入可能包含 init 默认分支。
+        # 仅此临时仓库允许更新 HEAD 指向的 ref，随后按记录显式 reset。
+        git(stage, 'fetch', '--quiet', '--update-head-ok', str(project/'repository.bundle'), '+refs/*:refs/*')
         if metadata['stashes']:
             git(stage, 'update-ref', '-d', 'refs/stash')
             for stash in reversed(metadata['stashes']):
