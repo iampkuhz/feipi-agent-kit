@@ -9,22 +9,25 @@ Git 提供配置、清单和脚本；软件、依赖、镜像及派生文件在�
 在本仓库根目录执行，基础配置导出目录必须尚不存在。源码归档只包含当前提交的 Git 跟踪内容，供新机尚无 Git 时运行前置安装；不包含工作区未提交改动。
 
 ```bash
+bash <<'EXPORT_CONFIG'
+set -euo pipefail
 ./workbench private export-mac "$HOME/feipi-mac-private"
 ./workbench private verify-mac "$HOME/feipi-mac-private"
 git archive --format=tar.gz --output "$HOME/feipi-bootstrap.tar.gz" HEAD
+EXPORT_CONFIG
 ```
 
 业务备份在最终切换维护窗口执行：先暂停 UI/聊天新派发，等活动任务归零，再执行下列命令。Multica 备份会短暂停 Web/API 写入并恢复 Web/API；daemon 保持停止。OpenClaw 备份会恢复原 Gateway 启动状态，最终切换前仍须停旧机 Gateway。记录两个命令打印的批次路径，填写下一节变量。
 
 ```bash
+bash <<'BACKUP'
+set -euo pipefail
+umask 077
 ./workbench service multica stop
 ./workbench private backup multica
 ./workbench private backup openclaw
 
 # LiteLLM 使用 PostgreSQL 原生一致性导出，不复制在线数据库目录。
-bash <<'BACKUP'
-set -euo pipefail
-umask 077
 ./workbench service podman check
 batch="$(mktemp -d "$HOME/feipi-litellm-backup.XXXXXX")"
 podman exec litellm-db-podman pg_dump -Fc -U litellm litellm > "$batch/database.dump.partial"
@@ -108,6 +111,8 @@ INSTALL
 应用安装完成后，先在 FlClash 导入 ZIP、登录并同步节点，确认本机 7890 已可用，再关闭临时 SSH 转发。恢复的 env 指向本机代理，不能继续把尚未启动的 7890 当作可用网络。随后新开终端，进入长期仓库，先完成普通目录直传，再恢复 OpenClaw。这里只安装锁定程序和依赖、发布配置，不启动渠道，不发送消息。
 
 ```bash
+bash <<'RESTORE_CONFIG'
+set -euo pipefail
 source components/mac/bootstrap/environment.sh
 openclaw_version="$(python3 -c 'import json; print(json.load(open("components/openclaw/versions.json"))["openclaw"])')"
 npm install --global "openclaw@$openclaw_version"
@@ -119,6 +124,7 @@ bash components/mac/bootstrap/ohmyzsh.sh install
 ./workbench apply skills
 ./workbench apply services
 bash components/mac/bootstrap/neovim.sh
+RESTORE_CONFIG
 ```
 
 OpenClaw 独立备份恢复会核对固定文件摘要、原 HOME 和 SQLite，拒绝覆盖已有状态；不需要项目或模型归档。旧格式缺少原 HOME 元数据时，用当前旧机入口重新导出。Multica 数据库、附件和服务密钥恢复及新设备注册，执行[Mac mini 切换步骤](../components/multica/docs/mac-mini-migration.md)，禁止克隆旧 daemon 身份。LiteLLM 先仅启动新机空 PostgreSQL，恢复同批 `database.dump` 和原密钥，再启动代理；详见[服务恢复](setup-new-mac.md)。这两项尚待实体新机冷启动验收，不跳过数据恢复而直接启动空业务。
@@ -140,6 +146,10 @@ OpenClaw 独立备份恢复会核对固定文件摘要、原 HOME 和 SQLite，�
 ## 准备完成后验收
 
 ```bash
+bash <<'VERIFY_MAC'
+# 子 Bash 失败即停止，不改动当前交互终端的选项；本人 env 沿用原生 Shell 求值。
+set -eo pipefail
+source components/mac/bootstrap/environment.sh
 ./workbench doctor mac
 ./develop mac run -- bash bootstrap/check.sh
 python3 components/mac/bootstrap/verify-apps.py
@@ -147,6 +157,7 @@ python3 components/mac/bootstrap/verify-extras.py
 # 仅加载本人已审核的本地 env，不输出密钥。
 set -a; source "$HOME/.env"; set +a
 ./develop mac run -- bash bootstrap/verify-agents.sh
+VERIFY_MAC
 ```
 
 服务就绪、原生备份恢复、新设备绑定通过后，按[自启步骤](setup-new-mac.md#登录自启与-env-vault)安装自启；完整关机开机并登录后再次执行必要真实任务。旧机停止主力后才启新机 OpenClaw/Multica，避免双主。任何失败保留日志，按组件恢复批次处理；整机验收通过前不宣称部署完成。
