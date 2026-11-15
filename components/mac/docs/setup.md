@@ -35,6 +35,7 @@ bash scripts/bootstrap/prerequisites.sh install
 ./workbench plan mac        # 只读：看依赖阶段、清单、受管目标和已知冲突
 ./workbench install mac     # 补装缺失项，复用组件依赖编排
 ./workbench install mac --apps # 完整新机同时补齐 Brewfile.apps 中的应用
+./workbench install mac --apps --agents # 同时补装与旧机兼容的四个 Agent CLI
 ./workbench apply mac       # 备份后发布独立运行副本
 ```
 
@@ -57,6 +58,13 @@ plan 不联网、不执行 brew/nvm/rustup、不加载用户启动配置，也�
 Node 和 Rust 相互没有安装依赖，这里固定串行以便排障；它们先于 oh-my-zsh 是为了补全完整。
 配置链接本身不要求先启动 Neovim，但放最后能避免新终端先加载尚未准备好的工具配置。
 单独执行 ohmyzsh.sh 时，生成补全所需的工具也应已在当前 PATH；全量入口会重新激活 nvm default。
+
+`--agents` 在依赖阶段后运行 `bootstrap/agents.sh install`：Codex 版本从 Multica 的
+`config/agents.json` 兼容声明派生，Qwen 使用固定 npm 包和完整性摘要；Claude/Qoder 使用
+已与旧机程序核对的 Apple Silicon 原生发布包，不通过可漂移的 Homebrew cask 安装 CLI。
+已有相同版本直接保留，其他版本先报冲突，下载摘要或执行版本不符则停止。安装不会复制认证状态，
+完成后还需在新机登录或恢复受支持的 API 配置，再执行真实小任务。
+只读核对：`bash components/mac/bootstrap/agents.sh check`；版本清单见 `config/cli-versions.json`。
 
 工作台在任何下载安装前检查受管目录和父路径冲突；发布时再次检查并备份。以下 Stow 说明仅适用于独立组件源码链接调试。
 已有 Stow 时，源码链接模式在下载安装前检查冲突；Homebrew 阶段结束后必须再检查一次。

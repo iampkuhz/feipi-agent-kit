@@ -477,14 +477,16 @@ def mac_preflight():
             raise ValueError('配置父路径被文件占用，未安装：' + str(path))
 
 
-def install(component, apps=False):
-    if apps and component != 'mac':
-        raise ValueError('--apps 只适用于 install mac')
+def install(component, apps=False, agents=False):
+    if (apps or agents) and component != 'mac':
+        raise ValueError('--apps/--agents 只适用于 install mac')
     if component == 'mac':
         # 复用安装器的依赖阶段；配置由工作台应用，避免重新链接研发目录。
         base = ROOT/'components/mac/bootstrap'
         mac_preflight()
         run(['bash', base/'run.sh', 'install', '--dependencies-only'])
+        if agents:
+            run(['bash', base/'agents.sh', 'install'])
         if apps:
             brew = shutil.which('brew')
             if not brew:
@@ -524,6 +526,7 @@ def main():
             parser.add_argument('--skill')
         if action == 'install':
             parser.add_argument('--apps', action='store_true', help='Mac 同时安装完整应用清单')
+            parser.add_argument('--agents', action='store_true', help='Mac 同时补装四个锁定版 Agent CLI')
     parser = sub.add_parser('restore'); parser.add_argument('batch')
     parser = sub.add_parser('service'); parser.add_argument('component'); parser.add_argument('args', nargs=argparse.REMAINDER)
     parser = sub.add_parser('private'); parser.add_argument('args', nargs=argparse.REMAINDER)
@@ -561,7 +564,7 @@ def main():
     elif a.action == 'apply':
         apply(a.component, a.agent, a.skill)
     elif a.action == 'install':
-        install(a.component, apps=a.apps)
+        install(a.component, apps=a.apps, agents=a.agents)
     elif a.action == 'restore':
         restore(a.batch)
     elif a.action == 'service':
