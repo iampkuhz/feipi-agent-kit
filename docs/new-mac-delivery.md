@@ -48,7 +48,7 @@
 
 当前主机为 Apple M1、16 GiB 内存；建立验证机前可用磁盘约 77 GiB，目前约 19 GiB。没有预装 VM 工具。本轮安装的 Tart 2.41.1 及验证资料均在仓库外，不清理用户其他镜像或资料。
 
-干净镜像 `ghcr.io/cirruslabs/macos-tahoe-vanilla@sha256:eeec54bfe1f076e27786c5d92b89187a05b1d109b5071eb2dcdf02d596e34640` 为 macOS 26.6.2 arm64，初始无 CLT/Homebrew，分配 2 CPU / 4 GiB，系统卷扩至约 80 GB。真实完成 CLT/Homebrew/Git/Python、共享工具链、四个锁定 CLI、17 项应用/字体和上述编辑器/文档验收。Neovim 与配置已用提交 `2521096` 完整复放并通过来源检查；桌面字体修复的最终提交复验仍在进行。源码、环境指纹、私有阶段日志及产物保存于 `~/.local/state/feipi-workbench/new-mac-validation/`。
+干净镜像 `ghcr.io/cirruslabs/macos-tahoe-vanilla@sha256:eeec54bfe1f076e27786c5d92b89187a05b1d109b5071eb2dcdf02d596e34640` 为 macOS 26.6.2 arm64，初始无 CLT/Homebrew，分配 2 CPU / 4 GiB，系统卷扩至约 80 GB。真实完成 CLT/Homebrew/Git/Python、共享工具链、四个锁定 CLI、17 项应用/字体和上述编辑器/文档验收。Neovim 与配置已用提交 `2521096` 完整复放并通过来源检查；桌面、字体、编辑器与基础配置已用提交 `5fb906d` 在完整关机开机后再次执行 install/apply/验收：全部通过，产物报告的 source_dirty=false。该复放没有再输入管理员密码，已有软件/CLI/插件版本保留。源码、环境指纹、私有阶段日志及产物保存于 `~/.local/state/feipi-workbench/new-mac-validation/`。
 
 Env Vault 使用验证专用无秘密 `.env`，已通过原生加载、目标文件监听、完整关机开机后的自动恢复；不据此声称真实私有数据已完成迁移。本机 `kern.hv_support=1`，该 VM 为 0，Podman 在下载前明确拒绝并返回非零；M1 不支持该场景所需的嵌套虚拟化。完整容器服务/模型及实际新 Mac mini 的整机证明仍未完成，继续推进可独立交付的恢复和业务能力。
 参考：[Tart 嵌套虚拟化边界](https://tart.run/faq/#nested-virtualization-support)、[Homebrew 无交互安装](https://docs.brew.sh/Installation#unattended-installation)、[OpenAI 固定版本 Codex 安装示例](https://developers.openai.com/cookbook/examples/codex/build_iterative_repair_loops_with_codex)。
