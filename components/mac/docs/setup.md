@@ -112,6 +112,16 @@ Node 和 Rust 相互没有安装依赖，这里固定串行以便排障；它们
 来源检查会先激活已经存在的 Homebrew、nvm default/Cargo 路径，不加载 `.zshrc` 或安装软件；SSH/非交互 Bash 的 PATH 缺少 Homebrew 时会探测 macOS 标准安装位置。
 工作台 doctor 也会核实不在父进程 PATH 中的 nvm Node，避免全新机器安装成功后误报缺失。
 
+恢复私有设置并准备当前终端的环境变量后，可执行真实 Agent 文件任务：
+
+```bash
+./develop mac run -- bash bootstrap/verify-agents.sh
+# 单独复验某个 CLI，使用原有模型和代理设置：
+./develop mac run -- bash bootstrap/verify-agents.sh --cli qwen
+```
+
+验收使用各 CLI 的原生非交互模式，在独立私有目录创建文件并逐字节核对；单项最多 180 秒，失败继续检查其余 CLI，最终返回非零。报告和原生日志保存在 `~/.local/state/feipi-workbench/validation/agent-tasks-*/`。这会按现有账号配置发送小型模型请求；没有凭据、服务未启动、退出码为 0 却未生成正确文件，均不算通过。完整迁移验收还须核实相关服务和开机后的真实行为。
+
 配置发布后显式执行编辑器准备：
 
 ```bash
