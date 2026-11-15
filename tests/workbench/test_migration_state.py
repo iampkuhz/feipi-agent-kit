@@ -46,6 +46,8 @@ class MigrationState(unittest.TestCase):
     def archive_state(self):
         with tarfile.open(self.bundle/'openclaw/state.tar.gz', 'w:gz') as archive:
             archive.add(self.state, arcname='.openclaw')
+            item=tarfile.TarInfo('._.openclaw');item.size=8
+            archive.addfile(item,io.BytesIO(b'\x00\x05\x16\x07test'))
 
     def test_state_restores_database_memory_home_and_native_program_links(self):
         (self.state/'plugin-skills').mkdir()
@@ -54,6 +56,7 @@ class MigrationState(unittest.TestCase):
         restore_openclaw(self.bundle, self.home, self.old, self.package)
         restored = self.home/'.openclaw'
         self.assertEqual((restored/'workspace/MEMORY.md').read_text(), 'Preserve original memory.\n')
+        self.assertFalse((self.home/'._.openclaw').exists())
         value = json.loads((restored/'openclaw.json').read_text())
         self.assertEqual(value['workspace'],str(self.home)+'/notes')
         self.assertEqual(value['credential'],'fixture-secret')
@@ -72,6 +75,16 @@ class MigrationState(unittest.TestCase):
             restore_openclaw(self.bundle,self.home,self.old,self.package)
         self.assertFalse((self.home/'.openclaw').exists())
         self.assertEqual(list(self.home.iterdir()),[])
+
+    def test_config_link_cannot_overwrite_an_existing_home_file(self):
+        existing=self.home/'existing-config.json';existing.write_text('keep original')
+        (self.state/'openclaw.json').unlink()
+        (self.state/'openclaw.json').symlink_to(self.old/'existing-config.json')
+        self.archive_state()
+        with self.assertRaises(ValueError):
+            restore_openclaw(self.bundle,self.home,self.old,self.package)
+        self.assertEqual(existing.read_text(),'keep original')
+        self.assertFalse((self.home/'.openclaw').exists())
 
     def test_corrupt_database_is_rejected_without_partial_state(self):
         self.db.write_bytes(b'bad database')

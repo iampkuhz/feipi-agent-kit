@@ -48,12 +48,12 @@ for path in paths:
     checks[str(path.relative_to(home))] = 'ok'
 pathlib.Path(sys.argv[1], 'sqlite-integrity.json').write_text(json.dumps(checks, indent=2)+'\n')
 PY
-tar -czf "$batch/state.tar.gz" \
+COPYFILE_DISABLE=1 tar -czf "$batch/state.tar.gz" \
   --exclude='node_modules' --exclude='.openclaw/cache' --exclude='.openclaw/tmp' --exclude='.openclaw/logs' \
   -C "$HOME" .openclaw
 vault_file="$(python3 -c 'from pathlib import Path; print((Path.home()/".env").resolve())')"
 # 只保存当前配置实际引用的 env 文件；~/.env 是普通文件时也不能递归归档整个 HOME。
-tar -czf "$batch/env-vault.tar.gz" -C "$(dirname "$vault_file")" "$(basename "$vault_file")"
+COPYFILE_DISABLE=1 tar -czf "$batch/env-vault.tar.gz" -C "$(dirname "$vault_file")" "$(basename "$vault_file")"
 python3 - "$batch" "$vault_file" <<'PY'
 import json, pathlib, sys
 pathlib.Path(sys.argv[1], 'env-location.json').write_text(json.dumps({'original_path': sys.argv[2]}, indent=2)+'\n')

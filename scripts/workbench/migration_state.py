@@ -54,6 +54,13 @@ def restore_openclaw(bundle, home, source_home, package):
     replacements = {}
     with tarfile.open(source) as archive:
         for member in archive:
+            # 旧版 BSD tar 自动添加的根目录 AppleDouble 不是业务文件。
+            if member.name == '._.openclaw' and member.isfile():
+                with archive.extractfile(member) as stream:
+                    if stream.read(4) != b'\x00\x05\x16\x07':
+                        raise ValueError('OpenClaw 归档的根元数据格式无效。')
+                replacements[member.name] = None
+                continue
             name = relative(member.name.rstrip('/'))
             if name.parts[0] != '.openclaw':
                 raise ValueError('OpenClaw 归档包含状态目录外的内容。')
@@ -81,6 +88,8 @@ def restore_openclaw(bundle, home, source_home, package):
         extract_archive(source, stage, home, home, source_home, replacements)
         state = stage/'.openclaw'
         for name, skill in replacements.items():
+            if skill is None:
+                continue
             destination = stage/name
             if not destination.parent.resolve().is_relative_to(state.resolve()):
                 raise ValueError('程序链接父目录越界。')
@@ -97,6 +106,8 @@ def restore_openclaw(bundle, home, source_home, package):
             finally:
                 connection.close()
         config = state/'openclaw.json'
+        if config.is_symlink() or not config.is_file() or not config.resolve().is_relative_to(state.resolve()):
+            raise ValueError('恢复的运行声明不是状态目录内的普通文件。')
         config.write_bytes(relocate(config.read_bytes(), str(source_home), home, Path('openclaw.json')))
         config.chmod(0o600)
         link = state/'.env'
