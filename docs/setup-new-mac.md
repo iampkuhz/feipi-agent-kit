@@ -80,7 +80,7 @@ RESTORE
 
 ```bash
 ./workbench apply services
-./workbench service startup install # 先备份两个已有 plist，写入运行副本路径并保存 env 本地 Git 快照
+./workbench service startup install # 先备份受管 plist，写入运行副本路径并保存 env 本地 Git 快照
 ./workbench service startup check
 ./workbench service startup start   # 加载当前用户图形登录域；会替换同名旧自启任务
 ```
@@ -90,7 +90,12 @@ Env Vault 使用原生 WatchPaths 与 5 分钟兜底调度，不再依赖旧机 
 Podman 自启复用默认本机 ensure，然后分别启动 LiteLLM、SearXNG、Crawl4AI 并等待就绪；
 一个服务失败仍继续其他独立服务，最终返回失败并保留日志。
 
-日志位于 `~/.local/state/feipi-workbench/logs/com.local.envvault*` 与 `com.feipi.podman-services*`。
+已安装原生 `~/.local/bin/session-browser` 时，同一入口额外安装独立的
+`com.feipi.session-browser` 任务，直接运行原生 `serve`，只监听 `127.0.0.1:8848`。
+不依赖 Podman，也不复制索引缓存；未安装该可选应用时仍只管理前两个任务。
+退出或启动失败后保留原生日志，不循环重试掩盖端口冲突。
+
+日志位于 `~/.local/state/feipi-workbench/logs/` 下对应任务名的 `.log` 和 `.error.log`。
 加载成功只表示 LaunchAgent 注册完成；完整重启、三个服务的真实业务请求，以及 OpenClaw、Multica、
 oMLX、图表渲染服务的各自恢复与验收仍须完成。
 

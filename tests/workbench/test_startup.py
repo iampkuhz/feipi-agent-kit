@@ -75,6 +75,46 @@ class Startup(unittest.TestCase):
             startup.install()
         self.assertFalse((self.home/'Library').exists())
 
+    def test_installed_session_browser_gets_an_independent_loopback_job(self):
+        launcher = self.home/'.local/bin/session-browser'
+        launcher.parent.mkdir(parents=True)
+        launcher.write_text('#!/bin/sh\nexit 0\n'); launcher.chmod(0o700)
+        with patch.object(startup, 'run') as run:
+            startup.install()
+        run.assert_not_called()
+        path = self.home/'Library/LaunchAgents'/(startup.SESSION_BROWSER_LABEL+'.plist')
+        actual = plistlib.loads(path.read_bytes())
+        self.assertEqual(actual['ProgramArguments'],
+                         [str(launcher), 'serve', '--host', '127.0.0.1', '--port', '8848'])
+        self.assertNotIn('KeepAlive', actual)
+        self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+        with patch.object(startup.subprocess, 'run') as launchctl, \
+                patch.object(startup, 'run') as load:
+            launchctl.return_value.returncode = 1
+            startup.start()
+        self.assertEqual([call.args[0][-1].name for call in load.call_args_list],
+                         [label+'.plist' for label in startup.definitions()])
+
+    def test_absent_or_non_executable_session_browser_is_not_required(self):
+        self.assertNotIn(startup.SESSION_BROWSER_LABEL, startup.definitions())
+        launcher = self.home/'.local/bin/session-browser'
+        launcher.parent.mkdir(parents=True)
+        launcher.write_text('not executable\n'); launcher.chmod(0o600)
+        self.assertNotIn(startup.SESSION_BROWSER_LABEL, startup.definitions())
+
+    def test_session_browser_drift_fails_before_loading_any_job(self):
+        launcher = self.home/'.local/bin/session-browser'
+        launcher.parent.mkdir(parents=True)
+        launcher.write_text('#!/bin/sh\nexit 0\n'); launcher.chmod(0o700)
+        startup.install()
+        path = self.home/'Library/LaunchAgents'/(startup.SESSION_BROWSER_LABEL+'.plist')
+        data = plistlib.loads(path.read_bytes()); data['ProgramArguments'][-1] = '9999'
+        path.write_bytes(plistlib.dumps(data))
+        with patch.object(startup.subprocess, 'run') as launchctl, \
+                patch.object(startup, 'run') as load, self.assertRaisesRegex(ValueError, 'session-browser'):
+            startup.start()
+        launchctl.assert_not_called(); load.assert_not_called()
+
     def test_start_refuses_drift_before_touching_loaded_jobs(self):
         startup.install()
         path = self.home/'Library/LaunchAgents/com.local.envvault.plist'

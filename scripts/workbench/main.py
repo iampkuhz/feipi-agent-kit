@@ -436,7 +436,7 @@ def service(component, args):
             raise ValueError('先 apply services，发布独立自启运行副本。')
         if args == ['install']:
             paths = [HOME/'Library/LaunchAgents'/(label+'.plist') for label in
-                     ['com.local.envvault', 'com.feipi.podman-services']]
+                     ['com.local.envvault', 'com.feipi.podman-services', 'com.feipi.session-browser']]
             batch = backup('startup', paths)
             print('自启文件回退：./workbench restore '+str(batch), flush=True)
             try:

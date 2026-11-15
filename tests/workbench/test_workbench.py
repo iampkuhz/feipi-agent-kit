@@ -3,6 +3,7 @@ import importlib.util
 from pathlib import Path
 import tempfile
 import unittest
+import subprocess
 from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location('workbench', Path(__file__).resolve().parents[2]/'scripts/workbench/main.py')
@@ -11,6 +12,23 @@ spec.loader.exec_module(wb)
 
 
 class Recovery(unittest.TestCase):
+    def test_startup_failure_restores_all_managed_plists_including_session_browser(self):
+        with tempfile.TemporaryDirectory(prefix='feipi startup backup ') as scratch:
+            root = Path(scratch); runtime = root/'runtime'; home = root/'home'
+            script = runtime/'services/tools/runtime/startup.py'
+            script.parent.mkdir(parents=True); script.write_text('fixture')
+            batch = root/'backup'
+            with patch.object(wb, 'HOME', home), patch.object(wb, 'RUNTIME', runtime), \
+                    patch.object(wb, 'backup', return_value=batch) as backup, \
+                    patch.object(wb, 'run', side_effect=subprocess.CalledProcessError(1, 'install')), \
+                    patch.object(wb, 'restore') as restore, patch('builtins.print'), \
+                    self.assertRaises(subprocess.CalledProcessError):
+                wb.service('startup', ['install'])
+            paths = backup.call_args.args[1]
+            self.assertIn(home/'Library/LaunchAgents/com.feipi.session-browser.plist', paths)
+            self.assertEqual(len(paths), 3)
+            restore.assert_called_once_with(batch)
+
     def test_mac_doctor_detects_installed_nvm_node_outside_inherited_path(self):
         from types import SimpleNamespace
         with tempfile.TemporaryDirectory(prefix='feipi nvm doctor ') as scratch:

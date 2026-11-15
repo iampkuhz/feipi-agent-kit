@@ -107,11 +107,12 @@ INSTALL
 
 ```bash
 source components/mac/bootstrap/environment.sh
-export PATH="$HOME/.local/bin:$PATH"
 openclaw_version="$(python3 -c 'import json; print(json.load(open("components/openclaw/versions.json"))["openclaw"])')"
 npm install --global "openclaw@$openclaw_version"
 ./workbench private restore-state openclaw "$HOME/feipi-restore/openclaw"
 bash components/openclaw/scripts/deploy.sh --dependencies-only --yes
+# OpenClaw 晚于基础终端安装；复用原入口生成补全，不升级已有主题或插件。
+bash components/mac/bootstrap/ohmyzsh.sh install
 ./workbench apply openclaw
 ./workbench apply skills
 ./workbench apply services

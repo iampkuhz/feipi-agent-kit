@@ -15,6 +15,7 @@ HOME = Path.home()
 ROOT = Path(__file__).resolve().parents[2]
 STATE = HOME/'.local/state/feipi-workbench'
 LABELS = {'com.local.envvault': 'snapshot-env', 'com.feipi.podman-services': 'run-services'}
+SESSION_BROWSER_LABEL = 'com.feipi.session-browser'
 
 
 def run(args, **kwargs):
@@ -99,6 +100,18 @@ def definitions():
             definition.update(WatchPaths=[str((HOME/'.env').resolve())], StartInterval=300,
                               ThrottleInterval=10)
         result[label] = definition
+    launcher = HOME/'.local/bin/session-browser'
+    if launcher.is_file() and os.access(launcher, os.X_OK):
+        # 原生 serve 常驻前台；独立任务避免 Podman 不可用时阻断会话浏览器。
+        # 使用原生默认索引目录，不复制旧缓存，也不经用户 shell 或额外守护进程。
+        result[SESSION_BROWSER_LABEL] = {
+            'Label': SESSION_BROWSER_LABEL,
+            'ProgramArguments': [str(launcher), 'serve', '--host', '127.0.0.1', '--port', '8848'],
+            'WorkingDirectory': str(HOME), 'RunAtLoad': True, 'ProcessType': 'Background',
+            'EnvironmentVariables': {'PATH': ':'.join(dict.fromkeys(paths))}, 'Umask': 0o077,
+            'StandardOutPath': str(STATE/'logs'/(SESSION_BROWSER_LABEL+'.log')),
+            'StandardErrorPath': str(STATE/'logs'/(SESSION_BROWSER_LABEL+'.error.log')),
+        }
     return result
 
 
@@ -108,24 +121,26 @@ def install():
     if not (ROOT/'tools/gateway/litellm/scripts/litellm.sh').is_file():
         raise ValueError('缺少已发布服务定义，先 workbench apply services。')
     (STATE/'logs').mkdir(mode=0o700, parents=True, exist_ok=True)
-    for label, definition in definitions().items():
+    managed = definitions()
+    for label, definition in managed.items():
         atomic(HOME/'Library/LaunchAgents'/(label+'.plist'), plistlib.dumps(definition))
     snapshot_env()
-    print('两个自启定义已安装；执行 service startup start 加载，或在下次图形登录时加载。')
+    print(str(len(managed))+' 个自启定义已安装；执行 service startup start 加载，或在下次图形登录时加载。')
 
 
 def start():
-    for label in LABELS:
+    managed = definitions()
+    for label, expected in managed.items():
         plist = HOME/'Library/LaunchAgents'/(label+'.plist')
-        if not plist.is_file() or plistlib.loads(plist.read_bytes()) != definitions()[label]:
+        if not plist.is_file() or plistlib.loads(plist.read_bytes()) != expected:
             raise ValueError('自启定义缺少或有漂移，请先 install：'+label)
     domain = 'gui/'+str(os.getuid())
-    for label in LABELS:
+    for label in managed:
         if subprocess.run(['launchctl', 'print', domain+'/'+label], stdout=subprocess.DEVNULL,
                           stderr=subprocess.DEVNULL, timeout=15).returncode == 0:
             run(['launchctl', 'bootout', domain+'/'+label], capture_output=True)
         run(['launchctl', 'bootstrap', domain, HOME/'Library/LaunchAgents'/(label+'.plist')], capture_output=True)
-    print('已加载两个用户自启任务；服务实际完成需检查 readiness 和日志，不以加载成功代替验收。')
+    print('已加载 '+str(len(managed))+' 个用户自启任务；服务实际完成需检查 readiness 和日志，不以加载成功代替验收。')
 
 
 def services():
@@ -169,7 +184,7 @@ def main():
             path = HOME/'Library/LaunchAgents'/(label+'.plist')
             if not path.is_file() or plistlib.loads(path.read_bytes()) != expected:
                 raise ValueError('自启文件缺失或漂移：'+label)
-        print('两个自启文件检查通过；完整重启与真实业务另行验收。')
+        print('自启文件检查通过；完整重启与真实业务另行验收。')
 
 
 if __name__ == '__main__':
