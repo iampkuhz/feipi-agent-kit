@@ -22,6 +22,8 @@ macOS：PowerPoint 导出（若可自动化）→ QuickLook/CoreText → LibreOf
 
 `Kaiti SC` 在 strict 目标环境必须可由 PowerPoint/CoreText 解析。LibreOffice/fontconfig 缺少该 macOS 字体时，不能把中文方框误判为 PowerPoint 字体缺失，也不能静默改成 Verdana。
 
+多页兼容预览入口 `scripts/render_pptx.sh` 需要 LibreOffice、Python 3 和 Poppler：macOS 安装 `brew install --cask libreoffice` 与 `brew install python poppler`；Linux 安装 `libreoffice python3 poppler-utils`。脚本先导出 PDF，再逐页转 PNG，校验实际页数，只登记本轮工件；`--json` 的 stdout 只有一份 JSON。它验证预览完整性，仍需按上述优先级看图，不能代替字体与视觉签字。
+
 ## 能力声明
 
 - 只有 schema/Static QA：不能声称 PPTX 已验证。

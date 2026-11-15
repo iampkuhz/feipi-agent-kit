@@ -81,58 +81,55 @@ if [[ -z "$JSON_MODE" ]]; then
   echo "使用渲染引擎: $RENDERER"
 fi
 
-# --- 执行渲染 ---
-# 策略 1: 直接转 PNG
-# 策略 2: 先转 PDF 再转 PNG（如果策略 1 产出的图片异常）
-
-TMPDIR_RENDER=$(mktemp -d)
+# 直接转 PNG 只会得到第一页；先转 PDF，再由 Poppler 输出所有页面。
+if ! command -v python3 >/dev/null 2>&1 || ! command -v pdftoppm >/dev/null 2>&1; then
+  echo '渲染需要 Python 3 和 Poppler：macOS brew install python poppler；Linux 安装 python3 poppler-utils' >&2
+  exit 100
+fi
+TMPDIR_RENDER="$(mktemp -d "${TMPDIR:-/tmp}/feipi-ppt-render.XXXXXX")"
 trap 'rm -rf "$TMPDIR_RENDER"' EXIT
-
-# 策略 1: PPTX → PNG 直接转换
-"${RENDER_CMD[@]}" --convert-to png --outdir "$TMPDIR_RENDER" "$INPUT_PPTX" 2>/dev/null || true
-
-# 检查直接转换是否产出了有效文件
-PNG_COUNT=$(find "$TMPDIR_RENDER" -name '*.png' -size +1k 2>/dev/null | wc -l | tr -d ' ')
-
-if [[ "$PNG_COUNT" -eq 0 ]]; then
-  if [[ -z "$JSON_MODE" ]]; then
-    echo "直接 PNG 转换未产生有效文件，尝试 PPTX → PDF → PNG 策略..."
-  fi
-  # 策略 2: PPTX → PDF → PNG
-  "${RENDER_CMD[@]}" --convert-to pdf --outdir "$TMPDIR_RENDER" "$INPUT_PPTX" 2>/dev/null || true
-
-  PDF_FILE=$(find "$TMPDIR_RENDER" -name '*.pdf' 2>/dev/null | head -1)
-  if [[ -n "$PDF_FILE" ]]; then
-    # 使用 sips (macOS 内置) 转 PNG
-    if command -v sips &>/dev/null; then
-      sips -s format png "$PDF_FILE" --out "$TMPDIR_RENDER/rendered.png" 2>/dev/null || true
-    fi
-    # 使用 convert (ImageMagick，可选)
-    if [[ ! -f "$TMPDIR_RENDER/rendered.png" ]] && command -v convert &>/dev/null; then
-      convert -density 150 "$PDF_FILE" "$TMPDIR_RENDER/rendered-%03d.png" 2>/dev/null || true
-    fi
-  fi
+PROFILE_URI="$(python3 - "$TMPDIR_RENDER/profile" <<'PYPROFILE'
+from pathlib import Path
+import sys
+print(Path(sys.argv[1]).as_uri())
+PYPROFILE
+)"
+EXPECTED_SLIDES="$(python3 - "$INPUT_PPTX" <<'PYCOUNT'
+import re
+import sys
+import zipfile
+with zipfile.ZipFile(sys.argv[1]) as archive:
+    print(sum(bool(re.fullmatch(r'ppt/slides/slide[0-9]+\.xml', name)) for name in archive.namelist()))
+PYCOUNT
+)"
+if [[ "$EXPECTED_SLIDES" -lt 1 ]]; then
+  echo 'PPTX 不含可渲染页面' >&2
+  exit 2
 fi
-
-# --- 移动结果到目标目录 ---
-PNG_FILES=$(find "$TMPDIR_RENDER" -name '*.png' -size +0 2>/dev/null | sort)
-COPIED=0
-for png in $PNG_FILES; do
-  base="$(basename "$png")"
+if ! "${RENDER_CMD[@]}" "-env:UserInstallation=$PROFILE_URI" --convert-to pdf \
+    --outdir "$TMPDIR_RENDER" "$INPUT_PPTX" > "$TMPDIR_RENDER/conversion.log" 2>&1; then
+  cat "$TMPDIR_RENDER/conversion.log" >&2
+  exit 2
+fi
+INPUT_BASE="$(basename "$INPUT_PPTX")"
+PDF_FILE="$TMPDIR_RENDER/${INPUT_BASE%.*}.pdf"
+if [[ ! -s "$PDF_FILE" ]]; then
+  echo 'LibreOffice 未产生有效 PDF' >&2
+  exit 2
+fi
+pdftoppm -png -r 144 "$PDF_FILE" "$TMPDIR_RENDER/slide" > "$TMPDIR_RENDER/raster.log" 2>&1
+shopt -s nullglob
+PNG_FILES=("$TMPDIR_RENDER"/slide-*.png)
+if [[ "${#PNG_FILES[@]}" -ne "$EXPECTED_SLIDES" ]]; then
+  echo "PPTX 页数与实际 PNG 数量不符：$EXPECTED_SLIDES / ${#PNG_FILES[@]}" >&2
+  exit 2
+fi
+OUTPUT_NAMES=()
+for png in "${PNG_FILES[@]}"; do
+  base="${TMPDIR_RENDER##*/}-$(basename "$png")"
   cp "$png" "$OUTPUT_DIR/$base"
-  COPIED=$((COPIED + 1))
-  if [[ -z "$JSON_MODE" ]]; then
-    echo "  已导出: $base"
-  fi
+  OUTPUT_NAMES+=("$base")
+  if [[ -z "$JSON_MODE" ]]; then echo "  已导出: $base"; fi
 done
-
-if [[ "$COPIED" -eq 0 ]]; then
-  if [[ -z "$JSON_MODE" ]]; then
-    echo "警告: 渲染未产生有效 PNG 文件。"
-    echo "可能原因: PPTX 文件为空，或 LibreOffice 转换失败。"
-  fi
-  # 仍输出 manifest（status=fail），让下游处理
-fi
-
-# --- 生成 manifest ---
-node "$SCRIPT_DIR/render_pptx.js" "$INPUT_PPTX" "$OUTPUT_DIR" "$RENDERER"
+# 只登记本轮文件，输出目录里遗留的旧图不参与验收；JSON 模式 stdout 只有一份报告。
+node "$SCRIPT_DIR/render_pptx.js" "$INPUT_PPTX" "$OUTPUT_DIR" "$RENDERER" "${OUTPUT_NAMES[@]}"

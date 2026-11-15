@@ -67,6 +67,27 @@ if (report.final_status !== 'pass') throw new Error(`fast pipeline 未通过: ${
 if (!fs.existsSync(process.argv[2].replace(/pipeline-report\.json$/, 'output.pptx'))) throw new Error('fast pipeline 未生成 PPTX');
 NODE
 
+"$NODE_BIN" "$SCRIPT_DIR/generate_demo_deck.js" --output "$TMP_ROOT/demo" --no-render > "$TMP_ROOT/demo.log"
+"$NODE_BIN" - "$TMP_ROOT/demo/demo-manifest.json" <<'NODE'
+const fs = require('fs');
+const report = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+if (report.status !== 'ok' || report.total_slides !== 3 || report.scenarios_covered.length !== 3) {
+  throw new Error('Demo 必须完整覆盖 architecture、flow 和 comparison');
+}
+NODE
+
+python3 - "$TMP_ROOT/demo/demo-deck.pptx" <<'PYTEST'
+from pathlib import Path
+import re
+import sys
+import zipfile
+with zipfile.ZipFile(Path(sys.argv[1])) as archive:
+    slides = [name for name in archive.namelist() if re.fullmatch(r'ppt/slides/slide[0-9]+\.xml', name)]
+    assert len(slides) == 3, '演示必须有三个实际页面'
+    for name in slides:
+        assert b'<a:t>' in archive.read(name), '每页必须包含原生文本'
+PYTEST
+
 DOCTOR_JSON=$("$NODE_BIN" "$SKILL_DIR/scripts/doctor.js" --json)
 RUNTIME_JSON=$("$NODE_BIN" "$SKILL_DIR/scripts/runtime_capabilities.js")
 "$NODE_BIN" - "$DOCTOR_JSON" "$RUNTIME_JSON" <<'NODE'

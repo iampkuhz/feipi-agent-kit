@@ -60,7 +60,7 @@ const outputDir = path.resolve(args[1]);
 const renderer = args[2];
 
 // 扫描 PNG 输出
-const slides = manifest.scanPngSlides(outputDir, inputPptx);
+const slides = manifest.scanPngSlides(outputDir, inputPptx, args.length > 3 ? args.slice(3) : undefined);
 
 // 构建 manifest
 const result = manifest.buildManifest(inputPptx, outputDir, slides, renderer);

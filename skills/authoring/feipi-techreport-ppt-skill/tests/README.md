@@ -53,6 +53,13 @@ node scripts/generate_pptx_pipeline.js \
   --mode strict
 ```
 
+开发演示入口位于测试目录，不随 skill 安装。它使用仓库里的 benchmark 样例；缺页或构建失败返回非零。去掉 `--no-render` 时需要 LibreOffice、Python 3 和 Poppler（macOS：`brew install --cask libreoffice`、`brew install python poppler`；Linux：安装 `libreoffice python3 poppler-utils`），逐页 PNG 数量必须与 PPTX 一致：
+
+```bash
+demo_dir="$(mktemp -d "${TMPDIR:-/tmp}/feipi-ppt-demo.XXXXXX")"
+node tests/generate_demo_deck.js --output "$demo_dir" --no-render
+```
+
 ## 兼容与限制
 
 - v1 `slide-ir.schema.json` 和旧 CLI 文件名继续保留；新页面应使用 v2。

@@ -30,10 +30,13 @@ function parsePngHeader(filePath) {
  * 或者 slide1.png, slide2.png, ...
  * 按文件名排序后分配 index。
  */
-function scanPngSlides(outputDir, inputPptx) {
-  const files = fs.readdirSync(outputDir)
+function scanPngSlides(outputDir, inputPptx, selectedFiles) {
+  const files = (selectedFiles || fs.readdirSync(outputDir))
     .filter(f => f.toLowerCase().endsWith('.png'))
     .sort();
+  if (files.some(file => path.basename(file) !== file) || new Set(files).size !== files.length) {
+    throw new Error('PNG 清单必须为无重复的本目录文件名');
+  }
 
   const slides = [];
   for (const file of files) {

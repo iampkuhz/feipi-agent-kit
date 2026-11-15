@@ -20,7 +20,13 @@ class PptxGenJSBackend extends PptxBackend {
     catch (error) { return { available: false, error: `pptxgenjs 未安装: ${error.message}` }; }
   }
 
-  async write(renderPlan, outputPath) {
+  async write(input, outputPath) {
+    const plans = Array.isArray(input) ? input : [input];
+    if (!plans.length) throw new Error('PPTX 至少需要一页 Render Plan');
+    const renderPlan = plans[0];
+    if (plans.some(plan => plan.canvas_emu.w !== renderPlan.canvas_emu.w || plan.canvas_emu.h !== renderPlan.canvas_emu.h)) {
+      throw new Error('同一 PPTX 的页面尺寸必须一致');
+    }
     const dependency = this.checkDependency();
     if (!dependency.available) throw new Error(dependency.error);
     const PptxGenJS = loadDependency('pptxgenjs');
@@ -42,12 +48,14 @@ class PptxGenJSBackend extends PptxBackend {
     pptx.subject = renderPlan.slide_id;
     pptx.title = renderPlan.slide_id;
 
-    const slide = pptx.addSlide();
-    slide.background = { color: this.tokens.color('surface.page').replace(/^#/, '') };
-    renderPlan.elements
-      .map((element, index) => ({ element, index }))
-      .sort((a, b) => (a.element.z_order - b.element.z_order) || (a.index - b.index))
-      .forEach(({ element }) => primitives.renderElement(slide, element));
+    for (const plan of plans) {
+      const slide = pptx.addSlide();
+      slide.background = { color: this.tokens.color('surface.page').replace(/^#/, '') };
+      plan.elements
+        .map((element, index) => ({ element, index }))
+        .sort((a, b) => (a.element.z_order - b.element.z_order) || (a.index - b.index))
+        .forEach(({ element }) => primitives.renderElement(slide, element));
+    }
 
     fs.mkdirSync(path.dirname(outputPath), { recursive: true });
     await pptx.writeFile({ outputType: 'nodefs', fileName: outputPath });
@@ -55,7 +63,7 @@ class PptxGenJSBackend extends PptxBackend {
     if (!compatibilityFix.success) throw new Error(compatibilityFix.error);
     const stats = fs.statSync(outputPath);
     if (stats.size === 0) throw new Error(`PPTX 文件为空: ${outputPath}`);
-    return { path: outputPath, size_bytes: stats.size, elements_rendered: renderPlan.elements.length, compatibility_fix: 'cNvPr-id' };
+    return { path: outputPath, size_bytes: stats.size, elements_rendered: plans.reduce((sum, plan) => sum + plan.elements.length, 0), compatibility_fix: 'cNvPr-id' };
   }
 }
 
