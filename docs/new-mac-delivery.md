@@ -4,7 +4,7 @@
 
 ## 交付边界
 
-本次核对提交 `34b76d2`：Git 跟踪 902 个文件，内容合计 4,573,226 字节（4.36 MiB）；其中 `components/mac/` 为 77 文件、265,970 字节（约 260 KiB），包含配置、脚本、测试和文档。最大跟踪文件为 265,330 字节，没有超过 1 MiB 的跟踪文件。这是该版本内容的统计，不包含 Git 历史、工作区未跟踪文件或仓库外资料。
+本次核对提交 `189138d`：Git 跟踪 904 个文件，内容合计 4,611,458 字节（4.40 MiB）；其中 `components/mac/` 为 77 文件、265,970 字节（约 260 KiB），包含配置、脚本、测试和文档；其下 `config`、`zsh`、`neovim`、`qwen` 四个配置目录为 38 文件、77,119 字节（约 75 KiB）。最大跟踪文件为 265,330 字节，没有超过 1 MiB 的跟踪文件。这是该版本内容的统计，不包含 Git 历史、工作区未跟踪文件或仓库外资料。
 
 此前 GB 级迁移包是仓库外的私有资料副本，不是 Git 交付内容，也不再作为新机初始化的前置条件。后续验收关注 Git 声明是否齐全、脚本能否安装和启动、配置是否生效、实际功能能否运行；不再为普通资料目录进行打包、全量遍历、容量盘点或逐文件验收。必要目录和传输命令见 [本地目录直传](workbench.md#本地目录由用户直接传输)。数据库仍保留原生一致性导出要求，但由用户执行导出和传输，不合并成整机迁移大包。
 
@@ -69,6 +69,7 @@ CLI 真实任务补验：Node 26 与 Qwen 0.12.3 内置 dispatcher 的接口不�
 - 登录设置已在干净 macOS 26.6.2 arm64、源码 `d3a14bb`、执行前后 `source_dirty=false` 下复验。实际 Multica 0.6.3 配合隔离合成 API 完成本地设置、令牌登录和准确工作区切换；实测未登录/失效的 `auth status` 均返回 0，失效后的 `workspace switch` 返回 3，缺凭据/工作区不匹配的 start 返回 1 且未调用 launchctl。登录前后重复配置均保持摘要及 mtime，原生 profile 为 448 字节、0600，系统 Python 3.9 的启动前检查通过。8 项回归同机通过；未生成 env 或 LaunchAgent，未启动业务服务，Gatekeeper 开启。证据位于 `~/.local/state/feipi-workbench/new-mac-validation/multica-personal-doccjarz/`；未使用真实账号、浏览器 OAuth 或业务数据库。
 - 新机设备重绑补齐 `multica-ops rebind --local`：从本机原生状态交叉核对 profile、服务、设备、系统、固定构建、机器级 UUID 及同工作区唯一线上 runtime，等待注册最多 120 秒；失败不写机器绑定，重复执行一致时不重写，不修改服务端 Agent/项目。保留人工精确选择并新增互斥检查，启动与应用段按失败中止执行。独立空 HOME 测试同时发现并修复发布器缺少 `.local/bin` 的假设。新增 8 项身份/等待/发布入口回归及 1 项目录前置回归通过；Multica 共 97 项、工作台 78 项通过，21 段 Bash 语法通过。此处尚为隔离替身回归，不代表真实 daemon、数据库或实体新机业务切换完成。
 - 自动重绑协议已在干净 macOS 26.6.2 arm64、源码 `d495853`、执行前后 `source_dirty=false` 下复验：系统 Python 3.9.6 完整执行 97 项 Multica 测试通过。原生 0.6.3 CLI 配合两个隔离合成 HTTP 服务，经已发布 `multica-ops` 读取真实 JSON 协议，2.676 秒内观察 starting → running 并完成本机绑定；工作区与 runtime API 均携带准确 `X-Workspace-ID`，全部调用为 GET。重复执行 changed=false 且摘要/mtime 不变；服务地址冲突和重复 runtime 均返回 1、保留原绑定，身份输入文件未改变。空 HOME 的 `.local/bin` 创建与发布通过，无 LaunchAgent 或任务目录，无业务服务启动，Gatekeeper 开启。证据位于 `~/.local/state/feipi-workbench/new-mac-validation/multica-rebind-lhxf8l1u/`；健康状态、身份文件和 API 数据均为合成输入，未运行真实 daemon、账号或数据库。
+- 自动重绑另在旧机 macOS 27.2 arm64 完成真实集成验证：从提交 `189138d` 的 Git 归档运行配置发布与登录前设置，使用固定 0.6.3 原生 CLI、真实 daemon、锁定 backend/pgvector 镜像、全新数据库及隔离测试账号。API `/readyz` 的数据库和迁移检查均为 ok；原生 `workspace switch` 验证授权后，daemon 自行创建此前不存在的机器级 UUID、注册唯一线上 Codex runtime，已发布的 `multica-ops rebind --local` 返回 changed=true；重复执行 changed=false，绑定摘要及 mtime 不变。Issue/任务队列均为零，仅创建原生基础目录，未执行模型任务或安装 LaunchAgent；现有容器的启动时间/重启次数和日常 0.8.2 CLI 摘要/mtime 均未变。临时 daemon、容器、内部网络及其数据卷已清理，日志与报告位于 `~/.local/state/feipi-workbench/new-mac-validation/multica-real-eif92mmo/`。测试账号与 PAT 是该临时数据库中新建的合成数据；使用的是旧机已运行的 Podman VM 和缓存镜像，未验证真实账号 OAuth、前端、受管自启、新机 Podman 冷启动或完整业务切换。
 - Bash 3.2 在 UTF-8 环境把变量后相邻中文标点误解析为变量名：使用明确的大括号边界；测试同时运行 C 与可用的 UTF-8 locale。
 - 原来源验证只接受源码链接：增加工作台运行副本识别，同时逐文件比较源码与副本内容；旧副本仍失败。
 - macOS `/var` 与 `/private/var` 别名导致 doctor 误报：统一解析真实路径，增加别名回归。
