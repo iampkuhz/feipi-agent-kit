@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 仅激活已有的 nvm default 与 Cargo 路径；不安装、不加载 shell 启动文件。
+# 激活已有 Homebrew、nvm default 与 Cargo 路径；不安装、不加载 shell 启动文件。
 # 供 bootstrap/check/Agent 安装共用；直接执行 check 时实际核验 Node/npm。
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   set -euo pipefail
@@ -7,6 +7,16 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
     echo '用法：bash bootstrap/environment.sh check' >&2
     exit 2
   fi
+fi
+if ! command -v brew >/dev/null 2>&1; then
+  # SSH 和非交互 Bash 不读交互 Zsh 配置，仍应发现机器上已安装的原生 Homebrew。
+  for bootstrap_brew_prefix in /opt/homebrew /usr/local; do
+    if [[ -x "$bootstrap_brew_prefix/bin/brew" ]]; then
+      export PATH="$bootstrap_brew_prefix/bin:$bootstrap_brew_prefix/sbin:$PATH"
+      break
+    fi
+  done
+  unset bootstrap_brew_prefix
 fi
 export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
 export PATH="${CARGO_HOME:-$HOME/.cargo}/bin:$PATH"

@@ -108,7 +108,7 @@ Node 和 Rust 相互没有安装依赖，这里固定串行以便排障；它们
 ./develop mac run -- bash bootstrap/brew.sh check  # 单独检查共享/单机 Homebrew 清单
 ```
 
-来源检查会先激活已经存在的 nvm default/Cargo 路径，不加载 `.zshrc` 或安装软件；
+来源检查会先激活已经存在的 Homebrew、nvm default/Cargo 路径，不加载 `.zshrc` 或安装软件；SSH/非交互 Bash 的 PATH 缺少 Homebrew 时会探测 macOS 标准安装位置。
 工作台 doctor 也会核实不在父进程 PATH 中的 nvm Node，避免全新机器安装成功后误报缺失。
 
 配置发布后显式执行编辑器准备：
