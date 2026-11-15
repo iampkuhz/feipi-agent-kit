@@ -195,3 +195,39 @@ status=0
 run_entry install --dependencies-only || status=$?
 [[ "$status" == 42 && "$(tail -n 1 "$TEST_ROOT/calls")" == node:install ]]
 echo "通过：工作台四阶段不建立源码链接，补全继承 Node/Rust，失败立即停止。"
+
+# 首次打开应用会新建 ~/.omlx/bin；激活时目录尚不存在也必须预留其 PATH 优先级。
+# 只有通用入口时可调用，原生入口出现后必须自动使用它，不依赖手工追加 PATH。
+cli_home="$TEST_ROOT/cli-home"
+mkdir -p "$cli_home/.local/bin"
+printf '#!/bin/sh\necho COMPAT_CLI\n' >"$cli_home/.local/bin/omlx"
+chmod +x "$cli_home/.local/bin/omlx"
+# 测试脚本里的变量由子进程展开，不能在父进程提前替换 HOME。
+# shellcheck disable=SC2016
+env -i HOME="$cli_home" PATH="$TEST_ROOT/bin:/usr/bin:/bin" \
+  ENVIRONMENT_SCRIPT="$REPO_ROOT/bootstrap/environment.sh" /bin/bash -c '
+  set -eu
+  source "$ENVIRONMENT_SCRIPT"
+  [[ "$(omlx)" == COMPAT_CLI ]]
+  mkdir -p "$HOME/.omlx/bin"
+  printf "#!/bin/sh\\necho NATIVE_CLI\\n" >"$HOME/.omlx/bin/omlx"
+  chmod +x "$HOME/.omlx/bin/omlx"
+  [[ "$(omlx)" == NATIVE_CLI ]]
+'
+cli_home="$TEST_ROOT/zsh-cli-home"
+mkdir -p "$cli_home/.local/bin"
+printf '#!/bin/sh\necho COMPAT_CLI\n' >"$cli_home/.local/bin/omlx"
+chmod +x "$cli_home/.local/bin/omlx"
+# 测试脚本里的变量由子进程展开，不能在父进程提前替换 HOME。
+# shellcheck disable=SC2016
+env -i HOME="$cli_home" PATH="/usr/bin:/bin" AI_SCRIPT="$REPO_ROOT/zsh/.zsh_config/70-ai.zsh" \
+  zsh -fc '
+  path_prepend() { [[ -d "$1" ]] && path=("$1" $path); }
+  source "$AI_SCRIPT"
+  [[ "$(omlx)" == COMPAT_CLI ]] || exit 1
+  mkdir -p "$HOME/.omlx/bin"
+  printf "#!/bin/sh\\necho NATIVE_CLI\\n" >"$HOME/.omlx/bin/omlx"
+  chmod +x "$HOME/.omlx/bin/omlx"
+  [[ "$(omlx)" == NATIVE_CLI ]] || exit 1
+'
+echo "通过：Bash/Zsh 无需手工改 PATH，首次创建后优先使用 oMLX 原生入口。"

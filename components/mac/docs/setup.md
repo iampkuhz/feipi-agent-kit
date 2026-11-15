@@ -57,6 +57,7 @@ DMG 检查应用身份、版本和代码签名；保留已有安装，不借初�
 安装后用 `bash components/mac/bootstrap/desktop-extras.sh check` 检查实际签名及 CLI 入口。
 `session-browser serve` 使用官方自包含 Java runtime，`omlx` 使用应用自带 CLI；
 两者的 HOME 配置、会话数据、模型和真实业务请求另行恢复验收。
+非交互脚本先 `source components/mac/bootstrap/environment.sh`；它和交互 Zsh 都预留 `~/.omlx/bin`，优先使用应用原生入口，尚未打开应用时回退到 `~/.local/bin`。原生入口由 oMLX 创建并读取其数据目录设置；不会为此向 shell 启动文件追加另一份配置。
 恢复三个既用 oMLX 模型后运行 `python3 components/mac/bootstrap/verify-extras.py`：
 用合成 Codex 会话验证原生索引与网页，用随机本机端口验证文本推理及两套语音识别。
 仅创建本次隔离状态和公开验证音频，结束清理自有进程，保留私有日志、源码摘要及结果报告。

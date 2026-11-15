@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 激活已有 Homebrew、nvm default 与 Cargo 路径；不安装、不加载 shell 启动文件。
+# 激活已有 Homebrew、用户 CLI、nvm default 与 Cargo 路径；不安装、不加载 shell 启动文件。
 # 供 bootstrap/check/Agent 安装共用；直接执行 check 时实际核验 Node/npm。
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   set -euo pipefail
@@ -19,7 +19,9 @@ if ! command -v brew >/dev/null 2>&1; then
   unset bootstrap_brew_prefix
 fi
 export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
-export PATH="${CARGO_HOME:-$HOME/.cargo}/bin:$PATH"
+# oMLX 首次打开会创建原生入口并检查 PATH；预先保留目录位置，避免重复入口触发弹窗。
+# 通用 ~/.local/bin 仍可在应用尚未打开时提供已安装 CLI。
+export PATH="$HOME/.omlx/bin:$HOME/.local/bin:${CARGO_HOME:-$HOME/.cargo}/bin:$PATH"
 if [[ -s "$NVM_DIR/nvm.sh" ]]; then
   # nvm 不兼容 nounset；恢复调用方原有选项，且检查时不维护 current 链接。
   bootstrap_had_nounset=0

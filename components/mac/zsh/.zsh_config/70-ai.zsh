@@ -4,6 +4,10 @@
 
 # Qoder CLI（AI 代码助手命令行工具）
 path_prepend "$HOME/.local/bin"
+# 原生 oMLX 入口还会读取应用的数据目录设置；它优先于通用安装器的兼容入口。
+# 这里有意保留尚不存在的目录：应用首次打开创建入口后即可识别，避免 Shell PATH 弹窗。
+path=("$HOME/.omlx/bin" ${path:#"$HOME/.omlx/bin"})
+export PATH
 
 # =========================
 # 代码补全默认值（指向 litellm 网关）
