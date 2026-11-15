@@ -1,5 +1,8 @@
 # 变更记录
 
+## 2026-11-15
+- feipi-mermaid-generate-diagram v4：修复新 Mac 的 Chrome 发现与隔离运行说明
+
 ## 2026-11-12
 - feipi-skill-govern v8：隔离维护资料并重构功能契约与效果验收
 - feipi-multica-manage-tasks v6：同步通用协作约束与真实平台回归

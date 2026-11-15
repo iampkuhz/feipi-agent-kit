@@ -13,11 +13,17 @@ python3 scripts/prepare_runtime.py --check
 node scripts/render.mjs --check
 ```
 
+Homebrew Python 不写入全局 pip 环境；新机可用已安装的 uv 自动准备隔离依赖并运行：
+
+```bash
+uv run --no-project --with-requirements scripts/requirements.txt python3 scripts/run.py --brief brief.yaml --out-dir package
+```
+
 共享缓存位于 `$XDG_CACHE_HOME/feipi-agent-kit/mermaid/`；未设置时，macOS 使用 `~/Library/Caches/feipi-agent-kit/mermaid/`，其他系统使用 `~/.cache/feipi-agent-kit/mermaid/`。缓存按两个包清单的内容、系统/架构、Node 主版本和 ABI 隔离，不按客户端目录重复安装。同一版本并发准备只执行一次；失败不发布可用标记。`--check` 只读、不安装、不联网。
 
 准备使用 `npm ci --ignore-scripts --no-audit --no-fund --prefer-offline`，禁止 Puppeteer 下载浏览器。只有首次或清单/运行平台变化时需要准备；之后直接使用缓存，离线也可运行。损坏的依赖在预检中明确失败；确认没有相关渲染任务后，删除该版本缓存并重新准备，不在渲染失败后盲目更新。
 
-优先使用已安装的 Google Chrome（macOS）或 /usr/bin 下的 Chromium/Chrome。其他位置在 run.py 和 render.mjs 传 `--browser /absolute/path/to/chrome`。没有浏览器时明确报告缺少依赖，让用户安装其选择的浏览器，不暗中切换公共 renderer。
+显式 `--browser` 或 `PUPPETEER_EXECUTABLE_PATH` 优先；否则 macOS 通过 AppKit 的应用注册信息自动发现 Google Chrome，不启动 GUI、不要求应用在固定目录，再检查已有 Puppeteer 浏览器缓存和 PATH 中的 Chromium/Chrome。其他位置在 run.py 和 render.mjs 传 `--browser /absolute/path/to/chrome`。没有浏览器时明确报告缺少依赖，让用户安装其选择的浏览器，不暗中切换公共 renderer。
 
 依赖准备中的单次 `npm ci` 最多180秒，计入入口的静态阶段，不消耗图的渲染次数。预检只启动一次短生命周期浏览器以确认可用性，不渲染用户图。正式渲染单独启动浏览器，65秒上限；超时只终止本次调用创建的进程组。没有 `--no-sandbox`、自动提权或反复重启。连接权限错误与依赖不存在是不同失败层。
 

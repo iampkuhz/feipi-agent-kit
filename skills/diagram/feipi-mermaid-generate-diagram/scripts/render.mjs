@@ -26,6 +26,19 @@ try {
   const {renderMermaid} = await import(pathToFileURL(runtimeRequire.resolve('@mermaid-js/mermaid-cli')));
   const version = async name => JSON.parse(await fs.readFile(path.join(runtime,'node_modules',name,'package.json'),'utf8')).version;
   let executablePath = value('--browser') ?? process.env.PUPPETEER_EXECUTABLE_PATH ?? '';
+  if (!executablePath && process.platform === 'darwin') {
+    // Homebrew cask 不提供 PATH 命令；从系统应用注册信息取得路径，不启动 GUI 或写死安装位置。
+    try {
+      const application = execFileSync('osascript', ['-l', 'JavaScript', '-e',
+        'ObjC.import("AppKit"); ObjC.unwrap($.NSWorkspace.sharedWorkspace.URLForApplicationWithBundleIdentifier("com.google.Chrome").path)'],
+        {encoding:'utf8', timeout:5000, stdio:['ignore', 'pipe', 'pipe']}).trim();
+      const candidate = path.join(application, 'Contents/MacOS/Google Chrome');
+      if (path.isAbsolute(application)) {
+        await fs.access(candidate, constants.X_OK);
+        executablePath = candidate;
+      }
+    } catch {}
+  }
   if (!executablePath) {
     try {
       const bundledBrowser = puppeteer.executablePath();
