@@ -17,5 +17,5 @@ cask "obsidian"
 cask "notion"
 cask "telegram"
 cask "wechat"
-# Java 项目需要真实 JDK，不能仅检查 macOS 自带的 java 占位入口。
-cask "temurin"
+# 高频使用的 Session Browser 源码明确要求原生 JDK 25；不跟随 temurin 最新主版本。
+cask "temurin@25"
