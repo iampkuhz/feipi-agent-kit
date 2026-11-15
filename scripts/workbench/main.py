@@ -370,6 +370,11 @@ def doctor(component):
         if name == 'mac':
             for command in ['brew', 'git', 'zsh', 'nvim', 'node', 'python3', 'podman']:
                 found = shutil.which(command)
+                if command == 'node' and not found and (Path(os.environ.get('NVM_DIR', str(HOME/'.nvm')))/'nvm.sh').is_file():
+                    checked = subprocess.run(['bash', str(ROOT/'components/mac/bootstrap/environment.sh'), 'check'],
+                                             capture_output=True, text=True, timeout=30)
+                    if checked.returncode == 0:
+                        found = checked.stdout.splitlines()[0]
                 print(('发现' if found else '缺少')+': '+command+((' → '+found) if found else '；先 workbench install mac'))
                 failed |= not bool(found)
             live = HOME/'.zshrc'

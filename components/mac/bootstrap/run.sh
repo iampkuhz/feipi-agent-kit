@@ -170,15 +170,8 @@ for index in "${!stages[@]}"; do
   printf '[%s/%s] %s\n' "$((index + 1))" "${#stages[@]}" "$current_step"
   if [[ "${stages[$index]}" == ohmyzsh ]]; then
     # 前面的 Node 子进程无法改变父进程 PATH；为补全重新激活同一个 default。
-    if [[ -s "${NVM_DIR:-$HOME/.nvm}/nvm.sh" ]]; then
-      export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
-      set +u
-      # shellcheck source=/dev/null
-      source "$NVM_DIR/nvm.sh" --no-use
-      nvm use --silent default
-      set -u
-    fi
-    export PATH="${CARGO_HOME:-$HOME/.cargo}/bin:$PATH"
+    # shellcheck source=bootstrap/environment.sh
+    source "$REPO_ROOT/bootstrap/environment.sh"
   fi
   # 独立 Bash 子进程保留子脚本的 set -e 语义，不用 if 包住整段安装函数。
   bash "$REPO_ROOT/bootstrap/${stages[$index]}.sh" install

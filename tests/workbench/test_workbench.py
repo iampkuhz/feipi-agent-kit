@@ -11,6 +11,23 @@ spec.loader.exec_module(wb)
 
 
 class Recovery(unittest.TestCase):
+    def test_mac_doctor_detects_installed_nvm_node_outside_inherited_path(self):
+        from types import SimpleNamespace
+        with tempfile.TemporaryDirectory(prefix='feipi nvm doctor ') as scratch:
+            home = Path(scratch); nvm = home/'.nvm'; nvm.mkdir(); (nvm/'nvm.sh').write_text('fixture')
+            runtime = home/'runtime'; target = runtime/'mac/zsh/.zshrc'
+            target.parent.mkdir(parents=True); target.write_text('fixture')
+            (home/'.zshrc').symlink_to(target)
+            state = home/'state'; state.mkdir(); (state/'mac.json').write_text('{}')
+            with patch.object(wb, 'HOME', home), patch.object(wb, 'RUNTIME', runtime), \
+                    patch.object(wb, 'STATE', state), patch.object(wb, 'differences', return_value=[]), \
+                    patch.dict(wb.os.environ, {'NVM_DIR': str(nvm)}), \
+                    patch.object(wb.shutil, 'which', side_effect=lambda name: None if name == 'node' else '/mock/'+name), \
+                    patch.object(wb.subprocess, 'run', return_value=SimpleNamespace(returncode=0, stdout='/nvm/bin/node\nv26.13.1\n11.20.0\n')) as run, \
+                    patch('builtins.print'):
+                self.assertEqual(wb.doctor('mac'), 0)
+                self.assertEqual(run.call_args.args[0], ['bash', str(wb.ROOT/'components/mac/bootstrap/environment.sh'), 'check'])
+
     def test_mac_doctor_accepts_canonical_target_under_home_alias(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d).resolve()

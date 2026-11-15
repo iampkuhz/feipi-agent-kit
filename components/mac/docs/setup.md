@@ -81,6 +81,9 @@ Node 和 Rust 相互没有安装依赖，这里固定串行以便排障；它们
 ./develop mac run -- bash bootstrap/brew.sh check  # 单独检查共享/单机 Homebrew 清单
 ```
 
+来源检查会先激活已经存在的 nvm default/Cargo 路径，不加载 `.zshrc` 或安装软件；
+工作台 doctor 也会核实不在父进程 PATH 中的 nvm Node，避免全新机器安装成功后误报缺失。
+
 Neovim 首次启动会联网下载 lazy.nvim/插件，Mason 也可能下载工具。使用 `:Lazy restore` 按锁文件恢复，
 再按需执行 `:checkhealth`，实际打开代码与 Markdown 验证预览。命令入口或链接正确不等于这些功能已通过。
 私密环境变量按自己的安全备份渠道恢复，不在仓库保存真实 `.env`。

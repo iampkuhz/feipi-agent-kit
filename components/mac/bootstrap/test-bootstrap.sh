@@ -11,6 +11,7 @@ cleanup() {
 trap cleanup EXIT
 mkdir -p "$TEST_ROOT/repo/bootstrap" "$TEST_ROOT/bin" "$TEST_ROOT/home"
 cp "$REPO_ROOT/bootstrap/run.sh" "$TEST_ROOT/repo/bootstrap/run.sh"
+cp "$REPO_ROOT/bootstrap/environment.sh" "$TEST_ROOT/repo/bootstrap/environment.sh"
 touch "$TEST_ROOT/repo/Brewfile"
 # 每个替身记录阶段；中途失败后不应再到达“阶段完成”记录。
 for stage in brew node rust ohmyzsh macosinit; do

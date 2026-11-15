@@ -21,6 +21,9 @@ if command -v shellcheck >/dev/null 2>&1; then
   # 子 shell 固定源码查找目录；从其他目录调用时也能解析 source 注释。
   (cd "$REPO_ROOT" && shellcheck bootstrap/*.sh) || result=1
 fi
+# 新装 nvm/Rust 不在非交互 Bash 的继承 PATH 中；激活已有版本，不触发安装。
+# shellcheck source=bootstrap/environment.sh
+source "$REPO_ROOT/bootstrap/environment.sh"
 for required_command in git brew stow nvim tree-sitter shellcheck shfmt python3 uv node npm prettier prettierd yarn rustup rustfmt; do
   if command -v "$required_command" >/dev/null 2>&1; then
     echo "入口已发现：$required_command ($(command -v "$required_command"))；未运行核验版本。"
