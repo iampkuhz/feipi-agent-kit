@@ -86,12 +86,14 @@ Multica 网页调好 Agent：`./workbench multica plan` 看服务端差异；`./
 ./workbench private export-mac "$HOME/feipi-mac-private"
 ./workbench private verify-mac "$HOME/feipi-mac-private"
 ./workbench private restore-mac "$HOME/feipi-mac-private"
-./workbench private verify <组件> <输出的私有批次>
+# 例如核对已复制到新机的 OpenClaw 独立备份：
+./workbench private verify openclaw "$HOME/feipi-restore/openclaw"
 ```
 
 ### 本地目录由用户直接传输
 
 新机从 Git 获取本仓库，软件和依赖走安装脚本。个人项目、资料和已有模型目录由用户复制，不先生成整机大包，也不把资料目录容量作为初始化验收条件。
+集中导出、传输、安装、恢复和授权命令见[新 Mac 准备清单](new-mac-prepare.md)。`private check` 只看必要路径、目录是否为空和 env 定义，不递归统计资料文件。
 
 两台 Mac 可用网线直连；无网口时使用以太网转接器。在旧机「系统设置 → 通用 → 共享」开启「远程登录」，只允许自己的账号；在网络设置查看旧机的有线 IP。新机使用该 IP 连接，避免经 Wi-Fi 传输。连接方式见 [Apple 以太网直连说明](https://support.apple.com/en-ie/guide/mac-help/mchlp1413/27/mac/27)及[远程登录说明](https://support.apple.com/guide/mac-help/allow-a-remote-computer-to-access-your-mac-mchlp1066/mac)。
 
@@ -155,6 +157,8 @@ OpenClaw 当前原生备份拒绝 `.env` 的绝对符号链接，因此使用标
 `prepare-migration` 在基础配置外集中保存 Multica、OpenClaw 和 LiteLLM 的原生一致性备份、FlClash 官方备份、三个当前使用的 oMLX 模型，以及机器绑定引用的 Git 项目和 env vault 历史。Git 项目保留全部 refs、stash、暂存/未暂存补丁、未跟踪文件及固定私有覆写项；成长日记和装修项目还保留忽略的资料原件，家庭健康和房地产等非 Git 资料单独归档，跳过声明的构建缓存。它不复制 Multica 登录/设备身份、Podman VM 或容器镜像；新设备账号登录、节点同步、系统权限和切换前旧机停主力仍是集中准备中的独立事项。失败批次含 `INCOMPLETE`，不能用于恢复。`restore-sources` 只恢复代码和资料，不启动业务；已有工作台源码目录也会触发保全检查，可用 `--only 'Documents/…'` 选择其余来源。
 
 `restore-state` 先校验完整业务包，在新建临时目录中解包和检查，成功后发布整个状态目录。OpenClaw 恢复会话、记忆和数据库，重新检查所有已记录 SQLite；配置中的 HOME 路径和 env 链接跟随新机，原生插件技能链接指向新机同版本 npm 程序目录。无法识别的外部链接直接失败，不带着旧机路径继续启动。oMLX 恢复当前三个模型并检查配置与权重；随后仍须做真实推理。目标已存在时保持原样；该入口不替代同批 PostgreSQL 恢复、新设备授权或旧机切换。
+
+新机默认使用独立 OpenClaw 停写备份：`./workbench private restore-state openclaw "$HOME/feipi-restore/openclaw"`。它只要求 `backup openclaw` 的四个原生文件及摘要，先校验后检查 SQLite、调整 HOME 和程序链接，不依赖全量迁移清单、资料或模型包。须先恢复基础 env 并安装锁定版 OpenClaw；已有 `.openclaw` 保持原样，Gateway 不启动。
 
 备份目录：`~/.local/state/feipi-workbench/{backups,changes,openclaw-backups,openclash-backups}` 与 `~/.local/state/multica/backups`。不自动清理，避免删除最后可用副本。长期保留最近可恢复批次并加密复制到用户选定的外部介质；本次未配置自动外传。
 

@@ -2,6 +2,7 @@
 
 从 `feipi-agent-kit` 根目录使用工作台入口。这里的准备工作用于新 Mac 或缺失环境的机器，**不是每次开机都安装**。
 日常开机不运行 bootstrap，也不自动启动服务。已有机器先用 plan 看影响，不要为了“验证”重装。
+完整新机的集中 copy/export/授权命令见[准备清单](../../../docs/new-mac-prepare.md)。
 
 ## 先准备并确认
 
@@ -21,8 +22,8 @@ bash scripts/bootstrap/prerequisites.sh install
 | 顺序 | 需要准备什么 | 怎样确认 | 谁负责 |
 | --- | --- | --- | --- |
 | 1 | 普通用户账号、可用网络/必要代理、长期保存仓库的目录 | 不用 sudo 运行整个脚本；网络与认证由自己确认 | 人工 |
-| 2 | Apple Command Line Tools | `xcode-select -p` 与 `xcrun --find clang` 都成功 | 人工执行 `xcode-select --install`，完成系统对话框 |
-| 3 | Homebrew | 按 [官方说明](https://brew.sh/) 安装，用 `brew --version` 确认 | 人工 |
+| 2 | Apple Command Line Tools | `xcode-select -p` 与 `xcrun --find clang` 都成功 | 上述 prerequisites 安装入口；必要的系统授权由本人完成 |
+| 3 | Homebrew | 按 [官方说明](https://brew.sh/) 安装，用 `brew --version` 确认 | 上述 prerequisites 安装入口 |
 | 4 | Git、curl 与本仓库 | `command -v git curl`；`components/mac/Brewfile` 存在 | CLT/系统工具与自行克隆 |
 | 5 | 可选单机软件 | 按需复制 Brewfile.local.example 为 Brewfile.local | 人工选择，不从旧机软件快照生成 |
 

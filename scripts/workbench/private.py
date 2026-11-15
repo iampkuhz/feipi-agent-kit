@@ -35,10 +35,12 @@ def check():
         for relative, recovery in entries:
             path = HOME/relative
             exists = path.exists()
-            count = sum(1 for p in path.rglob('*') if p.is_file()) if path.is_dir() else int(path.is_file())
-            if label == '必需' and (not exists or not count):
+            # 仅看必要路径和首个目录项，不递归扫描或盘点个人资料。
+            populated = exists and (not path.is_dir() or next(path.iterdir(), None) is not None)
+            if label == '必需' and not populated:
                 missing = True
-            print(f'[{label}] {relative}: '+(f'已发现 {count} 个文件' if exists else '缺失')+'；'+recovery)
+            state = '已发现' if populated else ('目录为空' if exists else '缺失')
+            print(f'[{label}] {relative}: '+state+'；'+recovery)
     # 只检查当前声明引用的 env 键是否有定义，不求值或打印秘密，也不推断凭据有效。
     env = HOME/'.env'
     declared = {'HOME'}  # 由运行时提供，不是需要从 env vault 恢复的凭据。
@@ -85,7 +87,7 @@ def main():
     sources = sub.add_parser('restore-sources', help='恢复已校验迁移包中的代码和资料，拒绝覆盖')
     sources.add_argument('bundle')
     sources.add_argument('--only', action='append')
-    state = sub.add_parser('restore-state', help='从完整迁移包恢复程序状态，不覆盖、不启动服务')
+    state = sub.add_parser('restore-state', help='从 OpenClaw 独立停写备份或旧完整包恢复状态，不覆盖、不启动服务')
     state.add_argument('component', choices=['openclaw', 'omlx'])
     state.add_argument('bundle')
     backup = sub.add_parser('backup')

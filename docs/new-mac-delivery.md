@@ -25,10 +25,10 @@
 | 私有配置与本地资料 | 必要私有配置集中准备；目录提供直传命令；不把用户资料容量作为初始化验收指标 | 实际新配置包约 23 KiB，干净 macOS 连续两次恢复通过；Codex 原生读取自动重建的三个模型，元数据摘要完全一致；主机 67 项工作台回归通过；用户复制目录后核实所需功能 |
 | 数据一致性 | Multica 数据库/附件/密钥同批；OpenClaw SQLite 停写恢复；旧机不发生双主 | 当前 PostgreSQL 备份已在无网络临时容器恢复；OpenClaw 在实际新 HOME 恢复、重建依赖和发布配置，4 个 SQLite、7,289 个业务文件核查通过，Gateway 未启动；完整业务切换待验 |
 | 服务冷启动 | Podman VM、本地连接、Compose、镜像拉取、健康等待、模型实际请求 | 默认本机 Podman ensure 及三服务 10 分钟就绪等待已增加；64 项工作台、18 项服务回归通过；旧机 ensure 真实通过且未重启现有 VM；完整冷启动待验 |
-| 图表和文档 | Mermaid、draw.io、PlantUML、PPT/PDF 实际生成并检查产物 | Chrome/LibreOffice 中英文 PDF 导出、字体嵌入及 PNG 渲染通过；Mermaid/draw.io/PlantUML/PPT 待验 |
+| 图表和文档 | Mermaid、draw.io、PlantUML、PPT/PDF 实际生成并检查产物 | Chrome/LibreOffice 中英文 PDF 导出、字体嵌入及 PNG 渲染通过；Mermaid 原生 Chrome 的 SVG/PNG、可编辑 PPTX 与 QuickLook/CoreText 渲染及实际看图通过；draw.io/PlantUML 与 PowerPoint 编辑回环待验 |
 | oMLX/语音 | 安装来源、模型清单、设置恢复、首次推理 | 三个模型及完整设置已从迁移包恢复；原生应用读取迁入模型路径和自定义别名，文本及 Qwen3-ASR/SenseVoiceSmall 语音推理通过；登录后自启仍待验 |
 | 自启与重启 | Env Vault、Podman/受管服务、OpenClaw、Multica 按依赖恢复；完整重启后小任务 | Env Vault 已在干净系统真实加载、触发快照，完整关机开机后自动恢复及再次触发通过；终端 Node/Rust/Codex 复验通过。Podman 因该 VM 不支持嵌套虚拟化明确失败，其他组件待验 |
-| 人工准备 | 所有必要 copy/export/授权命令集中成一次操作；运行中不逐项追问 | 待交付可执行命令包 |
+| 人工准备 | 所有必要 copy/export/授权命令集中成一次操作；运行中不逐项追问 | [集中清单](new-mac-prepare.md)已列出源码/配置、独立备份、用户直传、代理过渡、安装与授权；25 个文档命令块通过系统 Bash 3.2 语法检查；实体双机执行与最终切换待验 |
 | 最终端到端证明 | 干净 macOS、准确源码版本/环境指纹、逐阶段日志、真实产物、重复执行、失败恢复 | 未完成 |
 
 业务恢复补验：Multica 原入口隐含依赖 Docker CLI/Compose 和旧机的 `/var/run/docker.sock`，共享清单现补入两项（加上 Fontconfig 后共 36 项），隔离配置自动发现 Homebrew Compose 插件并按机器绑定派生 Podman 当前 socket。干净 macOS 的空白 HOME 已真实执行 Docker Compose 5.7.1；本机现有服务只读查询通过，未重启服务。58 项 Multica 回归通过，现有 `20261101T102523041588` 备份也已恢复至独立、无网络的临时 PostgreSQL，四张表记录数一致并清理临时容器。它证明现有备份可恢复，不能代替当前数据的新备份或新机容器冷启动。
@@ -46,6 +46,8 @@ CLI 真实任务补验：Node 26 与 Qwen 0.12.3 内置 dispatcher 的接口不�
 提交 `ded5b1f` 的完整 CLI 演练中，Qwen 通过，Codex 暴露模型目录 JSON 漏迁，Claude 等待未启动的本地 LiteLLM，Qoder 明确返回未登录。已补入两份 Codex 模型目录白名单，真实重新导出并恢复 12 文件配置包。使用提交 `315ce35` 复验，source_dirty=false，Codex 已能运行至官方接口鉴权，失败为未登录的 401；Claude 通过只绑定 loopback 的 SSH 转发使用旧机 LiteLLM 后，按原设置完成精确文件任务。7890 代理和 4000 LiteLLM 转发均为隔离验证条件，不能代替新 FlClash 登录或新机容器冷启动证明。Codex、Qoder、Figma MCP 的新设备授权仍须纳入集中准备。64 项工作台回归在验证机通过。恢复、推理、CLI 原生日志及逐文件摘要已集中保存于 `~/.local/state/feipi-workbench/new-mac-validation/native-state-inference-evidence-5a6vv6uc/`。
 
 按小配置交付边界补验：提交 `b5eec47` 不再导出完整 Codex 派生目录。基础配置加清单实际为 23,685 字节，已在干净 macOS 的全新隔离 HOME 中连续恢复两次，source_dirty=false；程序从锁定版内置目录重建三个模型，规范化 JSON 摘要与旧机一致，原生 `codex debug models` 成功读取迁入配置及其目录。未引用的旧 LiteLLM 目录没有生成，env vault 相对链接及 0600 权限通过。此项不需要登录、不调用模型接口，不能替代真实任务鉴权。报告保存在 `~/.local/state/feipi-workbench/new-mac-validation/configuration-native-e3jahbr1/native-restore-report.json`。
+
+图表补验：首次 Mermaid 运行明确失败于浏览器发现，已安装的 Homebrew Chrome 没有 PATH 入口，原脚本遗漏 macOS 应用发现。提交 `f4c8061` 改用 AppKit 应用注册信息；同一个原图包复验成功，source_dirty=false，真实 SVG/PNG、覆盖及几何通过，实际查看中文和两条关系后登记 `final_status=success`。Python 依赖由 uv 隔离准备，固定 npm 包使用共享缓存，不传旧依赖。Mermaid 46 项离线回归、治理结构与平台静态扫描通过；Linux 未在本轮实测。PPT 使用同一新机的固定 npm 依赖、原生可编辑单页验收输入和 QuickLook/CoreText 生成 1800px 图像，自动门禁与实际看图通过；未做 PowerPoint 编辑回环。证据位于 `~/.local/state/feipi-workbench/new-mac-validation/document-native-esieuzpx/`。
 
 集中迁移补验：新增 `workbench private prepare-migration/verify-migration/restore-sources`，复用原生数据库备份，不复制热数据目录。真实批次 `full-20261115-prepare-03` 包含基础配置 10 文件、6 个 Git 项目（含 env vault 历史和 Session Browser 两份 stash）、家庭健康 102 个原件、房地产 363 个原件、FlClash 官方 ZIP、三个 oMLX 模型及业务备份。总计 906 文件、3.98 GiB，目录权限 0700，清单和摘要通过。当前 Multica 恢复后 issue/comment/attachment/agent 分别为 119/697/307/9，与同批记录一致；LiteLLM 原生恢复成功，public schema 有 75 张表。两者均使用无网络临时容器并清理；没有据此宣称新机容器冷启动通过。
 

@@ -56,7 +56,8 @@ vault_file="$(python3 -c 'from pathlib import Path; print((Path.home()/".env").r
 COPYFILE_DISABLE=1 tar -czf "$batch/env-vault.tar.gz" -C "$(dirname "$vault_file")" "$(basename "$vault_file")"
 python3 - "$batch" "$vault_file" <<'PY'
 import json, pathlib, sys
-pathlib.Path(sys.argv[1], 'env-location.json').write_text(json.dumps({'original_path': sys.argv[2]}, indent=2)+'\n')
+pathlib.Path(sys.argv[1], 'env-location.json').write_text(json.dumps({
+    'original_path': sys.argv[2], 'source_home': str(pathlib.Path.home().resolve())}, indent=2)+'\n')
 PY
 (cd "$batch" && shasum -a 256 state.tar.gz env-vault.tar.gz env-location.json sqlite-integrity.json >SHA256SUMS)
 tar -tzf "$batch/state.tar.gz" >/dev/null

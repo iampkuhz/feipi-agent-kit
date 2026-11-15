@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""从完整迁移包恢复 OpenClaw 状态或 oMLX 模型，不启动服务、不覆盖已有目录。"""
+"""从独立停写备份或旧迁移包恢复状态，不启动服务、不覆盖已有目录。"""
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -46,10 +47,42 @@ def installed_openclaw():
     return package
 
 
-def restore_openclaw(bundle, home, source_home, package):
+def verify_openclaw_backup(directory):
+    """固定四个原生输出，不依赖全量资料/模型清单。"""
+    expected = {'state.tar.gz', 'env-vault.tar.gz', 'env-location.json', 'sqlite-integrity.json'}
+    checks = {}
+    for line in (directory/'SHA256SUMS').read_text().splitlines():
+        fields = line.split()
+        if len(fields) != 2:
+            raise ValueError('OpenClaw 独立备份摘要格式无效。')
+        digest, name = fields
+        if (name not in expected or name in checks or len(digest) != 64
+                or any(char not in '0123456789abcdef' for char in digest)):
+            raise ValueError('OpenClaw 独立备份含非白名单或重复条目。')
+        checks[name] = digest
+    if set(checks) != expected:
+        raise ValueError('OpenClaw 独立备份缺少必要文件。')
+    for name, recorded in checks.items():
+        path = directory/name
+        if path.is_symlink() or not path.is_file():
+            raise ValueError('OpenClaw 备份文件缺失或不是普通文件：'+name)
+        digest = hashlib.sha256()
+        with path.open('rb') as stream:
+            for block in iter(lambda: stream.read(1024*1024), b''):
+                digest.update(block)
+        if digest.hexdigest() != recorded:
+            raise ValueError('OpenClaw 备份摘要不符：'+name)
+    metadata = json.loads((directory/'env-location.json').read_text())
+    value = metadata.get('source_home') if isinstance(metadata, dict) else None
+    if not isinstance(value, str) or not Path(value).is_absolute() or '..' in Path(value).parts or value == '/':
+        raise ValueError('独立备份缺少有效的 source_home；用当前 backup openclaw 重新导出。')
+    return Path(value)
+
+
+def restore_openclaw(directory, home, source_home, package):
     home = home.resolve()
     target = target_directory(home, '.openclaw')
-    source = bundle/'openclaw/state.tar.gz'
+    source = directory/'state.tar.gz'
     # plugin-skills 是程序生成的链接；只重建已识别且新程序确实提供的 skill。
     replacements = {}
     with tarfile.open(source) as archive:
@@ -80,7 +113,7 @@ def restore_openclaw(bundle, home, source_home, package):
                 if not (skill/'SKILL.md').is_file() or not skill.resolve().is_relative_to(package.resolve()):
                     raise ValueError('当前 OpenClaw 缺少需重建的内置 skill：'+name.name)
                 replacements[member.name] = skill
-    checks = json.loads((bundle/'openclaw/sqlite-integrity.json').read_text())
+    checks = json.loads((directory/'sqlite-integrity.json').read_text())
     if not checks or any(value != 'ok' for value in checks.values()):
         raise ValueError('缺少有效的原数据库完整性记录。')
     stage = Path(tempfile.mkdtemp(prefix='.openclaw-restore-', dir=home))
@@ -149,12 +182,19 @@ def main():
     try:
         bundle = args.bundle.expanduser().resolve()
         home = Path.home().resolve()
-        manifest = verify(bundle)
-        source_home = Path(manifest['source_home'])
+        if args.component == 'openclaw' and (bundle/'state.tar.gz').is_file():
+            source_home = verify_openclaw_backup(bundle)
+            directory = bundle
+            if not (home/'.env').is_file():
+                raise ValueError('先 restore-mac 恢复本机 env，再恢复 OpenClaw 状态。')
+        else:
+            manifest = verify(bundle)
+            source_home = Path(manifest['source_home'])
+            directory = bundle/'openclaw'
         if not source_home.is_absolute():
             raise ValueError('原 HOME 记录不是绝对路径。')
         if args.component == 'openclaw':
-            restore_openclaw(bundle, home, source_home, installed_openclaw())
+            restore_openclaw(directory, home, source_home, installed_openclaw())
         else:
             restore_models(bundle, home, source_home)
     except (OSError, ValueError, KeyError, TypeError, sqlite3.Error,

@@ -1,4 +1,5 @@
 """真实 WAL SQLite 与 tar 验证停写备份；只替换进程管理命令。"""
+import json
 import os
 from pathlib import Path
 import sqlite3
@@ -44,6 +45,7 @@ class OpenClawBackup(unittest.TestCase):
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.assertNotIn('fixture', proc.stdout)
         batch = next((self.home/'.local/state/feipi-workbench/openclaw-backups').iterdir())
+        self.assertEqual(json.loads((batch/'env-location.json').read_text())['source_home'], str(self.home))
         target = self.base/'restored'; target.mkdir()
         with tarfile.open(batch/'state.tar.gz') as archive:
             member = archive.getmember('.openclaw/openclaw-weixin/ref-messages.sqlite')
