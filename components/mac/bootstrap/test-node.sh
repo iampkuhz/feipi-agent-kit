@@ -76,3 +76,48 @@ for node_mode in install upgrade; do
     bash "$REPO_ROOT/bootstrap/node.sh" "$node_mode"
 done
 echo "通过：安装与升级均不接管所选 Node 前缀中的非 npm 工具。"
+
+# 新机不能跟随 --lts 漂移到尚未兼容当前 CLI 网络库的主版本。
+mkdir -p "$TEST_ROOT/fresh-nvm" "$TEST_ROOT/runtime/bin"
+cp "$TEST_ROOT/system/node" "$TEST_ROOT/runtime/bin/node"
+cp "$TEST_ROOT/npm-driver/npm" "$TEST_ROOT/runtime/bin/npm"
+for tool_package in prettier @fsouza/prettierd yarn; do
+  mkdir -p "$TEST_ROOT/npm-prefix/lib/node_modules/$tool_package"
+  touch "$TEST_ROOT/npm-prefix/lib/node_modules/$tool_package/package.json"
+done
+cat >"$TEST_ROOT/fresh-nvm/nvm.sh" <<'EOF'
+nvm() {
+  printf '%s\n' "$*" >> "$TEST_NVM_CALLS"
+  case "$*" in
+    'version default')
+      if [[ -f "$TEST_NVM_STATE" ]]; then cat "$TEST_NVM_STATE"; else echo N/A; fi ;;
+    'install 24.22.3')
+      echo v24.22.3 > "$TEST_NVM_STATE"
+      export PATH="$TEST_RUNTIME_BIN:$PATH" ;;
+    current) cat "$TEST_NVM_STATE" ;;
+    'alias default v24.22.3') : ;;
+    'use --silent default') export PATH="$TEST_RUNTIME_BIN:$PATH" ;;
+    *) echo "不应调用 nvm $*" >&2; return 99 ;;
+  esac
+}
+EOF
+HOME="$TEST_ROOT" NVM_DIR="$TEST_ROOT/fresh-nvm" \
+  TEST_NVM_CALLS="$TEST_ROOT/nvm-calls" TEST_NVM_STATE="$TEST_ROOT/nvm-state" \
+  TEST_RUNTIME_BIN="$TEST_ROOT/runtime/bin" TEST_NPM_PREFIX="$TEST_ROOT/npm-prefix" \
+  bash "$REPO_ROOT/bootstrap/node.sh" install
+grep -qx 'install 24.22.3' "$TEST_ROOT/nvm-calls"
+grep -qx 'alias default v24.22.3' "$TEST_ROOT/nvm-calls"
+echo "通过：全新 nvm 安装已验收的 Node 24.22.3。"
+
+: >"$TEST_ROOT/nvm-calls"
+echo v26.13.1 >"$TEST_ROOT/nvm-state"
+HOME="$TEST_ROOT" NVM_DIR="$TEST_ROOT/fresh-nvm" \
+  TEST_NVM_CALLS="$TEST_ROOT/nvm-calls" TEST_NVM_STATE="$TEST_ROOT/nvm-state" \
+  TEST_RUNTIME_BIN="$TEST_ROOT/runtime/bin" TEST_NPM_PREFIX="$TEST_ROOT/npm-prefix" \
+  bash "$REPO_ROOT/bootstrap/node.sh" install
+[[ "$(cat "$TEST_ROOT/nvm-state")" == v26.13.1 ]]
+if grep -Eq '^(install|alias)' "$TEST_ROOT/nvm-calls"; then
+  echo "不应替换已有 nvm default。" >&2
+  exit 1
+fi
+echo "通过：已有 nvm default 不被新机兼容基线替换。"

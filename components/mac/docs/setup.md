@@ -82,6 +82,7 @@ plan 不联网、不执行 brew/nvm/rustup、不加载用户启动配置，也�
 | 5 | workbench apply mac | 受管配置冲突已处理 | Zsh/Neovim 运行副本与桌面配置；备份原目标 |
 
 Node 和 Rust 相互没有安装依赖，这里固定串行以便排障；它们先于 oh-my-zsh 是为了补全完整。
+全新 nvm 固定安装 Node 24.22.3；已有 nvm default 或系统 Node 保留。当前 Qwen 0.12.3 在 Node 26 上会因内置网络库不兼容而请求失败，即使退出码为 0；验收须检查真实请求和工具产物，不能只检查版本或退出码。
 配置链接本身不要求先启动 Neovim，但放最后能避免新终端先加载尚未准备好的工具配置。
 单独执行 ohmyzsh.sh 时，生成补全所需的工具也应已在当前 PATH；全量入口会重新激活 nvm default。
 

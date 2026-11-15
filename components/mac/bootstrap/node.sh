@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Node 优先复用 nvm 默认版本或已有系统版本；全新环境才安装 nvm 与 Node LTS。
+# Node 优先复用 nvm 默认版本或已有系统版本；全新环境使用实际验收的兼容版本。
 set -euo pipefail
 
 MODE="${1:-install}"
@@ -28,7 +28,9 @@ if [[ -s "$NVM_DIR/nvm.sh" ]]; then
       echo "nvm default 不可用，请先用 nvm alias default <已安装版本> 修复。" >&2
       exit 1
     fi
-    nvm install --lts
+    # Node 26 的内置 fetch 不兼容当前 Qwen 的旧版 undici dispatcher。
+    # 不追随 --lts 漂移；变更基线前须验证真实 CLI 请求及工具调用。
+    nvm install 24.22.3
     nvm alias default "$(nvm current)"
   fi
   nvm use --silent default
