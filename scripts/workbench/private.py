@@ -77,7 +77,7 @@ def main():
     for action in ('export-mac', 'verify-mac', 'restore-mac'):
         bundle = sub.add_parser(action)
         bundle.add_argument('bundle')
-    prepare = sub.add_parser('prepare-migration', help='集中备份基础配置、业务数据、项目和模型')
+    prepare = sub.add_parser('prepare-migration', help='可选全量备份，含项目和模型；不是新机初始化前置步骤')
     prepare.add_argument('bundle')
     prepare.add_argument('--proxy-backup', required=True)
     migration = sub.add_parser('verify-migration', help='完整迁移包清单、字节与项目归档校验')

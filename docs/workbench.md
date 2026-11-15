@@ -85,6 +85,44 @@ Multica 网页调好 Agent：`./workbench multica plan` 看服务端差异；`./
 ./workbench private verify-mac "$HOME/feipi-mac-private"
 ./workbench private restore-mac "$HOME/feipi-mac-private"
 ./workbench private verify <组件> <输出的私有批次>
+```
+
+### 本地目录由用户直接传输
+
+新机从 Git 获取本仓库，软件和依赖走安装脚本。个人项目、资料和已有模型目录由用户复制，不先生成整机大包，也不把资料目录容量作为初始化验收条件。
+
+两台 Mac 可用网线直连；无网口时使用以太网转接器。在旧机「系统设置 → 通用 → 共享」开启「远程登录」，只允许自己的账号；在网络设置查看旧机的有线 IP。新机使用该 IP 连接，避免经 Wi-Fi 传输。连接方式见 [Apple 以太网直连说明](https://support.apple.com/en-ie/guide/mac-help/mchlp1413/27/mac/27)及[远程登录说明](https://support.apple.com/guide/mac-help/allow-a-remote-computer-to-access-your-mac-mchlp1066/mac)。
+
+以下在新机执行，替换旧机账号和有线 IP；先验证 SSH，再按需要保留目录项。只复制目录内容，不删除新机已有文件；任一命令失败即停止。不由 Agent 执行资料扫描或传输。
+
+```bash
+bash <<'COPY'
+set -euo pipefail
+OLD_MAC='旧机账号@旧机有线IP'
+ssh -n "$OLD_MAC" 'id -un'
+
+for relative in \
+  '.local/env-vault' \
+  'Documents/life/child-growth-diary' \
+  'Documents/life/家庭健康' \
+  'Documents/life/2028.装修/home-renovation-playbook-2028' \
+  'Documents/life/2030.房地产' \
+  'Documents/tools/llm/lexiflow' \
+  'Documents/tools/llm/feipi-session-browser-java' \
+  '.omlx/models'; do
+  mkdir -p "$HOME/$relative"
+  rsync -a -e ssh "$OLD_MAC:$relative/" "$HOME/$relative/"
+done
+COPY
+```
+
+这是用户执行的传输模板，尚未在两台实体 Mac 之间验收。Documents 访问受系统隐私权限限制时，需在旧机远程登录设置中允许远程用户访问相应资料。OpenClaw SQLite、Multica/PostgreSQL 等运行中数据不按上述普通目录热复制：用户先按对应组件命令停写并做原生一致性导出，再传输输出目录，由恢复脚本处理。
+
+### 可选的旧全量备份入口
+
+以下能力保留供显式全量备份使用，**不是新机初始化的必需步骤**，后续不再以该包大小或普通资料归档数量衡量初始化交付。
+
+```bash
 
 # 旧机集中准备：先暂停 Multica 新派发，在 FlClash 官方界面导出本地 ZIP。
 # 用实际保存的 ZIP 路径替换参数；命令会短暂停写并恢复原业务启动状态。
