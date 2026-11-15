@@ -1,5 +1,8 @@
 # 变更记录
 
+## 2026-11-16
+- feipi-interaction-review-output v1：交付交互审查与汇报前复审
+
 ## 2026-11-15
 - feipi-techreport-ppt-skill v6：修复演示编译与多页预览完整性
 - feipi-drawio-generate-diagram v5：预检回执准确记录只读启动策略

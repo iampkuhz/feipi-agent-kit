@@ -35,6 +35,17 @@ skills:
     validation: null
     status: stable
 
+  - name: feipi-interaction-review-output
+    path: skills/authoring/feipi-interaction-review-output
+    layer: authoring
+    description: 手机与聊天渠道交付审查、修订反馈和汇报前复审
+    clients: [claude, codex, qoder, openclaw]
+    entry: SKILL.md
+    validation:
+      type: script
+      command: bash skills/authoring/feipi-skill-govern/scripts/validate.sh skills/authoring/feipi-interaction-review-output
+    status: stable
+
   - name: feipi-health-maintain-family-records
     path: skills/authoring/feipi-health-maintain-family-records
     layer: authoring
