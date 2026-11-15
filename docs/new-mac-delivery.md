@@ -115,5 +115,7 @@ oMLX 两个自启开关已按固定版本的真实界面设置：Dock 原生 Ope
 
 干净镜像 `ghcr.io/cirruslabs/macos-tahoe-vanilla@sha256:eeec54bfe1f076e27786c5d92b89187a05b1d109b5071eb2dcdf02d596e34640` 为 macOS 26.6.2 arm64，初始无 CLT/Homebrew，分配 2 CPU / 4 GiB，系统卷扩至约 80 GB。真实完成 CLT/Homebrew/Git/Python、共享工具链、四个锁定 CLI、17 项应用/字体和上述编辑器/文档验收。Neovim 与配置已用提交 `2521096` 完整复放并通过来源检查；桌面、字体、编辑器与基础配置已用提交 `5fb906d` 在完整关机开机后再次执行 install/apply/验收：全部通过，产物报告的 source_dirty=false。该复放没有再输入管理员密码，已有软件/CLI/插件版本保留。源码、环境指纹、私有阶段日志及产物保存于 `~/.local/state/feipi-workbench/new-mac-validation/`。
 
-Env Vault 的开机验证使用专用无秘密 `.env`；之后真实私有配置已恢复至验证机，但真实 vault 历史和全业务重启仍需完整流程验收。本机 `kern.hv_support=1`，该 VM 为 0，Podman 在下载前明确拒绝并返回非零；M1 不支持该场景所需的嵌套虚拟化。完整容器服务及实际新 Mac mini 的整机证明仍未完成，继续推进可独立交付的恢复和业务能力。
+Env Vault 的开机验证使用专用无秘密 `.env`；之后真实私有配置已恢复至验证机，但真实 vault 历史和全业务重启仍需完整流程验收。本机 `kern.hv_support=1`，该 VM 为 0，Podman 在下载前明确拒绝并返回非零。2026-11-15 再次核对宿主机为 Apple M1；Tart 官方当前只支持 M3/M4 上的 Linux 虚拟机使用嵌套虚拟化，不能借此让现有 macOS 验证机运行本地 Podman。完整容器服务及实际新 Mac mini 的整机证明仍未完成。
 参考：[Tart 嵌套虚拟化边界](https://tart.run/faq/#nested-virtualization-support)、[Homebrew 无交互安装](https://docs.brew.sh/Installation#unattended-installation)、[OpenAI 固定版本 Codex 安装示例](https://developers.openai.com/cookbook/examples/codex/build_iterative_repair_loops_with_codex)。
+
+继续整机验收需要一台可原生运行 Podman 的干净 Mac，以及可用的 `ssh 新机账号@新机有线IP` 连接；该目标尚未提供。本人登录与系统权限按[集中清单](new-mac-prepare.md#一次完成授权与权限)一次准备，Codex、Qoder、Figma MCP 的新设备授权仍待完成。具备这些条件后，按同一清单执行服务冷启动、业务恢复与真实请求，再完整关机开机并登录、复跑验收任务；最终业务切换仍须排空旧机。旧机缓存镜像上的隔离容器和借旧机 LiteLLM 的请求，仅保留为相应组件证据。
