@@ -97,6 +97,13 @@ Multica 网页调好 Agent：`./workbench multica plan` 看服务端差异；`./
 ./workbench private restore-sources "$HOME/feipi-new-mac-transfer"
 # 基础配置另行恢复，数据库仍按对应组件手册恢复，最后再启动业务。
 ./workbench private restore-mac "$HOME/feipi-new-mac-transfer/mac-private"
+
+# 状态恢复拒绝覆盖已有目录，且不启动服务。OpenClaw 程序须先按 versions.json
+# 安装到已激活的 Node 环境，尚不要创建 Gateway 或启动渠道。
+./workbench private restore-state omlx "$HOME/feipi-new-mac-transfer"
+./workbench private restore-state openclaw "$HOME/feipi-new-mac-transfer"
+# 恢复后重建未归档的程序依赖；这一步不启动 Gateway。
+bash components/openclaw/scripts/deploy.sh --dependencies-only --yes
 ```
 
 OpenClaw 当前原生备份拒绝 `.env` 的绝对符号链接，因此使用标准 tar：停 Gateway → SQLite integrity_check 与 WAL checkpoint → 归档原状态（不跟随链接）和实际 env 文件 → 校验 → 恢复原启动状态。停写后使用 SQLite 原生读写连接，允许初始化已删除的 WAL 辅助文件；仍有锁定或数据库损坏即失败。不热复制 SQLite，不归档整个 HOME。Multica 复用原停写 pg_dump + 附件 + 服务密钥流程；单独备份前还须 `service multica stop`，完成后 `start`；集中准备入口自动处理已加载的受管 LaunchAgent。`verify multica` 在无网络临时 PostgreSQL 中恢复验证；`verify openclaw` 是摘要验证，SQLite 恢复演练应在新目录解包后运行，不能将校验和通过称作完整功能恢复。
@@ -104,6 +111,8 @@ OpenClaw 当前原生备份拒绝 `.env` 的绝对符号链接，因此使用标
 `export-mac` 只包含固定白名单的基础配置，解引用 `.env` 后保存真源，恢复时重建指向本机 vault 的相对链接。恢复先校验全部摘要，再备份已有目标和原子写入；不复制设备身份、认证、运行中数据库或模型。HOME 变化时仅调整配置中以旧 HOME 开头的路径；密钥有效性、SSH 授权、服务数据和模型仍须分别验收。完整新机交付进展见 [验收清单](new-mac-delivery.md)。
 
 `prepare-migration` 在基础配置外集中保存 Multica、OpenClaw 和 LiteLLM 的原生一致性备份、FlClash 官方备份、三个当前使用的 oMLX 模型，以及机器绑定引用的 Git 项目和 env vault 历史。Git 项目保留全部 refs、stash、暂存/未暂存补丁、未跟踪文件及固定私有覆写项；成长日记和装修项目还保留忽略的资料原件，家庭健康和房地产等非 Git 资料单独归档，跳过声明的构建缓存。它不复制 Multica 登录/设备身份、Podman VM 或容器镜像；新设备账号登录、节点同步、系统权限和切换前旧机停主力仍是集中准备中的独立事项。失败批次含 `INCOMPLETE`，不能用于恢复。`restore-sources` 只恢复代码和资料，不启动业务；已有工作台源码目录也会触发保全检查，可用 `--only 'Documents/…'` 选择其余来源。
+
+`restore-state` 先校验完整业务包，在新建临时目录中解包和检查，成功后发布整个状态目录。OpenClaw 恢复会话、记忆和数据库，重新检查所有已记录 SQLite；配置中的 HOME 路径和 env 链接跟随新机，原生插件技能链接指向新机同版本 npm 程序目录。无法识别的外部链接直接失败，不带着旧机路径继续启动。oMLX 恢复当前三个模型并检查配置与权重；随后仍须做真实推理。目标已存在时保持原样；该入口不替代同批 PostgreSQL 恢复、新设备授权或旧机切换。
 
 备份目录：`~/.local/state/feipi-workbench/{backups,changes,openclaw-backups,openclash-backups}` 与 `~/.local/state/multica/backups`。不自动清理，避免删除最后可用副本。长期保留最近可恢复批次并加密复制到用户选定的外部介质；本次未配置自动外传。
 

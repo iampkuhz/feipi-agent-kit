@@ -115,11 +115,13 @@ def validate_archive(path):
                     pass
 
 
-def extract_archive(path, destination, final_target, home, old_home):
+def extract_archive(path, destination, final_target, home, old_home, exclude_members=()):
     """兼容 Python 3.10 的有限解包：不经过父级链接写文件，链接只能落在新 HOME。"""
     validate_archive(path)
     with tarfile.open(path) as archive:
         for member in archive:
+            if member.name in exclude_members:
+                continue
             name = relative(member.name.rstrip('/'))
             target = destination/name
             parent = target.parent

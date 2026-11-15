@@ -85,6 +85,9 @@ def main():
     sources = sub.add_parser('restore-sources', help='恢复已校验迁移包中的代码和资料，拒绝覆盖')
     sources.add_argument('bundle')
     sources.add_argument('--only', action='append')
+    state = sub.add_parser('restore-state', help='从完整迁移包恢复程序状态，不覆盖、不启动服务')
+    state.add_argument('component', choices=['openclaw', 'omlx'])
+    state.add_argument('bundle')
     backup = sub.add_parser('backup')
     backup.add_argument('component', choices=['openclaw', 'multica', 'openclash'])
     verify = sub.add_parser('verify')
@@ -93,6 +96,9 @@ def main():
     a = p.parse_args()
     if a.action == 'check':
         return check()
+    if a.action == 'restore-state':
+        return subprocess.run([sys.executable, str(ROOT/'scripts/workbench/migration_state.py'),
+                               a.component, a.bundle]).returncode
     if a.action in ('prepare-migration', 'verify-migration', 'restore-sources'):
         args = [a.action.removesuffix('-migration'), a.bundle]
         if a.action == 'prepare-migration':
