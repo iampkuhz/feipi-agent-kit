@@ -28,6 +28,9 @@
 
 默认顺序：**Homebrew → Node/npm → Rust → oh-my-zsh → 运行副本发布**。
 安装前预检受管路径，发布时再次检查并备份。安装与升级分开，冲突不覆盖。
+
+`--apps` 包含 Homebrew 应用清单，以及固定官方发布包的 FlClash for oixCloud、oMLX、
+Session Browser。代理可在裸机先单独安装；来源、摘要及账号准备边界见 [首次安装](docs/setup.md)。
 这用于首次准备或补齐环境，不是每次开机要运行的流程，也不自动启动后台服务。
 
 `bootstrap/macosinit.sh` 保留源码链接调试：`check` 判断能否安全安装，`verify` 核对全部来源与内容，接受工作台运行副本；

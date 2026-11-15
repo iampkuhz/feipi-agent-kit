@@ -494,6 +494,7 @@ def install(component, apps=False, agents=False):
             run(['bash', base/'agents.sh', 'install'])
         if apps:
             run(['bash', base/'apps.sh', 'install'])
+            run(['bash', base/'desktop-extras.sh', 'install'])
         print('依赖已准备；下一步 diff/capture/apply mac。')
     elif component == 'openclaw':
         run(['bash', ROOT/'components/openclaw/scripts/deploy.sh', '--yes'])

@@ -45,6 +45,26 @@ bash scripts/bootstrap/prerequisites.sh install
 入口实际核实授权后标记本轮已检查，避免中途重新询问。清单已经齐备时只检查，不再要求授权。
 整个裸机流程跨阶段的一次准备与业务恢复仍在整体验收中，不能用桌面阶段代替。
 
+`--apps` 还会调用 `bootstrap/desktop-extras.sh install`，补齐固定官方发布包的
+FlClash for oixCloud 0.9.3、oMLX 0.4.4 和 Session Browser 0.5.2。下载后核对 SHA-256，
+DMG 检查应用身份、版本和代码签名；保留已有安装，不借初始化升级。固定来源与摘要见
+`config/desktop-extras.tsv`，只支持 Apple Silicon；oMLX 区分 macOS 15 与 26/27 包。
+也可在安装 CLT/Homebrew 前仅执行 `bash components/mac/bootstrap/desktop-extras.sh install flclash`；
+这个入口只用系统工具。代理首次登录、节点同步和系统权限必须在准备阶段完成。
+不要把旧机 `HTTP_PROXY=127.0.0.1:7890` 当作新机已经具备代理服务。
+
+安装后用 `bash components/mac/bootstrap/desktop-extras.sh check` 检查实际签名及 CLI 入口。
+`session-browser serve` 使用官方自包含 Java runtime，`omlx` 使用应用自带 CLI；
+两者的 HOME 配置、会话数据、模型和真实业务请求另行恢复验收。
+恢复三个既用 oMLX 模型后运行 `python3 components/mac/bootstrap/verify-extras.py`：
+用合成 Codex 会话验证原生索引与网页，用随机本机端口验证文本推理及两套语音识别。
+仅创建本次隔离状态和公开验证音频，结束清理自有进程，保留私有日志、源码摘要及结果报告。
+可用 `--only session-browser` 或 `--only omlx` 单独复验；模型不在默认位置时传 `--model-dir 路径`。
+参考：[FlClash 官方发布](https://github.com/pickrui/FlClash/releases/tag/v0.9.3)、
+[代理备份范围](https://docs.dler.io/en/flclash/backup.html)、
+[oMLX 官方发布](https://github.com/jundot/omlx/releases/tag/v0.4.4)、
+[Session Browser 官方发布](https://github.com/iampkuhz/feipi-session-browser/releases/tag/v0.5.2)。
+
 plan 不联网、不执行 brew/nvm/rustup、不加载用户启动配置，也不创建 HOME 或日志。
 已有 Stow 且 HOME 存在时会调用只读链接冲突模拟，否则显示“未核实”。已知阻塞返回非零；
 退出 0 仅表示已检查范围内没有阻塞，不代表未核实项通过，也不是稍后可直接重放的执行凭证。

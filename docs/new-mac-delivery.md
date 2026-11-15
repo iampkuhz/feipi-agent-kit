@@ -18,12 +18,14 @@
 | 数据一致性 | Multica 数据库/附件/密钥同批；OpenClaw SQLite 停写恢复；旧机不发生双主 | 复用现有备份能力，完整新机恢复待验 |
 | 服务冷启动 | Podman VM、本地连接、Compose、镜像拉取、健康等待、模型实际请求 | 默认本机 Podman ensure 及三服务 10 分钟就绪等待已增加；43 项工作台、18 项服务回归通过；旧机 ensure 真实通过且未重启现有 VM；完整冷启动待验 |
 | 图表和文档 | Mermaid、draw.io、PlantUML、PPT/PDF 实际生成并检查产物 | Chrome/LibreOffice 中英文 PDF 导出、字体嵌入及 PNG 渲染通过；Mermaid/draw.io/PlantUML/PPT 待验 |
-| oMLX/语音 | 安装来源、模型清单、设置恢复、首次推理 | 待补 |
+| oMLX/语音 | 安装来源、模型清单、设置恢复、首次推理 | 固定原生应用、三个当前模型已在干净 macOS 真实启动，文本及 Qwen3-ASR/SenseVoiceSmall 语音推理通过；完整配置/模型迁移包待补 |
 | 自启与重启 | Env Vault、Podman/受管服务、OpenClaw、Multica 按依赖恢复；完整重启后小任务 | Env Vault 已在干净系统真实加载、触发快照，完整关机开机后自动恢复及再次触发通过；终端 Node/Rust/Codex 复验通过。Podman 因该 VM 不支持嵌套虚拟化明确失败，其他组件待验 |
 | 人工准备 | 所有必要 copy/export/授权命令集中成一次操作；运行中不逐项追问 | 待交付可执行命令包 |
 | 最终端到端证明 | 干净 macOS、准确源码版本/环境指纹、逐阶段日志、真实产物、重复执行、失败恢复 | 未完成 |
 
 业务恢复补验：Multica 原入口隐含依赖 Docker CLI/Compose 和旧机的 `/var/run/docker.sock`，共享清单现补入两项（加上 Fontconfig 后共 36 项），隔离配置自动发现 Homebrew Compose 插件并按机器绑定派生 Podman 当前 socket。干净 macOS 的空白 HOME 已真实执行 Docker Compose 5.7.1；本机现有服务只读查询通过，未重启服务。58 项 Multica 回归通过，现有 `20261101T102523041588` 备份也已恢复至独立、无网络的临时 PostgreSQL，四张表记录数一致并清理临时容器。它证明现有备份可恢复，不能代替当前数据的新备份或新机容器冷启动。
+
+原生应用补验：FlClash for oixCloud 0.9.3、oMLX 0.4.4、Session Browser 0.5.2 官方发布包已核对摘要，DMG 身份、版本及签名通过；干净 macOS 首次安装与重复保留通过。Session Browser 已用合成 Codex 会话完成原生扫描、索引和 HTTP 页面验证；oMLX 已用当前三个模型完成文本与两套语音请求。语音输入由系统 say 生成，不读取个人资料；验收使用独立数据目录、随机 loopback 端口并清理自有进程。当前功能验收是在提交前运行，准确提交复放继续进行。代理账号/节点同步尚未完成，不能将应用安装通过表述为代理可用。
 
 ## 本轮发现与修复
 

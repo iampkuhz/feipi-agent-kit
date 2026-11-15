@@ -63,7 +63,10 @@ class Recovery(unittest.TestCase):
                  patch.object(wb, 'run') as run, patch.object(wb.shutil, 'which', return_value='/mock/brew'), \
                  patch('builtins.print'):
                 wb.install('mac', apps=True)
-                self.assertEqual(run.call_args_list[-1].args[0], ['bash', root/'components/mac/bootstrap/apps.sh', 'install'])
+                self.assertEqual([entry.args[0] for entry in run.call_args_list[-2:]], [
+                    ['bash', root/'components/mac/bootstrap/apps.sh', 'install'],
+                    ['bash', root/'components/mac/bootstrap/desktop-extras.sh', 'install'],
+                ])
                 with self.assertRaisesRegex(ValueError, '只适用于'):
                     wb.install('services', apps=True)
 
