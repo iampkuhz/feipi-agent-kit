@@ -8,6 +8,8 @@ cask "karabiner-elements"
 cask "rectangle"
 cask "font-jetbrains-mono"
 cask "font-jetbrains-mono-nerd-font"
+# 冷安装中 LibreOffice 的系统字体回退会丢失中文；提供可嵌入的中文文档字体。
+cask "font-noto-sans-cjk-sc"
 # 常用客户端；Codex CLI 由锁定版本的客户端安装入口管理，避免随 GUI 升级。
 cask "chatgpt"
 cask "codex-app"

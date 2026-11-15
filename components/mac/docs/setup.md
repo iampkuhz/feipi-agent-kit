@@ -40,6 +40,11 @@ bash scripts/bootstrap/prerequisites.sh install
 ./workbench apply mac       # 备份后发布独立运行副本
 ```
 
+桌面安装入口复用已经取得的 `sudo -v` 授权并在该阶段保活，不保存密码；
+授权缺失时在下载前失败。当前 Homebrew 会在首次 sudo 能力检查时清空凭据，
+入口实际核实授权后标记本轮已检查，避免中途重新询问。清单已经齐备时只检查，不再要求授权。
+整个裸机流程跨阶段的一次准备与业务恢复仍在整体验收中，不能用桌面阶段代替。
+
 plan 不联网、不执行 brew/nvm/rustup、不加载用户启动配置，也不创建 HOME 或日志。
 已有 Stow 且 HOME 存在时会调用只读链接冲突模拟，否则显示“未核实”。已知阻塞返回非零；
 退出 0 仅表示已检查范围内没有阻塞，不代表未核实项通过，也不是稍后可直接重放的执行凭证。
@@ -102,6 +107,19 @@ bash components/mac/bootstrap/neovim.sh
 HHKB/iTerm2 所需应用与字体已列入 `components/mac/Brewfile.apps`；完整新机安装需要显式安装该清单，
 `workbench apply mac` 会备份后复制配置。独立组件调试仍可使用 `bootstrap/desktop.sh check|install`。
 尽量在首次配置应用前恢复，减少默认文件冲突；之后人工授予权限、选择 Profile 并测试按键。
+
+桌面安装后可独立验证实际文档/编译能力：
+
+```bash
+python3 components/mac/bootstrap/verify-apps.py
+```
+
+它用独立临时浏览器/Office Profile 导出中英文 PDF，检查正文及中文字体嵌入，渲染 PNG；
+另用 JDK 25 编译并运行小程序。报告、日志、源码版本和产物保存在
+`~/.local/state/feipi-workbench/validation/mac-apps-*`。此检查不代表各客户端登录或键盘权限已完成。
+共享清单显式包含 Fontconfig，应用清单包含 Noto Sans CJK SC；新终端默认使用 Homebrew 的
+`fonts.conf`，保留已有 `FONTCONFIG_FILE`。非交互验收也显式使用同一配置，避免 LibreOffice
+虽能抽取 PDF 中文却没有可见字形。直接从其他环境调用 Office 转换时也应传入该配置。
 
 服务、Skills、模型及业务项目回所属仓库恢复。LiteLLM/PostgreSQL、SearxNG、Crawl4AI 由
 feipi-agent-kit 管理。完整换机和旧机退役前的人工验收仍以 [MIGRATION.md](../MIGRATION.md) 为准。

@@ -493,13 +493,7 @@ def install(component, apps=False, agents=False):
         if agents:
             run(['bash', base/'agents.sh', 'install'])
         if apps:
-            brew = shutil.which('brew')
-            if not brew:
-                brew = next((str(path) for path in (Path('/opt/homebrew/bin/brew'), Path('/usr/local/bin/brew')) if path.is_file()), None)
-            if not brew:
-                raise ValueError('依赖阶段后仍未发现 Homebrew，未安装应用。')
-            run([brew, 'bundle', 'install', '--no-upgrade', '--file', base.parent/'Brewfile.apps'],
-                env=dict(os.environ, HOMEBREW_NO_AUTO_UPDATE='1', HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK='1'))
+            run(['bash', base/'apps.sh', 'install'])
         print('依赖已准备；下一步 diff/capture/apply mac。')
     elif component == 'openclaw':
         run(['bash', ROOT/'components/openclaw/scripts/deploy.sh', '--yes'])

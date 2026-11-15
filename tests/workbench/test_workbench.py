@@ -56,15 +56,14 @@ class Recovery(unittest.TestCase):
                     wb.install('mac')
                 run.assert_not_called()
 
-    def test_mac_apps_install_is_explicit_and_does_not_upgrade(self):
+    def test_mac_apps_install_uses_the_authorization_aware_entry(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d); home = root/'home'; home.mkdir()
             with patch.object(wb, 'ROOT', root), patch.object(wb, 'HOME', home), \
                  patch.object(wb, 'run') as run, patch.object(wb.shutil, 'which', return_value='/mock/brew'), \
                  patch('builtins.print'):
                 wb.install('mac', apps=True)
-                self.assertEqual(run.call_args_list[-1].args[0], ['/mock/brew', 'bundle', 'install', '--no-upgrade', '--file', root/'components/mac/Brewfile.apps'])
-                self.assertEqual(run.call_args_list[-1].kwargs['env']['HOMEBREW_NO_AUTO_UPDATE'], '1')
+                self.assertEqual(run.call_args_list[-1].args[0], ['bash', root/'components/mac/bootstrap/apps.sh', 'install'])
                 with self.assertRaisesRegex(ValueError, '只适用于'):
                     wb.install('services', apps=True)
 

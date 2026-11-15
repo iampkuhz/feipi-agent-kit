@@ -21,6 +21,7 @@
 - `bash bootstrap/rust.sh install|upgrade`、`bash bootstrap/ohmyzsh.sh install|upgrade`：补装和升级分离，不向 shell 启动文件追加内容。
 - `bash bootstrap/check.sh`：只读检查 Bash 语法、可用时的 ShellCheck、关键命令和配置来源，不联网、不加载用户启动文件、不启动服务。
 - `bash bootstrap/neovim.sh`：配置发布后联网恢复锁定插件、构建与有界等待，检查解析器、Mason、Lua LSP、格式化及 Markdown 本机 HTTP 预览；失败非零，可修复后重跑。
+- `bash bootstrap/apps.sh check|install`：显式桌面清单；安装维持已有 sudo 授权，不保存密码；`python3 bootstrap/verify-apps.py` 真实检查中英文 PDF 及 JDK 25。
 - `bash bootstrap/desktop.sh check|install`：独立检查/恢复两份桌面配置，使用普通副本并拒绝覆盖，不由全量入口隐式执行。
 
 ## 编码风格与命名规范
