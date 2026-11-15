@@ -10,6 +10,8 @@ import re
 import sys
 import tempfile
 
+from mac_codex_catalog import CATALOGS, export_recipes, rebuild, validate_recipes
+
 ROOT = Path(__file__).resolve().parents[2]
 FILES = (
     ('.env', '.local/env-vault/.env'),
@@ -18,8 +20,6 @@ FILES = (
     ('.qwen/settings.json', '.qwen/settings.json'),
     ('.qoder/.config.json', '.qoder/.config.json'),
     ('.codex/config.toml', '.codex/config.toml'),
-    ('.codex/model-catalog.selected.json', '.codex/model-catalog.selected.json'),
-    ('.codex/model-catalogs/litellm-local.json', '.codex/model-catalogs/litellm-local.json'),
     ('.claude/settings.json', '.claude/settings.json'),
     ('.omlx/settings.json', '.omlx/settings.json'),
     ('.omlx/model_settings.json', '.omlx/model_settings.json'),
@@ -28,7 +28,8 @@ FILES = (
     ('.config/feipi-workbench/private/openclash/router.json',
      '.config/feipi-workbench/private/openclash/router.json'),
 )
-ALLOWED = {target for _, target in FILES}
+# 旧配置包仍可校验/恢复两份原目录；新导出只保存原生重建所需的选择。
+ALLOWED = {target for _, target in FILES} | CATALOGS
 
 
 def sha(data):
@@ -63,6 +64,7 @@ def export_bundle(destination):
         raise ValueError('配置包必须保存在仓库之外的私有目录。')
     if not (home/'.env').is_file():
         raise ValueError('缺少 ~/.env，不能导出完整的基础配置。')
+    generated = export_recipes(home)
     destination.mkdir(parents=True, mode=0o700, exist_ok=False)
     os.chmod(destination, 0o700)
     entries = []
@@ -82,6 +84,7 @@ def export_bundle(destination):
             'schema': 1, 'scope': 'configuration-only', 'source_home': str(home),
             'created_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
             'files': entries,
+            'generated_codex_catalogs': generated,
             'separate_restore_required': ['SSH private keys or fresh authorization',
                 'Codex/Claude/Qoder authentication', 'OpenClaw consistent state backup',
                 'Multica database, uploads and service secrets from one backup',
@@ -106,6 +109,8 @@ def verify_bundle(bundle):
         raise ValueError('配置包没有文件。')
     pending = []
     seen = set()
+    generated = manifest.get('generated_codex_catalogs', [])
+    validate_recipes(generated)
     for entry in entries:
         relative = checked_relative(entry['path'])
         if str(relative) in seen:
@@ -120,6 +125,8 @@ def verify_bundle(bundle):
         pending.append((relative, data))
     if '.local/env-vault/.env' not in seen:
         raise ValueError('配置包缺少 env 真源。')
+    if any(item['path'] in seen for item in generated):
+        raise ValueError('同一模型目录同时声明复制和重建，未写入。')
     print(f'配置包完整性通过：{len(pending)} 个文件；凭据有效性和业务恢复另行验证。')
     return manifest, pending
 
@@ -148,6 +155,7 @@ def restore_bundle(bundle):
     from main import backup, restore
     home = Path.home().resolve()
     manifest, entries = verify_bundle(bundle)
+    entries += rebuild(manifest.get('generated_codex_catalogs', []))
     pending = []
     for relative, data in entries:
         target = home/relative

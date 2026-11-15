@@ -23,13 +23,15 @@ class MacBundle(unittest.TestCase):
         (self.old/'.qwen').mkdir()
         (self.old/'.qwen/settings.json').write_text(json.dumps({'path': str(self.old)+'/notes'}))
         self.bundle = self.base/'transfer bundle'
+        self.extra_env = {}
 
     def tearDown(self):
         self.temp.cleanup()
 
     def cli(self, home, action):
+        env = dict(os.environ, HOME=str(home)); env.update(self.extra_env)
         return subprocess.run([str(ROOT/'workbench'), 'private', action, str(self.bundle)],
-                              env=dict(os.environ, HOME=str(home)), text=True,
+                              env=env, text=True,
                               capture_output=True, timeout=20)
 
     def export(self):
@@ -61,21 +63,79 @@ class MacBundle(unittest.TestCase):
         self.assertEqual((self.new/'.env').read_text(), 'keep-existing')
         self.assertFalse((self.new/'.local/env-vault').exists())
 
-    def test_codex_catalog_referenced_by_configuration_is_restored_with_configuration(self):
+    def codex_fixture(self):
+        native = {'models': [{'slug': 'first', 'base_instructions': 'native instructions '*1024},
+                             {'slug': 'second', 'base_instructions': 'other instructions'}]}
+        version = json.loads((ROOT/'components/multica/config/agents.json').read_text())['compatibility']['codex']
+        binary = self.base/'bin/codex'; binary.parent.mkdir()
+        binary.write_text('#!/usr/bin/env python3\nimport sys\n'
+                          'if sys.argv[1:] == ["--version"]: print('+repr('codex-cli '+version)+')\n'
+                          'elif sys.argv[1:] == ["debug", "models", "--bundled"]: print('+repr(json.dumps(native))+')\n'
+                          'else: raise SystemExit(99)\n')
+        binary.chmod(0o755)
+        self.extra_env['PATH'] = str(binary.parent)+os.pathsep+os.environ['PATH']
+        return native
+
+    def test_codex_catalog_is_rebuilt_exactly_without_copying_derived_metadata(self):
+        native = self.codex_fixture()
         codex = self.old/'.codex'; (codex/'model-catalogs').mkdir(parents=True)
         catalog = codex/'model-catalog.selected.json'
         (codex/'config.toml').write_text('model_catalog_json = "'+str(catalog)+'"\n')
-        content = json.dumps({'models': [{'slug': 'fixture-model', 'display_name': 'Fixture model'}]})
+        content = json.dumps({'models': [native['models'][1], native['models'][0]]})
         catalog.write_text(content)
         (codex/'model-catalogs/litellm-local.json').write_text(content)
         self.export()
+        manifest = json.loads((self.bundle/'manifest.json').read_text())
+        self.assertEqual(manifest['generated_codex_catalogs'][0]['slugs'], ['second', 'first'])
+        self.assertLess(len(json.dumps(manifest['generated_codex_catalogs'])), 1024)
+        self.assertFalse((self.bundle/'payload/.codex/model-catalog.selected.json').exists())
+        self.assertFalse((self.bundle/'payload/.codex/model-catalogs/litellm-local.json').exists())
         proc = self.cli(self.new, 'restore-mac')
         self.assertEqual(proc.returncode, 0, proc.stderr)
         restored = self.new/'.codex/model-catalog.selected.json'
         self.assertEqual(json.loads(restored.read_text()), json.loads(content))
         self.assertIn(str(restored), (self.new/'.codex/config.toml').read_text())
-        self.assertEqual(json.loads((self.new/'.codex/model-catalogs/litellm-local.json').read_text()),
-                         json.loads(content))
+        self.assertFalse((self.new/'.codex/model-catalogs/litellm-local.json').exists())
+
+    def test_custom_model_metadata_is_not_silently_replaced_by_bundled_defaults(self):
+        native = self.codex_fixture()
+        codex = self.old/'.codex'; codex.mkdir()
+        (codex/'config.toml').write_text('model_catalog_json = "'+str(codex/'model-catalog.selected.json')+'"\n')
+        native['models'][0]['base_instructions'] = 'custom instructions'
+        (codex/'model-catalog.selected.json').write_text(json.dumps(native))
+        result = self.cli(self.old, 'export-mac')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(self.bundle.exists())
+
+    def test_legacy_catalog_payload_still_restores_without_native_codex(self):
+        self.export()
+        content = json.dumps({'models': [{'slug': 'legacy', 'base_instructions': 'custom'}]}).encode()
+        relative = '.codex/model-catalog.selected.json'
+        payload = self.bundle/'payload'/relative; payload.parent.mkdir(parents=True)
+        payload.write_bytes(content)
+        path = self.bundle/'manifest.json'; manifest = json.loads(path.read_text())
+        manifest.pop('generated_codex_catalogs')
+        manifest['files'].append({'path': relative, 'sha256': hashlib.sha256(content).hexdigest(),
+                                  'size': len(content)})
+        path.write_text(json.dumps(manifest))
+        result = self.cli(self.new, 'restore-mac')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads((self.new/relative).read_text()), json.loads(content))
+
+    def test_changed_native_metadata_fails_before_overwriting_existing_configuration(self):
+        native = self.codex_fixture()
+        codex = self.old/'.codex'; codex.mkdir()
+        (codex/'config.toml').write_text('model_catalog_json = "'+str(codex/'model-catalog.selected.json')+'"\n')
+        (codex/'model-catalog.selected.json').write_text(json.dumps(native))
+        self.export()
+        (self.new/'.env').write_text('keep-existing')
+        path = self.bundle/'manifest.json'; manifest = json.loads(path.read_text())
+        manifest['generated_codex_catalogs'][0]['sha256'] = '0'*64
+        path.write_text(json.dumps(manifest))
+        result = self.cli(self.new, 'restore-mac')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual((self.new/'.env').read_text(), 'keep-existing')
+        self.assertFalse((self.new/'.codex/config.toml').exists())
 
     def test_manifest_traversal_rejected(self):
         self.export()

@@ -81,6 +81,8 @@ Multica 网页调好 Agent：`./workbench multica plan` 看服务端差异；`./
 
 # 迁机基础配置：旧机导出；将整个私有目录复制到新机后校验并恢复。
 # 导出目录必须在仓库外且尚不存在；包内含秘密，不上传公开网盘或 Git。
+# 若有 Codex 模型目录，旧机导出使用 Python 3.11+ 和清单锁定版 Codex；
+# 新机先完成 install mac --agents，再 restore-mac，以原生程序重建目录。
 ./workbench private export-mac "$HOME/feipi-mac-private"
 ./workbench private verify-mac "$HOME/feipi-mac-private"
 ./workbench private restore-mac "$HOME/feipi-mac-private"
@@ -146,7 +148,9 @@ bash components/openclaw/scripts/deploy.sh --dependencies-only --yes
 
 OpenClaw 当前原生备份拒绝 `.env` 的绝对符号链接，因此使用标准 tar：停 Gateway → SQLite integrity_check 与 WAL checkpoint → 归档原状态（不跟随链接）和实际 env 文件 → 校验 → 恢复原启动状态。停写后使用 SQLite 原生读写连接，允许初始化已删除的 WAL 辅助文件；仍有锁定或数据库损坏即失败。不热复制 SQLite，不归档整个 HOME。Multica 复用原停写 pg_dump + 附件 + 服务密钥流程；单独备份前还须 `service multica stop`，完成后 `start`；集中准备入口自动处理已加载的受管 LaunchAgent。`verify multica` 在无网络临时 PostgreSQL 中恢复验证；`verify openclaw` 是摘要验证，SQLite 恢复演练应在新目录解包后运行，不能将校验和通过称作完整功能恢复。
 
-`export-mac` 只包含固定白名单的基础配置，包括 Codex 已选择的模型目录和本地 LiteLLM 模型目录 JSON，避免恢复配置后引用不存在的文件。解引用 `.env` 后保存真源，恢复时重建指向本机 vault 的相对链接。恢复先校验全部摘要，再备份已有目标和原子写入；不复制设备身份、认证、运行中数据库或模型权重。HOME 变化时仅调整配置中以旧 HOME 开头的路径；密钥有效性、SSH 授权、服务数据和模型仍须分别验收。完整新机交付进展见 [验收清单](new-mac-delivery.md)。
+`export-mac` 只包含固定白名单的基础配置。对于 Codex 配置实际引用的模型目录，只保存模型名称、程序版本和元数据摘要；新机使用锁定版 `codex debug models --bundled` 精确重建，不传完整派生 JSON，也不带未引用的旧目录。若是自定义元数据或原生内容不匹配，导出或恢复会在写入前失败，并提示单独复制，不用近似默认值代替。旧格式配置包仍可恢复。
+
+导出解引用 `.env` 后保存真源，恢复时重建指向本机 vault 的相对链接。恢复先校验全部摘要和可重建内容，再备份已有目标和原子写入；不复制设备身份、认证、运行中数据库或模型权重。HOME 变化时仅调整配置中以旧 HOME 开头的路径；密钥有效性、SSH 授权、服务数据和模型仍须分别验收。完整新机交付进展见 [验收清单](new-mac-delivery.md)。
 
 `prepare-migration` 在基础配置外集中保存 Multica、OpenClaw 和 LiteLLM 的原生一致性备份、FlClash 官方备份、三个当前使用的 oMLX 模型，以及机器绑定引用的 Git 项目和 env vault 历史。Git 项目保留全部 refs、stash、暂存/未暂存补丁、未跟踪文件及固定私有覆写项；成长日记和装修项目还保留忽略的资料原件，家庭健康和房地产等非 Git 资料单独归档，跳过声明的构建缓存。它不复制 Multica 登录/设备身份、Podman VM 或容器镜像；新设备账号登录、节点同步、系统权限和切换前旧机停主力仍是集中准备中的独立事项。失败批次含 `INCOMPLETE`，不能用于恢复。`restore-sources` 只恢复代码和资料，不启动业务；已有工作台源码目录也会触发保全检查，可用 `--only 'Documents/…'` 选择其余来源。
 
