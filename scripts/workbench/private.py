@@ -74,6 +74,9 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     sub = p.add_subparsers(dest='action', required=True)
     sub.add_parser('check')
+    for action in ('export-mac', 'verify-mac', 'restore-mac'):
+        bundle = sub.add_parser(action)
+        bundle.add_argument('bundle')
     backup = sub.add_parser('backup')
     backup.add_argument('component', choices=['openclaw', 'multica', 'openclash'])
     verify = sub.add_parser('verify')
@@ -82,6 +85,9 @@ def main():
     a = p.parse_args()
     if a.action == 'check':
         return check()
+    if a.action.endswith('-mac'):
+        return subprocess.run([sys.executable, str(ROOT/'scripts/workbench/mac_bundle.py'),
+                               a.action.removesuffix('-mac'), a.bundle]).returncode
     if a.component == 'openclash':
         args = ['backup'] if a.action == 'backup' else ['verify-backup', a.batch]
         return subprocess.run(['python3', str(ROOT/'components/openclash/router.py'), *args]).returncode

@@ -25,6 +25,7 @@ Mac 不自动覆盖现有真实目录（例如 `~/bin`），必须先合并或�
 
 ```bash
 ./workbench install mac       # 复用 Brewfile 和 bootstrap：brew/node/rust/ohmyzsh
+./workbench install mac --apps # 新机同时安装终端、AI 客户端、浏览器、文档与 Java 应用
 ./workbench apply mac
 ./workbench install skills    # 等同 apply skills
 ./workbench install services  # 检查 Podman/Compose，安装定义，不启动所有服务
@@ -77,10 +78,18 @@ Multica 网页调好 Agent：`./workbench multica plan` 看服务端差异；`./
 ./workbench private backup openclaw
 ./workbench private backup multica
 ./workbench private backup openclash
+
+# 迁机基础配置：旧机导出；将整个私有目录复制到新机后校验并恢复。
+# 导出目录必须在仓库外且尚不存在；包内含秘密，不上传公开网盘或 Git。
+./workbench private export-mac "$HOME/feipi-mac-private"
+./workbench private verify-mac "$HOME/feipi-mac-private"
+./workbench private restore-mac "$HOME/feipi-mac-private"
 ./workbench private verify <组件> <输出的私有批次>
 ```
 
 OpenClaw 当前原生备份拒绝 `.env` 的绝对符号链接，因此使用标准 tar：停 Gateway → SQLite integrity_check → 归档原状态（不跟随链接）和实际 env 文件 → 校验 → 恢复原启动状态。不热复制 SQLite，不归档整个 HOME。Multica 复用原停写 pg_dump + 附件 + 服务密钥流程；备份前还须 `service multica stop`，完成后 `start`。`verify multica` 在无网络临时 PostgreSQL 中恢复验证；`verify openclaw` 是摘要验证，SQLite 恢复演练应在新目录解包后运行，不能将校验和通过称作完整功能恢复。
+
+`export-mac` 只包含固定白名单的基础配置，解引用 `.env` 后保存真源，恢复时重建指向本机 vault 的相对链接。恢复先校验全部摘要，再备份已有目标和原子写入；不复制设备身份、认证、运行中数据库或模型。HOME 变化时仅调整配置中以旧 HOME 开头的路径；密钥有效性、SSH 授权、服务数据和模型仍须分别验收。完整新机交付进展见 [验收清单](new-mac-delivery.md)。
 
 备份目录：`~/.local/state/feipi-workbench/{backups,changes,openclaw-backups,openclash-backups}` 与 `~/.local/state/multica/backups`。不自动清理，避免删除最后可用副本。长期保留最近可恢复批次并加密复制到用户选定的外部介质；本次未配置自动外传。
 
