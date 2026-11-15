@@ -30,6 +30,7 @@ class PodmanBootstrap(unittest.TestCase):
             return ''
         with patch.dict(podman.os.environ, {}, clear=True), \
                 patch.object(podman.platform, 'system', return_value='Darwin'), \
+                patch.object(podman.subprocess, 'run', return_value=type('Result', (), {'returncode': 0, 'stdout': '1'})()), \
                 patch.object(podman, 'command', side_effect=command):
             podman.ensure()
         return calls
@@ -59,6 +60,15 @@ class PodmanBootstrap(unittest.TestCase):
     def test_connection_override_is_rejected_before_any_command(self):
         with patch.dict(podman.os.environ, {'CONTAINER_HOST': 'unix:///tmp/another.sock'}), \
                 patch.object(podman, 'command') as command, self.assertRaises(ValueError):
+            podman.ensure()
+        command.assert_not_called()
+
+    def test_mac_without_hypervisor_never_creates_or_downloads_machine(self):
+        result = type('Result', (), {'returncode': 0, 'stdout': '0'})()
+        with patch.object(podman, 'local_connection', return_value=None), \
+                patch.object(podman.platform, 'system', return_value='Darwin'), \
+                patch.object(podman.subprocess, 'run', return_value=result), \
+                patch.object(podman, 'command') as command, self.assertRaisesRegex(ValueError, '虚拟化'):
             podman.ensure()
         command.assert_not_called()
 

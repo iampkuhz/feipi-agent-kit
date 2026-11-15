@@ -91,6 +91,6 @@ brew_environment="$("$brew_command" shellenv)"
 eval "$brew_environment"
 # 工作台自身需要 Git/Python；最小清单先于 Python 编排运行，不重复全量安装。
 printf 'brew "git"\nbrew "python"\n' >"$bootstrap_temp/Brewfile"
-HOMEBREW_NO_AUTO_UPDATE=1 "$brew_command" bundle install --no-upgrade --file "$bootstrap_temp/Brewfile"
+HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=1 "$brew_command" bundle install --no-upgrade --file "$bootstrap_temp/Brewfile"
 python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)'
 echo "裸机前置阶段完成；完整环境继续执行工作台部署与功能验收。"

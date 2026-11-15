@@ -15,6 +15,10 @@ import time
 import urllib.request
 
 ROOT = Path(__file__).resolve().parents[2]
+# 工作台与脱离源码运行的自启脚本共用同一就绪合同。
+sys.path.insert(0, str(ROOT/'tools/runtime'))
+from service_health import wait_service
+
 HOME = Path.home()
 STATE = HOME / '.local/state/feipi-workbench'
 RUNTIME = HOME / '.local/share/feipi-workbench'
@@ -418,29 +422,25 @@ def services_ready():
         return False
 
 
-def wait_service(component, endpoint):
-    """首次迁移/浏览器准备可能较慢；有界等待健康检查，不反复重建。"""
-    deadline = time.monotonic()+600
-    attempt = 0
-    while time.monotonic() < deadline:
-        try:
-            with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(endpoint, timeout=3) as response:
-                if response.status == 200:
-                    print(component+' readiness 已通过；业务能力需真实请求验证。')
-                    break
-        except OSError:
-            pass
-        if attempt % 10 == 0:
-            print('等待 '+component+' 首次初始化及服务就绪…', flush=True)
-        time.sleep(2)
-        attempt += 1
-    else:
-        raise ValueError(component+' 未在 10 分钟内就绪；保留运行状态供 service '+component+' logs 检查，不重复重建数据库。')
-
-
 def service(component, args):
     if component == 'podman':
         run([sys.executable, ROOT/'tools/runtime/podman.py', *args])
+    elif component == 'startup':
+        script = RUNTIME/'services/tools/runtime/startup.py'
+        if not script.is_file():
+            raise ValueError('先 apply services，发布独立自启运行副本。')
+        if args == ['install']:
+            paths = [HOME/'Library/LaunchAgents'/(label+'.plist') for label in
+                     ['com.local.envvault', 'com.feipi.podman-services']]
+            batch = backup('startup', paths)
+            print('自启文件回退：./workbench restore '+str(batch), flush=True)
+            try:
+                run([sys.executable, script, *args])
+            except (ValueError, OSError, subprocess.SubprocessError):
+                restore(batch)
+                raise
+        else:
+            run([sys.executable, script, *args])
     elif component in SERVICE_SCRIPTS:
         script = RUNTIME/'services/tools'/SERVICE_SCRIPTS[component]
         if not script.exists():
@@ -461,7 +461,7 @@ def service(component, args):
     elif component == 'openclash':
         run(['python3', ROOT/'components/openclash/router.py', *args])
     else:
-        raise ValueError('支持 podman/litellm/searxng/crawl4ai/otel/openclaw/multica/openclash')
+        raise ValueError('支持 startup/podman/litellm/searxng/crawl4ai/otel/openclaw/multica/openclash')
 
 
 def mac_preflight():
@@ -494,7 +494,7 @@ def install(component, apps=False, agents=False):
             if not brew:
                 raise ValueError('依赖阶段后仍未发现 Homebrew，未安装应用。')
             run([brew, 'bundle', 'install', '--no-upgrade', '--file', base.parent/'Brewfile.apps'],
-                env=dict(os.environ, HOMEBREW_NO_AUTO_UPDATE='1'))
+                env=dict(os.environ, HOMEBREW_NO_AUTO_UPDATE='1', HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK='1'))
         print('依赖已准备；下一步 diff/capture/apply mac。')
     elif component == 'openclaw':
         run(['bash', ROOT/'components/openclaw/scripts/deploy.sh', '--yes'])

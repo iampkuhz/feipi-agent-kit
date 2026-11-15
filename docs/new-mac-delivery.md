@@ -9,7 +9,7 @@
 | 原 dotfiles 配置 | 57 个跟踪文件和 6 个新增文件完整迁入并已推送；执行权限一致 | 已核对 |
 | Bash 3.2 与 UTF-8 | 实际预览、来源检查及 C/UTF-8 两组回归通过 | 本轮修复并通过 |
 | 裸机前置 | 无 Git/Python 时使用系统 Bash；固定官方安装器、摘要校验、一次 sudo 授权 | 干净 macOS 26.6.2 中已真实无交互完成 CLT、Homebrew、Git、Python 安装及独立 check；完整工具链待验 |
-| 工作台编排 | install 复用组件阶段及失败传播；Node/Rust 可供后续补全使用 | 已统一；C/UTF-8 的四阶段、环境传递与失败停止回归通过，冷安装待验 |
+| 工作台编排 | install 复用组件阶段及失败传播；Node/Rust 可供后续补全使用 | 干净 macOS 上四阶段真实通过：Brew 33 项、Node 26.13.1、Rust 1.100.0、oh-my-zsh/插件/补全；重复执行及最终整机验收待做 |
 | 配置发布与来源 | 空白 HOME 首次/重复应用、33 个配置来源及内容、路径别名、冲突保全 | Mac 两种 locale 与工作台回归通过，最终整机复验待做 |
 | 常用软件 | 对照旧机 Brew 清单、近期命令频率、真实应用/脚本依赖 | CLI 清单补充；16 项应用清单与 --apps 安装入口已增加，真实新机安装待验 |
 | AI CLI/客户端 | 锁定现有兼容版本安装、登录状态、真实小任务 | --agents 已增加四个锁定版 CLI 安装；旧机四版本 check 通过，冲突/摘要/只读回归通过；新机安装、账号和真实任务待验 |
@@ -18,7 +18,7 @@
 | 服务冷启动 | Podman VM、本地连接、Compose、镜像拉取、健康等待、模型实际请求 | 默认本机 Podman ensure 及三服务 10 分钟就绪等待已增加；28 项工作台、18 项服务回归通过；旧机 ensure 真实通过且未重启现有 VM；完整冷启动待验 |
 | 图表和文档 | Mermaid、draw.io、PlantUML、PPT/PDF 实际生成并检查产物 | 待新机验收 |
 | oMLX/语音 | 安装来源、模型清单、设置恢复、首次推理 | 待补 |
-| 自启与重启 | Env Vault、Podman/受管服务、OpenClaw、Multica 按依赖恢复；完整重启后小任务 | 旧机入口已盘点，待补并验收 |
+| 自启与重启 | Env Vault、Podman/受管服务、OpenClaw、Multica 按依赖恢复；完整重启后小任务 | Env Vault/Podman 三服务自启已补；隔离 HOME 真实 CLI 安装、重复安装及路径检查通过；实际加载/重启和其他组件待验 |
 | 人工准备 | 所有必要 copy/export/授权命令集中成一次操作；运行中不逐项追问 | 待交付可执行命令包 |
 | 最终端到端证明 | 干净 macOS、准确源码版本/环境指纹、逐阶段日志、真实产物、重复执行、失败恢复 | 未完成 |
 
@@ -28,16 +28,19 @@
 - 原来源验证只接受源码链接：增加工作台运行副本识别，同时逐文件比较源码与副本内容；旧副本仍失败。
 - macOS `/var` 与 `/private/var` 别名导致 doctor 误报：统一解析真实路径，增加别名回归。
 - 工作台原先直接循环四个脚本，遗漏总入口前置检查及 Node/Rust 环境激活：复用总入口的依赖阶段；统一仓库的组件入口转到工作台发布。
-- 本机 Brew 清单缺少 Homebrew 管理的 Git 和 jq：本轮实际安装 Git 2.56.1、jq 1.8.2；按其依赖更新 libunistring 1.4.2 → 1.5，安装 oniguruma 6.9.10。首轮直连 GHCR 瓶包出现 TLS 错误，改用已确认可访问 GHCR 的当前代理后安装成功。共享 Brewfile 33 项现已检查通过；libtiff/webp 仍有不阻塞检查的元数据循环告警，需进一步定位，不通过删除软件处理。
+- 本机 Brew 清单缺少 Homebrew 管理的 Git 和 jq：本轮实际安装 Git 2.56.1、jq 1.8.2；按其依赖更新 libunistring 1.4.2 → 1.5，安装 oniguruma 6.9.10。首轮直连 GHCR 瓶包出现 TLS 错误，改用已确认可访问 GHCR 的当前代理后安装成功。共享 Brewfile 33 项现已检查通过。
+- webp 的旧安装记录仍依赖 libtiff，而当前 libtiff 依赖 webp；重装当前 webp 后记录已更新，循环告警消失。操作意外触发 Homebrew 连带升级，已中止后续升级，已发生的变更包括 jpeg-turbo、little-cms2、librsvg、Graphviz、OpenJPH、OpenEXR、JPEG XL、ImageMagick、yt-dlp 及部分图像/证书/Python 依赖；没有回滚卸载现有库。`brew missing` 通过，共享清单 check 通过；JPEG→WebP→TIFF→PNG、Graphviz SVG、PDF→PNG 实际产物通过。安装入口已额外禁用已安装 dependent 的连带升级，显式 upgrade 保留原能力。
 
-工作台当前 32 项回归（含裸机前置、配置包、Podman/就绪、Agent 安装边界）、服务 18 项回归通过。以上覆盖程序/配置层，不包含实际新机服务、账号和重启验收。
+工作台 39 项回归与服务 18 项回归通过，覆盖原生自启、Env Vault 幂等/权限/保全其他暂存项、Git 环境隔离、服务失败隔离与不支持虚拟化的提前失败边界。以上覆盖程序/配置层，不包含实际新机服务、账号和重启验收。
 
 软件使用依据分开记录：Shell 历史覆盖 2025-08 至 2026-11，不能把全量频次当作最近使用。最近 30 天可定位 Podman 22 次、session-browser 12 次、SSH 11 次、tree/psql 各 1 次；Agent 自动调用通常不写该历史，因此还依据当前脚本依赖和运行服务补入 jq、ripgrep、PDF/Graphviz 工具、语言管理器与文档浏览器。session-browser 与相关 Java 项目仍需纳入后续完整环境恢复，不能仅安装 JDK 就认为功能已恢复。
+
+追加盘点：Session Browser 的原生入口明确要求 JDK 25，应用清单已改为 `temurin@25`（不能用当前最新主版本替代）。旧机 7890 监听由 FlClash for oixCloud 0.9.2 提供；只恢复 `.env` 会让代理变量指向未启动的端口，代理客户端/私有配置恢复仍需补齐。oMLX 0.4.4 与三个本地模型（Qwen3-ASR-1.7B-4bit、Qwen3.5-0.8B-MLX-4bit、SenseVoiceSmall）已盘点，完整安装/恢复待做。
 
 ## 当前真实验证条件
 
 当前主机为 Apple M1、16 GiB 内存，可用磁盘约 77 GiB，未预装 macOS VM 工具。已查询 Tart 官方文档：当前主机不能提供 Podman 所需的嵌套虚拟化，因此即便虚拟机内基础软件通过，也不能据此声称整套本地容器服务已经在干净 Mac 验收。仍推进可独立完成的软件/恢复/服务交付，并寻找真实可用的整机验收路径。
 
-Tart 手动下载首次经当前代理请求 GitHub API 返回 403；限定该下载使用直连后成功，Tart 2.41.1 归档通过官方 release 校验和。干净镜像 `ghcr.io/cirruslabs/macos-tahoe-vanilla@sha256:eeec54bfe1f076e27786c5d92b89187a05b1d109b5071eb2dcdf02d596e34640` 已下载并启动，2 CPU / 4 GiB。实际为 macOS 26.6.2 arm64，未安装 CLT/Homebrew。已复制干净的 621a438 源码快照；固定 Homebrew 安装器摘要通过，正在真实无交互安装 CLT，尚未宣称前置安装成功。验证工具、镜像和日志保存于仓库外 `~/.local/state/feipi-workbench/new-mac-validation/`，关闭自动清理其他镜像。
+Tart 手动下载首次经当前代理请求 GitHub API 返回 403；限定该下载使用直连后成功，Tart 2.41.1 归档通过官方 release 校验和。干净镜像 `ghcr.io/cirruslabs/macos-tahoe-vanilla@sha256:eeec54bfe1f076e27786c5d92b89187a05b1d109b5071eb2dcdf02d596e34640` 已下载并启动，2 CPU / 4 GiB。实际为 macOS 26.6.2 arm64，未安装 CLT/Homebrew。已复制干净的 621a438 源码快照；固定 Homebrew 安装器摘要及真实 CLT/Homebrew/Git/Python 安装已通过。验证系统卷已扩至约 80 GB，完整 33 项工具链及四个 Agent CLI 正在冷安装；本机 kern.hv_support=1，而该虚拟机为 0，Podman 已增加下载前的明确拒绝。验证工具、镜像和日志保存于仓库外 `~/.local/state/feipi-workbench/new-mac-validation/`，关闭自动清理其他镜像。
 
 参考：[Tart 嵌套虚拟化边界](https://tart.run/faq/#nested-virtualization-support)、[Homebrew 无交互安装](https://docs.brew.sh/Installation#unattended-installation)、[OpenAI 固定版本 Codex 安装示例](https://developers.openai.com/cookbook/examples/codex/build_iterative_repair_loops_with_codex)。

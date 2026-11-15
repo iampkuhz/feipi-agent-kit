@@ -34,6 +34,26 @@ make setup
 
 draw.io 已有独立的固定源码快照与构建流程，继续复用，不导出旧镜像。PlantUML 继续使用其 skill 的有界预检合同，不在此引入另一套渲染编排。
 
+## 登录自启与 Env Vault
+
+恢复私有包、确认 `~/.env` 后，集中安装自启定义：
+
+```bash
+./workbench apply services
+./workbench service startup install # 先备份两个已有 plist，写入运行副本路径并保存 env 本地 Git 快照
+./workbench service startup check
+./workbench service startup start   # 加载当前用户图形登录域；会替换同名旧自启任务
+```
+
+Env Vault 使用原生 WatchPaths 与 5 分钟兜底调度，不再依赖旧机 fswatch/xargs 管道；仅提交
+`~/.local/env-vault/env` 到该私有目录的 Git 历史，不执行 hooks、不提交其他暂存文件、不上传。
+Podman 自启复用默认本机 ensure，然后分别启动 LiteLLM、SearXNG、Crawl4AI 并等待就绪；
+一个服务失败仍继续其他独立服务，最终返回失败并保留日志。
+
+日志位于 `~/.local/state/feipi-workbench/logs/com.local.envvault*` 与 `com.feipi.podman-services*`。
+加载成功只表示 LaunchAgent 注册完成；完整重启、三个服务的真实业务请求，以及 OpenClaw、Multica、
+oMLX、图表渲染服务的各自恢复与验收仍须完成。
+
 ## 配置和数据
 
 - **SearXNG**：复用 Git 中的 settings 和固定镜像版本；启动脚本不自动加载根 `.env`。

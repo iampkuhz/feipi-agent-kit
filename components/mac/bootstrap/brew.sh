@@ -49,6 +49,8 @@ fi
 # 安装与检查不触发 Homebrew 自动更新；显式 upgrade 才允许更新元数据。
 if [[ "$MODE" != "upgrade" ]]; then
   export HOMEBREW_NO_AUTO_UPDATE=1
+  # 补装不连带刷新其他已装软件；显式 upgrade 保留 Homebrew 的升级检查。
+  export HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=1
 fi
 
 # 共享清单和单机清单使用同一模式处理，避免两套安装逻辑逐渐分叉。

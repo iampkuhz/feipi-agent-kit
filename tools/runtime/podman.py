@@ -33,6 +33,10 @@ def local_connection():
 def ensure():
     connection = local_connection()
     if platform.system() == 'Darwin':
+        support = subprocess.run(['/usr/sbin/sysctl', '-n', 'kern.hv_support'],
+                                 capture_output=True, text=True, timeout=10)
+        if support.returncode or support.stdout.strip() != '1':
+            raise ValueError('当前 macOS 不提供本地虚拟化能力（kern.hv_support != 1）；未下载或创建 Podman machine。请在支持虚拟化的物理 Mac 上验收容器服务。')
         machines = json.loads(command('machine', 'list', '--format', 'json')) or []
         if not machines:
             if connection:
