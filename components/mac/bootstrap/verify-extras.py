@@ -117,6 +117,7 @@ def omlx(base, environment, models):
     headers = {'Authorization': 'Bearer '+token}
     state = base/'omlx-state'
     settings_home = Path.home()/'.omlx'
+    model_settings = {}
     restored_settings = models == (settings_home/'models').resolve() and (settings_home/'settings.json').is_file()
     if restored_settings:
         # 在隔离副本中读取迁入配置，实际验证原生模型路径解析；不改动用户设置。
@@ -124,6 +125,8 @@ def omlx(base, environment, models):
         for name in ('settings.json', 'model_settings.json'):
             if (settings_home/name).is_file():
                 shutil.copy2(settings_home/name, state/name)
+        if (state/'model_settings.json').is_file():
+            model_settings = json.loads((state/'model_settings.json').read_text()).get('models', {})
     model_arguments = [] if restored_settings else ['--model-dir', str(models)]
     command = [str(Path.home()/'.local/bin/omlx'), 'serve', '--host', '127.0.0.1',
                '--port', endpoint.rsplit(':', 1)[1], '--base-path', str(state),
@@ -131,10 +134,14 @@ def omlx(base, environment, models):
                '--max-concurrent-requests', '1']
     with server(command, base/'omlx.log', environment) as process:
         available = json.loads(ready(process, endpoint+'/v1/models', headers))['data']
+        (base/'omlx-models.json').write_text(json.dumps(available, indent=2)+'\n')
         ids = [row['id'] for row in available]
         chosen = {}
         for name in required:
-            matches = [item for item in ids if item == name or item.endswith('/'+name)]
+            settings = next((value for key, value in model_settings.items()
+                             if key == name or key.endswith('/'+name)), {})
+            expected = settings.get('model_alias') or name
+            matches = [item for item in ids if item == expected or item.endswith('/'+expected)]
             if len(matches) != 1:
                 raise RuntimeError('模型发现结果缺失或歧义：'+name)
             chosen[name] = matches[0]
@@ -162,7 +169,8 @@ def omlx(base, environment, models):
                 raise RuntimeError('语音验证句识别不符：'+name+'；见私有产物。')
             transcriptions[name] = text
         (base/'omlx-transcriptions.json').write_text(json.dumps(transcriptions, indent=2)+'\n')
-    return {'text_inference': True, 'speech_models': list(transcriptions), 'restored_settings': restored_settings}
+    return {'text_inference': True, 'speech_models': list(transcriptions),
+            'restored_settings': restored_settings, 'model_ids': chosen}
 
 
 def main():
