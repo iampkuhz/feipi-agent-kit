@@ -51,6 +51,13 @@ class Publication(unittest.TestCase):
         self.assertEqual((self.target / 'versions.json').read_bytes(), before)
         self.assertTrue((self.home / '.local/bin/test-worker').is_symlink())
 
+    def test_fresh_home_does_not_require_an_existing_local_bin(self):
+        (self.home / '.local/bin').rmdir()
+        result = self.publish()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((self.home / '.local/bin/test-worker').is_symlink())
+        self.assertEqual((self.home / '.local/bin').stat().st_mode & 0o777, 0o700)
+
     def test_scoped_update_refuses_runtime_drift(self):
         self.assertEqual(self.publish().returncode, 0)
         (self.target / 'versions.json').write_text('{"local": true}')

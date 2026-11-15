@@ -60,6 +60,8 @@ for path in bin_files:
         raise SystemExit('Refusing to replace an unrelated command: ' + path.name)
     if command.exists() and not command.is_symlink():
         raise SystemExit('Refusing to replace an existing regular file: ' + path.name)
+if bin_files:
+    (home / '.local/bin').mkdir(mode=0o700, parents=True, exist_ok=True)
 for path in files:
     relative = path.relative_to(source)
     installed = target / relative
