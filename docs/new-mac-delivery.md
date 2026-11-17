@@ -28,7 +28,7 @@
 | 图表和文档 | Mermaid、draw.io、PlantUML、PPT/PDF 实际生成并检查产物 | Chrome/LibreOffice 中英文 PDF 导出、字体嵌入及 PNG 渲染通过；Mermaid 原生 Chrome 的 SVG/PNG、可编辑 PPTX 与 QuickLook/CoreText 渲染及实际看图通过；旧机现有 draw.io/PlantUML 服务的中文 SVG/PNG 出图及实际看图通过；两者新机本地容器冷启动与 PowerPoint 编辑回环待验 |
 | oMLX/语音 | 安装来源、模型清单、设置恢复、首次推理 | 三个模型及完整设置已从迁移包恢复；文本及 Qwen3-ASR/SenseVoiceSmall 语音推理通过；本轮原生 start、登录自启及重启后文本请求通过；菜单栏显示准备仍按集中清单执行 |
 | 自启与重启 | Env Vault、Podman/受管服务、OpenClaw、Multica 按依赖恢复；完整重启后小任务 | Env Vault 加载、快照及电源重启恢复通过；终端 Node/Rust/Codex 复验通过。Session Browser/oMLX 未手动启动即 HTTP 200，oMLX 控制状态及真实文本请求通过。Podman 因该 VM 不支持嵌套虚拟化明确失败，其他组件待验 |
-| 人工准备 | 所有必要 copy/export/授权命令集中成一次操作；运行中不逐项追问 | [集中清单](new-mac-prepare.md)已列出源码/配置、独立备份、用户直传、代理过渡、安装与授权；25 个文档命令块通过系统 Bash 3.2 语法检查；实体双机执行与最终切换待验 |
+| 人工准备 | 每阶段固定命令，完成后人工检查；本人登录和系统权限保持原生流程 | [分阶段清单](new-mac-prepare.md)已替换长段手工命令；新入口离线及隔离检查通过，双机传输与实机切换待验 |
 | 最终端到端证明 | 干净 macOS、准确源码版本/环境指纹、逐阶段日志、真实产物、重复执行、失败恢复 | 未完成 |
 
 业务恢复补验：Multica 原入口隐含依赖 Docker CLI/Compose 和旧机的 `/var/run/docker.sock`，共享清单现补入两项（加上 Fontconfig 后共 36 项），隔离配置自动发现 Homebrew Compose 插件并按机器绑定派生 Podman 当前 socket。干净 macOS 的空白 HOME 已真实执行 Docker Compose 5.7.1；本机现有服务只读查询通过，未重启服务。58 项 Multica 回归通过，现有 `20261101T102523041588` 备份也已恢复至独立、无网络的临时 PostgreSQL，四张表记录数一致并清理临时容器。它证明现有备份可恢复，不能代替当前数据的新备份或新机容器冷启动。
@@ -60,6 +60,13 @@ CLI 真实任务补验：Node 26 与 Qwen 0.12.3 内置 dispatcher 的接口不�
 真实备份还发现：Gateway 停止后微信 SQLite 会删除 WAL 辅助文件，原只读检查因此失败。已改为停写后的原生读写检查与 WAL checkpoint；损坏、锁定仍报错，退出时恢复 Gateway。当前 4 个数据库完整性检查及备份通过，失败测试也验证恢复启动与不输出秘密。模型采用标准 gzip 低压缩级别，减少大模型打包耗时；未打完的测试批次带 `INCOMPLETE`，不能用于恢复。
 
 ## 本轮发现与修复
+
+### 2026-11-17：固定阶段入口与雷雳连接
+
+- 新增 `workbench new-mac`，以 `network/prepare/software/config/services` 等明确阶段复用已有安装、配置发布、原生备份及检查入口；每次只运行一个阶段，结束提示人工检查与下一步。ZIP 源码可在无 Git/Python 时通过系统 Bash 准备前置，再转正式 Git 仓库。无需用户现场编写临时执行脚本。
+- 小配置接收、固定目录直传、业务备份回执与三项组件恢复分别是一条命令。接收中断不发布半包或混合批次；不打包/盘点个人资料容量。数据库只恢复空业务库；Multica 继续保留准确工作区访问、原生 plan 摘要审阅及 apply 门槛。
+- 按 Apple 官方资料改用雷雳线和雷雳网桥，或同一 Wi-Fi，统一复用 SSH/rsync；普通 Type-C 充电线不作为雷雳直连方案。当前 Mac 的网络服务已发现 Thunderbolt Bridge；尚未在两台实体机间接线或传输。
+- 工作台 110 项离线回归、Mac 初始化 C/en_US.UTF-8 两组回归、Bash/ShellCheck/shfmt 与 35 个文档命令块语法检查通过。本机真实 `network` 检查，以及隔离 HOME 通过完整新入口导出合成小配置、拒绝损坏包并确认未发布配置的检查通过。证据在私有 `~/.local/state/feipi-workbench/new-mac-validation/staged-entry.jMf2ib/`。这不是新机安装、双机传输或容器冷启动的实测证明。
 
 ### 2026-11-17：非交互前置与中断恢复
 

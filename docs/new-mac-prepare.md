@@ -1,188 +1,174 @@
-# 新 Mac 集中准备与执行清单
+# 新 Mac 分阶段部署
 
-Git 提供配置、清单和脚本；软件、依赖、镜像及派生文件在新机重建。私有配置使用约 23 KiB 的配置包。项目、资料、模型和必要原生备份由用户执行下面的传输命令，不要求生成整机大包，也不盘点资料容量。
+每次只执行一个仓库命令；脚本结束会说明人工检查项和下一步，不自动串到后一个阶段。软件、配置和可重建内容来自 Git 与固定安装入口；普通资料由用户运行直传命令，不盘点容量、不制作整机大包。新增入口的离线验证不等于新 Mac mini 已完成实机验收。
 
-本清单把人工输入集中列出；登录、系统权限和最终业务切换仍需本人完成。已实测范围与未完成项目见[交付验收](new-mac-delivery.md)，不能将这些命令的语法检查称为两台实体 Mac 的端到端证明。
+## 先准备网络
 
-准备期间不要求另提供干净 Mac；最终部署和端到端验收直接在用户的新 Mac mini 上完成。新机可以本地操作，SSH 不是准备阶段的前置条件。
-
-本文件供维护和桌面端复制完整命令。手机端汇报直接放在对话中，用短清单说明当前结果、待办及本人操作；需要决策时用简短选择卡片，执行时只展示当前阶段所需命令，不要求用户在手机阅读本文件或手填多组路径。现在只收集部署操作方式和账号可登录情况；新机初始设置、管理员授权、账号登录/扫码及系统权限到机器到手后集中引导，业务停写切换时间届时安排。
-
-## 旧机准备
-
-在本仓库根目录执行，基础配置导出目录必须尚不存在。源码归档只包含当前提交的 Git 跟踪内容，供新机尚无 Git 时运行前置安装；不包含工作区未提交改动。
+1. 新机完成 macOS 初始设置，使用普通管理员账号，连接 Wi-Fi。
+2. 手动安装 [FlClash for oixCloud 0.9.3](https://github.com/pickrui/FlClash/releases/tag/v0.9.3)，本人登录、同步节点，确认浏览器能上网。
+3. 下载[仓库 ZIP](https://github.com/iampkuhz/feipi-agent-kit/archive/refs/heads/main.zip)，在下载目录解压。让 Codex 打开解压目录，或在终端进入这个目录。此时不需要先装 Git/Python。
+4. 从解压目录执行一次网络检查：
 
 ```bash
-bash <<'EXPORT_CONFIG'
-set -euo pipefail
-./workbench private export-mac "$HOME/feipi-mac-private"
-./workbench private verify-mac "$HOME/feipi-mac-private"
-git archive --format=tar.gz --output "$HOME/feipi-bootstrap.tar.gz" HEAD
-EXPORT_CONFIG
+bash workbench new-mac network
 ```
 
-业务备份在最终切换维护窗口执行：先暂停 UI/聊天新派发，等活动任务归零，再执行下列命令。Multica 备份会短暂停 Web/API 写入并恢复 Web/API；daemon 保持停止。OpenClaw 备份会恢复原 Gateway 启动状态，最终切换前仍须停旧机 Gateway。记录两个命令打印的批次路径，填写下一节变量。
-
-```bash
-bash <<'BACKUP'
-set -euo pipefail
-umask 077
-./workbench service multica stop
-./workbench private backup multica
-./workbench private backup openclaw
-
-# LiteLLM 使用 PostgreSQL 原生一致性导出，不复制在线数据库目录。
-./workbench service podman check
-batch="$(mktemp -d "$HOME/feipi-litellm-backup.XXXXXX")"
-podman exec litellm-db-podman pg_dump -Fc -U litellm litellm > "$batch/database.dump.partial"
-podman exec -i litellm-db-podman pg_restore --list < "$batch/database.dump.partial" > /dev/null
-mv "$batch/database.dump.partial" "$batch/database.dump"
-podman inspect litellm-db-podman --format '{{.ImageName}}' > "$batch/database-image.txt"
-printf 'LiteLLM 备份：%s\n' "$batch"
-BACKUP
-```
-
-在 FlClash 官方界面导出本地备份到 `~/FlClash-backup.zip`，新机导入后完成账号登录和节点同步。授权和订阅不进入 Git。
-
-## 有线连接与传输
-
-用网线连接两台 Mac；旧机开启「系统设置 → 通用 → 共享 → 远程登录」，只允许自己的账号。查看旧机有线 IP，在新机填写以下变量；备份路径使用上一节打印的实际值。
-
-```bash
-export OLD_MAC='旧机账号@旧机有线IP'
-export OPENCLAW_BATCH='/Users/旧机账号/.local/state/feipi-workbench/openclaw-backups/实际批次'
-export MULTICA_BATCH='/Users/旧机账号/.local/state/multica/backups/实际批次'
-export LITELLM_BATCH='/Users/旧机账号/feipi-litellm-backup.实际后缀'
-```
-
-以下由用户在新机执行，不删除新机已有文件；普通项目、资料和模型目录的直传清单见[本地目录命令](workbench.md#本地目录由用户直接传输)。启用 LiteLLM 的 ChatGPT OAuth 上游时还需传输其 token 目录；使用自定义 `AGENT_SERVICE_DATA_DIR` 时替换示例中的数据根路径。
-
-```bash
-bash <<'COPY'
-set -euo pipefail
-umask 077
-ssh -n "$OLD_MAC" 'id -un'
-mkdir -p "$HOME/feipi-restore" "$HOME/feipi-restore/openclaw" \
-  "$HOME/feipi-restore/multica" "$HOME/feipi-restore/litellm"
-scp "$OLD_MAC:feipi-bootstrap.tar.gz" "$HOME/"
-scp -pr "$OLD_MAC:feipi-mac-private" "$HOME/"
-scp -p "$OLD_MAC:FlClash-backup.zip" "$HOME/"
-rsync -a -e ssh "$OLD_MAC:$OPENCLAW_BATCH/" "$HOME/feipi-restore/openclaw/"
-rsync -a -e ssh "$OLD_MAC:$MULTICA_BATCH/" "$HOME/feipi-restore/multica/"
-rsync -a -e ssh "$OLD_MAC:$LITELLM_BATCH/" "$HOME/feipi-restore/litellm/"
-COPY
-
-# 仅启用该上游时执行；目录内容由用户直接传，不重新打包。
-mkdir -p "$HOME/Documents/service-data/litellm/chatgpt-tokens"
-rsync -a -e ssh "$OLD_MAC:Documents/service-data/litellm/chatgpt-tokens/" \
-  "$HOME/Documents/service-data/litellm/chatgpt-tokens/"
-```
-
-新机下载暂时需要旧机代理时，在独立终端保留下列 SSH 会话；主终端设置对应代理后安装。17890 是临时转发端口，不替代新机 FlClash 的实际登录和同步。
-
-```bash
-ssh -N -o ExitOnForwardFailure=yes -L 127.0.0.1:17890:127.0.0.1:7890 "$OLD_MAC"
-# 主终端：
-export http_proxy=http://127.0.0.1:17890 https_proxy=http://127.0.0.1:17890
-export NO_PROXY=localhost,127.0.0.1,::1
-```
+人工检查：FlClash 节点已同步、浏览器能打开所需网站。终端检查仅覆盖 GitHub/Homebrew 来源；它优先保留已有代理，未指定代理且本机 7890 可达时为当前阶段启用该代理，不改 shell 启动文件。
 
 ## 新机安装与配置恢复
 
-普通用户在新机执行，首次 `sudo -v` 由本人授权。临时源码只用于准备 CLT/Homebrew/Git/Python；长期来源重新从 Git 克隆。若长期目录已存在，先核对其来源，不覆盖或重新套一层 clone。
+仍在 ZIP 解压目录执行：
 
 ```bash
-bash <<'INSTALL'
-set -euo pipefail
-bootstrap_source="$(mktemp -d "${TMPDIR:-/tmp}/feipi-bootstrap.XXXXXX")"
-tar -xzf "$HOME/feipi-bootstrap.tar.gz" -C "$bootstrap_source"
-sudo -v
-bash "$bootstrap_source/scripts/bootstrap/prerequisites.sh" install
-source "$bootstrap_source/components/mac/bootstrap/environment.sh"
-mkdir -p "$HOME/Documents/tools/llm"
-git clone --depth 1 https://github.com/iampkuhz/feipi-agent-kit.git "$HOME/Documents/tools/llm/feipi-agent-kit"
-cd "$HOME/Documents/tools/llm/feipi-agent-kit"
-./workbench install mac --apps --agents
-# 安装发生在子进程；刷新当前 Bash，才能找到本轮新建的 nvm default 和 Codex。
-source components/mac/bootstrap/environment.sh
-./workbench apply mac
-./workbench private verify-mac "$HOME/feipi-mac-private"
-./workbench private restore-mac "$HOME/feipi-mac-private"
-rm -rf "$bootstrap_source"
-INSTALL
+bash workbench new-mac prepare
 ```
 
-应用安装完成后，先在 FlClash 导入 ZIP、登录并同步节点，确认本机 7890 已可用，再关闭临时 SSH 转发。恢复的 env 指向本机代理，不能继续把尚未启动的 7890 当作可用网络。随后新开终端，进入长期仓库，先完成普通目录直传，再恢复 OpenClaw。这里只安装锁定程序和依赖、发布配置，不启动渠道，不发送消息。
+本阶段复用原前置脚本准备 CLT/Homebrew/Git/Python。需要时由本人输入一次管理员密码，然后克隆正式仓库到 `~/Documents/tools/llm/feipi-agent-kit`。已有正式仓库只核对来源，保留其改动，不自动 pull 或覆盖。人工检查：正式目录是 Git 仓库，Git/Python 可用。
+
+**此后让 Codex/终端切换到正式仓库，后续命令都从正式仓库执行。** 原始 ZIP 不作为日常配置来源。
 
 ```bash
-bash <<'RESTORE_CONFIG'
-set -euo pipefail
-source components/mac/bootstrap/environment.sh
-openclaw_version="$(python3 -c 'import json; print(json.load(open("components/openclaw/versions.json"))["openclaw"])')"
-npm install --global "openclaw@$openclaw_version"
-./workbench private restore-state openclaw "$HOME/feipi-restore/openclaw"
-bash components/openclaw/scripts/deploy.sh --dependencies-only --yes
-# OpenClaw 晚于基础终端安装；复用原入口生成补全，不升级已有主题或插件。
-bash components/mac/bootstrap/ohmyzsh.sh install
-./workbench apply openclaw
-./workbench apply skills
-./workbench apply services
-# 准备固定程序和入口，再从同批小配置重建本机路径；账号/数据/设备注册随后处理。
-python3 components/multica/scripts/install-native.py install
-python3 components/multica/scripts/install-runtime.py
-./workbench private restore-state multica "$HOME/feipi-restore/multica"
-python3 components/multica/scripts/configure.py --personal-profile
-bash components/mac/bootstrap/neovim.sh
-RESTORE_CONFIG
+./workbench new-mac software
 ```
 
-OpenClaw 独立备份恢复会核对固定文件摘要、原 HOME 和 SQLite，拒绝覆盖已有状态；不需要项目或模型归档。Multica 小配置恢复核对同批五个控制文件及已恢复 env 的原密钥，自动更新 HOME、仓库和程序路径，保留业务 UUID，清空旧 daemon/runtime 绑定。两个入口均拒绝覆盖；旧格式缺少原 HOME 元数据时，用当前旧机入口重新导出。Multica 数据库、附件、防重记录恢复及新设备注册，继续执行[Mac mini 切换步骤](../components/multica/docs/mac-mini-migration.md)。LiteLLM 先仅启动新机空 PostgreSQL，恢复同批 `database.dump` 和原密钥，再启动代理；详见[服务恢复](setup-new-mac.md)。这两项尚待实体新机冷启动验收，不跳过数据恢复而直接启动空业务。
+本阶段复用 `install mac --apps --agents`、备份发布公共配置和原生 Neovim 准备入口。人工检查：打开新终端、Neovim 和常用应用，确认能启动。此时尚未恢复个人 env、账号和业务数据。
+
+完成下一节旧机导出/新机接收后，再执行：
+
+```bash
+./workbench new-mac config
+```
+
+本阶段校验并恢复小配置包、发布公共配置和技能。人工检查：新终端、代理和应用设置正常；代理需要时导入接收的 ZIP 并完成本人登录。私有包不会复制 SSH 私钥、登录态或模型权重。
+
+```bash
+./workbench new-mac services
+```
+
+本阶段创建/复用本机 Podman、准备服务定义、启动 SearXNG/Crawl4AI/OTel。人工检查：搜索、抓取与容器状态。LiteLLM 留待数据库恢复阶段；此时不安装业务自启，不启动 OpenClaw Gateway 或 Multica daemon。
+
+## 旧机准备
+
+在旧机正式仓库执行：
+
+```bash
+./workbench new-mac export
+```
+
+只导出并校验必要私有配置到 `~/feipi-mac-private`。首次导出目标必须尚不存在，已有目录不会覆盖。在 FlClash 中另行导出 `~/FlClash-backup.zip`。人工检查：命令显示配置包校验通过。
+
+## 有线连接与传输
+
+MacBook 没有网口也可以直接连接：
+
+- 两端使用支持 Thunderbolt 的端口和雷雳线；Type-C 是接口形状，普通充电线/普通 USB 数据线不能直接当作雷雳网桥。
+- 两台 Mac 的「系统设置 → 网络 → 雷雳网桥（Thunderbolt Bridge）」查看连接和 IPv4 地址；不存在该服务时先添加。
+- 旧机「系统设置 → 通用 → 共享 → 远程登录」仅允许自己的账号。
+- 新机命令中的 IP 使用旧机的雷雳网桥 IPv4。没有雷雳线时，两机连接同一 Wi-Fi，也能使用相同 SSH/rsync 命令；无需为了部署购买网口转接器。
+- 双机连接只负责本地传输；新机继续通过 Wi-Fi/FlClash 获取互联网。脚本不会改网络设置或自动开 SSH。
+
+参考：[Apple 雷雳 IP 连接](https://support.apple.com/zh-hk/guide/mac-help/mchld53dd2f5/26/mac/26)、[雷雳线与 USB-C 充电线的区别](https://support.apple.com/en-sg/111750)、[远程登录](https://support.apple.com/zh-cn/guide/mac-help/mchlp1066/mac)。
+
+在新机正式仓库执行，替换唯一的连接参数：
+
+```bash
+./workbench new-mac receive 旧机账号@旧机IP
+```
+
+只接收小配置包和旧机已有的 FlClash ZIP，校验配置；小配置包目标已存在时停止，已用于新机网络准备的 FlClash ZIP 原样保留。人工检查后执行 `config`。
+
+普通项目、资料、Env Vault 历史、模型和可选 OAuth token 目录，由用户主动运行一次：
+
+```bash
+./workbench new-mac copy-data 旧机账号@旧机IP
+```
+
+它只对固定目录执行 rsync，不打包、不预先统计数量/容量、不删除新机文件；同路径文件按 rsync 正常更新。旧机缺少的可选目录显示跳过，SSH 错误会停止。范围包含原直传清单中的家庭资料、LexiFlow/Session Browser 源码、Env Vault、oMLX 模型及可选 LiteLLM OAuth token。需查看准确路径时运行 `./workbench new-mac copy-data --help`。人工检查：所需项目/资料可打开，模型能被原生应用发现。
+
+## 业务停写与备份
+
+**只在新机基础安装完成、已安排停写窗口后执行。** 先在旧机 UI 暂停新派发、确认所有 active runs 为零。此阶段会停止旧机 Multica daemon，原生入口继续检查活动任务，并短暂停 Web/API 写入。OpenClaw 备份恢复其原 Gateway 启动状态，最终切换前还须显式停止旧机 Gateway。
+
+旧机执行一次：
+
+```bash
+./workbench new-mac backup
+```
+
+复用 Multica/OpenClaw 原生一致性备份，并导出 LiteLLM PostgreSQL dump。原生备份保持各自批次；只生成一个小的私有路径回执，不复制成新的整机大包。任一组件失败即停止，不发布新的完成回执。人工检查：三项备份都成功，继续保持暂停派发。
+
+新机执行一次：
+
+```bash
+./workbench new-mac receive-backup 旧机账号@旧机IP
+```
+
+脚本从私有回执取得准确批次，直传至 `~/feipi-restore/{litellm,openclaw,multica}`，无需手填三个备份路径。已存在目标会停止，避免混合批次。
+
+## 分别恢复业务
+
+每个组件一条命令，完成并人工检查后再做下一项：
+
+```bash
+./workbench new-mac restore litellm
+```
+
+只向空业务库原生恢复，已有运行代理或业务表即拒绝。完成后用原客户端发一次真实请求，核对原有访问密钥。
+
+```bash
+./workbench new-mac restore openclaw
+```
+
+校验/恢复原生状态、安装固定版程序和依赖、发布受管配置与技能。检查原有记忆和会话；不启动 Gateway、不向渠道投递。
+
+```bash
+./workbench new-mac restore multica
+```
+
+校验同批备份、准备固定程序/本机小配置、拉取固定镜像、仅向空库导入数据库和附件，并恢复防重记录。检查 Web 中的项目/Issue，下载一个历史附件核对；daemon 尚未启动。数据库恢复中途失败时保留现场，交给 Codex 定位；不能盲目重跑或清库。
 
 ## 一次完成授权与权限
 
-| 项目 | 本人操作或命令 | 完成后的实际验证 |
-| --- | --- | --- |
-| FlClash | 导入 ZIP，登录、同步并选择节点，确认本机 7890 可用 | 关闭临时 SSH 转发后重跑下载和真实 CLI 请求 |
-| Codex | `codex login`；`codex login status` | 下方 Agent 文件任务 |
-| Figma MCP | `codex mcp login figma`；服务名以本机配置为准 | 新机真实读取有权限的设计资源，未授权不计通过 |
-| Qoder | 启动 `qodercli`，执行 `/login` | 下方 Agent 文件任务 |
-| Qwen / Claude | 保留恢复的 API/模型设置；启用账号模式时在原生客户端登录，Claude 可用 `claude auth login` | 下方 Agent 文件任务；不为通过测试擅自换模型或 provider |
-| Multica | 先恢复业务数据，再执行[组件手册的原生登录和 workspace switch 命令](../components/multica/docs/mac-mini-migration.md#3-恢复数据只在新机空数据库执行)，然后启动 daemon，`rebind --local` 自动等待并核对本机身份，无需手填 UUID | 不能用 `auth status` 的退出码证明登录；须通过工作区访问、真实小任务、附件与重复应用检查 |
-| SSH / Git | 使用本人选择的 SSH 私钥，或新建密钥并添加到服务端授权；不覆盖已有密钥 | `ssh -T git@github.com` 或实际 Git 拉取 |
-| oMLX 原生应用 | 首次打开后执行 `omlx start --timeout 120`；在 `Settings → Server` 开启 `Automatically start server on launch`；Dock 右键 `Options → Open at Login` 核实勾号；菜单栏显示提示走系统设置 | 确认模型请求；完整关机开机并登录后直接复验，不先手动 start |
-| 键盘与客户端 | Karabiner 的系统扩展/输入监控，Rectangle 辅助功能，iTerm2 Profile，以及需要的客户端登录 | 实际按键、窗口操作、终端和应用打开 |
+账号与系统权限由本人操作；每次只处理当前提示。包括 FlClash 登录同步，Codex/Qoder 等原生登录，Figma MCP 授权，Karabiner/Rectangle 权限，以及 oMLX 的登录启动和服务自动启动。密码、验证码与令牌不发进聊天。
+
+Multica 登录、准确工作区访问合并为：
+
+```bash
+./workbench new-mac login-multica
+```
+
+确认旧机不再派发、新机项目目录已直传后，准备本机 daemon 身份并展示差异：
+
+```bash
+./workbench new-mac bind-multica
+```
+
+人工审阅输出 plan 的受管对象/路径和 `plan_id`；然后只传该次摘要：
+
+```bash
+./workbench new-mac apply-multica 已审阅的plan_id
+```
+
+本阶段复用原生摘要校验、apply、verify、doctor，不自动接受新的计划。最后执行一个真实小任务并下载产物。若绑定阶段中断，Codex 使用原有 install/start/rebind 入口按实际状态恢复，不反复安装已加载的 LaunchAgent。
+
+OpenClaw 渠道最终切换仍由 Codex 按实机状态引导：先停止旧机 Gateway，再显式启用新机，核对渠道授权与真实使用。它不由基础安装顺带启动。
 
 ## 准备完成后验收
 
+业务数据恢复、登录和系统权限完成后：
+
 ```bash
-bash <<'VERIFY_MAC'
-# 子 Bash 失败即停止，不改动当前交互终端的选项；本人 env 沿用原生 Shell 求值。
-set -eo pipefail
-umask 077
-source components/mac/bootstrap/environment.sh
-./workbench doctor mac
-./develop mac run -- bash bootstrap/check.sh
-python3 components/mac/bootstrap/verify-apps.py
-python3 components/mac/bootstrap/verify-extras.py
-# 仅加载本人已审核的本地 env，不输出密钥。
-set -a; source "$HOME/.env"; set +a
-./develop mac run -- bash bootstrap/verify-agents.sh
-# 原生 headless 执行使用现有配置和模型；不启动 Gateway、不向渠道投递。
-# 与会话、记忆和业务 workspace 隔离，核对原生结果及文件工具的精确产物。
-openclaw_probe="$(mktemp -d "$HOME/.local/state/feipi-workbench/validation/openclaw-agent.XXXXXXXX")"
-mkdir "$openclaw_probe/workspace" "$openclaw_probe/state"
-printf 'OpenClaw 私有验收日志：%s\n' "$openclaw_probe"
-openclaw agent exec --config "$HOME/.openclaw/openclaw.json" \
-  --cwd "$openclaw_probe/workspace" --state-dir "$openclaw_probe/state" \
-  --timeout 90 --json \
-  '这是一项本地初始化验收。请使用文件写入工具，在当前目录创建 proof.txt，内容精确为 OPENCLAW_NEW_MAC_NATIVE_OK_7b0d4f92 并在末尾添加一个换行。不要读取其他文件，不要发送消息，不要委派任务。完成后只回复 OPENCLAW_NEW_MAC_NATIVE_OK_7b0d4f92，不附加其他文字。' \
-  > "$openclaw_probe/result.json" 2> "$openclaw_probe/request.log"
-jq -e '.ok == true and .status == "ok" and .final == "OPENCLAW_NEW_MAC_NATIVE_OK_7b0d4f92"' \
-  "$openclaw_probe/result.json" > /dev/null
-[[ -f "$openclaw_probe/workspace/proof.txt" && ! -L "$openclaw_probe/workspace/proof.txt" ]]
-printf 'OPENCLAW_NEW_MAC_NATIVE_OK_7b0d4f92\n' | cmp - "$openclaw_probe/workspace/proof.txt"
-printf 'OpenClaw 模型请求及文件工具通过。\n'
-VERIFY_MAC
+./workbench new-mac startup
 ```
 
-服务就绪、原生备份恢复、新设备绑定通过后，按[自启步骤](setup-new-mac.md#登录自启与-env-vault)安装自启；完整关机开机并登录后再次执行必要真实任务。旧机停止主力后才启新机 OpenClaw/Multica，避免双主。任何失败保留日志，按组件恢复批次处理；整机验收通过前不宣称部署完成。
+该入口要求 LiteLLM 真正 readiness 通过，再安装/检查/加载受管自启；只看到容器存在不算通过。oMLX 的两个原生自启开关仍由本人设置。
+
+```bash
+./workbench new-mac verify
+```
+
+合并基础 doctor、配置检查、应用/模型检查、四个 CLI 和 OpenClaw 的隔离文件任务。每个原生任务必须成功退出且产物匹配；OpenClaw 日志仅保存在本机私有目录，不启动 Gateway。Multica 的业务任务、图表渲染、Office 编辑和渠道授权继续由 Codex 按实际组件检查，不能凭此命令代替整机完成证明。
+
+人工完整关机、开机并登录，再执行同一条 `verify`，同时检查业务和自启。脚本不会自动重启电脑。
+
+入口是固定仓库代码：`workbench` 分发、`scripts/bootstrap/new-mac.sh` 负责无 Python 的前置、`scripts/workbench/new_mac.py` 组合现有组件命令。没有下载后生成的临时执行脚本；私有配置、备份回执和验证产物保存在仓库外。详细证据与限制见[交付验收](new-mac-delivery.md)。

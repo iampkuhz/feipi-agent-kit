@@ -95,29 +95,12 @@ Multica 网页调好 Agent：`./workbench multica plan` 看服务端差异；`./
 新机从 Git 获取本仓库，软件和依赖走安装脚本。个人项目、资料和已有模型目录由用户复制，不先生成整机大包，也不把资料目录容量作为初始化验收条件。
 集中导出、传输、安装、恢复和授权命令见[新 Mac 准备清单](new-mac-prepare.md)。`private check` 只看必要路径、目录是否为空和 env 定义，不递归统计资料文件。
 
-两台 Mac 可用网线直连；无网口时使用以太网转接器。在旧机「系统设置 → 通用 → 共享」开启「远程登录」，只允许自己的账号；在网络设置查看旧机的有线 IP。新机使用该 IP 连接，避免经 Wi-Fi 传输。连接方式见 [Apple 以太网直连说明](https://support.apple.com/en-ie/guide/mac-help/mchlp1413/27/mac/27)及[远程登录说明](https://support.apple.com/guide/mac-help/allow-a-remote-computer-to-access-your-mac-mchlp1066/mac)。
+MacBook 没有网口时，可用雷雳线连接两机的雷雳端口，通过「系统设置 → 网络 → 雷雳网桥」取得 IPv4；普通 Type-C 充电线不能直接替代雷雳网桥。也可让两机连接同一 Wi-Fi。旧机「系统设置 → 通用 → 共享」开启「远程登录」，只允许自己的账号；新机使用所选网络接口的旧机 IP。参考 [Apple 雷雳连接说明](https://support.apple.com/zh-hk/guide/mac-help/mchld53dd2f5/26/mac/26)及[远程登录说明](https://support.apple.com/guide/mac-help/allow-a-remote-computer-to-access-your-mac-mchlp1066/mac)。
 
-以下在新机执行，替换旧机账号和有线 IP；先验证 SSH，再按需要保留目录项。只复制目录内容，不删除新机已有文件；任一命令失败即停止。不由 Agent 执行资料扫描或传输。
+以下由用户在新机执行一次，替换旧机账号和 IP。固定目录范围用同一入口的 `--help` 查看；只直接同步目录，不删除新机文件，不先盘点数量/容量。任一传输失败即停止。Agent 不自行运行资料传输。
 
 ```bash
-bash <<'COPY'
-set -euo pipefail
-OLD_MAC='旧机账号@旧机有线IP'
-ssh -n "$OLD_MAC" 'id -un'
-
-for relative in \
-  '.local/env-vault' \
-  'Documents/life/child-growth-diary' \
-  'Documents/life/家庭健康' \
-  'Documents/life/2028.装修/home-renovation-playbook-2028' \
-  'Documents/life/2030.房地产' \
-  'Documents/tools/llm/lexiflow' \
-  'Documents/tools/llm/feipi-session-browser-java' \
-  '.omlx/models'; do
-  mkdir -p "$HOME/$relative"
-  rsync -a -e ssh "$OLD_MAC:$relative/" "$HOME/$relative/"
-done
-COPY
+./workbench new-mac copy-data 旧机账号@旧机IP
 ```
 
 这是用户执行的传输模板，尚未在两台实体 Mac 之间验收。Documents 访问受系统隐私权限限制时，需在旧机远程登录设置中允许远程用户访问相应资料。OpenClaw SQLite、Multica/PostgreSQL 等运行中数据不按上述普通目录热复制：用户先按对应组件命令停写并做原生一致性导出，再传输输出目录，由恢复脚本处理。

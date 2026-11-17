@@ -541,6 +541,7 @@ def main():
               '  ./workbench doctor                 检查缺项、配置漂移和接管状态\n'
               '  ./workbench plan mac               查看组件范围与操作顺序\n'
               '  ./workbench install mac            补装依赖，不主动升级\n'
+              '  ./workbench new-mac help           新机按阶段安装、传输、恢复和人工验收\n'
               '  ./workbench diff mac               仓库 ↔ 本机差异（原文仅存私有文件）\n'
               '  ./workbench capture mac --select zsh/.zshrc\n'
               '                                     将所选本机改动收回源码，尚不提交\n'

@@ -3,6 +3,10 @@
 从 `feipi-agent-kit` 根目录使用工作台入口。这里的准备工作用于新 Mac 或缺失环境的机器，**不是每次开机都安装**。
 日常开机不运行 bootstrap，也不自动启动服务。已有机器先用 plan 看影响，不要为了“验证”重装。
 完整新机的集中 copy/export/授权命令见[准备清单](../../../docs/new-mac-prepare.md)。
+推荐按阶段使用固定入口：先手动安装 FlClash 并准备网络，从仓库 ZIP 执行
+`bash workbench new-mac prepare`，再在正式 Git 仓库依次执行
+`./workbench new-mac software`、`config`、`services`。
+每个阶段只组合本页的已有入口，完成后由本人检查，再执行下一阶段；业务恢复另按组件分阶段。
 
 ## 先准备并确认
 

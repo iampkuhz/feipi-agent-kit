@@ -1,5 +1,7 @@
 # 新 Mac：从配置重建本地服务
 
+整机迁移使用[分阶段入口](new-mac-prepare.md)：每阶段一条固定命令，人工检查后再继续；本页保留服务级维护说明。
+
 本仓库保存服务定义；Podman、podman-compose、Python 3.10+ 等机器依赖由本仓库 `components/mac` 安装。不复制旧机容器、镜像、Podman 虚拟机或缓存，不需要 NAS。
 
 ## 首次准备
@@ -36,40 +38,10 @@ draw.io 已有独立的固定源码快照与构建流程，继续复用，不导
 
 ## 恢复已有 LiteLLM 数据
 
-新机先恢复基础 env、用户复制的 OAuth token 目录和原生 `database.dump`，再执行下列命令。它复用已发布 Compose 和本机连接检查，只启动 PostgreSQL；代理已运行或数据库已有业务表即拒绝恢复。不复制旧机 PostgreSQL 目录，不使用 `--clean`。该流程仍待实体新机冷启动验收，不能用旧机临时容器恢复成功代替。
+新机先恢复基础 env、用户复制的 OAuth token 目录和原生 `database.dump`，再执行下列命令。它复用已发布 Compose 和本机连接检查，先启动 PostgreSQL，恢复成功后才启动代理；代理已运行或数据库已有业务表即拒绝恢复。不复制旧机 PostgreSQL 目录，不使用 `--clean`。该流程仍待实体新机冷启动验收，不能用旧机临时容器恢复成功代替。
 
 ```bash
-bash <<'RESTORE'
-set -euo pipefail
-./workbench service podman ensure
-runtime_tools="$HOME/.local/share/feipi-workbench/services/tools"
-source "$runtime_tools/lib/podman.sh"
-podman_require_runtime
-set -a
-source "$HOME/.env"
-set +a
-agent_service_data_root
-if [[ "$(podman inspect litellm-proxy-podman --format '{{.State.Running}}' 2>/dev/null || true)" == true ]]; then
-  echo 'LiteLLM 已运行；先核对新机状态，未恢复数据库。' >&2
-  exit 1
-fi
-dump="$HOME/feipi-restore/litellm/database.dump"
-[[ -f "$dump" ]] || { echo '缺少原生 database.dump。' >&2; exit 1; }
-mkdir -p "$AGENT_SERVICE_DATA_DIR/postgres" "$AGENT_SERVICE_DATA_DIR/litellm/chatgpt-tokens"
-podman_compose --env-file /dev/null -f "$runtime_tools/gateway/litellm/compose/docker-compose.yml" up -d postgres
-for ((attempt=0; attempt<60; attempt++)); do
-  if podman exec litellm-db-podman pg_isready -U litellm -d litellm > /dev/null 2>&1; then
-    break
-  fi
-  sleep 2
-done
-podman exec litellm-db-podman pg_isready -U litellm -d litellm > /dev/null
-tables="$(podman exec litellm-db-podman psql -U litellm -d litellm -Atc \
-  "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'")"
-[[ "$tables" == 0 ]] || { echo '目标库已有业务表，未覆盖。' >&2; exit 1; }
-podman exec -i litellm-db-podman pg_restore -U litellm -d litellm --exit-on-error < "$dump"
-./workbench service litellm up
-RESTORE
+./workbench new-mac restore litellm
 ```
 
 恢复成功且 readiness 通过后，继续执行原客户端的真实请求。若恢复失败，保持代理未启动并保留日志；不要在已有部分导入结果上盲目重复导入。
