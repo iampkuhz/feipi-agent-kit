@@ -37,6 +37,9 @@ if [[ "$mode" == check ]]; then
     echo "CLT/Homebrew 尚未齐备；运行前置 install 阶段。" >&2
     exit 1
   fi
+  # 非交互环境可能只带系统 Python；与安装阶段一样先激活已发现的 Homebrew。
+  brew_environment="$("$brew_command" shellenv)"
+  eval "$brew_environment"
   command -v git >/dev/null
   python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)' || {
     echo "需要可用的 Python 3.10+；运行前置 install 阶段。" >&2

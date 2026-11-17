@@ -115,7 +115,9 @@ nvm() {
       export PATH="$TEST_RUNTIME_BIN:$PATH" ;;
     current) cat "$TEST_NVM_STATE" ;;
     'alias default v24.22.3') : ;;
-    'use --silent default') export PATH="$TEST_RUNTIME_BIN:$PATH" ;;
+    'use --silent default')
+      [[ -f "$TEST_NVM_STATE" ]] || return 3
+      export PATH="$TEST_RUNTIME_BIN:$PATH" ;;
     *) echo "不应调用 nvm $*" >&2; return 99 ;;
   esac
 }
@@ -123,10 +125,29 @@ EOF
 HOME="$TEST_ROOT" NVM_DIR="$TEST_ROOT/fresh-nvm" \
   TEST_NVM_CALLS="$TEST_ROOT/nvm-calls" TEST_NVM_STATE="$TEST_ROOT/nvm-state" \
   TEST_RUNTIME_BIN="$TEST_ROOT/runtime/bin" TEST_NPM_PREFIX="$TEST_ROOT/npm-prefix" \
-  bash "$REPO_ROOT/bootstrap/node.sh" install
+  bash -c '
+    set -euo pipefail
+    source "$1/bootstrap/environment.sh"
+    [[ "$-" == *u* ]]
+    bash "$1/bootstrap/node.sh" install
+  ' -- "$REPO_ROOT"
 grep -qx 'install 24.22.3' "$TEST_ROOT/nvm-calls"
 grep -qx 'alias default v24.22.3' "$TEST_ROOT/nvm-calls"
-echo "通过：全新 nvm 安装已验收的 Node 24.22.3。"
+echo "通过：nvm 下载后中断仍可激活环境并继续安装 Node 24.22.3，保留 nounset。"
+
+# 已有 default 损坏时仍须停止，不能把用户选择当成全新安装悄悄替换。
+mv "$TEST_ROOT/nvm-state" "$TEST_ROOT/nvm-state.saved"
+mkdir -p "$TEST_ROOT/fresh-nvm/alias"
+echo v0.missing >"$TEST_ROOT/fresh-nvm/alias/default"
+status=0
+HOME="$TEST_ROOT" NVM_DIR="$TEST_ROOT/fresh-nvm" \
+  TEST_NVM_CALLS="$TEST_ROOT/nvm-calls" TEST_NVM_STATE="$TEST_ROOT/nvm-state" \
+  TEST_RUNTIME_BIN="$TEST_ROOT/runtime/bin" \
+  bash -c 'set -euo pipefail; source "$1/bootstrap/environment.sh"' -- "$REPO_ROOT" || status=$?
+[[ "$status" == 3 && "$(cat "$TEST_ROOT/fresh-nvm/alias/default")" == v0.missing ]]
+rm "$TEST_ROOT/fresh-nvm/alias/default"
+mv "$TEST_ROOT/nvm-state.saved" "$TEST_ROOT/nvm-state"
+echo "通过：已有无效 default 仍然失败并保留原配置。"
 
 : >"$TEST_ROOT/nvm-calls"
 echo v26.13.1 >"$TEST_ROOT/nvm-state"

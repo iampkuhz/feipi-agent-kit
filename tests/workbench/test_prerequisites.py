@@ -20,7 +20,8 @@ class Prerequisites(unittest.TestCase):
             'xcode-select': 'exit "${TEST_CLT_MISSING:-0}"', 'xcrun': 'exit 0',
             'python3': 'exit 0', 'git': 'exit 0',
             'brew': '''if [ "$1" = shellenv ]; then
-  printf 'export PATH="%s"\n' "$PATH"
+  echo shellenv >> "$TEST_LOG"
+  printf 'export PATH="%s"\n' "${TEST_BREW_BIN:+$TEST_BREW_BIN:}$PATH"
 elif [ "$1" = bundle ]; then
   printf '%s\n' "$*" >> "$TEST_LOG"
 else exit 97; fi''',
@@ -51,6 +52,27 @@ else exit 97; fi''',
         proc = self.cli('check', TEST_CLT_MISSING='1')
         self.assertNotEqual(proc.returncode, 0)
         self.assertFalse(self.log.exists())
+
+    def test_check_uses_homebrew_python_before_older_system_python(self):
+        (self.bin/'python3').write_text('#!/bin/sh\nexit 1\n')
+        brew_bin = self.base/'homebrew bin'; brew_bin.mkdir()
+        python = brew_bin/'python3'
+        python.write_text('#!/bin/sh\necho checked-homebrew-python >> "$TEST_LOG"\n')
+        python.chmod(0o755)
+
+        proc = self.cli('check', TEST_BREW_BIN=str(brew_bin))
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(self.log.read_text(), 'shellenv\nchecked-homebrew-python\n')
+        self.assertFalse(list(self.scratch.iterdir()))
+        self.assertFalse(list(self.home.iterdir()))
+
+    def test_check_stops_when_homebrew_environment_fails(self):
+        (self.bin/'brew').write_text('#!/bin/sh\nexit 44\n')
+        (self.bin/'python3').write_text('#!/bin/sh\necho unexpected >> "$TEST_LOG"\n')
+        proc = self.cli('check')
+        self.assertEqual(proc.returncode, 44, proc.stderr)
+        self.assertFalse(self.log.exists())
+        self.assertFalse(list(self.scratch.iterdir()))
 
     def test_root_is_rejected_before_installation(self):
         proc = self.cli('install', TEST_UID='0')

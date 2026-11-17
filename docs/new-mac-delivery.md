@@ -61,6 +61,14 @@ CLI 真实任务补验：Node 26 与 Qwen 0.12.3 内置 dispatcher 的接口不�
 
 ## 本轮发现与修复
 
+### 2026-11-17：非交互前置与中断恢复
+
+- 已安装 Homebrew/Python 的机器在裸系统 PATH 下执行前置 `check`，原先误用 Python 3.9.6 并失败。现先激活发现的 Homebrew，再检查 Git/Python；相同真实命令已通过。plan 仍不运行发现的工具，check 不安装或联网，Homebrew 环境初始化失败仍保留非零退出码。
+- nvm 已下载、Node 安装前中断时，集中安装流程加载环境会提前以 3 退出。使用实际 nvm 脚本和隔离 HOME 复现后修复：允许空白 nvm 继续进入安装，已有失效 default 仍失败且保留原配置。隔离回归覆盖加载环境后继续安装固定 Node 24.22.3、保留 nounset 与已有版本。
+- 工作台 80 项回归、Mac 初始化的 C/en_US.UTF-8 两组回归及 ShellCheck/shfmt 检查通过；真实裸 PATH 前置检查和已有 nvm 默认版本检查通过。日志在私有 `~/.local/state/feipi-workbench/new-mac-validation/bootstrap-resume.oSbd9m/`。验证在当前 Mac 和隔离临时目录中执行，没有安装软件、发布配置或启停日常服务；不代替新 Mac mini 的完整部署与重启验收。
+
+### 此前补验记录
+
 - Multica 新机前置原先只有版本声明，没有实际安装入口。新增固定 CLI/单个官方 Compose 的摘要校验与安装，并接入 `workbench install multica` 和集中清单；不要求复制旧 CLI 或整份上游源码。78 项工作台、68 项 Multica 回归通过。干净 macOS 26.6.2 使用 `234dd0c`、`source_dirty=false`，从 CLI/Compose 均不存在的状态真实下载安装，重复安装和只读 check 后文件 inode、mtime、摘要保持不变，运行副本 check 及 `multica-task --version` 通过，权限分别为 0755/0600。缺少本机绑定时工作台明确返回非零；没有生成 personal 登录、machine.json 或 LaunchAgent。Gatekeeper 保持开启，原机现用 0.8.2 的程序摘要与版本未变；仓库 0.6.3 兼容基线未升级。证据位于 `~/.local/state/feipi-workbench/new-mac-validation/multica-native-48xjo8n9/`。此项证明固定程序与定义准备，不代表容器、账号或业务切换通过。
 - 集中操作的失败传播补验：配置导出、业务备份、OpenClaw/配置恢复、最终验收四组现有命令分别在子 Bash 中执行，失败即停止，保留退出码；不改变交互终端的选项。隔离 HOME、系统 Bash 3.2 和离线替身实测四组失败均未执行后续步骤，18 个 Bash 命令块语法通过。
 - 容器来源补验（2026-11-15，源码 `f42afe5`）：通过原生 Podman 实际读取 SearXNG、Crawl4AI、PostgreSQL、LiteLLM、Multica 三项固定 digest、draw.io 基础镜像及 PlantUML 共 9 项远端索引，全部含 `linux/arm64`；已确认本地没有同名 manifest list。未拉取镜像层、未启停容器，此项只证明当次来源与架构可用，不代表冷启动完成。报告及公开元数据位于 `~/.local/state/feipi-workbench/validation/remote-manifests-1uk59biq/`。

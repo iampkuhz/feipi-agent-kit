@@ -12,12 +12,16 @@
 bash scripts/bootstrap/prerequisites.sh plan
 sudo -v # 首次安装所需的一次管理员授权
 bash scripts/bootstrap/prerequisites.sh install
+source components/mac/bootstrap/environment.sh # 子进程安装不会刷新当前 shell 的 PATH
+bash scripts/bootstrap/prerequisites.sh check
 ```
 
 它使用固定提交和 SHA-256 校验的 Homebrew 官方安装器，以无交互方式准备 CLT/Homebrew，
 再补装 Git/Python；不升级已有包，不写启动文件。缺少已有 sudo 授权会在下载安装前停止。
 已在没有 CLT/Homebrew 的干净 macOS 26.6.2 arm64 中真实完成安装与独立 check。
 完成此阶段不代表整个环境已验收。
+`check` 会激活已经发现的 Homebrew，避免非交互环境误用系统旧版 Python；不会补装软件。
+若此前只完成 nvm 下载、尚未安装 Node，环境激活允许继续执行安装；已有无效 default 仍会停止并保留原选择。
 
 | 顺序 | 需要准备什么 | 怎样确认 | 谁负责 |
 | --- | --- | --- | --- |

@@ -29,7 +29,12 @@ if [[ -s "$NVM_DIR/nvm.sh" ]]; then
   set +u
   # shellcheck source=/dev/null
   source "$NVM_DIR/nvm.sh" --no-use
-  NVM_SYMLINK_CURRENT=false nvm use --silent default
+  # nvm 克隆成功、Node 尚未安装时，环境激活不能挡住 node.sh 的续装入口。
+  # 已有版本或 default 的故障仍然交给 nvm 报错，不替换用户选择。
+  if [[ "$(nvm version default)" != N/A || -d "$NVM_DIR/versions/node" ||
+  -e "$NVM_DIR/alias/default" || -L "$NVM_DIR/alias/default" ]]; then
+    NVM_SYMLINK_CURRENT=false nvm use --silent default
+  fi
   if [[ "$bootstrap_had_nounset" == 1 ]]; then set -u; fi
   unset bootstrap_had_nounset
 fi
