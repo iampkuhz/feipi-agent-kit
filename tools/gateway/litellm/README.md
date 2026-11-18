@@ -53,7 +53,7 @@ BAILIAN_TOKEN_PLAN_API_KEY=替换为你的TokenPlan专属Key
 
 Token Plan 的端点与凭证按[百炼官方接入文档](https://help.aliyun.com/zh/model-studio/token-plan-personal-quick-start)配置，模型 ID 见[支持的模型](https://help.aliyun.com/zh/model-studio/token-plan-personal-overview)。该入口不会回退使用 `BAILIAN_CODING_PLAN_API_KEY`、`BAILIAN_API_KEY` 或 Coding Plan 的地址；未填 Key 时保留模型入口，但无法成功调用。
 
-填好 Key 后，在仓库根目录执行 `make litellm-restart`，让容器重新加载环境变量。如果客户端使用了限制模型范围的 Virtual Key，需要在 Dashboard 中允许 `litellm-token-plan-deepseek`；客户端仍使用自己的 LiteLLM Virtual Key，上游 Token Plan Key 只配置在网关中。
+填好 Key 后，在仓库根目录执行 `./workbench service litellm restart`，让容器重新加载环境变量。如果客户端使用了限制模型范围的 Virtual Key，需要在 Dashboard 中允许 `litellm-token-plan-deepseek`；客户端仍使用自己的 LiteLLM Virtual Key，上游 Token Plan Key 只配置在网关中。
 
 配置来源固定为 `~/.env`，不提供其他文件路径覆盖。该文件使用 Shell 赋值语法，由脚本加载并导出；Compose 使用 `--env-file /dev/null`，防止再次加载项目或当前目录的 dotenv 文件。
 

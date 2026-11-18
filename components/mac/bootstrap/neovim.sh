@@ -10,7 +10,7 @@ fi
 source "$BOOTSTRAP_DIR/environment.sh"
 for required in nvim git node npm yarn python3; do
   command -v "$required" >/dev/null 2>&1 || {
-    echo "缺少 ${required}；请先完成依赖安装和 workbench apply mac。" >&2
+    echo "缺少 ${required}；请先完成依赖安装和 workbench install mac。" >&2
     exit 1
   }
 done

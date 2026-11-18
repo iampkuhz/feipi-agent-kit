@@ -87,7 +87,7 @@ def restore(batch, kit):
         raise ValueError('Agent Kit 来源不是已克隆的统一仓库。')
     source_home = verify_controls(batch)
     if not (home/'.env').is_file():
-        raise ValueError('先 restore-mac 恢复本机 env，再恢复 Multica 控制配置。')
+        raise ValueError('先在本机手动配置 ~/.env，再恢复 Multica 控制配置。')
     saved_keys = read_values(batch/'server.env', set(SECRET_MAP))
     vault_keys = read_values(home/'.env', set(SECRET_MAP.values()))
     if any(not saved_keys.get(key) or saved_keys[key] != vault_keys.get(source)

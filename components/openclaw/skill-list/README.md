@@ -1,6 +1,6 @@
 # Skill installation manifests
 
-这里不保存 skill 源码。每个 `*.json` 独立声明一个 skill 的 Git 来源和安装配置，`make bootstrap` 根据这些文件把对应子目录同步到固定的 `~/.openclaw/skills/<name>`。
+这里不保存 skill 源码。每个 `*.json` 独立声明一个 skill 的 Git 来源和安装配置，`bash components/openclaw/scripts/bootstrap.sh` 根据这些文件把对应子目录同步到固定的 `~/.openclaw/skills/<name>`。
 
 最小格式：
 
@@ -29,13 +29,13 @@
 一次同步全部 manifest：
 
 ```bash
-make bootstrap
+bash components/openclaw/scripts/bootstrap.sh
 ```
 
 只同步一个：
 
 ```bash
-make bootstrap SKILL=skill-list/feipi-video-read-url.json
+bash components/openclaw/scripts/bootstrap.sh --manifest skill-list/feipi-video-read-url.json
 ```
 
 删除 manifest 不会自动删除已安装 skill；卸载属于独立的显式操作，避免清单误删导致 live 状态被破坏。

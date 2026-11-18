@@ -26,7 +26,7 @@ done < <(jq -r '.plugins | to_entries[] | [.key, .value.version] | @tsv' "$REPO_
 "$REPO_DIR/scripts/install-runtime.sh" --check
 openclaw config validate --json
 openclaw secrets audit --check --json
-# MCP 连通性由 make mcp-probe 单独负责；Gateway 仅对本机开放是本仓库的安全选择。
+# MCP 连通性用 openclaw mcp doctor --probe 验证；Gateway 仅对本机开放。
 openclaw doctor --lint --severity-min warning \
   --skip core/doctor/runtime-tool-schemas \
   --skip core/doctor/node-hosting-preconditions

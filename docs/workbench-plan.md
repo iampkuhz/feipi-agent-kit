@@ -2,6 +2,8 @@
 
 本次沿用 feipi-agent-kit 的 Git 与原有 skills/tools/rules/runtimes。新增 `components/mac`、`components/multica`、`components/openclaw`、`components/openclash`，保留成熟实现，不引入子模块或新仓库。
 
+本文记录 2026-10-31 的接管背景和早期实施顺序。现行入口见 [工作台手册](workbench.md)。
+
 ## 已核实的基线（2026-10-31）
 
 | 组件 | 原来源与状态 | 接管原则 |
@@ -24,7 +26,7 @@
 ## 实施与验收顺序
 
 1. 保全工作区、记录来源和私有边界。
-2. 实现 `./workbench` 日常入口与 `./develop` 研发入口；配置 diff/capture/apply 明确方向和范围。
+2. 统一仓库入口 `./workbench`。`install` 安装依赖并发布配置。组件回归直接运行。
 3. 分组件回归、备份、应用和真实验收；失败恢复当前组件。
 4. 核对运行配置来源、旧路径、自启动和私有资料；写入真实验收记录。
 

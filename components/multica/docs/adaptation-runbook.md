@@ -72,9 +72,9 @@ multica-ops doctor
 
 安装器先校验 Python/JSON，再逐文件原子发布和生成校验清单；整批不是原子事务，排空期间发布。首次启动定义用 `manage-runtime.py install`，已经注册时先 stop。配置更新不需要重建服务镜像。
 
-已有运行副本可用 `install-runtime.py --only config/agents.json` 定点发布；可重复 `--only`。`--remove 相对文件名` 仅能移除源码已退役、摘要未变的受管文件，拒绝覆盖无关命令。局部发布前会校验既有清单；遇到运行修改先比较回收。工作台 diff/doctor 同时比较运行代码，配置以外的代码差异需审阅合并，不能用 capture 扩大回收范围。
+已有运行副本可用 `install-runtime.py --only config/agents.json` 定点发布；可重复 `--only`。`--remove 相对文件名` 仅能移除源码已退役、摘要未变的受管文件，拒绝覆盖无关命令。局部发布前会校验既有清单；遇到运行修改先比较回收。工作台 `doctor skills` 检查技能运行副本。Multica 的代码差异在组件内审阅合并。
 
-技能更新在 Agent Kit 根运行 `./workbench diff skills`，再 `./workbench apply skills`，备份后安装到各客户端并保留其他来源。之后同步 workspace Skill：plan → apply → verify。doctor 比较当前执行器所需技能的全部运行文件，排除 tests/evals、缓存和 tmp；不能只比较 SKILL.md。
+技能更新在 Agent Kit 根运行 `./workbench doctor skills`，再 `./workbench install skills`，备份后安装到各客户端并保留其他来源。之后同步 workspace Skill：plan → apply → verify。doctor 比较当前执行器所需技能的全部运行文件，排除 tests/evals、缓存和 tmp；不能只比较 SKILL.md。
 
 本机 Multica 0.6.3 的同名 workspace Skill 优先于用户目录，工作区只装载 SKILL.md。当前受管执行链为 Codex，因此同步器先比较源码与 `~/.codex/skills/feipi-multica-manage-tasks` 的全部运行文件，再从已安装正文生成工作区入口：注明完整资源目录 SKILL_DIR，并将参考和模板链接改为该目录的绝对路径。未安装或内容漂移时拒绝同步，后台不直接加载研发目录。更换执行器或机器时需按实际安装路径重新验收，不能沿用旧入口。
 

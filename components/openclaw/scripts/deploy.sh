@@ -7,7 +7,6 @@ STATE_DIR="$HOME/.openclaw"
 GLOBAL_ENV="$HOME/.env"
 MODE="deploy"
 ASSUME_YES=0
-DEPENDENCIES_ONLY=0
 
 usage() {
   cat <<'EOF'
@@ -15,15 +14,13 @@ usage() {
   scripts/deploy.sh
   scripts/deploy.sh --check
   scripts/deploy.sh --yes
-  scripts/deploy.sh --dependencies-only --yes
 
 从空的 ~/.openclaw 一次部署 OpenClaw、锁定的 provider/微信插件、受管运行文件、
-workspace 模板、managed skills 和 macOS LaunchAgent。
+workspace 模板和 managed skills。通过 OpenClaw 原生命令启动 Gateway。
 
 参数：
   --check  只检查前提和当前状态
   --yes    跳过部署前确认
-  --dependencies-only  仅安装程序、provider 和 skills，不要求业务凭据、不启动 Gateway
   -h       显示帮助
 EOF
 }
@@ -36,10 +33,6 @@ while [[ $# -gt 0 ]]; do
       ;;
     --yes)
       ASSUME_YES=1
-      shift
-      ;;
-    --dependencies-only)
-      DEPENDENCIES_ONLY=1
       shift
       ;;
     -h|--help)
@@ -59,7 +52,7 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
   exit 1
 fi
 
-for command_name in awk git jq make node npm shasum; do
+for command_name in awk git jq node npm shasum; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
     echo "未检测到部署依赖：$command_name" >&2
     exit 1
@@ -87,7 +80,7 @@ if ! jq -e '
   exit 1
 fi
 
-if [[ "$DEPENDENCIES_ONLY" == 0 && ! -f "$GLOBAL_ENV" ]]; then
+if [[ ! -f "$GLOBAL_ENV" ]]; then
   echo "全局环境文件不存在：$GLOBAL_ENV" >&2
   exit 1
 fi
@@ -112,14 +105,12 @@ required_env=(
   OPENCLAW_TG_BOT_TOKEN
 )
 missing_env=()
-if [[ "$DEPENDENCIES_ONLY" == 0 ]]; then
-  for key in "${required_env[@]}"; do
-    if ! has_env_key "$key"; then
-      missing_env+=("$key")
-    fi
-  done
-fi
-if [[ "$DEPENDENCIES_ONLY" == 0 && "${#missing_env[@]}" -gt 0 ]]; then
+for key in "${required_env[@]}"; do
+  if ! has_env_key "$key"; then
+    missing_env+=("$key")
+  fi
+done
+if [[ "${#missing_env[@]}" -gt 0 ]]; then
   echo "${HOME}/.env 缺少必填变量：" >&2
   printf '  - %s\n' "${missing_env[@]}" >&2
   exit 1
@@ -133,8 +124,7 @@ echo "OpenClaw：$required_openclaw"
 jq -r '.plugins | to_entries[] | "插件：\(.key) \(.value.version)"' "$REPO_DIR/versions.json"
 echo
 
-make -C "$REPO_DIR" test
-if [[ "$DEPENDENCIES_ONLY" == 0 ]]; then "$REPO_DIR/scripts/install-runtime.sh" --check; fi
+"$REPO_DIR/scripts/install-runtime.sh" --check
 
 if [[ "$MODE" == "check" ]]; then
   if command -v openclaw >/dev/null 2>&1; then
@@ -151,11 +141,7 @@ if [[ "$ASSUME_YES" -eq 0 ]]; then
     echo "非交互部署必须显式添加 --yes。" >&2
     exit 2
   fi
-  if [[ "$DEPENDENCIES_ONLY" == 1 ]]; then
-    read -r -p "确认仅准备 OpenClaw 依赖？[y/N] " answer
-  else
-    read -r -p "确认一次部署并重启 OpenClaw Gateway？[y/N] " answer
-  fi
+  read -r -p "确认安装 OpenClaw 并发布配置？[y/N] " answer
   case "$answer" in
     y|Y|yes|YES) ;;
     *)
@@ -170,9 +156,9 @@ if command -v openclaw >/dev/null 2>&1; then
   current_openclaw="$(openclaw --version | awk 'NR == 1 {print $2}')"
 fi
 if [[ "$current_openclaw" == "$required_openclaw" ]]; then
-  echo "[1/7] OpenClaw $required_openclaw 已安装"
+  echo "[1/4] OpenClaw $required_openclaw 已安装"
 else
-  echo "[1/7] 安装 OpenClaw $required_openclaw"
+  echo "[1/4] 安装 OpenClaw $required_openclaw"
   npm install --global "openclaw@$required_openclaw"
   hash -r
 fi
@@ -188,7 +174,7 @@ cleanup_deploy() {
 }
 trap cleanup_deploy EXIT
 printf '{}\n' >"$bootstrap_config"
-echo "[2/7] 安装锁定 provider/微信插件"
+echo "[2/4] 安装锁定 provider/微信插件"
 
 while IFS=$'\t' read -r plugin_id plugin_package required_version; do
   current_version="$(OPENCLAW_CONFIG_PATH="$bootstrap_config" openclaw plugins inspect "$plugin_id" --json 2>/dev/null \
@@ -201,29 +187,13 @@ while IFS=$'\t' read -r plugin_id plugin_package required_version; do
   fi
 done < <(jq -r '.plugins | to_entries[] | [.key, .value.package, .value.version] | @tsv' "$REPO_DIR/versions.json")
 
-echo "[3/7] 安装 managed skills（包含本地成长日记插件）"
+echo "[3/4] 安装 managed skills（包含本地成长日记插件）"
 OPENCLAW_CONFIG_PATH="$bootstrap_config" \
   "$REPO_DIR/scripts/bootstrap.sh" --yes
 
-if [[ "$DEPENDENCIES_ONLY" == 1 ]]; then
-  echo "依赖已准备；恢复同批状态及 env 后运行完整部署，尚未启动 Gateway。"
-  exit 0
-fi
-
-echo "[4/7] 校验配置和 SecretRef"
-# provider 安装会向运行配置写入版本 meta；仓库配置始终覆盖该生成内容。
+echo "[4/4] 发布并校验配置"
 "$REPO_DIR/scripts/install-runtime.sh" --write --yes
-make -C "$REPO_DIR" validate
+OPENCLAW_CONFIG_PATH="$REPO_DIR/openclaw.json" bash "$REPO_DIR/scripts/validate-config.sh"
 
-echo "[5/7] 核对受管运行文件"
-"$REPO_DIR/scripts/install-runtime.sh" --check
-
-echo "[6/7] 安装并重启 macOS LaunchAgent"
-env -u OPENCLAW_CONFIG_PATH openclaw gateway install --force
-env -u OPENCLAW_CONFIG_PATH openclaw gateway restart
-
-echo "[7/7] 检查 Gateway 和消息渠道"
-env -u OPENCLAW_CONFIG_PATH make -C "$REPO_DIR" doctor
-
-echo "部署完成。MCP 外部服务连通性请另行执行：make mcp-probe"
-echo "首次微信接入请执行 make weixin-login，并用手机微信扫码。"
+printf '%s\n' '安装完成。首次启动运行 openclaw gateway install --force，再运行 openclaw gateway restart。' \
+  '已有 Gateway 时，配置发布后按需运行 openclaw gateway restart。'

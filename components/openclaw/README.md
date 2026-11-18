@@ -1,13 +1,14 @@
 # feipi-openclaw
 
-日常操作统一从仓库根目录 `./workbench` 进入；本目录命令供组件维护与显式源码调试。应用、回收与恢复见 [工作台手册](../../docs/workbench.md)。原独立仓库仅留作历史回退。
+日常操作统一从仓库根目录 `./workbench` 进入；本目录命令供组件维护与显式源码调试。安装与恢复见 [工作台手册](../../docs/workbench.md)。原独立仓库仅留作历史回退。
 
 OpenClaw 的 macOS 配置仓库。版本基线由 `versions.json` 锁定 OpenClaw、Qwen provider 和腾讯微信插件。
 
 ```bash
-cd ~/Documents/tools/llm/feipi-agent-kit/components/openclaw
-make deploy-check
-make deploy
+# 在 feipi-agent-kit 根目录执行
+./workbench install openclaw
+openclaw gateway install --force    # 首次注册 Gateway
+openclaw gateway restart
 ```
 
 详细说明见 [部署手册](handbook/deployment.md)。
@@ -16,16 +17,16 @@ make deploy
 
 | 目的 | 命令 |
 |---|---|
-| 一次性完整部署 | `make deploy` |
-| 只检查部署条件 | `make deploy-check` |
-| 安装仓库配置和 workspace 模板 | `make runtime-install` |
-| 检查运行文件是否与仓库一致 | `make runtime-check` |
-| 校验仓库与 OpenClaw 配置 | `make validate` |
-| 检查 Gateway、provider、消息渠道 | `make doctor` |
-| 微信扫码登录 | `make weixin-login` |
-| 预览 skill 更新 | `make skills-check` |
-| 安装或更新 skill | `make bootstrap` |
-| 探测 MCP 外部服务 | `make mcp-probe` |
+| 安装锁定依赖并发布配置 | `./workbench install openclaw` |
+| 只检查部署条件 | `bash components/openclaw/scripts/deploy.sh --check` |
+| 检查运行状态 | `./workbench doctor openclaw` |
+| 检查运行文件是否与仓库一致 | `bash components/openclaw/scripts/install-runtime.sh --check` |
+| 源码回归和配置校验 | `bash components/openclaw/tests/run.sh`、`bash components/openclaw/scripts/validate-config.sh` |
+| 检查 Gateway、provider、消息渠道 | `bash components/openclaw/scripts/doctor.sh` |
+| 微信扫码登录 | `bash components/openclaw/scripts/weixin-login.sh` |
+| 预览 skill 更新 | `bash components/openclaw/scripts/bootstrap.sh --dry-run` |
+| 安装或更新 skill | `bash components/openclaw/scripts/bootstrap.sh` |
+| 探测 MCP 外部服务 | `openclaw mcp doctor --probe` |
 
 ## 管理边界
 
@@ -33,18 +34,15 @@ make deploy
 - `~/.env`：唯一人工维护的环境变量和密钥来源。
 - `~/.openclaw`：SQLite、会话、浏览器、插件、skills、日志、长期记忆和任务产物。
 
-`~/.openclaw/.env` 软链接到 `~/.env`。配置、workspace 模板和语音 adapter 由 `make runtime-install` 复制到运行目录；不用 Documents 软链接，因为 macOS LaunchAgent 会被系统文件访问控制阻塞。
+`~/.openclaw/.env` 软链接到 `~/.env`。配置、workspace 模板和语音 adapter 由 `./workbench install openclaw` 复制到运行目录；不用 Documents 软链接，因为 macOS LaunchAgent 会被系统文件访问控制阻塞。
 
 业务路径使用 OpenClaw 原生 `${HOME}` 插值；workspace 文字使用 `~/`。本地 skill manifest
 的 `source.repository` 支持 `~/`（当前用户）和 `./`、`../`（相对本组件），安装时解析真实路径，
 不执行配置中的 Shell 表达式。独立家庭资料库仍须先恢复；缺少来源明确失败，不创建空资料库代替。
 
-新机可先执行 `bash scripts/deploy.sh --dependencies-only --yes`，准备锁定程序、provider、
-微信插件和 managed skills，不要求业务凭据，也不启动 Gateway。依赖安装使用同一状态目录下
-的临时空配置，避免完整声明引用尚未存在的本地插件而阻断首次安装；完成后删除临时配置。
-恢复原数据和 env 后再执行完整部署。默认部署也按此顺序准备依赖，最后发布完整声明、校验并启动。
+新机手动准备 `~/.env` 和外部资料库后，运行 `./workbench install openclaw`，再用原生命令启动 Gateway。会话、记忆和登录状态由 OpenClaw 原生流程处理。
 
-微信使用腾讯官方 `@tencent-weixin/openclaw-weixin` 插件。部署后运行 `make weixin-login`，手机微信扫码确认，再向 ClawBot 发送“请只回复：微信接入成功”。扫码凭据保存在 `~/.env` 所在 vault；微信与 Telegram 私聊会话隔离。详细步骤及验收边界见[微信入口](handbook/deployment.md#10-微信入口)。
+微信使用腾讯官方 `@tencent-weixin/openclaw-weixin` 插件。部署后运行 `bash components/openclaw/scripts/weixin-login.sh`，手机微信扫码确认，再向 ClawBot 发送“请只回复：微信接入成功”。扫码凭据保存在 `~/.env` 所在 vault；微信与 Telegram 私聊会话隔离。详细步骤及验收边界见[微信入口](handbook/deployment.md#10-微信入口)。
 
 Telegram 提供 `/housing`、`/growth` 和 `/health`，没有 `housing_review`。成长日记的规则、文字、原始媒体单独放在 `~/Documents/life/child-growth-diary`；使用方式见该目录 `README.md`。MCP 服务统一定义在 `openclaw.json#mcp.servers`。
 
@@ -52,7 +50,7 @@ Telegram 提供 `/housing`、`/growth` 和 `/health`，没有 `housing_review`�
 
 ### 成长日记接入与验收
 
-`/health` 定向使用 Agent Kit 中的 `feipi-health-maintain-family-records`，维护 `~/Documents/life/家庭健康`。示例：`/health 更新奶奶头疼的进展：……`、`/health 归档这些体检报告`（附文件）、`/health 查询某成员历年报告`。照片说明或文件说明中带上命令，保留原消息与附件；持续事件在同一记录追加，监测数据按需记录。该入口走 Agent 读取 skill 并操作本地资料，不新增收件插件。源码修改后用工作台按 skill 定向实拷到 Codex/OpenClaw；配置 apply 并重启 Gateway 后生效。资料和来源只在健康库维护，不进本配置仓库。
+`/health` 定向使用 Agent Kit 中的 `feipi-health-maintain-family-records`，维护 `~/Documents/life/家庭健康`。示例：`/health 更新奶奶头疼的进展：……`、`/health 归档这些体检报告`（附文件）、`/health 查询某成员历年报告`。照片说明或文件说明中带上命令，保留原消息与附件；持续事件在同一记录追加，监测数据按需记录。该入口走 Agent 读取 skill 并操作本地资料，不新增收件插件。源码修改后用工作台按 skill 定向实拷到 Codex/OpenClaw；用 `./workbench install openclaw` 发布配置后重启 Gateway。资料和来源只在健康库维护，不进本配置仓库。
 
 `feipi-growth-diary` 插件代码随独立成长资料库的 skill 安装，配置仅在本仓库 `openclaw.json` 声明。收件走 Gateway 官方 `before_dispatch` 接入点，先调用日记脚本保存原件，再独立分析图片或用本地 large-v3 转写。具体用法与原件限制维护在 `~/Documents/life/child-growth-diary/README.md`。
 

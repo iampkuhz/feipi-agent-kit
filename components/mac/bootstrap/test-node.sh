@@ -25,7 +25,7 @@ done
 for first_command in nvm node npm npx; do
   HOME="$TEST_ROOT" NVM_DIR="$TEST_ROOT/.nvm" \
     zsh -f -c '
-      source "$1/zsh/.zsh_config/62-nvm.zsh"
+      source "$1/zsh/.zshrc"
       [[ "$("$2" --version)" == "$2 --version" ]] || exit 1
       # 首次命令在子 shell 中验证后，再在当前 shell 真正触发懒加载。
       "$2" --version >/dev/null || exit 1
@@ -45,9 +45,7 @@ printf '24.22.3\n' >"$TEST_ROOT/.nvm/alias/lts/krypton"
 for default_alias in 24.22.3 v24.22.3 'lts/*'; do
   printf '%s\n' "$default_alias" >"$TEST_ROOT/.nvm/alias/default"
   HOME="$TEST_ROOT" NVM_DIR="$TEST_ROOT/.nvm" zsh -f -c '
-    source "$1/zsh/.zsh_config/00-core.zsh"
-    source "$1/zsh/.zsh_config/09-nvm-path.zsh"
-    source "$1/zsh/.zsh_config/62-nvm.zsh"
+    source "$1/zsh/.zshrc"
     [[ "$(command -v openclaw)" == "$NVM_DIR/versions/node/v24.22.3/bin/openclaw" ]] || exit 1
     [[ "$(openclaw --version)" == "openclaw --version" ]] || exit 1
     [[ "$NVM_BIN" == "$NVM_DIR/versions/node/v24.22.3/bin" ]] || exit 1
@@ -58,7 +56,8 @@ echo "通过：新终端直接使用带 v、不带 v 和多级别名的 nvm 默�
 # 没有 nvm 时，node/npm/npx 仍应落到系统版本；nvm 自身要明确报缺失。
 HOME="$TEST_ROOT" NVM_DIR="$TEST_ROOT/missing-nvm" PATH="$TEST_ROOT/system:$PATH" \
   zsh -f -c '
-    source "$1/zsh/.zsh_config/62-nvm.zsh"
+    source "$1/zsh/.zshrc"
+    path=("$HOME/system" $path)
     [[ "$(node --version)" == "node --version" ]] || exit 1
     [[ "$(npm --version)" == "npm --version" ]] || exit 1
     [[ "$(npx --version)" == "npx --version" ]] || exit 1
@@ -68,7 +67,7 @@ echo "通过：无 nvm 时复用系统 Node/npm/npx。"
 # nvm 缺失应返回明确的 127，而不是加载后把函数误删导致命令失踪。
 HOME="$TEST_ROOT" NVM_DIR="$TEST_ROOT/missing-nvm" \
   zsh -f -c '
-    source "$1/zsh/.zsh_config/62-nvm.zsh"
+    source "$1/zsh/.zshrc"
     nvm --version >/dev/null 2>&1
     [[ $? -eq 127 ]]
   ' -- "$REPO_ROOT"

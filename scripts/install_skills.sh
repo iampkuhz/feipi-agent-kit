@@ -36,16 +36,12 @@ INSTALL_SOURCE_MARKER=".feipi-agent-kit-source"
 
 AGENT_NAME=""
 TARGET_DIR=""
-VERBOSE=false
-COLOR_MODE=auto
 COPY_USER=false
 SKILL_NAME=""
 
 # 在实际输出的文件描述符上判断 TTY，重定向的 stdout/stderr 不混入 ANSI。
 color_enabled() {
-  [[ -z "${NO_COLOR:-}" ]] && { [[ "$COLOR_MODE" == always ]] || {
-    [[ "$COLOR_MODE" == auto && -t 1 && "${TERM:-dumb}" != dumb ]]
-  }; }
+  [[ -z "${NO_COLOR:-}" && -t 1 && "${TERM:-dumb}" != dumb ]]
 }
 
 styled() {
@@ -98,15 +94,13 @@ print_counts() {
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -h|--help)
-      echo "用法: $0 [--agent <name>] [--skill <name>] [--dir <path>] [--verbose] [--color auto|always|never]"
+      echo "用法: $0 [--agent <name>] [--skill <name>] [--dir <path>] [--copy]"
       echo ""
       echo "选项:"
       echo "  --agent <name>  指定 agent 类型（codex | qwen | qoder | claudecode | openclaw）"
       echo "  --skill <name>  只安装该 skill 及其直接共享依赖，不清理其他入口"
       echo "  --dir <path>    指定目标路径"
       echo "  --copy          用户级安装也使用实拷（日常工作台默认）；不随源码编辑变化"
-      echo "  --verbose       显示逐项跳过、保留原因和验证详情"
-      echo "  --color <mode>  auto（默认，按终端检测）| always | never；NO_COLOR 非空时禁用样式"
       echo ""
       echo "安装前自动验证："
       echo "  1. 运行 registry 校验（validate_registry.py）"
@@ -144,23 +138,8 @@ while [[ $# -gt 0 ]]; do
       fi
       SKILL_NAME="$1"
       ;;
-    --verbose)
-      VERBOSE=true
-      ;;
     --copy)
       COPY_USER=true
-      ;;
-    --color)
-      shift
-      if [[ $# -eq 0 ]]; then
-        status_line failed "--color 缺少参数（auto | always | never）" >&2
-        exit 1
-      fi
-      COLOR_MODE="$1"
-      case "$COLOR_MODE" in
-        auto|always|never) ;;
-        *) status_line failed "无效颜色模式：${COLOR_MODE}（auto | always | never）" >&2; exit 1 ;;
-      esac
       ;;
     -*)
       status_line failed "未知参数：$1" >&2
@@ -305,9 +284,7 @@ finish_staged_install() {
   if installation_trees_equal "$staging" "$dest"; then
     rm -rf "$staging" || return 1
     ITEM_STATUS=skipped
-    if [[ "$VERBOSE" == true ]]; then
-      status_line skipped "${label}（内容未变）"
-    fi
+    status_line skipped "${label}（内容未变）"
     return 2
   else
     comparison_status=$?
@@ -370,9 +347,7 @@ link_item() {
 
     if [[ "$current_target" == "$src" ]] && [[ "$is_broken" == false ]]; then
       ITEM_STATUS=skipped
-      if [[ "$VERBOSE" == true ]]; then
-        status_line skipped "${label}（链接未变）"
-      fi
+      status_line skipped "${label}（链接未变）"
       return 2
     fi
 
@@ -495,7 +470,7 @@ validate_registry() {
     status_line failed "注册表验证失败，已中止安装；请先修复 skills/registry.yaml。" >&2
     return 1
   fi
-  if [[ "$VERBOSE" == true || "$validation_output" == *'[WARN'* ]]; then
+  if [[ "$validation_output" == *'[WARN'* ]]; then
     printf '%s\n' "$validation_output"
   fi
   return 0
@@ -627,9 +602,6 @@ fi
 # ===== 安装前汇总；明细随实际结果输出，避免重复技能清单 =====
 _skill_count="$(wc -l < "$_tmp_skills_collected" | tr -d ' ')"
 status_line passed "注册表及目录一致 · ${_skill_count} 个技能"
-if [[ "$VERBOSE" == false ]]; then
-  status_line info "仅显示变更和警告；逐项跳过/保留原因：VERBOSE=1（脚本：--verbose）"
-fi
 
 # ===== 开始安装 =====
 
@@ -643,7 +615,7 @@ cleanup_retired_skills() {
   repository_origin="$(git -C "$REPO_ROOT" config --get remote.origin.url 2>/dev/null || true)"
   local use_color=false
   if color_enabled; then use_color=true; fi
-  FEIPI_INSTALL_VERBOSE="$VERBOSE" FEIPI_INSTALL_COLOR="$use_color" \
+  FEIPI_INSTALL_COLOR="$use_color" \
     python3 - "$SRC_ROOT" "$dest_root" "$INSTALL_SOURCE_MARKER" "$repository_origin" "$@" <<'PYEOF'
 import json
 import os
@@ -766,8 +738,7 @@ for entry in sorted(destination.iterdir()):
             reason = "OpenClaw 来源不属于本仓库或记录无效"
         elif entry.is_dir() and not entry.is_symlink() and not os.path.lexists(entry / marker_name):
             reason = "无来源标记，内部链接不足以确认归属"
-        if os.environ["FEIPI_INSTALL_VERBOSE"] == "true":
-            report("保留", f"{entry}（{reason}）", "2")
+        report("保留", f"{entry}（{reason}）", "2")
         preserved += 1
         continue
     if entry.is_symlink():
@@ -790,7 +761,7 @@ install_entry() {
     installation_trees_equal "$src" "$dest" "$mode" || comparison=$?
     if [[ "$comparison" -eq 0 ]]; then
       ITEM_STATUS=skipped
-      if [[ "$VERBOSE" == true ]]; then status_line skipped "${label}（内容未变）"; fi
+      status_line skipped "${label}（内容未变）"
     elif [[ "$comparison" -eq 1 ]]; then
       "$install_func" "$src" "$dest" "$label" || status=$?
     else
@@ -831,7 +802,7 @@ install_skills() {
   else
     printf '  模式：实拷；递归排除 maintenance/tests/evals/node_modules\n'
   fi
-  if [[ "$VERBOSE" == true ]]; then printf '  源目录：%s\n' "$SRC_ROOT"; fi
+
 
   if ! mkdir -p "$dest_root"; then
     status_line failed "无法创建目标目录：$dest_root" >&2

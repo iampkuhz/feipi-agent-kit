@@ -74,7 +74,8 @@ brew "mpv"
 brew "netpbm"
 brew "nmap"
 brew "potrace"
-brew "sdkman/tap/sdkman-cli"
+# Homebrew Bundle 在加载配方前只为这一项记录信任，范围限定为 SDKMAN CLI。
+brew "sdkman/tap/sdkman-cli", trusted: true
 brew "smartmontools"
 brew "svgo"
 brew "tailscale"

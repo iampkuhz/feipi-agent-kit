@@ -17,7 +17,6 @@ import urllib.parse
 ROOT = Path(__file__).resolve().parent
 HOME = Path.home()
 CONFIG = HOME/'.config/feipi-workbench/router.json'
-PRIVATE = HOME/'.config/feipi-workbench/private/openclash'
 MODULE = 'OIX-Region-Priority.conf'
 REMOTE = '/etc/openclash/overwrite/'+MODULE
 
@@ -46,14 +45,10 @@ def ssh(command, *, capture=True):
     return result.stdout
 
 
-def fetch():
+def check_live_module():
     data = ssh('cat '+shlex.quote(REMOTE))
     if not data.startswith(b'#!NAME') or b'[YAML]' not in data:
         raise ValueError('路由器返回的不是预期覆写模块。')
-    PRIVATE.mkdir(parents=True, exist_ok=True, mode=0o700)
-    (PRIVATE/MODULE).write_bytes(data)
-    (PRIVATE/MODULE).chmod(0o600)
-    print('已读取路由器模块到私有目录；尚未回收源码。')
 
 
 def export_private():
@@ -163,27 +158,9 @@ def verify():
     return int(not passed)
 
 
-def verify_backup(batch):
-    batch = Path(batch).expanduser()
-    manifest = json.loads((batch/'SHA256SUMS.json').read_text())
-    for name, expected in manifest.items():
-        if Path(name).name != name or hashlib.sha256((batch/name).read_bytes()).hexdigest() != expected:
-            raise ValueError('备份摘要不匹配。')
-    with tarfile.open(batch/'config.tar.gz') as archive:
-        names = archive.getnames()
-        if not {'etc/config/openclash', 'etc/openclash/overwrite/'+MODULE}.issubset(names):
-            raise ValueError('备份缺少 UCI 或受管模块。')
-        if any(n.startswith('/') or '..' in Path(n).parts or '/core/' in n for n in names):
-            raise ValueError('备份范围异常。')
-        for member in archive:
-            if member.isfile():
-                archive.extractfile(member).read()
-    print('备份摘要和完整压缩流通过；只含配置，恢复时仍须安装匹配内核/数据文件并验证网络。')
-
-
 def apply():
     # 先通过 SSH 读回，阻止用过期下载快照覆盖路由器刚调好的模块。
-    fetch()
+    check_live_module()
     source = ROOT/MODULE
     local_backup = export_private()
     stamp = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
@@ -240,26 +217,17 @@ def apply():
 def main():
     os.umask(0o077)
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('action', choices=['test', 'fetch', 'doctor', 'apply', 'backup', 'verify', 'verify-backup'])
-    p.add_argument('batch', nargs='?')
+    p.add_argument('action', choices=['test', 'doctor', 'apply', 'verify'])
     a = p.parse_args()
     if a.action == 'test':
         text = (ROOT/MODULE).read_text()
         assert '#!CONFIG = oixCloud.yaml' in text and '[YAML]' in text and '[Overwrite]' in text
         assert all(name in text for name in ['香港自动','日本自动','新加坡自动','美国自动','全球自动','empty-fallback: REJECT'])
         print('模块静态契约通过；真实合并和核心校验必须在路由器执行。')
-    elif a.action == 'fetch':
-        fetch()
     elif a.action == 'apply':
         apply()
-    elif a.action == 'backup':
-        export_private()
     elif a.action == 'verify':
         return verify()
-    elif a.action == 'verify-backup':
-        if not a.batch:
-            p.error('verify-backup 需要本机私有备份目录')
-        verify_backup(a.batch)
     else:
         return doctor()
     return 0

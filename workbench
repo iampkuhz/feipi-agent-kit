@@ -2,8 +2,11 @@
 # 日常入口始终从此仓库找到实现，不依赖调用者的当前目录。
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [[ "${1:-}" == new-mac ]]; then
-  shift
-  exec /bin/bash "$ROOT/scripts/bootstrap/new-mac.sh" "$@"
+if [[ $# == 2 && "$1" == install && "$2" == mac ]]; then
+  if ! /bin/bash "$ROOT/scripts/bootstrap/prerequisites.sh" check >/dev/null; then
+    /bin/bash "$ROOT/scripts/bootstrap/prerequisites.sh" install
+  fi
+  # shellcheck source=components/mac/bootstrap/environment.sh
+  source "$ROOT/components/mac/bootstrap/environment.sh"
 fi
 exec python3 "$ROOT/scripts/workbench/main.py" "$@"

@@ -1,4 +1,4 @@
-"""通过真实工作台子进程验证小配置恢复；数据卷、登录和项目目录均不参与。"""
+"""通过组件恢复脚本验证小配置恢复；数据卷、登录和项目目录均不参与。"""
 import contextlib
 import hashlib
 import importlib.util
@@ -85,7 +85,8 @@ class LocalRestore(unittest.TestCase):
         (self.batch/'SHA256SUMS.json').write_text(json.dumps(checks))
 
     def run_restore(self):
-        return subprocess.run([str(ROOT/'workbench'), 'private', 'restore-state', 'multica', str(self.batch)],
+        return subprocess.run([sys.executable, str(COMPONENT/'scripts/restore-local.py'),
+                               str(self.batch), '--agent-kit', str(ROOT)],
                               env=self.env, cwd=self.base, capture_output=True, text=True, timeout=30)
 
     def assert_failed(self, message):
@@ -193,7 +194,10 @@ class BackupHomeMetadata(unittest.TestCase):
             home = Path(directory).resolve()
             config = home/'.config/multica-selfhost'; config.mkdir(parents=True)
             (config/'server.env').write_text('JWT_SECRET=fixture\n')
-            (config/'machine.json').write_text('{"schema":1}\n')
+            binding = {'schema': 1, 'device_name': 'old-host', 'daemon_id': 'old-daemon',
+                       'runtimes': {'codex': {'id': 'old-runtime', 'provider': 'codex'}},
+                       'startup': {'podman_machine': 'old-vm'}, 'workspace_id': 'workspace'}
+            (config/'machine.json').write_text(json.dumps(binding))
             published = home/'.local/share/multica/ops'; published.mkdir(parents=True)
             (published/'fixture.py').write_bytes(b'# published fixture\n')
             (published/'installed-files.json').write_text(json.dumps(
@@ -208,7 +212,7 @@ class BackupHomeMetadata(unittest.TestCase):
                 return '' if 'ps' in args else '0\n'
 
             with patch.dict(os.environ, {'HOME': str(home)}), patch.object(sys, 'argv', ['backup.py', '--apply']), \
-                    patch.object(backup, 'machine', return_value={}), \
+                    patch.object(backup, 'machine', side_effect=lambda: json.loads((config/'machine.json').read_text())), \
                     patch.object(backup, 'cli', side_effect=lambda *args: {'status':'stopped'} if args[0] == 'daemon' else []), \
                     patch.object(backup.subprocess, 'run', side_effect=run), \
                     patch.object(backup.subprocess, 'check_output', side_effect=output), \
@@ -221,6 +225,10 @@ class BackupHomeMetadata(unittest.TestCase):
             self.assertEqual(metadata.stat().st_mode & 0o777, 0o600)
             self.assertEqual(json.loads((batch/'SHA256SUMS.json').read_text())[metadata.name],
                              hashlib.sha256(metadata.read_bytes()).hexdigest())
+            reference = json.loads((batch/'machine.reference.json').read_text())
+            self.assertEqual(reference, {'schema': 1, 'runtimes': {'codex': {'provider': 'codex'}},
+                                         'startup': {}, 'workspace_id': 'workspace'})
+            self.assertEqual(json.loads((config/'machine.json').read_text()), binding)
 
 
 if __name__ == '__main__':

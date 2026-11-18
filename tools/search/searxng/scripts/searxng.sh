@@ -7,11 +7,11 @@ SERVICE_DIR="$(dirname "$SCRIPT_DIR")"
 source "$SERVICE_DIR/../../lib/podman.sh"
 
 case "${1:-up}" in
-up | start | down | stop | restart | logs | status)
+up | down | restart | logs | status)
   podman_require_runtime
   case "${1:-up}" in
-  up | start) action=(up -d) ;;
-  down | stop) action=(down) ;;
+  up) action=(up -d) ;;
+  down) action=(down) ;;
   restart) action=(restart) ;;
   logs) action=(logs --tail 50) ;;
   status) action=(ps) ;;

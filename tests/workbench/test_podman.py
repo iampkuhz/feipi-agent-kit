@@ -3,6 +3,7 @@ import importlib.util
 import json
 from pathlib import Path
 import subprocess
+import sys
 import unittest
 from unittest.mock import patch
 
@@ -10,9 +11,8 @@ ROOT = Path(__file__).resolve().parents[2]
 spec = importlib.util.spec_from_file_location('podman_bootstrap', ROOT/'tools/runtime/podman.py')
 podman = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(podman)
-spec = importlib.util.spec_from_file_location('workbench_main', ROOT/'scripts/workbench/main.py')
-workbench = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(workbench)
+sys.path.insert(0, str(ROOT/'tools/runtime'))
+import service_health
 
 
 class PodmanBootstrap(unittest.TestCase):
@@ -76,19 +76,19 @@ class PodmanBootstrap(unittest.TestCase):
         from unittest.mock import MagicMock
         ready = MagicMock()
         ready.__enter__.return_value.status = 200
-        with patch.object(workbench.urllib.request, 'build_opener') as opener, \
-                patch.object(workbench.time, 'sleep') as sleep:
+        with patch.object(service_health.urllib.request, 'build_opener') as opener, \
+                patch.object(service_health.time, 'sleep') as sleep:
             opener.return_value.open.side_effect = [OSError('starting'), ready]
-            workbench.wait_service('crawl4ai', 'http://127.0.0.1:11235/health')
+            service_health.wait_service('crawl4ai', 'http://127.0.0.1:11235/health')
         sleep.assert_called_once_with(2)
 
     def test_readiness_timeout_remains_failure(self):
-        with patch.object(workbench.urllib.request, 'build_opener') as opener, \
-                patch.object(workbench.time, 'sleep'), \
-                patch.object(workbench.time, 'monotonic', side_effect=[0, 1, 601]), \
+        with patch.object(service_health.urllib.request, 'build_opener') as opener, \
+                patch.object(service_health.time, 'sleep'), \
+                patch.object(service_health.time, 'monotonic', side_effect=[0, 1, 601]), \
                 self.assertRaises(ValueError):
             opener.return_value.open.side_effect = OSError('still starting')
-            workbench.wait_service('litellm', 'http://localhost:4000/health/readiness')
+            service_health.wait_service('litellm', 'http://localhost:4000/health/readiness')
 
 
 if __name__ == '__main__':

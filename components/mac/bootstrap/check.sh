@@ -4,7 +4,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 if [[ $# -gt 0 ]]; then
-  echo "用法：bash bootstrap/check.sh；安装计划用 bash bootstrap/run.sh plan。" >&2
+  echo "用法：bash bootstrap/check.sh。" >&2
   exit 2
 fi
 if [[ -z "${HOME:-}" || "$HOME" != /* || "$HOME" == / ]]; then
@@ -32,8 +32,8 @@ for required_command in git brew stow nvim tree-sitter shellcheck shfmt python3 
     result=1
   fi
 done
-# 与链接入口共用默认包范围；校验 Git 跟踪的全部配置，而不是四个样本。
-bash "$REPO_ROOT/bootstrap/macosinit.sh" verify || result=1
+# 校验 Git 跟踪的 Zsh 与 Neovim 配置。
+bash "$REPO_ROOT/bootstrap/verify-config.sh" || result=1
 if [[ ! -s "$HOME/.oh-my-zsh/oh-my-zsh.sh" ]]; then
   echo "缺少 oh-my-zsh；执行 bash bootstrap/ohmyzsh.sh install。" >&2
   result=1

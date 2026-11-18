@@ -73,10 +73,15 @@ def main():
         (batch / 'server.env').chmod(0o600)
         shutil.copyfile(root / 'versions.json', batch / 'versions.json')
         shutil.copyfile(root / 'config/compose.pinned.yml', batch / 'compose.pinned.yml')
-        # 保存恢复绑定和防重回执，不复制 CLI 登录/设备身份或工具私有会话。
-        config_root = Path.home() / '.config/multica-selfhost'
-        shutil.copyfile(config_root / 'machine.json', batch / 'machine.reference.json')
-        (batch / 'machine.reference.json').chmod(0o600)
+        # 只保留业务绑定。设备和 runtime 由恢复机重新注册。
+        m.pop('daemon_id', None)
+        m.pop('device_name', None)
+        for runtime in m.get('runtimes', {}).values():
+            runtime.pop('id', None)
+        m.get('startup', {}).pop('podman_machine', None)
+        reference = batch / 'machine.reference.json'
+        reference.write_text(json.dumps(m, ensure_ascii=False, indent=2) + '\n')
+        reference.chmod(0o600)
         (batch / 'source-home.json').write_text(json.dumps(
             {'schema': 1, 'source_home': str(Path.home().resolve())}, indent=2)+'\n')
         (batch / 'source-home.json').chmod(0o600)

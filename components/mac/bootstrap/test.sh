@@ -6,7 +6,7 @@ if [[ $# -gt 0 ]]; then
   echo "用法：bash bootstrap/test.sh" >&2
   exit 2
 fi
-for required in bash zsh git stow shellcheck shfmt; do
+for required in bash zsh git python3 stow shellcheck shfmt; do
   command -v "$required" >/dev/null 2>&1 || {
     echo "缺少测试工具：${required}；未自动安装。" >&2
     exit 2

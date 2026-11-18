@@ -150,14 +150,13 @@ def entry_identity(path: Path):
 
 
 def validate_retired_entries(root: Path, link_root: Path, project: Path, env: dict[str, str]) -> None:
-    """在最小仓库副本执行真实 make 入口，不修改源码或用户安装目录。"""
+    """在最小仓库副本执行真实 Skill 安装器，不修改源码或用户安装目录。"""
     repo = root / "source repo"
     scripts = repo / "scripts"
     (scripts / "harness").mkdir(parents=True)
     shutil.copy2(INSTALLER, scripts / INSTALLER.name)
     shutil.copy2(REPO_ROOT / "scripts/package_skill.py", scripts / "package_skill.py")
     shutil.copy2(REPO_ROOT / "scripts/harness/validate_registry.py", scripts / "harness")
-    shutil.copy2(REPO_ROOT / "Makefile", repo / "Makefile")
     subprocess.run(["git", "init", "--quiet", str(repo)], check=True)
     subprocess.run(["git", "-C", str(repo), "remote", "add", "origin",
                     "git@github.com:iampkuhz/feipi-agent-kit.git"], check=True)
@@ -192,16 +191,17 @@ def validate_retired_entries(root: Path, link_root: Path, project: Path, env: di
             )
         (source_root / "registry.yaml").write_text("\n".join(records) + "\n", encoding="utf-8")
 
+    installer = ["bash", "scripts/install_skills.sh"]
     commands = (
-        (["make", "install-skills", "AGENT=codex"], link_root, True),
-        (["make", "install-project", f"PROJECT={project}"], project / ".agents/skills", False),
-        (["make", "install-skills", "AGENT=openclaw"], openclaw_home / "skills", False),
+        ([*installer, "--agent", "codex"], link_root, True),
+        ([*installer, "--dir", str(project)], project / ".agents/skills", False),
+        ([*installer, "--agent", "openclaw"], openclaw_home / "skills", False),
     )
 
-    def install(expect_success: bool = True, verbose: bool = False) -> dict[Path, str]:
+    def install(expect_success: bool = True) -> dict[Path, str]:
         outputs = {}
         for command, destination, _ in commands:
-            result = subprocess.run([*command, "COLOR=never", f"VERBOSE={int(verbose)}"],
+            result = subprocess.run(command,
                                     cwd=repo, env=env, text=True, capture_output=True, timeout=60)
             if (result.returncode == 0) != expect_success:
                 fail(f"同步清理验证失败：{command}\n{result.stdout[-1200:]}\n{result.stderr[-1200:]}")
@@ -409,7 +409,7 @@ def validate_retired_entries(root: Path, link_root: Path, project: Path, env: di
 
     write_registry([moved, renamed])
     for iteration in range(2):
-        outputs = install(verbose=True)
+        outputs = install()
         assert_counts(outputs, {dest: 2 for _, dest, _ in commands} if iteration == 0 else {},
                       total=3, added=1 if iteration == 0 else 0)
         for destination, output in outputs.items():

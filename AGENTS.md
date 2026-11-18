@@ -1,12 +1,13 @@
 # Feipi Agent Kit
 
-个人工作台与 AI 工程助手仓库。日常入口 `./workbench`，研发入口 `./develop`。既有 skills / tools / rules / commands 职责保留；Mac、Multica、OpenClaw、OpenClash 集成在 `components/`。
+个人工作台与 AI 工程助手仓库。仓库入口统一为 `./workbench`。既有 skills / tools / rules / commands 职责保留；Mac、Multica、OpenClaw、OpenClash 集成在 `components/`。
 
 ## 强约束
 
 1. **中文优先**：面向用户输出默认简体中文。详见 `rules/global/language.md`。
 2. **规则先行**：先遵循 `rules/` 和 `skills/authoring/feipi-skill-govern/`，再实现。
 3. **职责分离**：`skills/`（Agent 能力）| `tools/`（外部服务封装）| `rules/`（行为规范）| `runtimes/`（运行时框架）。
+4. **默认行为优先**。脚本和工具直接采用适合常规场景的默认行为。能由默认行为或现有配置满足的需求，不新增命令行参数、环境变量或配置项。只有调用方确实需要不同且无法自动判断的行为时，才提供最小的配置入口。批量安装默认显示下载与安装进度。
 
 ## 规则加载顺序
 
@@ -45,10 +46,10 @@ Agent 启动后按以下顺序加载规则：
 
 ## 运行与私有边界
 
-- 研发修改不自动进入日常环境；经 `workbench diff/capture/apply` 显式发布，先备份。
+- 通过 `workbench install` 显式发布仓库配置，运行 `workbench doctor` 检查状态。
 - 不把旧独立仓库重新作为运行来源；来源记录见 `docs/workbench-plan.md`。
 - 私有数据原位保留，恢复遵守 `docs/workbench.md`；数据库停写或使用原生一致性导出。
-- 回收只接受白名单配置；记忆、会话、密钥、登录态、订阅、备份不得进入 Git。
+- 记忆、会话、密钥、登录态和订阅保留在私有位置。换机时手动配置 `~/.env`，项目和文档用仓库外的一次性复制脚本。SSH 密钥、主机记录、设备身份和登录状态留在原机，新机独立授权。
 
 ## 用户个人配置
 

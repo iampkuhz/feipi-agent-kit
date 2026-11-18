@@ -1,142 +1,81 @@
 #!/usr/bin/env bash
-# 离线验证链接安全性；HOME 仅在子进程中指向临时目录，不加载真实 shell 配置。
+# 在隔离 HOME 中通过工作台实际运行 Stow，不下载安装软件或加载自启。
 set -euo pipefail
-
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+WORKBENCH_DIR="$REPO_ROOT/../../scripts/workbench"
 TEST_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-links.XXXXXX")"
-# 失败时保留诊断输出供阅读；无论成功或失败都只删除本次测试目录。
-cleanup() {
-  local status=$?
-  if [[ "$status" -ne 0 && -f "$TEST_ROOT/output.log" ]]; then
-    cat "$TEST_ROOT/output.log" >&2
-  fi
-  rm -rf "$TEST_ROOT"
-}
-trap cleanup EXIT
-run_linker() {
-  HOME="$1" bash "$REPO_ROOT/bootstrap/macosinit.sh" "${2:-install}" >"$TEST_ROOT/output.log" 2>&1
-}
-expect_conflict() {
-  if run_linker "$1"; then
-    echo "预期拒绝冲突，但脚本成功：$1" >&2
-    exit 1
-  fi
-  # 冲突时不能提前链接另一个包，保证先整体预检。
-  [[ ! -e "$1/bin/doctor-zsh-config" ]]
-}
+trap 'rm -rf "$TEST_ROOT"' EXIT
 
-# 首次安装：连 HOME 本身都不存在，验证父目录创建及 Neovim 的真实层级。
-test_home="$TEST_ROOT/fresh home/home"
-run_linker "$test_home"
-[[ "$test_home/.config/nvim/init.vim" -ef "$REPO_ROOT/neovim/.config/nvim/init.vim" ]]
-[[ "$test_home/.config/nvim/lazy-lock.json" -ef "$REPO_ROOT/neovim/.config/nvim/lazy-lock.json" ]]
-[[ "$test_home/.zshrc" -ef "$REPO_ROOT/zsh/.zshrc" ]]
-run_linker "$test_home"
-run_linker "$test_home" check
-run_linker "$test_home" verify
-echo "通过：全新 HOME、重复执行、只读预检。"
-
-# 四文件抽查之外的模块也必须验证；移除的仅是临时 HOME 内的软链。
-rm "$test_home/.zsh_config/62-nvm.zsh"
-printf '# old configuration\n' >"$TEST_ROOT/old-nvm.zsh"
-ln -s "$TEST_ROOT/old-nvm.zsh" "$test_home/.zsh_config/62-nvm.zsh"
-if run_linker "$test_home" verify; then
-  echo "来源错误的非抽查模块不应通过。" >&2
-  exit 1
-fi
-grep -q '62-nvm.zsh' "$TEST_ROOT/output.log"
-[[ "$test_home/.zsh_config/62-nvm.zsh" -ef "$TEST_ROOT/old-nvm.zsh" ]]
-rm "$test_home/.zsh_config/62-nvm.zsh"
-if run_linker "$test_home" verify; then
-  echo "缺失模块不应通过。" >&2
-  exit 1
-fi
-run_linker "$test_home"
-run_linker "$test_home" verify
-echo "通过：全量来源验证发现错误链接与缺失，不修改目标。"
-
-# 工作台链接到运行副本也必须通过；副本过期或缺失模块必须失败。
-test_home="$TEST_ROOT/runtime-home"
+test_home="$TEST_ROOT/runtime home"
 runtime_root="$test_home/.local/share/feipi-workbench/mac"
-mkdir -p "$runtime_root" "$test_home/.config"
-cp -R "$REPO_ROOT/zsh" "$REPO_ROOT/neovim" "$runtime_root/"
-ln -s "$runtime_root/zsh/.zshrc" "$test_home/.zshrc"
-ln -s "$runtime_root/zsh/.zsh_config" "$test_home/.zsh_config"
-ln -s "$runtime_root/zsh/bin" "$test_home/bin"
+mkdir -p "$runtime_root/zsh" "$runtime_root/neovim/.config/nvim" "$test_home/.config" "$test_home/.qwen" "$test_home/bin"
+printf '# Previous standalone .zshrc\n' >"$runtime_root/zsh/.zshrc"
+cp "$runtime_root/zsh/.zshrc" "$test_home/.zshrc"
 ln -s "$runtime_root/neovim/.config/nvim" "$test_home/.config/nvim"
-run_linker "$test_home" verify
-printf '\n# stale runtime\n' >>"$runtime_root/zsh/.zsh_config/62-nvm.zsh"
-if run_linker "$test_home" verify; then
-  echo "过期运行副本不应通过来源校验。" >&2
+printf 'FEIPI_TEST_ENV=local\n' >"$test_home/.env"
+printf 'keep Qwen settings\n' >"$test_home/.qwen/settings.json"
+printf 'keep personal bin\n' >"$test_home/bin/user-tool"
+printf '%s\n' '--adopt' >"$test_home/.stowrc"
+
+run_install() {
+  HOME="$test_home" PYTHONDONTWRITEBYTECODE=1 python3 - "$WORKBENCH_DIR" <<'PY'
+import sys
+
+sys.path.insert(0, sys.argv[1])
+import main
+
+run = main.run
+
+
+def run_local_stow(args, **kwargs):
+    if args[0] == 'stow':
+        return run(args, **kwargs)
+    if args[1].name in ('run.sh', 'env-history.py'):
+        return
+    raise AssertionError(f'Unexpected installation command: {args}')
+
+
+main.run = run_local_stow
+main.install('mac')
+PY
+}
+
+run_verify() {
+  HOME="$1" bash "$REPO_ROOT/bootstrap/verify-config.sh" >"$TEST_ROOT/output.log" 2>&1
+}
+
+run_install
+run_install
+run_verify "$test_home" || {
+  cat "$TEST_ROOT/output.log" >&2
   exit 1
-fi
-grep -q '62-nvm.zsh' "$TEST_ROOT/output.log"
-echo "通过：工作台运行副本来源正确，过期内容不会误判通过。"
-
-# 只读预检面对缺失 HOME 也不能偷偷创建父目录。
-if run_linker "$TEST_ROOT/readonly/missing" check; then
-  echo "缺失 HOME 的检查不应成功。" >&2
-  exit 1
-fi
-[[ ! -e "$TEST_ROOT/readonly" ]]
-if run_linker "$TEST_ROOT/readonly/missing" verify; then
-  echo "缺失 HOME 不应被报告为已安装。" >&2
-  exit 1
-fi
-[[ ! -e "$TEST_ROOT/readonly" ]]
-echo "通过：缺失 HOME 的只读检查不创建目录。"
-
-# 正确的旧式目录链接也可复用，不能为了重新安装而删除它们。
-test_home="$TEST_ROOT/legacy"
-mkdir -p "$test_home/.config"
-ln -s "$REPO_ROOT/neovim/.config/nvim" "$test_home/.config/nvim"
-ln -s "$REPO_ROOT/zsh/.zshrc" "$test_home/.zshrc"
-ln -s "$REPO_ROOT/zsh/.zsh_config" "$test_home/.zsh_config"
-run_linker "$test_home"
-run_linker "$test_home"
-run_linker "$test_home" verify
-[[ "$test_home/.config/nvim/init.vim" -ef "$REPO_ROOT/neovim/.config/nvim/init.vim" ]]
-[[ "$(readlink "$test_home/.config/nvim")" == "$REPO_ROOT/neovim/.config/nvim" ]]
-echo "通过：正确的旧式链接与重复执行。"
-
-# 用户级 Stow 的 ignore 不能让入口悄悄跳过配置。
-test_home="$TEST_ROOT/user-ignore"
-mkdir -p "$test_home"
-echo '--ignore=.*' >"$test_home/.stowrc"
-run_linker "$test_home"
-run_linker "$test_home" verify
-[[ "$test_home/.zshrc" -ef "$REPO_ROOT/zsh/.zshrc" ]]
-[[ "$test_home/.config/nvim/init.vim" -ef "$REPO_ROOT/neovim/.config/nvim/init.vim" ]]
-echo "通过：用户级 Stow ignore 不影响固定安装范围。"
-
-# 真实文件、断链和原先的错误 Neovim 目录链接都不能被覆盖。
-for conflict_kind in zsh_file nvim_file broken_link wrong_nvim parent_file user_adopt; do
-  test_home="$TEST_ROOT/$conflict_kind"
-  mkdir -p "$test_home/.config/nvim"
-  case "$conflict_kind" in
-  zsh_file) echo "保留我的配置" >"$test_home/.zshrc" ;;
-  user_adopt)
-    echo '--adopt' >"$test_home/.stowrc"
-    echo "保留我的配置" >"$test_home/.zshrc"
-    ;;
-  nvim_file) echo "保留我的配置" >"$test_home/.config/nvim/init.vim" ;;
-  broken_link) ln -s "$test_home/missing" "$test_home/.zshrc" ;;
-  wrong_nvim)
-    rmdir "$test_home/.config/nvim"
-    ln -s "$REPO_ROOT/neovim" "$test_home/.config/nvim"
-    ;;
-  parent_file)
-    rmdir "$test_home/.config/nvim" "$test_home/.config"
-    echo "保留我的配置" >"$test_home/.config"
-    ;;
-  esac
-  expect_conflict "$test_home"
-  case "$conflict_kind" in
-  zsh_file | user_adopt) [[ "$(cat "$test_home/.zshrc")" == "保留我的配置" ]] ;;
-  nvim_file) [[ "$(cat "$test_home/.config/nvim/init.vim")" == "保留我的配置" ]] ;;
-  broken_link) [[ "$(readlink "$test_home/.zshrc")" == "$test_home/missing" ]] ;;
-  wrong_nvim) [[ "$(readlink "$test_home/.config/nvim")" == "$REPO_ROOT/neovim" ]] ;;
-  parent_file) [[ "$(cat "$test_home/.config")" == "保留我的配置" ]] ;;
-  esac
-  echo "通过：拒绝冲突并保全内容（${conflict_kind}）。"
+}
+for target in .zshrc .zsh_config/10-ohmyzsh.zsh .config/nvim/init.vim .qwen/output-language.md \
+  .config/karabiner/karabiner.json 'Library/Application Support/iTerm2/DynamicProfiles/dotfiles.json'; do
+  [[ -L "$test_home/$target" && "$test_home/$target" -ef "$runtime_root/dotfiles/$target" ]]
 done
+[[ ! -L "$test_home/.env" && "$(cat "$test_home/.env")" == 'FEIPI_TEST_ENV=local' ]]
+[[ "$(cat "$test_home/.qwen/settings.json")" == 'keep Qwen settings' ]]
+[[ "$(cat "$test_home/bin/user-tool")" == 'keep personal bin' ]]
+printf 'FEIPI_LOCAL_MODULE=loaded\n' >"$test_home/.zsh_config/98-local.zsh"
+# shellcheck disable=SC2016
+HOME="$test_home" ZDOTDIR="$test_home" zsh -ic '
+  [[ "$FEIPI_TEST_ENV" == local && "$EDITOR" == nvim && "$FEIPI_LOCAL_MODULE" == loaded ]] &&
+    (( $+functions[path_prepend] ))
+'
+
+printf '\n-- stale runtime\n' >>"$runtime_root/dotfiles/.config/nvim/lua/basic.lua"
+if run_verify "$test_home"; then exit 1; fi
+grep -q 'basic.lua' "$TEST_ROOT/output.log"
+run_install
+run_verify "$test_home"
+[[ -f "$test_home/.zsh_config/98-local.zsh" ]]
+
+rm "$test_home/.zshrc"
+printf 'keep custom zshrc\n' >"$test_home/.zshrc"
+if run_install >"$TEST_ROOT/output.log" 2>&1; then exit 1; fi
+grep -q '配置文件已存在' "$TEST_ROOT/output.log"
+[[ ! -L "$test_home/.zshrc" && "$(cat "$test_home/.zshrc")" == 'keep custom zshrc' ]]
+if run_verify "$TEST_ROOT/missing"; then exit 1; fi
+[[ ! -e "$TEST_ROOT/missing" ]]
+echo "通过：Stow 发布与重复安装、真实 Zsh 加载、用户配置冲突及漂移检查。"

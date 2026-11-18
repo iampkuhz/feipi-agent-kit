@@ -17,14 +17,14 @@ Claude Code ──(gRPC)──▶ OTel Collector ──▶ claude-code-otel.raw 
 以下命令在仓库根执行；本机环境见 [新 Mac 重建](../../../docs/setup-new-mac.md)。
 
 ```bash
-make otel-up
-make otel-status
+./workbench service otel up
+./workbench service otel status
 ```
 
 ## 停止
 
 ```bash
-make otel-down
+./workbench service otel down
 ```
 
 ## Claude Code 环境变量

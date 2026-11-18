@@ -9,7 +9,7 @@ source "$SERVICE_DIR/../../lib/podman.sh"
 agent_service_data_root
 
 case "${1:-up}" in
-up | start | restart)
+up | restart)
   podman_require_runtime
   # 只在明确启动时创建本机目录；status/check 不落盘。
   mkdir -p "$AGENT_SERVICE_DATA_DIR/otel"
@@ -20,7 +20,7 @@ up | start | restart)
   fi
   podman_compose --env-file /dev/null -f "$SERVICE_DIR/compose/docker-compose.yml" "${action[@]}"
   ;;
-down | stop)
+down)
   podman_require_runtime
   podman_compose --env-file /dev/null -f "$SERVICE_DIR/compose/docker-compose.yml" down
   ;;

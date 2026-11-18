@@ -29,17 +29,10 @@
 本仓库只支持 macOS，需要：
 
 ```bash
-command -v git jq make node npm
+command -v git jq node npm
 ```
 
-仓库固定位置：
-
-```bash
-mkdir -p /Users/zhehan/Documents/tools/llm/openclaw
-git clone git@github.com:iampkuhz/feipi-openclaw.git \
-  /Users/zhehan/Documents/tools/llm/feipi-agent-kit/components/openclaw
-cd /Users/zhehan/Documents/tools/llm/feipi-agent-kit/components/openclaw
-```
+以下命令从 feipi-agent-kit 仓库根目录执行。
 
 `~/.env` 至少需要以下变量，格式参考仓库 `.env.example`：
 
@@ -67,43 +60,32 @@ export all_proxy=socks5://127.0.0.1:7890
 先做只读检查：
 
 ```bash
-make deploy-check
+bash components/openclaw/scripts/deploy.sh --check
 ```
 
-再执行完整部署：
+安装锁定的程序、provider、微信插件和技能，并发布配置。首次注册和启动 Gateway 使用原生命令。
 
 ```bash
-make deploy
+./workbench install openclaw
+openclaw gateway install --force
+openclaw gateway restart
+./workbench doctor openclaw
 ```
 
-非交互执行使用：
-
-```bash
-make deploy YES=1
-```
-
-部署会依次完成：
-
-1. 安装 `versions.json` 锁定的 OpenClaw。
-2. 安装配置、全局 env 入口、workspace 模板和语音 adapter。
-3. 安装版本锁中的 `@openclaw/qwen-provider` 和 `@tencent-weixin/openclaw-weixin`。
-4. 重新覆盖插件生成的配置元数据，并校验配置与 SecretRef。
-5. 根据 `skill-list/*.json` 安装 enabled skills。
-6. 安装并重启 macOS LaunchAgent。
-7. 检查 Gateway 和消息渠道；微信首次使用另行扫码登录。
+微信首次使用时另行扫码登录。
 
 ## 4. 日常修改配置
 
 只编辑仓库中的 `openclaw.json`，不要直接维护运行副本。修改后执行：
 
 ```bash
-make runtime-install YES=1
-make validate
+bash components/openclaw/tests/run.sh
+./workbench install openclaw
 openclaw gateway restart
-make doctor
+bash components/openclaw/scripts/doctor.sh
 ```
 
-如果修改了 `~/.env`，执行完整的 `make deploy`，让 LaunchAgent 的服务环境重新生成。
+需要重建 LaunchAgent 的服务环境时，执行 `openclaw gateway install --force` 后重启 Gateway。
 
 ## 5. Workspace 管理
 
@@ -117,7 +99,7 @@ make doctor
 修改模板后运行：
 
 ```bash
-make runtime-install YES=1
+./workbench install openclaw
 openclaw gateway restart
 ```
 
@@ -149,9 +131,9 @@ openclaw gateway restart
 常用命令：
 
 ```bash
-make skills-check
-make bootstrap
-make bootstrap SKILL=skill-list/feipi-video-read-url.json
+bash components/openclaw/scripts/bootstrap.sh --dry-run
+bash components/openclaw/scripts/bootstrap.sh
+bash components/openclaw/scripts/bootstrap.sh --manifest skill-list/feipi-video-read-url.json
 ```
 
 安装目标固定为 `~/.openclaw/skills/<skill-name>`。bootstrap 会下载 manifest 指定的 Git ref，比较来源 commit、内容和安装选项，再决定新增、覆盖或跳过。删除 manifest 不会自动删除已安装 skill。
@@ -163,10 +145,10 @@ make bootstrap SKILL=skill-list/feipi-video-read-url.json
 Housing 的业务 skill 从本机住宅装修 Git 仓库的已提交 `main` 安装；迁移前先恢复该仓库。图文和视频通用 skill 来自 Agent Kit，两个 manifest 锁定同一 commit。依次执行：
 
 ```bash
-bash scripts/bootstrap.sh --manifest skill-list/feipi-video-read-url.json --yes
-bash scripts/bootstrap.sh --manifest skill-list/feipi-xiaohongshu-read-note.json --yes
-bash scripts/bootstrap.sh --manifest skill-list/feipi-housing-capture-inbox.json --yes
-make runtime-install YES=1
+bash components/openclaw/scripts/bootstrap.sh --manifest skill-list/feipi-video-read-url.json --yes
+bash components/openclaw/scripts/bootstrap.sh --manifest skill-list/feipi-xiaohongshu-read-note.json --yes
+bash components/openclaw/scripts/bootstrap.sh --manifest skill-list/feipi-housing-capture-inbox.json --yes
+./workbench install openclaw
 openclaw gateway restart
 ```
 
@@ -177,8 +159,8 @@ openclaw gateway restart
 `/growth` 使用 `feipi-growth-record-diary`，规则和数据在 `/Users/zhehan/Documents/life/child-growth-diary` 独立维护。该目录同时是本地 Git skill 来源；从零部署时先恢复它，再执行：
 
 ```bash
-make bootstrap SKILL=skill-list/feipi-growth-record-diary.json
-make runtime-install YES=1
+bash components/openclaw/scripts/bootstrap.sh --manifest skill-list/feipi-growth-record-diary.json
+./workbench install openclaw
 ```
 
 Gateway 重启后，用“文件 / 不压缩”发送附件并写 `/growth YYYY-MM-DD <原话>`；日期可省略。`/growth 查询 YYYY-MM-DD 到 YYYY-MM-DD` 只读返回素材。普通 Telegram 照片保留平台收到版本，不能宣称为手机原图。云端 Bot API 的 20 MB 下载限制用 Mac 本地原文件导入解决；本次不部署本地 Bot API。[Telegram getFile](https://core.telegram.org/bots/api#getfile)
@@ -197,13 +179,13 @@ MCP 定义统一位于 `openclaw.json` 的 `mcp.servers`：
 OpenClaw 根据这些定义连接服务，并把服务暴露的工具交给 Agent。静态校验与真实探测是两回事：
 
 ```bash
-make validate
-make mcp-probe
+bash components/openclaw/tests/run.sh
+openclaw mcp doctor --probe
 ```
 
 外部 MCP 进程不由本仓库启动；端口未监听时应修复相应服务，而不是把服务源码、缓存或日志放进本仓库。
 
-启用 `fastmcp-gateway` 时，先确认 18080 端口的服务已经启动，再把仓库配置中的 `enabled` 改为 `true`，执行 `make runtime-install YES=1`、`openclaw gateway restart` 和 `make mcp-probe`。不要只修改运行副本。
+启用 `fastmcp-gateway` 时，先确认 18080 端口的服务已经启动，再把仓库配置中的 `enabled` 改为 `true`，执行 `./workbench install openclaw`、`openclaw gateway restart` 和 `openclaw mcp doctor --probe`。不要只修改运行副本。
 
 ## 9. 验收与更新
 
@@ -213,13 +195,13 @@ make mcp-probe
 openclaw --version
 openclaw gateway status
 openclaw channels status --probe
-make doctor
-make mcp-probe
+bash components/openclaw/scripts/doctor.sh
+openclaw mcp doctor --probe
 ```
 
 最后从 Telegram owner 私聊验证普通文本、语音转写、`/housing` 和带文件附件的 `/growth`。
 
-OpenClaw 继续使用日期版本号；“OpenClaw 2.0”是 `v2026.8.1` 的发布名称。升级时同时修改 `versions.json` 中的 OpenClaw 与 Qwen provider，按新 schema 调整 `openclaw.json`，然后重新执行 `make deploy`。不要单独安装 `openclaw@latest`。
+OpenClaw 继续使用日期版本号；“OpenClaw 2.0”是 `v2026.8.1` 的发布名称。升级时同时修改 `versions.json` 中的 OpenClaw 与 Qwen provider，按新 schema 调整 `openclaw.json`，然后重新执行 `./workbench install openclaw`。不要单独安装 `openclaw@latest`。
 
 ## 10. 微信入口
 
@@ -228,7 +210,7 @@ OpenClaw 继续使用日期版本号；“OpenClaw 2.0”是 `v2026.8.1` 的发�
 完整部署后执行：
 
 ```bash
-make weixin-login
+bash components/openclaw/scripts/weixin-login.sh
 ```
 
 手机微信扫码并确认连接。脚本检查登录凭据和扫码者 ID，覆盖登录器自动生成的配置时间戳，随后重启 Gateway。扫码会过期，未完成时重新执行即可。账号索引不在仓库；从零部署后需重新扫码。
@@ -236,7 +218,7 @@ make weixin-login
 账号标签写在 `channels.openclaw-weixin.accounts.<实际账号ID>.name`，第一个账号为 `hanzhe`。新增第二个用户并标记为 `xuzan`：
 
 ```bash
-bash scripts/weixin-login.sh --name xuzan
+bash components/openclaw/scripts/weixin-login.sh --name xuzan
 ```
 
 二维码必须由 xuzan 本人的微信扫描。脚本对比登录前后的账号与扫码者 ID，确认新增了独立用户并保留原账号后，才把新账号标签写回仓库配置并部署；重复标签或误扫已有用户时不会写入新标签。从零部署恢复未登录的标签时也用 `--name`，成功后替换该标签的旧账号 ID。标签供 OpenClaw 管理使用，不修改微信中的联系人备注，也不自动授予管理员权限。
@@ -259,7 +241,7 @@ bash scripts/weixin-login.sh --name xuzan
 1. 微信 ClawBot 中发送 `请只回复：微信接入成功`，确认收到模型回复。
 2. 连续发送两条关联问题，确认同一微信会话能延续上下文。
 3. 按需要发送一张图片或一段语音，分别验证媒体处理。
-4. 执行 `make runtime-check`、`make doctor`。无账号时状态提示未配置属于未完成扫码；状态正常也不能代替微信实际收发验收。
+4. 执行 `bash components/openclaw/scripts/install-runtime.sh --check`、`bash components/openclaw/scripts/doctor.sh`。无账号时状态提示未配置属于未完成扫码；状态正常也不能代替微信实际收发验收。
 
 插件安装、版本检查和 Gateway 存活只能验证各自层级，收到新的微信消息并成功回复后才算文本端到端通过。
 

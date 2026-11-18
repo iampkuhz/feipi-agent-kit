@@ -1,151 +1,55 @@
-# 验证指南
+# 本地服务验收指南
 
-> 如何验证 Feipi Agent Kit 重构已落地并可实际使用
+以下命令从仓库根目录运行。尚未发布服务定义时，先完成 [本地服务准备](../setup-new-mac.md#首次准备)。
 
----
+## 选择检查方式
 
-## 验证清单
+| 要确认什么 | 怎么检查 | 通过条件 |
+| --- | --- | --- |
+| 源码改动是否通过回归 | `python3 -m unittest discover -s tests -p 'test_service*.py'` | 相关用例通过，记录跳过的环境检验 |
+| 本机服务是否已发布 | `./workbench doctor services` | 确认运行来源，并查看 LiteLLM 就绪结果 |
+| 某个服务是否运行 | `./workbench service <服务> status` | 所需容器正在运行 |
+| 服务是否就绪 | 请求下方健康端点 | HTTP 检查成功 |
+| 客户端任务是否可用 | 用日常客户端执行一次真实请求 | 返回任务所需的结果，使用的服务和授权符合预期 |
 
-### 1. 目录结构验证
+## 启动并检查就绪
 
-```bash
-# 检查核心目录是否存在
-ls -d skills rules commands tools runtimes docs
-```
+只启动要验收的服务。工作台启动 SearXNG、LiteLLM 和 Crawl4AI 时会等待对应的 HTTP 检查。
 
-**预期结果**：所有目录存在
+| 服务 | 启动命令 | 检查方式 |
+| --- | --- | --- |
+| SearXNG | `./workbench service searxng up` | `curl -fsS http://127.0.0.1:8873/healthz` |
+| LiteLLM | `./workbench service litellm up` | `curl -fsS http://127.0.0.1:4000/health/readiness` |
+| Crawl4AI | `./workbench service crawl4ai up` | `curl -fsS http://127.0.0.1:11235/health` |
+| OTel | `./workbench service otel up` | `./workbench service otel status` |
 
-### 2. SearXNG 服务验证
+## 验证功能
 
-```bash
-# 启动服务
-make searxng-up
+### SearXNG
 
-# 等待 10 秒后检查健康状态
-sleep 10
-curl http://localhost:8873/healthz
-```
-
-**预期结果**：
-- 容器启动成功
-- 健康检查返回 200
-
-```bash
-# 测试搜索
-curl -s "http://localhost:8873/search?q=test&format=json" | jq '.results | length'
-```
-
-**预期结果**：返回结果数量 > 0
-
-### 3. LiteLLM 服务验证
+发送 JSON 搜索请求，确认 `results` 有内容。若结果为空，换一个已知有结果的查询，并查看搜索引擎日志。
 
 ```bash
-# LiteLLM 只自动加载 ~/.env，不读取项目 .env 或复用旧 shell 配置。
-# 把变量配置到 ~/.env 后直接执行脚本即可，无需重开终端。
-
-# 启动服务
-make litellm-up
-
-# 等待 30 秒后检查健康状态
-sleep 30
-curl -s http://localhost:4000/health
+curl -fsS 'http://127.0.0.1:8873/search?q=podman&format=json' | jq '.results | length'
 ```
 
-**预期结果**：健康检查返回 200
+### LiteLLM
 
-```bash
-# 测试模型调用
-curl -s http://localhost:4000/v1/models \
-  -H "Authorization: Bearer ${LITELLM_MASTER_KEY:-sk-litellm-local-dev}" | jq .
-```
+用已配置的客户端和有效密钥发起一次模型请求，核对返回内容和模型。可先调用 `/v1/models` 核对可见模型，再使用相应的 Chat Completions 或 Responses 接口。 [客户端配置与请求示例](../../tools/gateway/litellm/README.md)
 
-**预期结果**：返回配置的模型列表
+### Crawl4AI
 
-### 4. SearXNG MCP 服务 [已退役]
+抓取一个已知可访问的网页，确认响应含目标正文。使用 MCP 的客户端再从实际会话调用一次抓取工具。 [HTTP 与 MCP 验证示例](../../tools/crawl/crawl4ai/README.md)
 
-> SearXNG MCP（`tools/search/searxng-mcp/`）已于 2026-05 移除。如需网页搜索能力，请使用 Crawl4AI MCP（`tools/crawl/crawl4ai/`）。
+### OTel
 
-### 5. Claude Code 集成验证
+从已接入的客户端发送一条可识别的日志，检查清洗后的输出中是否出现对应记录。 [OTel 配置和数据位置](../../tools/gateway/otel/README.md)
 
-> 以下 SearXNG MCP 配置示例已随服务退役失效。如需配置 MCP Server，请参考 Crawl4AI MCP 的文档。
+## 故障排查
 
-### 6. 健康检查脚本验证
+1. 先运行 `./workbench service <服务> status` 和 `./workbench service <服务> logs`，再决定是否重启。
+2. 连接失败时，核对 `./workbench service podman check` 的本机连接及目标端口占用，例如 `lsof -nP -iTCP:8873 -sTCP:LISTEN`。
+3. LiteLLM 返回 502 时，查看网关日志，核对上游网络、代理与授权配置。需要查看数据库时运行 `./workbench service litellm logs postgres`。 [LiteLLM 排查说明](../../tools/gateway/litellm/README.md)
+4. Crawl4AI 的 HTTP 健康检查通过但 MCP 调用失败时，核对客户端的 MCP 地址、容器日志和代理旁路设置。 [Crawl4AI MCP 配置](../../tools/crawl/crawl4ai/README.md#mcp-服务配置)
 
-```bash
-# 运行健康检查
-./scripts/doctor/check.sh
-```
-
-**预期结果**：显示各项检查状态
-
----
-
-## 常见问题排查
-
-### SearXNG 无法启动
-
-**症状**：容器启动失败或健康检查失败
-
-**排查步骤**：
-1. 检查 settings.yml 语法：`docker compose -f tools/search/searxng/compose/docker-compose.yml config`
-2. 查看日志：`docker compose -f tools/search/searxng/compose/docker-compose.yml logs`
-3. 检查端口占用：`lsof -i :8873`
-
-### LiteLLM 返回 502
-
-**症状**：API 调用返回 502 错误
-
-**可能原因**：容器内代理配置问题
-
-**解决方案**：
-1. 检查 compose 文件中的代理设置（应清空）
-2. 重启服务：`make litellm-restart`
-
-### MCP 服务无法连接
-
-> SearXNG MCP 服务已退役。如需 MCP 搜索能力，请使用 Crawl4AI MCP（`tools/crawl/crawl4ai/`）。
-
----
-
-## 完成定义
-
-满足以下**全部条件**时，可判定重构已实际落地：
-
-### 基础条件
-
-- [x] `tools/` 目录结构已创建
-- [x] `rules/` 目录已创建
-- [x] `commands/` 目录已创建
-- [x] `runtimes/fastmcp/` 已创建
-
-### 服务验证
-
-- [x] LiteLLM 已配置到 `tools/gateway/litellm/`
-- [x] SearXNG 已配置到 `tools/search/searxng/`
-- [x] 服务可正常启动和停止
-
-### 新增服务
-
-- [x] LiteLLM 已配置到 `tools/gateway/litellm/`
-- [x] SearXNG MCP 曾创建于 `tools/search/searxng-mcp/`（已于 2026-05 移除）
-
-### 集成验证
-
-- [ ] Crawl4AI MCP 可在 Claude Code 中使用
-- [ ] 搜索工具返回有效结果
-- [ ] 错误处理清晰可读
-
-### 文档完整
-
-- [x] README.md 已更新
-- [x] AGENTS.md 已更新
-- [x] 各服务 README 完整
-- [x] 运行说明清晰
-
----
-
-## 参考
-
-- [docs/architecture/overview.md](architecture/overview.md) - 架构说明
-- [README.md](../README.md) - 仓库总览
-- [AGENTS.md](../AGENTS.md) - Agent 行为指南
+历史实机结果见 [工作台实机验收记录](../workbench-validation.md)。新环境分别记录检查、就绪探测、真实请求和跳过项。

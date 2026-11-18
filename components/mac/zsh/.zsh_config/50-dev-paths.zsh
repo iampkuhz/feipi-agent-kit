@@ -1,6 +1,6 @@
 # 用户自行安装的命令；例如 uv tool 的入口和少量本机启动脚本。
 path_prepend "$HOME/.local/bin"
-# Stow 将 doctor-zsh-config 放在 ~/bin；放到 PATH 末尾以便直接调用。
+# 保留用户自己的 ~/bin。
 path_append "$HOME/bin"
 
 # Rust

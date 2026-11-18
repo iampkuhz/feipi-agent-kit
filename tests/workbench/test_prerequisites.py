@@ -41,13 +41,6 @@ else exit 97; fi''',
         return subprocess.run(['/bin/bash', str(ROOT/'scripts/bootstrap/prerequisites.sh'), action],
                               env=dict(self.env, **values), capture_output=True, text=True, timeout=10)
 
-    def test_plan_is_read_only_and_does_not_call_discovered_tools(self):
-        proc = self.cli('plan', TEST_CLT_MISSING='1')
-        self.assertEqual(proc.returncode, 0, proc.stderr)
-        self.assertFalse(self.log.exists())
-        self.assertFalse(list(self.home.iterdir()))
-        self.assertFalse(list(self.scratch.iterdir()))
-
     def test_check_reports_missing_clt_without_installation(self):
         proc = self.cli('check', TEST_CLT_MISSING='1')
         self.assertNotEqual(proc.returncode, 0)

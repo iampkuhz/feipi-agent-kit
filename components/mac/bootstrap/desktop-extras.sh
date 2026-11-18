@@ -85,6 +85,11 @@ while IFS=$'\t' read -r name version kind payload bundle_id sha url; do
     echo "缺少 ${actual_name}：${target}" >&2
     exit 1
   else
+    # 应用目录不可写时提前停止，避免沿用调用者终端的 sudo 缓存。
+    if [[ "${kind}" == dmg && ! -w /Applications ]]; then
+      echo "当前用户无法写入 /Applications，请单独处理 ${actual_name} 的安装。" >&2
+      exit 1
+    fi
     mkdir -p "${cache_dir}"
     archive="${cache_dir}/${name}-${version}.${kind}"
     if ! digest_matches "${archive}" "${sha}"; then
@@ -109,11 +114,7 @@ while IFS=$'\t' read -r name version kind payload bundle_id sha url; do
       ditto "${mount_dir}/${payload}" "${temp_dir}/${payload}"
       hdiutil detach -quiet "${mount_dir}"
       mount_dir=""
-      if [[ -w /Applications ]]; then
-        mv "${temp_dir}/${payload}" "${target}"
-      else
-        /usr/bin/sudo -n mv "${temp_dir}/${payload}" "${target}"
-      fi
+      mv "${temp_dir}/${payload}" "${target}"
     else
       # 固定摘要先于解包；仍拒绝绝对路径和父目录跳转。
       if tar -tzf "${archive}" | awk '/^\// || /(^|\/)\.\.(\/|$)/ {bad=1} END {exit !bad}'; then

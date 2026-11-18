@@ -28,18 +28,18 @@
 
 5. Skills 只管理来源
 - `skill-list/<name>.json` 每个 skill 一个文件，只声明 Git repository、ref、子目录和安装选项。
-- 本组件不重复保存 skill 源码；共享源码仍在根目录 skills/。日常共享技能由 `workbench apply skills` 实拷，外部业务技能沿用本组件 bootstrap。
+- 本组件不重复保存 skill 源码；共享源码仍在根目录 skills/。日常共享技能由 `workbench install skills` 实拷，外部业务技能沿用本组件 bootstrap。
 - 删除 manifest 不自动删除已安装 skill。
 
 6. 版本成对锁定
 - `versions.json` 同时锁定 OpenClaw 和 `@openclaw/qwen-provider`。
-- 更新版本时先适配配置并通过 `make validate`，不得只升级全局 npm 包。
+- 更新版本时先适配配置并通过 `bash components/openclaw/tests/run.sh`，不得只升级全局 npm 包。
 
 7. 验证
-- 仓库和配置：`make validate`
-- live 受管文件：`make runtime-check`
-- Gateway、provider、Telegram：`make doctor`
-- MCP 外部服务：`make mcp-probe`
+- 仓库和配置：`bash components/openclaw/tests/run.sh`
+- live 受管文件：`bash components/openclaw/scripts/install-runtime.sh --check`
+- Gateway、provider、Telegram：`bash components/openclaw/scripts/doctor.sh`
+- MCP 外部服务：`openclaw mcp doctor --probe`
 - 静态通过不等于真实 Telegram、模型或 MCP 请求通过。
 
 8. 仅支持 macOS

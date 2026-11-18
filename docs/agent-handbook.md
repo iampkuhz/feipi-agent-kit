@@ -1,119 +1,56 @@
 # Agent 操作手册
 
-> 日常总入口是 `./workbench`，研发入口是 `./develop`，参见 [工作台使用与恢复](workbench.md)。下文保留底层命令参考。
+以下命令从仓库根目录运行。Mac 配置、组件命令和私有资料恢复见 [工作台手册](workbench.md)。
 
-## Skills 管理
+## 安装或更新 Skill
 
 ```bash
-# 日常安装 Skills（备份后实拷，递归排除 maintenance/tests/evals）
-./workbench apply skills
+./workbench install skills
+```
 
-# 查看逐项跳过/保留原因、注册表验证详情
-make install VERBOSE=1
+工作台先备份客户端中的受管入口，然后安装运行副本。安装后新开客户端对话，让客户端重新发现技能。
 
-# 强制彩色（如支持 ANSI 的日志查看器）；纯文本使用 COLOR=never
-make install COLOR=always
+| 需要的范围 | 命令 |
+| --- | --- |
+| 发布到一个客户端 | `./workbench install skills --agent codex` |
+| 发布一个 Skill 到一个客户端 | [单个 Skill 发布](workbench.md#单个-skill-发布) |
+| 安装到某个项目 | `bash scripts/install_skills.sh --dir /path/to/project` |
+| 检查仓库结构与注册表 | `bash scripts/harness/doctor.sh` |
+| 验证安装行为 | `python3 -m unittest discover -s tests -p test_install_output.py` |
 
-# 安装到项目目录
-make install-project PROJECT=/path/to/project
+安装前会检查 `skills/registry.yaml`。全量同步会清理能确认由本仓库安装的旧入口。按 Skill 发布只更新选定技能及直接共享依赖。安装过程中会递归过滤 `maintenance/`、`tests/` 和 `evals/`。
 
-# 初始化新 skill
+## 阅读安装结果
+
+| 标记 | 含义 |
+| --- | --- |
+| `[新增]` / `[更新]` | 安装新入口，或更新内容、权限和链接 |
+| `[跳过]` | 内容、权限和链接一致 |
+| `[清理]` / `[保留]` | 清理本仓库的退役入口，或保留其他来源及归属不明的入口 |
+| `[警告]` | 存在冲突等异常，安装器会给出原因和路径 |
+| `[失败]` | 校验或安装中止，退出码非零 |
+
+安装日志按客户端或项目分组，并在终端实时输出。警告计入跳过，清理和保留另计。日志重定向、`TERM=dumb` 或非空 `NO_COLOR` 时以纯文本输出。
+
+安装器用 `.feipi-agent-kit-source` 识别仓库归属。没有标记的旧入口，可通过指向本仓库的链接，或 OpenClaw 的 `.openclaw/source-origin.json` 识别。OpenClaw 记录须匹配仓库身份、技能名及子目录。显式来源记录优先于内部链接，来源不明的旧实拷会保留。
+
+## 新增或维护 Skill
+
+1. 查阅命名、分层、测试和注册要求。 [Skill 工程治理](../skills/authoring/feipi-skill-govern/SKILL.md)
+2. 创建脚手架，替换下方占位参数为实际名称和分层。
+3. 运行 Skill 自身测试与注册表回归，最后用一个代表性任务验证结果。
+
+```bash
 bash skills/authoring/feipi-skill-govern/scripts/init_skill.sh <name> --layer <layer>
-
-# 校验新增或本次治理的 skill（历史布局检查可省略严格参数）
 bash skills/authoring/feipi-skill-govern/scripts/validate.sh <skill-path> --require-maintenance
-
-# 执行技能测试
 bash <skill-path>/tests/run.sh
+bash scripts/harness/doctor.sh
 ```
 
-再次运行安装命令 会按当前技能列表同步清理本仓库因源码删除、改名或退役留下的旧入口。请先同步 `skills/registry.yaml`；注册表校验失败时不会安装或清理。
+## 接入本地服务
 
-仅源码调试使用 `./develop skills link`；返回日常环境用 `./workbench apply skills`。
+- **LiteLLM** · 使用 `http://127.0.0.1:4000/v1` 作为兼容接口。 [网关与客户端配置](../tools/gateway/litellm/README.md)
+- **SearXNG** · 通过 HTTP API 查询搜索结果。 [搜索接口](../tools/search/searxng/README.md)
+- **Crawl4AI** · 通过 HTTP API 或内置 MCP 接口提取网页内容。 [Crawl4AI 接入](../tools/crawl/crawl4ai/README.md)
 
-安装器在每个 skill 目录写入 `.feipi-agent-kit-source` 来源标记，链接与实拷模式均适用。旧版未标记的安装通过指向本仓库的顶层链接，或指向同一源码 skill 的内部资源链接识别；相对链接按所在目录解析。清理时保留其他来源的 skill（包括失效链接）。
-
-OpenClaw 原生 Git 安装的纯拷贝通过 `.openclaw/source-origin.json` 确认归属：Git 仓库地址必须与本仓库 `origin` 一致，`slug` 必须与入口目录名一致，`subdirectory` 必须是 `skills/` 下对应的技能路径。HTTPS 与 SSH 地址按仓库身份匹配。其他仓库、损坏或不匹配的来源记录均保留；显式来源标记或 OpenClaw 记录优先于内部链接证据。没有任何来源或链接证据的旧版纯实拷目录仍保留。
-
-重复安装会比较过滤后的文件类型、权限、文件内容和链接目标；内容一致时计入跳过，保留现有目录和文件。变化的入口或纯拷贝资源会更新，错误链接会修复。`maintenance/`、`tests/`、`evals/` 在任何嵌套位置均不参与安装与比较，其脚本引用的共享路径也不安装。链接模式只链接无需过滤的运行目录，需要过滤的目录展开后再安装。安装失败会中止，不计入跳过。
-
-安装输出按 agent/项目分组，目标路径与安装模式只显示一次。默认逐项显示变更、清理删除和警告，未变更的技能及保留的其他来源入口只汇总数量；`VERBOSE=1` 展开逐项名称、跳过/保留原因和验证详情。共享路径以 `共享/` 标识，计入安装小计和总计。
-
-| 标记 | 终端样式 | 含义 |
-|------|----------|------|
-| `[新增]` | 绿色粗体 | 目标原先不存在，安装成功 |
-| `[更新]` | 蓝色粗体 | 已有内容变化、链接迁移或修复成功；旧版和新版均有 `agents/openai.yaml` 版本号时显示 `（v旧 → v新）` |
-| `[跳过]` | 弱化显示 | 内容或链接未变，仅详细模式逐项显示 |
-| `[清理]` | 删除项黄色粗体 | 已删除本仓库旧入口；清理计数独立列出 |
-| `[保留]` | 弱化显示 | 其他来源或无法确认归属，仅详细模式逐项显示 |
-| `[警告]` | 黄色粗体 | 冲突等导致跳过，默认也显示原因与路径 |
-| `[失败]` | 红色粗体 | 验证或安装失败，中止并返回非零状态 |
-
-每个目标显示小计，末尾分别汇总新增、更新、跳过和警告。警告数量是跳过中的异常项数量，不重复计入安装项数；清理的移除/保留数量不参与安装总计。输出即时写入控制台，失败时保留此前完成的日志，不打印成功总计。
-
-`COLOR=auto` 为默认值，仅在终端且 `TERM` 不是 `dumb` 时启用颜色、粗体和弱化样式；管道或日志重定向默认使用纯文本。`COLOR=always` 强制启用，`COLOR=never` 禁用；非空 `NO_COLOR` 优先禁用所有样式。状态文字始终保留，颜色不影响结果识别。这些选项也适用于 `make install` 和 `make install-project`；直接运行脚本时使用 `--verbose`、`--color auto|always|never`。
-
-输出回归测试：`python3 -m unittest discover -s tests -p 'test_install_output.py'`；完整安装、来源清理和目录过滤验证：`make harness-doctor`。测试使用临时安装目录。
-
-## 服务管理
-
-### LiteLLM
-
-```bash
-make litellm-up          # 启动
-make litellm-down        # 停止
-make litellm-restart     # 重启
-```
-
-### SearXNG
-
-```bash
-make searxng-up          # 启动
-make searxng-down        # 停止
-make searxng-restart     # 重启
-```
-
-### SearXNG MCP [已退役]
-
-> SearXNG MCP 服务（`tools/search/searxng-mcp/`）已于 2026-05 移除。如需网页搜索能力，请使用 Crawl4AI MCP。
-
-## 仓库维护
-
-```bash
-# 初始化设置
-./scripts/bootstrap/setup.sh
-
-# 健康检查
-./scripts/doctor/check.sh
-```
-
-## 服务接入指南
-
-### Claude Code 使用 SearXNG MCP [已退役]
-
-> SearXNG MCP 已移除。如需网页搜索能力，请使用 Crawl4AI MCP（`tools/crawl/crawl4ai/`）。
-
-### 使用 LiteLLM 作为模型网关
-
-1. 启动服务：`make litellm-up`
-2. 客户端通过 `http://127.0.0.1:4000/v1` 访问
-
-## 故障排查
-
-### 服务无法启动
-
-1. 检查端口占用：`lsof -i :<port>`
-2. 查看日志：`docker compose logs`
-3. 验证配置：检查 `env/` 和 `compose/` 文件
-
-### MCP 服务不可用
-
-1. 检查基础服务：`curl http://localhost:8873/healthz`
-2. 检查 MCP 进程
-3. 验证 Claude Code MCP 配置
-
-### Skill 无法使用
-
-1. 检查安装：`ls ~/.claude/skills/`
-2. 检查入口文件权限和运行目录链接
-3. 重新安装：`./workbench apply skills`
+启动顺序和自启设置见 [新 Mac 服务重建](setup-new-mac.md)。服务或 MCP 不可用时，从 [验收与排查](verification/README.md) 查健康端点和日志。Skill 未出现时，先核对安装输出中的客户端、目录和来源，再定点发布并开启新对话。

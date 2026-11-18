@@ -1,6 +1,6 @@
 # 本机 Multica 运维
 
-日常操作统一从仓库根目录 `./workbench` 进入；本目录命令供组件维护与显式源码调试。应用、回收与恢复见 [工作台手册](../../docs/workbench.md)。原独立仓库仅留作历史回退。
+从仓库根目录用 `./workbench install multica` 安装固定版 CLI 和 Compose。用 `./workbench doctor multica` 查看 personal profile 的 daemon 状态。任务操作使用官方 CLI 或 Web，本机部署维护见下文。
 
 服务采用 Multica v0.6.3，所需官方 Compose 固定到上游提交并保存于 `~/.local/share/multica/server`，Web/API/PostgreSQL 镜像由 `config/compose.pinned.yml` 锁定 digest。`python3 scripts/install-native.py install|check` 准备或核对固定 CLI 和单个 Compose，无需克隆整份上游源码；保留匹配的既有文件，版本或内容冲突即停止。当前目录不保存真实凭据或业务数据。后台运行副本位于 `~/.local/share/multica/ops`，通过 `scripts/install-runtime.py` 发布，避免 launchd 直接读取 Documents 被 macOS 拒绝；运行副本不手工编辑。
 

@@ -4,60 +4,87 @@ from pathlib import Path
 import tempfile
 import unittest
 import subprocess
+import sys
 from unittest.mock import patch
 
-spec = importlib.util.spec_from_file_location('workbench', Path(__file__).resolve().parents[2]/'scripts/workbench/main.py')
+directory = Path(__file__).resolve().parents[2]/'scripts/workbench'
+sys.path.insert(0, str(directory))
+spec = importlib.util.spec_from_file_location('workbench', directory/'main.py')
 wb = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(wb)
 
 
 class Recovery(unittest.TestCase):
-    def test_multica_install_prepares_native_files_before_requesting_binding(self):
+    def test_multica_install_only_prepares_native_files(self):
         with tempfile.TemporaryDirectory(prefix='feipi multica install ') as directory:
-            with patch.object(wb, 'HOME', Path(directory)), patch.object(wb, 'run') as run, \
-                    patch.object(wb, 'apply') as apply, self.assertRaisesRegex(ValueError, '已准备'):
+            home = Path(directory)
+            with patch.object(wb, 'HOME', home), patch.object(wb, 'run') as run, patch.object(wb, 'rollback_on_failure') as rollback:
                 wb.install('multica')
             run.assert_called_once_with([wb.sys.executable, wb.ROOT/'components/multica/scripts/install-native.py', 'install'])
-            apply.assert_not_called()
+            rollback.assert_not_called()
+            self.assertEqual(list(home.iterdir()), [])
 
-    def test_multica_native_install_failure_does_not_publish_runtime(self):
-        with patch.object(wb, 'run', side_effect=subprocess.CalledProcessError(1, 'install')), \
-                patch.object(wb, 'apply') as apply, self.assertRaises(subprocess.CalledProcessError):
-            wb.install('multica')
-        apply.assert_not_called()
+    def test_multica_doctor_reads_native_status_without_receipt(self):
+        with tempfile.TemporaryDirectory(prefix='feipi multica status ') as directory:
+            home = Path(directory)
+            native = home/'.local/bin/multica'
+            native.parent.mkdir(parents=True)
+            native.touch()
+            native.chmod(0o700)
+            with patch.object(wb, 'HOME', home), patch.object(wb, 'STATE', home/'state'), \
+                    patch.object(wb, 'differences') as diff, patch('builtins.print'), \
+                    patch.object(wb.subprocess, 'run') as run:
+                run.return_value = subprocess.CompletedProcess([], 0, '{"status":"running"}')
+                self.assertEqual(wb.doctor('multica'), 0)
+                run.assert_called_once_with(
+                    [str(native), '--profile', 'personal', 'daemon', 'status', '--output', 'json'],
+                    capture_output=True, text=True, timeout=10,
+                )
+                run.return_value = subprocess.CompletedProcess([], 0, '{"status":"stopped"}')
+                self.assertEqual(wb.doctor('multica'), 1)
+                diff.assert_not_called()
+            self.assertFalse((home/'state').exists())
 
-    def test_multica_bound_install_still_uses_existing_publication_checks(self):
-        with tempfile.TemporaryDirectory(prefix='feipi multica bound ') as directory:
-            home = Path(directory); binding = home/'.config/multica-selfhost/machine.json'
-            binding.parent.mkdir(parents=True); binding.write_text('{}')
-            with patch.object(wb, 'HOME', home), patch.object(wb, 'run') as run, patch.object(wb, 'apply') as apply:
-                wb.install('multica')
-            run.assert_called_once()
-            apply.assert_called_once_with('multica')
+    def test_service_does_not_forward_unlisted_operations(self):
+        with patch.object(wb, 'run') as run:
+            for component, args in (
+                ('multica', ['start']), ('startup', ['run-services']), ('litellm', []),
+                ('litellm', ['logs', 'litellm']), ('searxng', ['status', 'extra']),
+            ):
+                with self.subTest(component=component, args=args), self.assertRaises(ValueError):
+                    wb.service(component, args)
+            run.assert_not_called()
 
     def test_startup_failure_restores_all_managed_plists_including_session_browser(self):
-        with tempfile.TemporaryDirectory(prefix='feipi startup backup ') as scratch:
+        with tempfile.TemporaryDirectory(prefix='feipi startup ') as scratch:
             root = Path(scratch); runtime = root/'runtime'; home = root/'home'
             script = runtime/'services/tools/runtime/startup.py'
             script.parent.mkdir(parents=True); script.write_text('fixture')
-            batch = root/'backup'
+            agents = home/'Library/LaunchAgents'
+            agents.mkdir(parents=True)
+            labels = ['com.feipi.podman-services', 'com.feipi.session-browser']
+            plists = [agents/(label+'.plist') for label in labels]
+            for plist in plists:
+                plist.write_text('original '+plist.name)
+
+            def fail_after_writing(_):
+                for plist in plists:
+                    plist.write_text('changed')
+                raise subprocess.CalledProcessError(1, 'install')
+
             with patch.object(wb, 'HOME', home), patch.object(wb, 'RUNTIME', runtime), \
-                    patch.object(wb, 'backup', return_value=batch) as backup, \
-                    patch.object(wb, 'run', side_effect=subprocess.CalledProcessError(1, 'install')), \
-                    patch.object(wb, 'restore') as restore, patch('builtins.print'), \
+                    patch.object(wb, 'run', side_effect=fail_after_writing), \
                     self.assertRaises(subprocess.CalledProcessError):
                 wb.service('startup', ['install'])
-            paths = backup.call_args.args[1]
-            self.assertIn(home/'Library/LaunchAgents/com.feipi.session-browser.plist', paths)
-            self.assertEqual(len(paths), 3)
-            restore.assert_called_once_with(batch)
+            for plist in plists:
+                self.assertEqual(plist.read_text(), 'original '+plist.name)
 
     def test_mac_doctor_detects_installed_nvm_node_outside_inherited_path(self):
         from types import SimpleNamespace
         with tempfile.TemporaryDirectory(prefix='feipi nvm doctor ') as scratch:
             home = Path(scratch); nvm = home/'.nvm'; nvm.mkdir(); (nvm/'nvm.sh').write_text('fixture')
             runtime = home/'runtime'; target = runtime/'mac/zsh/.zshrc'
-            target.parent.mkdir(parents=True); target.write_text('fixture')
+            target.parent.mkdir(parents=True); target.write_bytes((wb.ROOT/'components/mac/zsh/.zshrc').read_bytes())
             (home/'.zshrc').symlink_to(target)
             state = home/'state'; state.mkdir(); (state/'mac.json').write_text('{}')
             with patch.object(wb, 'HOME', home), patch.object(wb, 'RUNTIME', runtime), \
@@ -72,7 +99,7 @@ class Recovery(unittest.TestCase):
     def test_mac_doctor_finds_homebrew_tools_outside_ssh_path(self):
         with tempfile.TemporaryDirectory(prefix='feipi ssh doctor ') as scratch:
             home = Path(scratch); runtime = home/'runtime'; target = runtime/'mac/zsh/.zshrc'
-            target.parent.mkdir(parents=True); target.write_text('fixture')
+            target.parent.mkdir(parents=True); target.write_bytes((wb.ROOT/'components/mac/zsh/.zshrc').read_bytes())
             (home/'.zshrc').symlink_to(target)
             state = home/'state'; state.mkdir(); (state/'mac.json').write_text('{}')
             def which(name, path=None):
@@ -91,7 +118,7 @@ class Recovery(unittest.TestCase):
             alias = root/'home-alias'; alias.symlink_to(home)
             runtime = alias/'.local/share/feipi-workbench'
             target = runtime/'mac/zsh/.zshrc'
-            target.parent.mkdir(parents=True); target.write_text('fixture')
+            target.parent.mkdir(parents=True); target.write_bytes((wb.ROOT/'components/mac/zsh/.zshrc').read_bytes())
             (home/'.zshrc').symlink_to(target.resolve())
             state = root/'state'; state.mkdir(); (state/'mac.json').write_text('{}')
             with patch.object(wb, 'HOME', alias), patch.object(wb, 'RUNTIME', runtime), \
@@ -102,29 +129,51 @@ class Recovery(unittest.TestCase):
     def test_mac_install_uses_shared_orchestration_and_rejects_conflict_first(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d); home = root/'home'; home.mkdir()
+            source = root/'components/mac/zsh/.zshrc'
+            target = home/'.zshrc'
+            source.parent.mkdir(parents=True)
+            source.write_text('export EDITOR=nvim\n')
+            pairs = {'zsh/.zshrc': (source, target)}
             with patch.object(wb, 'ROOT', root), patch.object(wb, 'HOME', home), \
-                 patch.object(wb, 'run') as run, patch('builtins.print'):
-                wb.install('mac')
-                run.assert_called_once_with(['bash', root/'components/mac/bootstrap/run.sh', 'install', '--dependencies-only'])
-                run.reset_mock()
+                 patch.object(wb, 'run') as run, patch.object(wb, 'STATE', root/'state'), \
+                 patch.object(wb, 'RUNTIME', root/'runtime'), patch.object(wb, 'snapshot') as publish, \
+                 patch.object(wb, 'mappings', return_value=pairs), patch.object(wb, 'receipt'), patch('builtins.print'):
+                snapshot = root/'runtime/mac'
+                stow = ['stow', '--dir', snapshot.resolve(), '--target', home.resolve(), '--no-folding']
                 (home/'bin').mkdir()
-                with self.assertRaisesRegex(ValueError, '先合并'):
+                wb.install('mac')
+                self.assertEqual([entry.args[0] for entry in run.call_args_list], [
+                    ['bash', root/'components/mac/bootstrap/run.sh'],
+                    [*stow, '--simulate', 'dotfiles'],
+                    [*stow, 'dotfiles'],
+                    [wb.sys.executable, root/'runtime/mac/bootstrap/env-history.py', 'install'],
+                ])
+                self.assertEqual(publish.call_args.args[2][source], Path('dotfiles/.zshrc'))
+                self.assertEqual(run.call_args_list[1].kwargs['env']['HOME'], str(snapshot.resolve()))
+                run.reset_mock()
+                target.write_text('local configuration')
+                with self.assertRaisesRegex(ValueError, '内容不同'):
                     wb.install('mac')
                 run.assert_not_called()
 
-    def test_mac_apps_install_uses_the_authorization_aware_entry(self):
-        with tempfile.TemporaryDirectory() as d:
-            root = Path(d); home = root/'home'; home.mkdir()
-            with patch.object(wb, 'ROOT', root), patch.object(wb, 'HOME', home), \
-                 patch.object(wb, 'run') as run, patch.object(wb.shutil, 'which', return_value='/mock/brew'), \
-                 patch('builtins.print'):
-                wb.install('mac', apps=True)
-                self.assertEqual([entry.args[0] for entry in run.call_args_list[-2:]], [
-                    ['bash', root/'components/mac/bootstrap/apps.sh', 'install'],
-                    ['bash', root/'components/mac/bootstrap/desktop-extras.sh', 'install'],
-                ])
-                with self.assertRaisesRegex(ValueError, '只适用于'):
-                    wb.install('services', apps=True)
+    def test_openclaw_install_rolls_back_files_when_deployment_fails(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            live = root/'openclaw.json'
+            live.write_text('previous configuration')
+
+            def failed_deployment(command):
+                self.assertEqual(command, ['bash', root/'components/openclaw/scripts/deploy.sh', '--yes'])
+                live.write_text('new configuration')
+                raise subprocess.CalledProcessError(1, command)
+
+            with patch.object(wb, 'ROOT', root), patch.object(wb, 'HOME', root), \
+                 patch.object(wb, 'STATE', root/'state'), \
+                 patch.object(wb, 'mappings', return_value={'openclaw.json': (root/'source', live)}), \
+                 patch.object(wb, 'run', side_effect=failed_deployment), patch('builtins.print'), \
+                 self.assertRaises(subprocess.CalledProcessError):
+                wb.install('openclaw')
+            self.assertEqual(live.read_text(), 'previous configuration')
 
     def test_targeted_skill_publish_backs_up_only_selected_client_and_skill(self):
         with tempfile.TemporaryDirectory() as d:
@@ -140,10 +189,10 @@ class Recovery(unittest.TestCase):
             codex = home/'.codex'
             with patch.object(wb, 'ROOT', root), patch.object(wb, 'HOME', home), \
                  patch.dict(wb.os.environ, {'CODEX_HOME':str(codex)}), \
-                 patch.object(wb, 'mappings', return_value={}), patch.object(wb, 'backup', return_value=root/'backup') as backup, \
+                 patch.object(wb, 'mappings', return_value={}), patch.object(wb, 'rollback_on_failure') as rollback, \
                  patch.object(wb, 'run') as run, patch.object(wb, 'receipt'), patch('builtins.print'):
-                wb.apply('skills', agent='codex', skill=name)
-                backup.assert_called_once_with('skills', [codex/'skills'/name])
+                wb.install('skills', agent='codex', skill=name)
+                rollback.assert_called_once_with([codex/'skills'/name])
                 run.assert_called_once_with(['bash', root/'scripts/install_skills.sh', '--copy', '--agent', 'codex', '--skill', name])
 
     def test_skill_mapping_excludes_nested_maintenance(self):
@@ -164,25 +213,9 @@ class Recovery(unittest.TestCase):
 
     def test_skill_selection_rejects_other_components_and_unsafe_names(self):
         with self.assertRaisesRegex(ValueError, '只适用'):
-            wb.apply('mac', agent='codex')
+            wb.install('mac', agent='codex')
         with self.assertRaisesRegex(ValueError, '无效'):
-            wb.apply('skills', skill='../../escape')
-
-    def test_multica_diff_detects_runtime_code_without_expanding_capture(self):
-        with tempfile.TemporaryDirectory() as d:
-            root = Path(d)
-            source = root/'components/multica/scripts/adapt.py'
-            source.parent.mkdir(parents=True)
-            source.write_text('old code')
-            home = root/'home'
-            live = home/'.local/share/multica/ops/scripts/adapt.py'
-            live.parent.mkdir(parents=True)
-            live.write_text('newer published code')
-            with patch.object(wb, 'ROOT', root), patch.object(wb, 'HOME', home), patch.object(wb, 'mappings', side_effect=lambda _: {}), patch.object(wb, 'source_files', side_effect=lambda p: [source] if p.name == 'scripts' else []), patch('builtins.print'):
-                self.assertEqual(wb.differences('multica', show=False), ['scripts/adapt.py'])
-                with self.assertRaisesRegex(ValueError, '不在允许回收范围'):
-                    wb.capture('multica', ['scripts/adapt.py'])
-            self.assertEqual(source.read_text(), 'old code')
+            wb.install('skills', skill='../../escape')
 
     def test_failed_mac_publish_restores_existing_links_and_snapshot(self):
         with tempfile.TemporaryDirectory() as d:
@@ -192,14 +225,14 @@ class Recovery(unittest.TestCase):
             (runtime/'mac/keep').write_text('previous runtime')
             original = root/'original'; original.write_text('previous config')
             (home/'.zshrc').symlink_to(original)
-            with patch.object(wb, 'HOME', home), patch.object(wb, 'RUNTIME', runtime), patch.object(wb, 'STATE', root/'state'), patch.object(wb, 'mappings', return_value={}), patch.object(wb, 'snapshot', side_effect=OSError('disk write failed')):
-                with self.assertRaises(OSError): wb.apply('mac')
+            with patch.object(wb, 'HOME', home), patch.object(wb, 'RUNTIME', runtime), patch.object(wb, 'STATE', root/'state'), patch.object(wb, 'mappings', return_value={}), patch.object(wb, 'snapshot', side_effect=OSError('disk write failed')), patch.object(wb, 'run'):
+                with self.assertRaises(OSError): wb.install('mac')
             self.assertTrue((home/'.zshrc').is_symlink())
             self.assertEqual((home/'.zshrc').read_text(), 'previous config')
             self.assertEqual((runtime/'mac/keep').read_text(), 'previous runtime')
             self.assertFalse((home/'bin').exists())
 
-    def test_backup_restores_symlinks_files_absence_and_directory(self):
+    def test_rollback_restores_symlinks_files_absence_and_directory(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             src = root/'source'; src.write_text('source')
@@ -207,12 +240,11 @@ class Recovery(unittest.TestCase):
             file = root/'file'; file.write_text('old')
             missing = root/'missing'
             tree = root/'tree'; tree.mkdir(); (tree/'keep').write_text('data')
-            with patch.object(wb, 'STATE', root/'state'):
-                batch = wb.backup('test', [link, file, missing, tree])
+            with self.assertRaises(OSError), wb.rollback_on_failure([link, file, missing, tree]):
                 link.unlink(); link.write_text('new')
                 file.write_text('new'); missing.write_text('added')
                 (tree/'keep').write_text('new'); (tree/'extra').write_text('new')
-                wb.restore(batch)
+                raise OSError('deployment failed')
             self.assertTrue(link.is_symlink())
             self.assertEqual(file.read_text(), 'old')
             self.assertFalse(missing.exists())
@@ -220,29 +252,17 @@ class Recovery(unittest.TestCase):
             self.assertFalse((tree/'extra').exists())
             self.assertEqual(src.read_text(), 'source')
 
-    def test_capture_rejects_secret_before_writing_any_selected_file(self):
-        with tempfile.TemporaryDirectory() as d:
-            root = Path(d)
-            src = root/'config.json'; src.write_text('{}')
-            live = root/'live.json'; live.write_text('{"apiKey":"do-not-copy"}')
-            pairs = {'config.json': (src, live)}
-            with patch.object(wb, 'mappings', return_value=pairs):
-                with self.assertRaises(ValueError): wb.capture('openclaw', ['config.json'])
-                with self.assertRaises(ValueError): wb.capture('openclaw', ['../../anything'])
-            self.assertEqual(src.read_text(), '{}')
-
-    def test_secret_ref_is_allowed(self):
-        wb.check_public(Path('openclaw.json'), b'{"apiKey":{"source":"env","id":"KEY"}}')
-
-    def test_diff_does_not_print_private_content(self):
+    def test_drift_check_never_prints_or_exports_private_content(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             src = root/'source'; src.write_text('old')
             live = root/'live'; live.write_text('secret-content')
-            with patch.object(wb, 'STATE', root/'state'), patch.object(wb, 'mappings', return_value={'config':(src,live)}), patch('builtins.print') as out:
+            with patch.object(wb, 'STATE', root/'state'), \
+                    patch.object(wb, 'mappings', return_value={'config': (src, live)}), patch('builtins.print') as out:
                 self.assertEqual(wb.differences('mac'), ['config'])
+            self.assertEqual(src.read_text(), 'old')
             self.assertNotIn('secret-content', str(out.call_args_list))
-            self.assertIn('secret-content', (root/'state/diff/mac/config.diff').read_text())
+            self.assertFalse((root/'state').exists())
 
 
 if __name__ == '__main__':

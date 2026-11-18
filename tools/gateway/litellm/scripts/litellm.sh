@@ -463,50 +463,50 @@ EOF
 # 所有 Compose 操作先核对同一个本地引擎；只读和停止命令也不能落到远端。
 # 放在目录创建之前，检查失败时不产生本机数据。
 case "${1:-up}" in
-  up|start|down|stop|restart|restart-chatgpt|recreate|logs|status)
+  up|down|restart|restart-chatgpt|recreate|logs|status)
     podman_require_runtime
     agent_service_data_root
     ;;
 esac
 
 case "${1:-up}" in
-  print-chatgpt-env|chatgpt-env)
+  print-chatgpt-env)
     print_chatgpt_env
     ;;
 
-  print-client-env|client-env)
+  print-client-env)
     print_client_env
     ;;
 
-  print-codex-config|codex-config)
+  print-codex-config)
     print_codex_config
     ;;
 
-  write-codex-model-catalog|codex-model-catalog)
+  write-codex-model-catalog)
     write_codex_model_catalog
     ;;
 
-  check-chatgpt-env|doctor-chatgpt)
+  check-chatgpt-env)
     check_chatgpt_env
     ;;
 
-  check-client-env|doctor-client)
+  check-client-env)
     check_client_env "${2:-all}"
     ;;
 
-  check-chatgpt-runtime|doctor-chatgpt-runtime)
+  check-chatgpt-runtime)
     check_chatgpt_runtime
     ;;
 
-  check-chatgpt-network|doctor-chatgpt-network)
+  check-chatgpt-network)
     check_chatgpt_network
     ;;
 
-  check-dashboard-auth|doctor-dashboard)
+  check-dashboard-auth)
     check_dashboard_auth "${2:-}"
     ;;
 
-  up|start)
+  up)
     prepare_runtime
 
     echo "🚀 启动 LiteLLM..."
@@ -519,7 +519,7 @@ case "${1:-up}" in
     echo "📌 就绪检查：curl http://localhost:${LITELLM_PORT}/health/readiness"
     ;;
 
-  down|stop)
+  down)
     echo "🛑 停止 LiteLLM..."
     compose down
     echo "✅ LiteLLM 已停止"

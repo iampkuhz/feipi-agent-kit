@@ -2,8 +2,8 @@
 # 裸机前置阶段只依赖 macOS 自带工具；准备 CLT、Homebrew、Git 和 Python，再进入工作台。
 set -euo pipefail
 mode="${1:-check}"
-if [[ $# -gt 1 || ("$mode" != plan && "$mode" != check && "$mode" != install) ]]; then
-  echo "用法：bash scripts/bootstrap/prerequisites.sh plan|check|install" >&2
+if [[ $# -gt 1 || ("$mode" != check && "$mode" != install) ]]; then
+  echo "用法：bash scripts/bootstrap/prerequisites.sh check|install" >&2
   exit 2
 fi
 if [[ "$(uname -s)" != Darwin || "$(id -u)" == 0 ]]; then
@@ -26,12 +26,6 @@ if [[ -z "$brew_command" ]]; then
 fi
 clt_ready=0
 if xcode-select -p >/dev/null 2>&1 && xcrun --find clang >/dev/null 2>&1; then clt_ready=1; fi
-if [[ "$mode" == plan ]]; then
-  echo "前置阶段：CLT 状态=${clt_ready}；Homebrew=${brew_command:-待安装}。"
-  echo "安装将使用已固定版本并校验摘要的 Homebrew 官方安装器，随后补装 Git/Python，不升级已有包。"
-  echo "首次安装前一次执行 sudo -v；后续保持已有授权，不在安装中逐项提问。"
-  exit 0
-fi
 if [[ "$mode" == check ]]; then
   if [[ "$clt_ready" == 0 || -z "$brew_command" ]]; then
     echo "CLT/Homebrew 尚未齐备；运行前置 install 阶段。" >&2

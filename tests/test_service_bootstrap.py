@@ -30,7 +30,7 @@ import json, os, pathlib, sys
 args = sys.argv[1:]
 name = pathlib.Path(sys.argv[0]).name
 with open(os.environ['CALL_LOG'], 'a') as stream:
-    stream.write(json.dumps({{'name': name, 'args': args, 'crawl_env': os.environ.get('CRAWL4AI_ENV_FILE')}})+'\\n')
+    stream.write(json.dumps({{'name': name, 'args': args}})+'\\n')
 if name == 'curl':
     raise SystemExit(22)
 if name == 'podman' and args[:3] == ['system', 'connection', 'list']:
@@ -63,36 +63,40 @@ elif args == ['--version']:
         self.assertFalse((self.home / ".env").exists())
         self.assertFalse(any("machine" in row["args"] for row in self.calls()))
 
-    def test_make_setup_preserves_engine_failure(self):
+    def test_service_install_preserves_engine_failure(self):
         env = dict(self.env, TEST_ENGINE_FAIL="1")
-        p = subprocess.run(["/usr/bin/make", "setup"], cwd=ROOT, env=env,
-                           capture_output=True, text=True, timeout=20)
+        p = self.run_script("workbench", "install", "services", env=env)
         self.assertNotEqual(p.returncode, 0)
         self.assertNotIn("检查通过", p.stdout)
 
-    def test_make_searxng_status_uses_podman_wrapper(self):
-        installed = self.run_script("workbench", "apply", "services")
+    def test_searxng_status_uses_published_podman_wrapper(self):
+        installed = self.run_script("workbench", "install", "services")
         self.assertEqual(installed.returncode, 0, installed.stderr)
-        p = subprocess.run(["/usr/bin/make", "searxng-status"], cwd=ROOT, env=self.env,
-                           capture_output=True, text=True, timeout=20)
+        p = self.run_script("workbench", "service", "searxng", "status")
         self.assertEqual(p.returncode, 0, p.stderr)
         self.assertTrue(any(row["args"][:1] == ["compose"] and row["args"][-1:] == ["ps"]
                             for row in self.calls()))
 
-    def test_crawl_clean_copy_uses_template_and_real_up_action(self):
+    def test_crawl_clean_checkout_uses_tracked_configuration(self):
         # 模拟克隆后没有本机环境文件、且仓库路径带空格的情况。
         clone = self.base / "clone with spaces"
         for rel in ["tools/crawl/crawl4ai/scripts/crawl4ai.sh",
                     "tools/crawl/crawl4ai/compose/docker-compose.yml",
-                    "tools/crawl/crawl4ai/env/.env.example", "tools/lib/podman.sh"]:
+                    "tools/crawl/crawl4ai/config/config.yml", "tools/lib/podman.sh"]:
             target = clone / rel
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(ROOT / rel, target)
         p = self.run_script("tools/crawl/crawl4ai/scripts/crawl4ai.sh", "up", root=clone)
         self.assertEqual(p.returncode, 0, p.stderr)
         compose = next(row for row in self.calls() if row["args"][:1] == ["compose"])
-        self.assertTrue(compose["crawl_env"].endswith("env/.env.example"))
+        self.assertEqual(compose["args"][1:3], ["--env-file", "/dev/null"])
         self.assertEqual(compose["args"][-2:], ["up", "-d"])
+        self.assertFalse((self.home / ".env").exists())
+
+    def test_crawl_restart_applies_published_configuration(self):
+        p = self.run_script("tools/crawl/crawl4ai/scripts/crawl4ai.sh", "restart")
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertTrue(any(row["args"][-3:] == ["up", "-d", "--force-recreate"] for row in self.calls()))
 
     def test_remote_connection_does_not_start_or_create_data(self):
         env = dict(self.env, TEST_CONNECTION="ssh://user@another-machine/run/podman.sock")
@@ -223,14 +227,6 @@ raise SystemExit(p.returncode)
                 self.assertFalse(self.data.exists())
                 self.assertFalse(any(row["args"][:1] == ["compose"] for row in self.calls()))
 
-    def test_doctor_reaches_summary_and_reports_http_error(self):
-        p = self.run_script("scripts/doctor/check.sh")
-        self.assertNotEqual(p.returncode, 0)
-        self.assertIn("检查结果", p.stdout)
-        self.assertIn("LiteLLM", p.stdout)
-        calls = [row for row in self.calls() if row["name"] == "curl"]
-        self.assertEqual(len(calls), 2)
-        self.assertTrue(any("/health/readiness" in " ".join(row["args"]) for row in calls))
 
 
 class ComposePortabilityTests(unittest.TestCase):

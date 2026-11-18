@@ -39,7 +39,7 @@
 
 ```bash
 # Podman 与 podman-compose 由 Dotfiles 安装，macOS 先准备本地 machine。
-# 在仓库根运行 make setup 做只读检查；详见 docs/setup-new-mac.md。
+# 在仓库根运行 ./workbench install services 检查依赖并发布服务定义；详见 docs/setup-new-mac.md。
 ```
 
 ### 运行服务
@@ -48,12 +48,9 @@
 # 进入服务目录
 cd tools/crawl/crawl4ai
 
-# 普通抓取可跳过此步；需要本机覆盖时才复制，不能覆盖已有配置。
-test -f env/.env.local || cp env/.env.example env/.env.local
-
 # 启动服务
 bash scripts/crawl4ai.sh up
-# 仓库根也可执行 make crawl4ai-up；使用仓库固定镜像版本。
+# 仓库根也可执行 ./workbench service crawl4ai up；使用仓库固定镜像版本。
 ```
 
 说明：
@@ -62,7 +59,9 @@ bash scripts/crawl4ai.sh up
 - 该 compose 会自动挂载：
   - `config/config.yml` → `/app/config.yml`
 
-如果需要通过宿主机代理访问外网，请在 `env/.env.local` 中同时设置 `HTTP_PROXY`、`HTTPS_PROXY` 以及有效的 `NO_PROXY` / `no_proxy`。至少应包含 `127.0.0.1,localhost,0.0.0.0,::1,host.containers.internal`；否则 Crawl4AI 的 MCP handler 在容器内部回调 `/md`、`/crawl` 等本地接口时，可能会误走代理并返回 `502 Bad Gateway`，即使 GUI 页面仍能正常使用。
+普通抓取直接使用版本化的 `compose/docker-compose.yml` 和 `config/config.yml`。需要宿主机代理时，在 Compose 中启用已有的 `HTTP_PROXY` 和 `HTTPS_PROXY` 示例，保留 `NO_PROXY` 和 `no_proxy` 的本地回调地址。只有可选 LLM 接口用到 `LLM_PROVIDER` 和 `LLM_API_KEY`，由调用进程导出，密钥留在本机。
+
+修改仓库配置后，运行 `./workbench install services` 发布，再运行 `./workbench service crawl4ai restart` 使容器加载配置。
 
 ### 验证服务
 
@@ -175,13 +174,9 @@ This domain is for use in documentation examples...
 ```bash
 cd tools/crawl/crawl4ai
 
-CRAWL4AI_VERIFY_ENV=env/.env.example
-if test -f env/.env.local; then CRAWL4AI_VERIFY_ENV=env/.env.local; fi
-
 podman run -d \
   --name crawl4ai-verify \
   -p 12235:11235 \
-  --env-file "$CRAWL4AI_VERIFY_ENV" \
   -e NO_PROXY=127.0.0.1,localhost,0.0.0.0,::1,host.containers.internal \
   -e no_proxy=127.0.0.1,localhost,0.0.0.0,::1,host.containers.internal \
   --shm-size 1gb \

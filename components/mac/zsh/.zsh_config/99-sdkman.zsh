@@ -19,7 +19,7 @@ elif [[ -s "$HOME/.sdkman/bin/sdkman-init.sh" ]]; then
   export SDKMAN_DIR="$HOME/.sdkman"
 else
   # 新机未安装 SDKMAN 时不定义 java 等占位函数，保留系统或独立 JDK 的命令。
-  # 本文件由 .zshrc source；return 只结束当前模块，不退出交互 shell。
+  # 此段放在 .zshrc 最后，缺少 SDKMAN 时可以直接结束加载。
   return 0
 fi
 

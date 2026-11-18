@@ -1,0 +1,5 @@
+# 使用 macOS PKG 系统安装器的 cask。此清单仅供检查，审核后逐项运行 brew install --cask。
+cask "karabiner-elements"
+cask "tailscale-app"
+cask "synology-drive"
+cask "hhkb"

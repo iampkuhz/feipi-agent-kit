@@ -31,17 +31,17 @@ python3 scripts/install-runtime.py
 PREPARE_MULTICA
 ```
 
-先用集中清单恢复基础 env、激活当前终端环境，再恢复 Multica 小配置。集中清单已包含下面命令；单独部署时在 `components/multica` 中执行一次：
+先手动准备 `~/.env` 并激活当前终端环境，再从组件目录恢复 Multica 的业务绑定。
 
 ```bash
 bash <<'RESTORE_MULTICA_CONTROLS'
 set -euo pipefail
-../../workbench private restore-state multica "$HOME/feipi-restore/multica"
+python3 scripts/restore-local.py "$HOME/feipi-restore/multica" --agent-kit ../..
 python3 scripts/configure.py --personal-profile
 RESTORE_MULTICA_CONTROLS
 ```
 
-入口只校验同批 `source-home.json`、`machine.reference.json`、`server.env`、`versions.json` 和 `compose.pinned.yml`，不读取数据库、附件或项目目录。旧备份缺少原 HOME 记录时，用当前旧机入口重新备份。版本/镜像锁定或三项服务密钥与本机 env 不匹配时，在写入前失败；不要执行 init-secrets 生成替换值。
+入口校验同批 `source-home.json`、`machine.reference.json`、`server.env`、`versions.json` 和 `compose.pinned.yml`。新备份的 `machine.reference.json` 只保留业务绑定，设备名、daemon ID、runtime ID 和 Podman machine 在新机重建。旧备份缺少原 HOME 记录时，用旧机的当前入口重新备份。版本、镜像或三项服务密钥与本机 env 不匹配时，在写入前失败。
 
 恢复创建 0700 的 `~/.config/multica-selfhost` 和 0600 的 machine/server.env/匿名 Docker 配置，已有目标保持原样。保留 workspace、Agent、项目及 resource UUID 和额外声明；原 HOME 下路径改为新 HOME，仓库和程序路径按新机实际安装重建，Podman machine 取本机默认名称，role=primary。原 HOME 外的绝对路径保留，使用前须挂载到相同位置。daemon/runtime 的物理 ID 清空，稍后原生注册后重绑。它不复制 CLI 登录或创建项目目录，不启动服务。
 

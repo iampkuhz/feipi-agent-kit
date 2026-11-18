@@ -8,7 +8,7 @@ source "$REPO_ROOT/tools/lib/podman.sh"
 
 printf '%s\n' 'Feipi Agent Kit 新机检查（只读）'
 if ! command -v python3 >/dev/null 2>&1; then
-  echo '裸机先运行 bash scripts/bootstrap/prerequisites.sh install，再通过 ./workbench install mac 安装完整依赖。' >&2
+  echo '先运行 ./workbench install mac 安装完整依赖。' >&2
   exit 1
 fi
 python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else "需要 Python 3.10+")'
@@ -44,5 +44,5 @@ if command -v uv >/dev/null 2>&1; then
 else
   echo 'uv 未安装：部分 skill/MCP 需要时再通过 ./workbench install mac 安装。'
 fi
-printf '%s\n' '检查通过。按需执行 make searxng-up / crawl4ai-up / litellm-up / otel-up。' \
+printf '%s\n' '检查通过。发布后按需执行 ./workbench service <服务> up。' \
   '新机恢复说明：docs/setup-new-mac.md；不需要复制容器镜像或 Podman VM。'

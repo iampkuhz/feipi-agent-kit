@@ -3,12 +3,9 @@
 这里只公开无凭据的覆写模块、原生合并校验和操作脚本。日常入口位于仓库根目录：
 
 ```bash
-./workbench diff openclash
-./workbench capture openclash --select OIX-Region-Priority.conf
-./workbench apply openclash
-./workbench service openclash verify
-./workbench private backup openclash
-./workbench private verify openclash <私有批次>
+./workbench doctor openclash
+./workbench install openclash
+python3 components/openclash/router.py verify
 ```
 
 当前声明：Proxy → 地区优先 fallback，按香港、日本、新加坡、美国、全球排序；各地区内部 URLTest 自动选择。Domestic、CN Mainland TV、Speedtest 保持 DIRECT。测试只验证当前路径，不主动断开节点模拟地区全部故障。
@@ -17,7 +14,7 @@
 
 锁定运行版本记录在 `versions.json`。路由器用已有 LuCI/OpenClash 安装与升级能力，不从本仓库下载未知内核。apply 先获取当前模块，保存最小私有配置和路由器原模块/UCI，再调用当前 `/usr/share/openclash/YAML.rb` 合并和 `clash_meta -t`。实际内容相同时登记接管；变化时重启并恢复原 Selector 选择。未提交 UCI 改动会阻止应用。
 
-## 最小导出
+## 发布时保留的路由器副本
 
 `export-private.sh` 只导出 `/etc/config/openclash`、`/etc/openclash/custom`、`/etc/openclash/overwrite`、`/etc/openclash/config/*.yaml|*.yml`；另存 Selector 选择、版本与校验清单。排除核心、GeoIP、运行生成 YAML、provider 下载缓存、历史和日志。
 
@@ -25,7 +22,7 @@
 
 ## 恢复
 
-同机只回退模块：使用 apply 输出的 `/root/feipi-workbench-backup-<时间>/module.conf` 恢复到 overwrite 目录，然后 `/etc/init.d/openclash restart`，核对原选择及 `service openclash verify`。UCI 若本次未改不必恢复整份。
+同机只回退模块：使用 apply 输出的 `/root/feipi-workbench-backup-<时间>/module.conf` 恢复到 overwrite 目录，然后 `/etc/init.d/openclash restart`，核对原选择及 `python3 components/openclash/router.py verify`。UCI 若本次未改不必恢复整份。
 
 重建路由器：先安装同版 OpenClash 和匹配核心/Geo 数据；校验最小包，解压到私有暂存目录检查路径；通过 SSH 将对应 UCI、custom、overwrite、订阅配置放回原位置，权限保持仅管理员可读；重启并按 selections.json 恢复选择。下载型 provider 和缓存重新获取。核心启动后先 doctor，再进行真实国内/国外联网验证。首次恢复仍需当前订阅有效；备份文件存在不保证订阅或节点可用。
 

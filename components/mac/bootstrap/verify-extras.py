@@ -111,7 +111,7 @@ def omlx(base, environment, models):
     required = ['Qwen3.5-0.8B-MLX-4bit', 'Qwen3-ASR-1.7B-4bit', 'SenseVoiceSmall']
     for name in required:
         if not any((directory/name/'config.json').is_file() for directory in (models, models/'mlx-community')):
-            raise RuntimeError('先恢复当前使用的模型：'+name)
+            raise RuntimeError('先从 Hugging Face 下载模型：mlx-community/'+name)
     endpoint = 'http://127.0.0.1:'+str(port())
     token = uuid.uuid4().hex
     headers = {'Authorization': 'Bearer '+token}

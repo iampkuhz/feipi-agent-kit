@@ -1,6 +1,6 @@
 # Feipi Agent Kit
 
-统一个人工作台与 AI 工程助手仓库。日常入口 `./workbench`，研发入口 `./develop`；组件与私有边界见 `AGENTS.md` 和 `docs/workbench.md`。
+统一个人工作台与 AI 工程助手仓库。仓库入口统一为 `./workbench`。组件与私有边界见 `AGENTS.md` 和 `docs/workbench.md`。
 
 ## 强约束
 

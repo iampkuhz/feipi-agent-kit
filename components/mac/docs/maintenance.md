@@ -1,39 +1,25 @@
 # 日常检查与故障恢复
 
-所有命令从仓库根目录执行。首次安装顺序见 [setup.md](setup.md)，完整迁移见 [MIGRATION.md](../MIGRATION.md)。
+以下命令从仓库根目录执行。首次安装见 [setup.md](setup.md)。
 
-## 选择合适的入口
-
-| 想做什么 | 命令 | 会不会修改环境 |
-| --- | --- | --- |
-| 看整体安装计划 | `bash bootstrap/run.sh plan` | 只读；未核实项明确标出 |
-| 看命令入口、脚本语法与配置来源 | `bash bootstrap/check.sh` | 只读，不加载 .zshrc |
-| 看 Homebrew 清单是否满足 | `bash bootstrap/brew.sh check` | 不安装、不主动更新元数据 |
-| 看配置能否安全链接 | `bash bootstrap/macosinit.sh check` | Stow 整体模拟，未实际链接 |
-| 看当前配置是否已来自本仓库 | `bash bootstrap/macosinit.sh verify` | 只读，核对默认包内 Git 跟踪文件 |
-| 补齐机器环境 | `bash bootstrap/run.sh` | 会下载安装和链接，失败停止 |
-| 修改脚本后离线验证 | `bash bootstrap/test.sh` | 只在临时 HOME/替身环境测试，不安装依赖 |
-
-check 与 verify 不等价：Stow 模拟通过可能表示“没有冲突，可以建立缺失链接”；verify 会把缺失链接报错。
-verify 兼容正确的旧目录链接和逐文件链接，拒绝把独立副本当作受管来源。
-配置清单来自 Git 中的 zsh/neovim 文件，不含 Qwen 可选包、未跟踪文件、缓存和日志。
-若某个受跟踪配置被 Stow 忽略，verify 会指出未安装；维护者应调整包内容或规则，不能默默漏装。
-
-PATH 中没有命令不等于从未安装；先检查其安装目录和管理方式。check 不运行这些工具核验版本。
-ShellCheck 已安装时会执行，缺失会在关键工具检查中报告；Zsh 的语法应另用 `zsh -f -n 文件`，不由 ShellCheck 检查。
-参数错误返回 2；普通检查不满足返回非零。原安装命令失败时总入口保留其退出码。
+| 用途 | 命令 |
+| --- | --- |
+| 补齐机器环境 | `./workbench install mac` |
+| 检查配置差异 | `./workbench doctor mac` |
+| 发布配置 | `./workbench install mac` |
+| 核对工具、脚本语法与配置来源 | `bash components/mac/bootstrap/check.sh` |
+| 检查 Homebrew 清单 | `bash components/mac/bootstrap/brew.sh check` |
+| 运行离线回归 | `bash components/mac/bootstrap/test.sh` |
 
 ## 失败后怎样继续
 
-例如 npm 下载失败，总入口会列出 Homebrew 完成、Node/npm 失败、其他三步未执行，并显示重试入口。
-先处理原始错误，再执行 `bash bootstrap/node.sh install`；成功后重新运行总入口，已安装内容按原规则保留。
-这不是跳过检查的断点续装，也不会自动卸载之前已经安装成功的软件。
+出现下载或安装错误时，处理原始报错后重跑 `./workbench install mac`。已经完成的项会核对并复用。
 
 | 提示/现象 | 处理方法 |
 | --- | --- |
-| CLT 无法定位 clang | 在系统界面完成 CLT 安装，再运行 plan |
-| .zshrc 或 Neovim 配置冲突 | 核对内容/链接来源，备份并移走确认不用的冲突项，再 check、install；不用 adopt/override |
-| 某个 Zsh 模块来源不符 | 检查是否仍指向旧仓库；verify 不自动改链接 |
+| CLT 无法定位 clang | 在系统界面完成 CLT 安装，再运行 `./workbench install mac` |
+| .zshrc 或 Neovim 配置冲突 | 核对内容/链接来源，备份并移走确认不用的冲突项，再运行 `./workbench install mac` |
+| `.zshrc` 来源不符 | 用 `workbench doctor mac` 确认状态。选择保留本机修改或发布仓库版本 |
 | nvm default 无效 | 人工选择已有版本，例如 `nvm alias default <已安装版本>`，不以重装替代版本选择 |
 | 已有 Rust 工具链但默认版本不可用 | 按提示执行 `rustup default <已安装版本>`，再重试 |
 | oh-my-zsh 仓库有本地修改 | 自己审查和处理改动；升级不自动 stash/reset |
@@ -48,16 +34,16 @@ ShellCheck 已安装时会执行，缺失会在关键工具检查中报告；Zsh
 
 ```bash
 # 只补装缺失项，可单独重试；前置条件见 setup.md
-bash bootstrap/brew.sh install
-bash bootstrap/node.sh install
-bash bootstrap/rust.sh install
-bash bootstrap/ohmyzsh.sh install
+bash components/mac/bootstrap/brew.sh install
+bash components/mac/bootstrap/node.sh install
+bash components/mac/bootstrap/rust.sh install
+bash components/mac/bootstrap/ohmyzsh.sh install
 
 # 只有主动选择才升级
-bash bootstrap/brew.sh upgrade
-bash bootstrap/node.sh upgrade      # 仅 npm 工具，不升级 Node/nvm
-bash bootstrap/rust.sh upgrade
-bash bootstrap/ohmyzsh.sh upgrade
+bash components/mac/bootstrap/brew.sh upgrade
+bash components/mac/bootstrap/node.sh upgrade      # 仅 npm 工具，不升级 Node/nvm
+bash components/mac/bootstrap/rust.sh upgrade
+bash components/mac/bootstrap/ohmyzsh.sh upgrade
 ```
 
 Homebrew install 使用 `--no-upgrade` 并关闭自动更新；新包所需依赖仍由 Homebrew 解析。不执行 cleanup，
@@ -83,10 +69,9 @@ Karabiner 恢复普通 JSON 副本，保留 HHKB-test，设备匹配 vendor 1278
 iTerm2 动态 Profile 写入 `~/Library/Application Support/iTerm2/DynamicProfiles/dotfiles.json`，在应用里选择 Dotfiles；
 不替换其他 Profile，不恢复会话、认证或偏好数据库。应用权限、字体和按键均需人工验收。
 
-`test.sh` 要求已有 Bash、Zsh、Git、Stow、ShellCheck、shfmt；缺失返回 2，不自动安装。
+`test.sh` 要求已有 Bash、Zsh、Git、ShellCheck 和 shfmt。
 它逐文件检查 Bash 语法，运行 ShellCheck/shfmt，再执行链接、Node、总入口和补全缓存离线测试。
 可单独执行 `test-links.sh`、`test-node.sh`、`test-bootstrap.sh`、`test-completion-cache.sh` 定位失败。
-测试不会在真实 HOME 重新 Stow，也不执行真实联网安装。提交前另运行 `git diff --check`。
+测试使用隔离 HOME 和本地替身。提交前另运行 `git diff --check`。
 
-真实 Zsh/Neovim 启动、插件下载、GUI 和业务项目仍在新机人工验证。`bootstrap/podman.sh` 是独立的可选
-PlantUML 启动命令，不由全量安装或测试入口调用；服务定义始终归所属仓库。
+真实 Zsh/Neovim 启动、插件下载、GUI 和业务项目在目标环境验证。

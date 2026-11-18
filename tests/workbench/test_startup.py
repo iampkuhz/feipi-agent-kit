@@ -1,4 +1,4 @@
-"""自启文件和 env 本地历史；隔离 HOME，不加载真实 LaunchAgent 或启停服务。"""
+"""在隔离 HOME 中验证自启文件，不加载真实 LaunchAgent 或启停服务。"""
 import importlib.util
 import os
 from pathlib import Path
@@ -21,59 +21,40 @@ class Startup(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix='feipi startup ')
         self.home = Path(self.temp.name)
-        self.vault = self.home/'.local/env-vault'; self.vault.mkdir(parents=True)
-        self.source = self.vault/'.env'; self.source.write_text('TOKEN=fixture-one\n')
-        (self.home/'.env').symlink_to(self.source)
         self.home_patch = patch.object(startup, 'HOME', self.home); self.home_patch.start()
         self.state_patch = patch.object(startup, 'STATE', self.home/'state'); self.state_patch.start()
 
     def tearDown(self):
         self.home_patch.stop(); self.state_patch.stop(); self.temp.cleanup()
 
-    def git(self, *args):
-        return subprocess.check_output(['git', '-C', str(self.vault), *args], text=True).strip()
-
-    def test_snapshots_are_private_idempotent_and_preserve_unrelated_staging(self):
-        startup.snapshot_env()
-        first = self.git('rev-parse', 'HEAD')
-        startup.snapshot_env()
-        self.assertEqual(self.git('rev-parse', 'HEAD'), first)
-        (self.vault/'unrelated').write_text('keep staged\n')
-        self.git('add', 'unrelated')
-        self.source.write_text('TOKEN=fixture-two\n')
-        startup.snapshot_env()
-        self.assertNotEqual(self.git('rev-parse', 'HEAD'), first)
-        self.assertEqual(self.git('diff', '--cached', '--name-only'), 'unrelated')
-        self.assertEqual((self.vault/'env').read_text(), self.source.read_text())
-        self.assertEqual((self.vault/'env').stat().st_mode & 0o777, 0o600)
-        self.assertEqual(self.vault.stat().st_mode & 0o777, 0o700)
-
-    def test_git_environment_cannot_redirect_snapshot_into_business_repository(self):
-        other = self.home/'business'; other.mkdir()
-        subprocess.run(['git', 'init', '-q', str(other)], check=True)
-        with patch.dict(os.environ, {'GIT_DIR': str(other/'.git'), 'GIT_WORK_TREE': str(other)}):
-            startup.snapshot_env()
-        self.assertTrue((self.vault/'.git').is_dir())
-        self.assertFalse((other/'env').exists())
-        self.assertFalse((other/'.git/index').exists())
-
-    def test_install_only_writes_native_plists_without_loading(self):
+    def test_install_writes_only_service_plists_without_requiring_env(self):
         with patch.object(startup, 'run') as run:
             startup.install()
         run.assert_not_called()
-        for label in startup.LABELS:
-            path = self.home/'Library/LaunchAgents'/(label+'.plist')
-            self.assertEqual(plistlib.loads(path.read_bytes()), startup.definitions()[label])
-            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
-        definition = startup.definitions()['com.local.envvault']
-        self.assertEqual(definition['StartInterval'], 300)
-        self.assertNotIn('KeepAlive', definition)
+        agents = self.home/'Library/LaunchAgents'
+        path = agents/(startup.SERVICE_LABEL+'.plist')
+        self.assertEqual(list(agents.iterdir()), [path])
+        self.assertEqual(plistlib.loads(path.read_bytes()), startup.definitions()[startup.SERVICE_LABEL])
+        self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+        self.assertFalse((self.home/'.local/env-vault').exists())
 
-    def test_missing_env_fails_before_installing_any_plist(self):
-        (self.home/'.env').unlink()
-        with self.assertRaises(ValueError):
-            startup.install()
-        self.assertFalse((self.home/'Library').exists())
+    def test_start_retires_only_the_previous_workbench_vault_job(self):
+        startup.install()
+        path = self.home/'Library/LaunchAgents/com.local.envvault.plist'
+        old = {'Label': 'com.local.envvault', 'ProgramArguments': ['/usr/bin/python3', str(Path(startup.__file__).resolve()), 'snapshot-env']}
+        target = 'gui/'+str(os.getuid())+'/com.local.envvault'
+        with patch.object(startup.subprocess, 'run') as status, patch.object(startup, 'run') as run:
+            status.side_effect = lambda args, **kwargs: subprocess.CompletedProcess(args, 0 if args[-1] == target else 1)
+            path.write_bytes(plistlib.dumps(old))
+            startup.start()
+            self.assertFalse(path.exists())
+            self.assertIn(['launchctl', 'bootout', target], [call.args[0] for call in run.call_args_list])
+            run.reset_mock()
+            old['ProgramArguments'][1] = '/other/startup.py'
+            path.write_bytes(plistlib.dumps(old))
+            startup.start()
+            self.assertTrue(path.is_file())
+            self.assertNotIn(['launchctl', 'bootout', target], [call.args[0] for call in run.call_args_list])
 
     def test_installed_session_browser_gets_an_independent_loopback_job(self):
         launcher = self.home/'.local/bin/session-browser'
@@ -117,7 +98,7 @@ class Startup(unittest.TestCase):
 
     def test_start_refuses_drift_before_touching_loaded_jobs(self):
         startup.install()
-        path = self.home/'Library/LaunchAgents/com.local.envvault.plist'
+        path = self.home/'Library/LaunchAgents'/(startup.SERVICE_LABEL+'.plist')
         data = plistlib.loads(path.read_bytes()); data['RunAtLoad'] = False
         path.write_bytes(plistlib.dumps(data))
         with patch.object(startup, 'run') as run, self.assertRaises(ValueError):

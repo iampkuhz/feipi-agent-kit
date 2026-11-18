@@ -1,12 +1,14 @@
 # 工作台实机验收记录
 
+以下记录按日期保留当时的运行结果和命令。复验时，请使用 [现行工作台命令](workbench.md#命令与参数) 和 [服务验收指南](verification/README.md)。
+
 ## 2026-11-05：安装提速与 npm 依赖分离
 
 当前索引及所有本地引用可达的 Git 历史均没有 `node_modules`；`.gitignore` 已排除该目录。本轮不改写历史。原问题是安装器将本地生成目录一起扫描、复制，再比较是否需要更新。运行依赖迁移验收后，已清理 Mermaid 源码中的旧依赖及本轮隔离测试缓存，正式共享缓存和全部发布备份保留。
 
 ### 同范围计时
 
-以下为本机串行、隔离目标、相同五客户端与十技能的分段计时；当时目标名为 `make install-links`，现统一命名为 `make install-skills`。修复后计时时仍保留446 MB的源码依赖，避免把删掉依赖造成的加速算作安装器改进。
+以下为本机串行、隔离目标、相同五客户端与十技能的分段计时；当时目标名为 `make install-links`，现已退役。修复后计时时仍保留446 MB的源码依赖，避免把删掉依赖造成的加速算作安装器改进。
 
 | 场景 | 修复前 | 修复后 |
 | --- | --- | --- |
@@ -25,7 +27,7 @@ Mermaid v2 和 PPT v4 复用系统 Node；npm 包按各自清单、锁文件、�
 - 安装器15项、Mermaid 46项、PPT依赖生命周期8项、PPT完整现有回归（含19项 P0）、workbench 6项与完整 Harness 通过。覆盖首次准备、防重、并发、锁/平台变化、损坏缓存、只读检查和失败隔离。
 - Mermaid 六类结构化图、原生类图和均衡思维导图真实渲染、图包复核与实际看图通过；21项真实图包回归通过。隔离实拷副本首次自动准备并渲染，另一客户端在 npm 命令被阻止时仍复用同一缓存并渲染；本机已有 npm 下载缓存条件下分别耗时7.797秒和2.897秒。
 - 日常 OpenClaw 安装副本实际生成 Mermaid 图并完成 review；日常 Codex 安装副本实际生成可编辑 PPTX，fast pipeline 为 pass，QuickLook/CoreText 渲染并看图通过。PPT 最终预览与已审阅的隔离实拷预览 SHA-256 同为 `eeaf825751df73220880397f69f1fb011fc9597109dde868595b482415d9c4be`。
-- 五客户端中两个 Node 技能均不含 `node_modules`；`workbench diff skills` 无差异，统一 doctor 通过，Multica 当前实机证据仍匹配。两份受保护个人配置的 SHA-256 未变化。
+- 五客户端中两个 Node 技能均不含 `node_modules`；当时的技能差异检查无差异，统一 doctor 通过，Multica 当前实机证据仍匹配。两份受保护个人配置的 SHA-256 未变化。
 
 首次改写前完整备份为 `~/.local/state/feipi-workbench/changes/20261105-094326-258323-skills`；后续发布同样留有备份，最终发布批次为 `20261105-100050-380382-skills`。程序、计时、安装与视觉证据在忽略目录 `tmp/install-runtime-fix/`，原始性能基线在 `tmp/install-performance/`。两个技能的新增依赖行为由程序和实际 CLI 验收，未声称全部行为用例均运行真实 Agent。实测为当前 Mac，PPT 验收为 fast 模式，不代替 strict 的编辑回环或 Linux 新机验收。
 
@@ -65,19 +67,19 @@ skill v2 已发布到5个客户端及 Multica workspace；服务端只更新共�
 
 ## 2026-11-04：全部分支集成与复验
 
-本轮合入 Multica 任务技能、Mac/Multica/OpenClaw/OpenClash 组件、workbench/develop 入口与备份恢复能力，以及 video oMLX 转写。保留原提交历史。11月1日已正式发布的 Multica 声明与运行脚本较分支源码更新，经发布清单核对后回收；当前仅启用 Codex Builder 和 LexiFlow 三个专用角色，其他执行器实现保留。
+本轮合入 Multica 任务技能、Mac/Multica/OpenClaw/OpenClash 组件、当时的工作台和研发入口及备份恢复能力，以及 video oMLX 转写。保留原提交历史。11月1日已正式发布的 Multica 声明与运行脚本较分支源码更新，经发布清单核对后回收；当前仅启用 Codex Builder 和 LexiFlow 三个专用角色，其他执行器实现保留。
 
 | 验证 | 本轮结果 |
 | --- | --- |
 | 研发回归 | 10组检查全部通过：Mac、Multica、OpenClaw、OpenClash、Skills Harness、services、workbench、安装器、Multica skill、video ASR 契约。修复后补跑 Multica 31项与 workbench 6项，全部通过；安装器11项、服务18项、oMLX HTTP契约19项通过 |
-| 统一检查 | `./workbench doctor`、`./workbench private check`、`./workbench multica verify` 返回0，受管运行文件一致，LiteLLM就绪且配置来自运行副本 |
+| 统一检查 | `./workbench doctor`、当时的私有资料检查、`multica-ops verify`（当时由工作台转发）返回0，受管运行文件一致，LiteLLM就绪且配置来自运行副本 |
 | 终端与编辑器 | 实际登录Zsh发现 compdef/nvm，Node v26.11.1；实际Neovim启动并返回验收标记 |
 | OpenClaw | 本机 Gateway 模型请求返回 `FEIPI_INTEGRATION_MODEL_OK_20261104`，provider=qwen，model=litellm-code-openai；4.257秒；未请求外部投递 |
 | OpenClash | 路由器真实请求 Baidu/Google 均HTTP200；连接表分别命中 Domestic→DIRECT、PROXY→地区优先→香港自动 |
 | Multica | 排空后停止监督器、备份发布、重新启动。新 Codex Builder run `01a1a5b4-4017-74a0-821f-28ab412ca441` completed；实际probe、五项任务身份、note/deliver、in_review与附件下载全部通过。下载JSON与最新run报告一致，报告SHA-256为 `44b2e1287390678045e2d89890ad0a33647a2df170b67c91aaee889ff4b832f7` |
 | Skills发布 | 备份后更新5个客户端中的video skill，其余45个受管安装项跳过；第三方技能保留 |
 
-本轮修复：doctor按启用执行器检查依赖和版本，Codex模式不再访问已移除的LiteLLM/OpenClaw机器字段；验收角色随声明选择，缺失绑定明确失败；附件下载不再追加原生命令不支持的JSON参数，报告必须匹配最新执行，验收未通过返回非零。回收持续监督器、共享VM启动进程组隔离、停止等待与局部发布能力，新增隔离HOME及模拟监督测试。workbench diff/doctor现在同时检查运行代码，配置回收白名单未扩大。
+本轮修复：doctor按启用执行器检查依赖和版本，Codex模式不再访问已移除的LiteLLM/OpenClaw机器字段；验收角色随声明选择，缺失绑定明确失败；附件下载不再追加原生命令不支持的JSON参数，报告必须匹配最新执行，验收未通过返回非零。回收持续监督器、共享VM启动进程组隔离、停止等待与局部发布能力，新增隔离HOME及模拟监督测试。当时的差异与状态检查同时检查运行代码，配置回收白名单未扩大。
 
 本轮原始日志与摘要位于私有 `~/.local/state/feipi-workbench/integration-20261104/`，研发检查位于仓库忽略目录 `tmp/workbench-integration/`。运行发布备份保留在 `~/.local/state/feipi-workbench/changes/`；回收前源码与第一次运行发布也均有备份。`.mcp.json`、`.claude/settings.local.json` 的摘要与本轮开始时相同。
 
@@ -116,7 +118,7 @@ OpenClaw 原资料交互 run：`dda93a81-230c-4423-8bb3-aa55eb9a26c6`，会话 `
 | https://www.baidu.com/ | HTTP 200，完整读取 | RuleSet Domestic → Domestic → DIRECT |
 | https://www.google.com/ | HTTP 200，完整读取 | RuleSet PROXY → Proxy → 地区优先 → 香港自动 |
 
-可重跑 `./workbench service openclash verify`。没有主动切断节点模拟所有地区故障，也没有把策略 API 可访问当作联网证据。
+可重跑 `python3 components/openclash/router.py verify`。没有主动切断节点模拟所有地区故障，也没有把策略 API 可访问当作联网证据。
 
 ### 备份与恢复验证
 

@@ -30,7 +30,7 @@ def skill_body(m, c):
     # 生成的单文件入口明确指向已发布资源，不能让后台读研发源码或空相对路径。
     installed = Path.home() / '.codex/skills' / c['skill']['name']
     if installed.is_symlink() or file_inventory(source) != file_inventory(installed):
-        raise AdaptError('共享 Skill 尚未完整发布或内容漂移；先 workbench apply skills，再 plan。')
+        raise AdaptError('共享 Skill 尚未完整发布或内容漂移；先 workbench install skills，再 plan。')
     body = (installed / 'SKILL.md').read_text()
     body = re.sub(r'\]\(((?:references|templates)/[^)]+)\)',
                   lambda match: '](<' + str(installed / match.group(1)) + '>)', body)

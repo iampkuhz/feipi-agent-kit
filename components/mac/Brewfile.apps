@@ -1,26 +1,28 @@
-# 完整个人工作环境的应用清单，由新机部署显式安装；日常补 CLI 不重复触发 GUI 安装。
+# 新机批量补装的桌面清单，Homebrew 提权关闭。需管理员审核的包见 Brewfile.apps.admin。
 # Chrome 为 Mermaid/PPT 提供浏览器，LibreOffice 为文档验证提供命令行转换。
 cask "google-chrome"
 cask "libreoffice"
 # 当前工作终端、键盘、窗口与既有 Profile 字体。
 cask "iterm2"
-cask "karabiner-elements"
 cask "rectangle"
 cask "font-jetbrains-mono"
 cask "font-jetbrains-mono-nerd-font"
 # 冷安装中 LibreOffice 的系统字体回退会丢失中文；提供可嵌入的中文文档字体。
 cask "font-noto-sans-cjk-sc"
-# 常用客户端；Codex CLI 由锁定版本的客户端安装入口管理，避免随 GUI 升级。
+# 仅安装 ChatGPT 桌面应用；Codex CLI 由锁定版本的命令行入口管理。
 cask "chatgpt"
-cask "codex-app"
 cask "visual-studio-code"
 cask "intellij-idea"
 cask "obsidian"
 cask "notion"
 cask "telegram"
 cask "wechat"
-# 高频使用的 Session Browser 源码明确要求原生 JDK 25；不跟随 temurin 最新主版本。
-cask "temurin@25"
+# Homebrew 只准备搜狗输入法的原厂安装器，实际安装由本人在 macOS 界面完成。
+cask "sogouinput"
+
+# oMLX 命令行服务默认编译原生自定义内核，需要完整 Xcode 和 Metal Toolchain。
+tap "jundot/omlx", "https://github.com/jundot/omlx", trusted: { formula: "omlx" }
+brew "jundot/omlx/omlx", args: ["with-custom-kernel"], trusted: true
 
 # 旧机已安装的研发应用；Qoder 编辑器与锁定安装的 qodercli 分开管理。
 cask "datagrip"
@@ -46,18 +48,10 @@ cask "chatgpt-classic"
 
 # 旧机已有的网络、同步、远程连接及桌面工具；安装不复制账号或授权。
 cask "clash-verge-rev"
-cask "tailscale-app"
-cask "synology-drive"
-cask "synology-image-assistant"
-cask "jump-desktop-connect"
 cask "itsycal"
 cask "menumeters"
 cask "openinterminal"
-cask "hhkb"
-# 搜狗安装在 /Library/Input Methods，不在 Applications；cask 只准备手动安装程序。
-# 按 Homebrew 输出的 open 命令完成安装，再在系统设置中启用输入法。
-cask "sogouinput"
 
 # 不重复安装 codex/claude-code/qodercli，统一使用 bootstrap/agents.sh。
-# temurin 由上面的 temurin@25 覆盖；FlClash/oMLX/Session Browser 使用 desktop-extras.sh。
+# temurin@25 见管理员审核清单；FlClash/oMLX/Session Browser 使用 desktop-extras.sh。
 # Chromium 只剩旧安装元数据且当前 cask 已停用，不作为可恢复的软件安装。
