@@ -39,6 +39,8 @@ bash workbench new-mac prepare
 
 旧机的 `steipete/tap/bird` 配方目前已移除，不加入会阻断整段安装的失效条目，也不自动替换成另一款 `birdclaw` 软件。
 
+搜狗输入法安装在 `/Library/Input Methods`，已补入 `sogouinput` cask。其官方 Homebrew 定义是手动安装器：Bundle 只下载并显示 `open .../sogou_mac_*.app` 的完整命令；按该提示打开安装器、完成本人授权，再在系统设置中启用搜狗并实际输入文字。Brew 清单检查通过不等于输入法安装完成。来源：[Homebrew 定义](https://formulae.brew.sh/cask/sogouinput)。
+
 从旧版继续时，在正式仓库执行 `git pull --ff-only && sudo -v && ./workbench new-mac software`。可对同一命令重跑，补齐清单并保留已有版本；管理员密码仅在终端原生提示中输入。安装不代替账号登录、系统权限和应用实际打开验收。
 
 完成下一节旧机导出/新机接收后，再执行：

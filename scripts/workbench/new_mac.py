@@ -65,7 +65,9 @@ def software():
     wb('install', 'mac', '--apps', '--agents')
     wb('apply', 'mac')
     run(['/bin/bash', ROOT/'components/mac/bootstrap/neovim.sh'])
-    done('新终端能使用 Node/Codex，Neovim 可打开，常用应用可启动。',
+    done('新终端能使用 Node/Codex，Neovim 可打开，常用应用可启动。'
+         '搜狗输入法还需按 Homebrew 的 open 提示完成手动安装，并在系统设置中启用；'
+         'Brew 登记完成不代表输入法已安装或可输入。',
          '旧机 export；新机 receive 账号@IP，然后 config。')
 
 

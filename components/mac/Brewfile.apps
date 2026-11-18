@@ -54,6 +54,9 @@ cask "itsycal"
 cask "menumeters"
 cask "openinterminal"
 cask "hhkb"
+# 搜狗安装在 /Library/Input Methods，不在 Applications；cask 只准备手动安装程序。
+# 按 Homebrew 输出的 open 命令完成安装，再在系统设置中启用输入法。
+cask "sogouinput"
 
 # 不重复安装 codex/claude-code/qodercli，统一使用 bootstrap/agents.sh。
 # temurin 由上面的 temurin@25 覆盖；FlClash/oMLX/Session Browser 使用 desktop-extras.sh。
