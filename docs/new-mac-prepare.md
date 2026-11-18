@@ -35,6 +35,12 @@ bash workbench new-mac prepare
 
 本阶段复用 `install mac --apps --agents`、备份发布公共配置和原生 Neovim 准备入口。人工检查：打开新终端、Neovim 和常用应用，确认能启动。此时尚未恢复个人 env、账号和业务数据。
 
+已按旧机主动安装的 Homebrew 工具和 cask 补齐固定清单，包含手动安装但有 cask 的 Qoder 编辑器、Synology Drive、HHKB 工具、剪映专业版和 ChatGPT Classic。Agent CLI、Node/Rust、npm 工具及 Zsh 插件继续使用原入口；运行时依赖交给 Homebrew 自动解析。Chromium 残留且 cask 已停用，未加入；Amphetamine、Blackmagic Disk Speed Test、Keynote、Maipo、TestFlight、Xcode 等没有可用 cask 的应用，仍按 App Store/原厂方式准备。
+
+旧机的 `steipete/tap/bird` 配方目前已移除，不加入会阻断整段安装的失效条目，也不自动替换成另一款 `birdclaw` 软件。
+
+从旧版继续时，在正式仓库执行 `git pull --ff-only && sudo -v && ./workbench new-mac software`。可对同一命令重跑，补齐清单并保留已有版本；管理员密码仅在终端原生提示中输入。安装不代替账号登录、系统权限和应用实际打开验收。
+
 完成下一节旧机导出/新机接收后，再执行：
 
 ```bash

@@ -61,4 +61,28 @@ brew "podman-compose"
 # Multica 固定使用 Docker CLI/Compose 协议连接本机 Podman，不安装 Docker Desktop。
 brew "docker"
 brew "docker-compose"
+
+# 补齐旧机主动安装的工具；第三方 tap 使用全名，首次安装由 Bundle 准备对应 tap。
+tap "sdkman/tap"
+brew "anchor"
+brew "caddy"
+brew "cloudflared"
+brew "cpanminus"
+brew "fswatch"
+brew "librsvg"
+brew "mpv"
+brew "netpbm"
+brew "nmap"
+brew "potrace"
+brew "sdkman/tap/sdkman-cli"
+brew "smartmontools"
+brew "svgo"
+brew "tailscale"
+brew "zsh"
+# 保留旧机主动安装的 Python 3.14；不替换上面的默认 Python。
+brew "python@3.14"
+# Node/Rust 已由 node.sh/rust.sh 管理；Prettier、prettierd、Yarn 由 node.sh 管理。
+# Zsh 插件由 ohmyzsh.sh 管理（语法高亮使用 fast-syntax-highlighting），不重复安装 Brew 插件。
+# 其余间接依赖由 Homebrew 解析当前依赖树，不固定旧机的底层库版本。
+# 旧机 steipete/tap/bird 的配方现已移除，不用不同软件 birdclaw 冒充恢复。
 # 完整新机的软件界面入口见 Brewfile.apps；本机附加选择仍放 Brewfile.local。

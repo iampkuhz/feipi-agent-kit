@@ -21,3 +21,40 @@ cask "telegram"
 cask "wechat"
 # 高频使用的 Session Browser 源码明确要求原生 JDK 25；不跟随 temurin 最新主版本。
 cask "temurin@25"
+
+# 旧机已安装的研发应用；Qoder 编辑器与锁定安装的 qodercli 分开管理。
+cask "datagrip"
+cask "goland"
+cask "pycharm"
+cask "webstorm"
+cask "rustrover"
+cask "zed"
+cask "qoder"
+cask "comfy"
+cask "podman-desktop"
+
+# 旧机已有的浏览器、文档、绘图及媒体客户端。
+cask "microsoft-edge"
+cask "wpsoffice"
+cask "xmind"
+cask "omnigraffle"
+cask "baidunetdisk"
+cask "bilibili"
+cask "qqmusic"
+cask "videofusion"
+cask "chatgpt-classic"
+
+# 旧机已有的网络、同步、远程连接及桌面工具；安装不复制账号或授权。
+cask "clash-verge-rev"
+cask "tailscale-app"
+cask "synology-drive"
+cask "synology-image-assistant"
+cask "jump-desktop-connect"
+cask "itsycal"
+cask "menumeters"
+cask "openinterminal"
+cask "hhkb"
+
+# 不重复安装 codex/claude-code/qodercli，统一使用 bootstrap/agents.sh。
+# temurin 由上面的 temurin@25 覆盖；FlClash/oMLX/Session Browser 使用 desktop-extras.sh。
+# Chromium 只剩旧安装元数据且当前 cask 已停用，不作为可恢复的软件安装。

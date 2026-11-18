@@ -20,7 +20,7 @@
 | 工作台编排 | install 复用组件阶段及失败传播；Node/Rust 可供后续补全使用 | 干净 macOS 上四阶段真实通过；首次 Node 26.13.1 暴露 CLI 兼容问题，新机现固定 Node 24.22.3，实际安装/CLI 及 OpenClaw 依赖检查通过；最终整机验收待做 |
 | 配置发布与来源 | 空白 HOME 首次/重复应用、33 个配置来源及内容、路径别名、冲突保全 | 干净 macOS 首次/重复 apply、doctor、全部 33 文件检查和真实 Zsh 的 Node/npm/Rust 通过；两种 locale 离线回归通过 |
 | Neovim | 按锁恢复插件、原生构建、解析器/语言服务器与实际编辑功能 | 干净 macOS 上 31 个解析器可加载、5 个 Mason 服务安装、Lua LSP 初始化、Lua/JSON 格式化及 Markdown HTTP 预览通过；已补可重跑入口 |
-| 常用软件 | 对照旧机 Brew 清单、近期命令频率、真实应用/脚本依赖 | 共享 CLI 清单补充；17 项应用/字体已在干净系统真实安装，清单检查通过；客户端账号和系统权限待验 |
+| 常用软件 | 对照旧机 Brew 安装记录、应用目录和实际依赖 | 现有固定清单扩为 52 项 formula、44 项 cask，已核对定义与覆盖；历史 17 项应用/字体完成过干净安装，新增项的新机安装、账号和权限待验 |
 | AI CLI/客户端 | 锁定现有兼容版本安装、登录状态、真实小任务 | 四个锁定 CLI 安装/版本检查通过；迁入设置的 Qwen 真实文件任务通过，Claude 经现有 LiteLLM 隔离转发通过；OpenClaw 原生 headless 文件任务经同类转发通过，未启动 Gateway；Codex/Qoder 已确认需要新机登录，整套尚未通过 |
 | 私有配置与本地资料 | 必要私有配置集中准备；目录提供直传命令；不把用户资料容量作为初始化验收指标 | 实际新配置包约 23 KiB，干净 macOS 连续两次恢复通过；Codex 原生读取自动重建的三个模型，元数据摘要完全一致；主机 70 项工作台回归通过；用户复制目录后核实所需功能 |
 | 数据一致性 | Multica 数据库/附件/密钥同批；OpenClaw SQLite 停写恢复；旧机不发生双主 | 当前 PostgreSQL 备份已在无网络临时容器恢复；OpenClaw 在实际新 HOME 恢复、重建依赖和发布配置，4 个 SQLite、7,289 个业务文件核查通过，Gateway 未启动；完整业务切换待验 |
@@ -60,6 +60,13 @@ CLI 真实任务补验：Node 26 与 Qwen 0.12.3 内置 dispatcher 的接口不�
 真实备份还发现：Gateway 停止后微信 SQLite 会删除 WAL 辅助文件，原只读检查因此失败。已改为停写后的原生读写检查与 WAL checkpoint；损坏、锁定仍报错，退出时恢复 Gateway。当前 4 个数据库完整性检查及备份通过，失败测试也验证恢复启动与不输出秘密。模型采用标准 gzip 低压缩级别，减少大模型打包耗时；未打完的测试批次带 `INCOMPLETE`，不能用于恢复。
 
 ## 本轮发现与修复
+
+### 2026-11-18：补齐旧机可用 Homebrew 软件
+
+- 保持 `workbench new-mac software` 原入口，直接扩充 `components/mac/Brewfile` 与 `Brewfile.apps`：新增 16 项命令行包、27 项 cask，总数分别为 52、44。除旧机 Brew 已登记应用外，也核对 `/Applications`，补入手动安装的 Qoder 编辑器、Synology Drive、HHKB 工具、剪映专业版和 ChatGPT Classic；对应应用名称及 HHKB/剪映/ChatGPT Classic 的本机 Bundle ID 已核对。
+- 对照本机 57 项主动安装的 formula 与 39 项已安装 cask：Node、Rust、三个 npm 工具、两个 Zsh 插件、三个 Agent CLI 和 JDK 继续走现有专门安装或明确替代入口；除下述失效软件外，无未覆盖项。间接依赖交给 Homebrew 解析，不固定旧机底层库。第三方 SDKMAN tap 已显式声明。
+- `steipete/tap/bird` 配方已移除，原生查询失败且上游文件返回 404，未以不同的 `birdclaw` 替代；Chromium 只有残留元数据且 cask 已停用。没有可用 cask 的 App Store/厂商应用仍单独准备，具体续装步骤见[分阶段部署](new-mac-prepare.md)。
+- Homebrew Bundle 实际解析、全部 52/44 项定义可解析且未停用、安装记录覆盖比对、112 项工作台回归及差异检查通过。本轮未安装或启动旧机应用，也未验证所有新增软件在新 Mac mini 的真实冷安装和运行；由新机继续执行同一个 `software` 阶段验收。
 
 ### 2026-11-18：新机 prepare 的 UTF-8 提示语错误
 
