@@ -74,7 +74,7 @@ if [[ "$stage" == network || "$stage" == prepare ]]; then
     mkdir -p "$(dirname "$destination")"
     git clone --depth 1 https://github.com/iampkuhz/feipi-agent-kit.git "$destination"
   fi
-  echo "人工检查：正式仓库位于 $destination；在 Codex/终端中切换到该目录。"
+  echo "人工检查：正式仓库位于 ${destination}；在 Codex/终端中切换到该目录。"
   echo '下一步：./workbench new-mac software'
   exit 0
 fi

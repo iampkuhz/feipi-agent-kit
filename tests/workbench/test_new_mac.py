@@ -255,23 +255,26 @@ class ShellEntry(unittest.TestCase):
             'curl': 'echo "curl $https_proxy" >> "$TEST_LOG"; exit "${TEST_NETWORK_STATUS:-0}"',
             'python3': 'echo forbidden-python >> "$TEST_LOG"; exit 99',
             'sudo': 'echo sudo >> "$TEST_LOG"',
-            'git': 'echo git >> "$TEST_LOG"; [ "$1" = clone ]; mkdir -p "$5/.git"',
+            'git': '''echo git >> "$TEST_LOG"
+if [ "$1" = clone ]; then mkdir -p "$5/.git"
+else exec "$TEST_REAL_GIT" "$@"; fi''',
         }
         for name, body in fixtures.items():
             path = self.bin/name; path.write_text('#!/bin/sh\n'+body+'\n'); path.chmod(0o755)
         pre = self.repo/'scripts/bootstrap/prerequisites.sh'
         pre.write_text('#!/bin/bash\n'
                        'echo "prerequisites $1" >> "$TEST_LOG"\n'
-                       'if [[ "$1" == check ]]; then exit 1; fi\n')
+                       'if [[ "$1" == check ]]; then exit "${TEST_CHECK_STATUS:-1}"; fi\n')
         self.env = {'HOME': str(self.home), 'PATH': str(self.bin)+':/usr/bin:/bin',
-                    'TEST_LOG': str(self.log)}
+                    'TEST_LOG': str(self.log), 'TEST_REAL_GIT': shutil.which('git')}
 
     def tearDown(self):
         self.temp.cleanup()
 
     def cli(self, *args, **env):
         return subprocess.run(['/bin/bash', str(self.repo/'workbench'), 'new-mac', *args],
-                              env=dict(self.env, **env), text=True, capture_output=True, timeout=10)
+                              env=dict(self.env, **env), text=True, encoding='utf-8', errors='replace',
+                              capture_output=True, timeout=10)
 
     def test_help_needs_no_python_git_or_home_writes(self):
         proc = self.cli('help')
@@ -304,6 +307,34 @@ class ShellEntry(unittest.TestCase):
         self.assertNotIn('forbidden', self.log.read_text())
         self.assertIn('prerequisites install', self.log.read_text())
         self.assertIn('人工检查', proc.stdout)
+
+    def test_prepare_utf8_new_clone_prints_complete_destination_and_next_step(self):
+        proc = self.cli('prepare', LC_ALL='en_US.UTF-8')
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        destination = self.home/'Documents/tools/llm/feipi-agent-kit'
+        self.assertTrue((destination/'.git').is_dir())
+        self.assertIn(str(destination)+'；在 Codex/终端中切换到该目录。', proc.stdout)
+        self.assertIn('下一步：./workbench new-mac software', proc.stdout)
+
+    def test_prepare_utf8_existing_repo_preserves_changes_without_install_or_pull(self):
+        destination = self.home/'Documents/tools/llm/feipi-agent-kit'
+        destination.mkdir(parents=True)
+        git = self.env['TEST_REAL_GIT']
+        subprocess.run([git, 'init', '-q', str(destination)], env=self.env, check=True, capture_output=True)
+        subprocess.run([git, '-C', str(destination), 'remote', 'add', 'origin',
+                        'https://github.com/iampkuhz/feipi-agent-kit.git'], env=self.env, check=True)
+        marker = destination/'local-config'; marker.write_text('preserve user work\n')
+        for locale in ('en_US.UTF-8', 'zh_CN.UTF-8'):
+            with self.subTest(locale=locale):
+                proc = self.cli('prepare', LC_ALL=locale, TEST_CHECK_STATUS='0')
+                self.assertEqual(proc.returncode, 0, proc.stderr)
+                self.assertIn('保留已有正式仓库及其修改，不自动 pull。', proc.stdout)
+                self.assertIn(str(destination)+'；在 Codex/终端中切换到该目录。', proc.stdout)
+                self.assertIn('下一步：./workbench new-mac software', proc.stdout)
+        self.assertEqual(marker.read_text(), 'preserve user work\n')
+        self.assertEqual(self.log.read_text().splitlines(),
+                         ['curl http://127.0.0.1:7890']*2+['prerequisites check', 'git', 'git']+
+                         ['curl http://127.0.0.1:7890']*2+['prerequisites check', 'git', 'git'])
 
     def test_zip_software_stops_before_any_installer(self):
         proc = self.cli('software')

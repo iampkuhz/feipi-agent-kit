@@ -25,6 +25,8 @@ bash workbench new-mac prepare
 
 本阶段复用原前置脚本准备 CLT/Homebrew/Git/Python。需要时由本人输入一次管理员密码，然后克隆正式仓库到 `~/Documents/tools/llm/feipi-agent-kit`。已有正式仓库只核对来源，保留其改动，不自动 pull 或覆盖。人工检查：正式目录是 Git 仓库，Git/Python 可用。
 
+旧版若在最后提示语报 `destination` 未定义，且前面已显示安装完成、正式仓库已保留，这是系统 Bash 在 UTF-8 环境下解析相邻中文标点的问题。在正式仓库执行 `git pull --ff-only && bash workbench new-mac prepare` 更新并重新检查即可；无需删除仓库或重装已完成的前置工具。
+
 **此后让 Codex/终端切换到正式仓库，后续命令都从正式仓库执行。** 原始 ZIP 不作为日常配置来源。
 
 ```bash

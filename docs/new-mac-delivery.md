@@ -61,6 +61,11 @@ CLI 真实任务补验：Node 26 与 Qwen 0.12.3 内置 dispatcher 的接口不�
 
 ## 本轮发现与修复
 
+### 2026-11-18：新机 prepare 的 UTF-8 提示语错误
+
+- 用户新机截图显示 Homebrew/Git/Python 安装完成，已有正式仓库通过来源检查，但最后提示语报 `destination` 未定义。本机系统 Bash 3.2 在 `en_US.UTF-8` 与 `zh_CN.UTF-8` 下复现；C locale 不触发。将中文分号前的 `$destination` 改为 `${destination}`，明确变量边界。
+- 新增 UTF-8 下首次克隆及已有正式仓库两类入口回归，修复前复现同一报错，修复后通过；已有前置工具和用户修改保留，不调用安装或 pull。工作台 112 项测试、Bash 语法、ShellCheck、shfmt 和差异检查通过。验证使用隔离目录和安装/网络替身，不代表新机后续软件、容器及业务已验收。旧版恢复步骤见[分阶段部署](new-mac-prepare.md)。
+
 ### 2026-11-17：固定阶段入口与雷雳连接
 
 - 新增 `workbench new-mac`，以 `network/prepare/software/config/services` 等明确阶段复用已有安装、配置发布、原生备份及检查入口；每次只运行一个阶段，结束提示人工检查与下一步。ZIP 源码可在无 Git/Python 时通过系统 Bash 准备前置，再转正式 Git 仓库。无需用户现场编写临时执行脚本。
