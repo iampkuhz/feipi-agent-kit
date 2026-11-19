@@ -1,5 +1,8 @@
 # 变更记录
 
+## 2026-11-19
+- feipi-skill-govern v9：补全重构退出、脚本归位与初始化规则
+
 ## 2026-11-16
 - feipi-interaction-review-output v1：交付交互审查与汇报前复审
 

@@ -7,7 +7,7 @@ set -euo pipefail
 # - agents/openai.yaml
 # - tests/run.sh
 # - <target_skill>/maintenance/README.md 与术语表
-# - 可选资源目录（references/assets）
+# - 用户明确选择的资源目录；默认不预建空目录
 
 usage() {
   cat <<'USAGE'
@@ -35,7 +35,7 @@ TEMPLATES_ROOT="$SKILL_DIR/templates"
 SKILL_NAME_INPUT="$1"
 shift
 
-RESOURCES="scripts,references"
+RESOURCES=""
 TARGET="auto"
 LAYER=""
 ALLOWED_LAYERS="authoring diagram integration"
@@ -74,15 +74,11 @@ done
 normalize_resources() {
   local raw="$1"
   local item=""
-  local normalized=()
+  local normalized=""
   local seen="|"
+  local IFS=','
 
-  if [[ -z "$raw" ]]; then
-    raw="scripts,references"
-  fi
-
-  IFS=',' read -r -a items <<< "$raw"
-  for item in "${items[@]}"; do
+  for item in $raw; do
     item="$(printf "%s" "$item" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
     [[ -z "$item" ]] && continue
     case "$item" in
@@ -93,23 +89,15 @@ normalize_resources() {
         ;;
     esac
     if [[ "$seen" != *"|$item|"* ]]; then
-      normalized+=("$item")
+      if [[ -n "$normalized" ]]; then
+        normalized+=","
+      fi
+      normalized+="$item"
       seen="${seen}${item}|"
     fi
   done
 
-  if [[ "$seen" != *"|scripts|"* ]]; then
-    normalized=("scripts" "${normalized[@]}")
-  fi
-
-  local joined=""
-  for item in "${normalized[@]}"; do
-    if [[ -n "$joined" ]]; then
-      joined+=","
-    fi
-    joined+="$item"
-  done
-  printf "%s" "$joined"
+  printf "%s" "$normalized"
 }
 
 normalize_skill_name() {
@@ -243,7 +231,7 @@ fi
 
 RESOURCES="$(normalize_resources "$RESOURCES")"
 
-mkdir -p "$ROOT_DIR/agents" "$ROOT_DIR/scripts" "$ROOT_DIR/tests" "$ROOT_DIR/maintenance"
+mkdir -p "$ROOT_DIR/agents" "$ROOT_DIR/tests" "$ROOT_DIR/maintenance"
 
 for name in README terminology; do
   sed -e "s/{{SKILL_NAME}}/$SKILL_NAME/g" \
@@ -269,9 +257,10 @@ sed \
   -e "s/{{DEFAULT_PROMPT}}/$DEFAULT_PROMPT/g" \
   "$TEMPLATES_ROOT/openai.template.yaml" > "$ROOT_DIR/agents/openai.yaml"
 
-IFS=',' read -r -a ARR <<< "$RESOURCES"
-for r in "${ARR[@]}"; do
-  mkdir -p "$ROOT_DIR/$r"
+for r in scripts references assets; do
+  case ",$RESOURCES," in
+    *",$r,"*) mkdir -p "$ROOT_DIR/$r" ;;
+  esac
 done
 
 sed \

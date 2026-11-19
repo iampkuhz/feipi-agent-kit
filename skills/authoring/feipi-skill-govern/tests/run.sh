@@ -79,6 +79,14 @@ run_case() {
       bash "$VALIDATE_SCRIPT" "$gen_dir" --require-maintenance >/dev/null
       bash "$gen_dir/tests/run.sh" >/dev/null
       ;;
+    init-default-no-empty-resources)
+      bash "$INIT_SCRIPT" "report-build-summary" --target "$TMP_ROOT/default-resources" >/dev/null
+      gen_dir="$TMP_ROOT/default-resources/feipi-report-build-summary"
+      [[ -d "$gen_dir" ]] || return 1
+      [[ ! -e "$gen_dir/scripts" && ! -e "$gen_dir/references" && ! -e "$gen_dir/assets" ]] || return 1
+      bash "$INIT_SCRIPT" "report-generate-brief" --resources scripts --target "$TMP_ROOT/selected-resources" >/dev/null
+      [[ -d "$TMP_ROOT/selected-resources/feipi-report-generate-brief/scripts" ]] || return 1
+      ;;
     reject-missing-option-value)
       set +e
       output="$(bash "$INIT_SCRIPT" video-read-youtube --layer 2>&1)"
@@ -207,6 +215,7 @@ fi
 for case_name in \
   validate-self \
   init-generated-skill \
+  init-default-no-empty-resources \
   reject-v1-name \
   reject-low-signal-action \
   validate-detects-placeholder \

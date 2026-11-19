@@ -45,5 +45,5 @@
 - 本次治理目标：从治理 Skill 目录运行 `bash scripts/validate.sh "$target_skill" --require-maintenance`，并执行目标实际受影响的测试。
 - 路径/平台：`python3 scripts/check_portability.py "$target_skill"`，覆盖脚本和测试；静态通过与平台实测分列。
 - 模板/初始化：生成临时 skill，核对功能交付规约和失败表达；初始化通过只证明脚手架可生成。
-- 全 registry 的结构与安装验收：仓库根运行 `python3 scripts/harness/validate_skill_layout.py`。改变共享校验器或分发内容时执行，不能只测自身支持全仓结论。
+- 全 registry 的结构与安装验收：先读目标仓库 `AGENTS.md`，再从其指定入口、构建文件或 CI 配置定位实际验收命令；记录命令覆盖范围。禁止凭记忆假设目标仓库有某脚本。当前 Feipi Agent Kit 仓库可运行 `python3 scripts/harness/validate_skill_layout.py`，覆盖 registry 中 Skill 的结构与过滤安装布局，不等于语义评估或跨平台实测。改变共享校验器或分发内容时执行，不能只测自身支持全仓结论。
 - 按本次变化搜索旧规则、过时引用和模板残留；更新版本与 CHANGELOG。具体技术检查不能代替上面的业务验收。

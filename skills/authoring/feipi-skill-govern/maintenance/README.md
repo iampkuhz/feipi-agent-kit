@@ -7,10 +7,10 @@
 | 内容 | 维护位置 |
 |---|---|
 | 触发与功能路由 | `../SKILL.md`、`../agents/openai.yaml` |
-| 阶段功能契约、输入输出与消费者 | `../references/governance-process.md` |
+| 阶段功能契约、重构退出、模块拆分与消费者 | `../references/governance-process.md` |
 | 正式交接记录与输入绑定 | `../references/governance-artifacts.md`、`../templates/governance-record.template.json`、`../scripts/check_delivery.py` |
 | 技术、语义、链路验证及失败定位 | `../references/workflow.md`、`../references/quality-checklist.md` |
-| 新建 Skill 与维护资料模板 | `../scripts/init_skill*.sh`、`../templates/` |
+| 新建 Skill 与维护资料模板 | `../scripts/init_skill*.sh`、`../templates/`；初始化默认不创建空资源目录 |
 | 结构、维护资料与运行依赖校验 | `../scripts/validate.sh`、`../scripts/validate_resources.py` |
 | 路径与双平台静态检查 | `../scripts/check_portability.py` |
 | 确定性回归与独立 Agent 评估 | `../tests/run.sh`、`../tests/test_delivery.py`、`../evals/cases.json`、`../evals/README.md` |
@@ -38,4 +38,4 @@ python3 -m unittest discover -s tests -p 'test_install_output.py'
 python3 -m unittest discover -s tests/workbench
 ```
 
-安装过滤和链接行为由 `scripts/package_skill.py` 实现、仓库布局测试覆盖；修改时沿上表的消费者核对。版本策略见 `../references/version-changelog-policy.md`，证据边界见 `../references/workflow.md`。
+安装过滤和链接行为由 `scripts/package_skill.py` 实现、仓库布局测试覆盖；修改时沿上表的消费者核对。仓库级验收命令从目标仓库 `AGENTS.md`、构建入口或 CI 配置确认，不凭记忆假设路径。版本策略见 `../references/version-changelog-policy.md`，证据边界见 `../references/workflow.md`。

@@ -14,6 +14,7 @@ usage() {
 
 示例:
   bash scripts/init_skill.sh video-read-youtube --layer integration
+  bash scripts/init_skill.sh report-generate-brief --resources scripts,references --layer authoring
   bash scripts/init_skill.sh report-generate-brief --resources scripts,references,assets --layer authoring
   temp_dir="$(mktemp -d)"
   bash scripts/init_skill.sh video-read-youtube scripts,references "$temp_dir/skills"
@@ -49,7 +50,7 @@ fi
 SKILL_INPUT="$1"
 shift
 
-RESOURCES_INPUT="scripts,references"
+RESOURCES_INPUT=""
 TARGET_INPUT="auto"
 LAYER_INPUT=""
 POSITIONAL_RESOURCES_USED=0
