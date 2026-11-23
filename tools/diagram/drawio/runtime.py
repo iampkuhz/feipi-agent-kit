@@ -152,9 +152,9 @@ def health():
 
 def manage(action):
     port()
-    engine(prepare=action == 'ensure')
+    engine(prepare=action in ('ensure', 'restart'))
     c = container()
-    if action == 'ensure' and c is None:
+    if action in ('ensure', 'restart') and c is None:
         if podman('image', 'exists', IMAGE, missing_ok=True) is None:
             result = subprocess.run(['bash', str(ROOT / 'drawio.sh'), 'prepare'])
             if result.returncode:
@@ -162,7 +162,7 @@ def manage(action):
                 if result.returncode == 75:
                     error.details.update(code='download_confirmation_required', confirmation_required=True)
                 raise error
-    if action in ('up', 'ensure'):
+    if action in ('up', 'ensure', 'restart'):
         if c is None:
             if podman('image', 'exists', IMAGE, missing_ok=True) is None:
                 raise ToolError('专用镜像未准备；请执行 drawio.sh prepare 或 ensure')
@@ -170,6 +170,8 @@ def manage(action):
                    '--security-opt=no-new-privileges', '--cap-drop=all', '--read-only',
                    '--tmpfs', '/tmp:rw,size=512m', '--shm-size=256m', '--memory=2g', '--pids-limit=256',
                    '-p', f'127.0.0.1:{port()}:8080', IMAGE)
+        elif action == 'restart':
+            podman('restart', CONTAINER)
         elif not c['State']['Running']:
             podman('start', CONTAINER)
         return health()
@@ -185,7 +187,7 @@ def manage(action):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=['engine', 'ensure', 'up', 'status', 'down', 'logs'])
+    parser.add_argument('action', choices=['engine', 'ensure', 'up', 'restart', 'status', 'down', 'logs'])
     parser.add_argument('--prepare', action='store_true')
     args = parser.parse_args()
     try:

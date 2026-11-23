@@ -12,7 +12,7 @@ up | down | restart | logs | status)
   case "${1:-up}" in
   up) action=(up -d) ;;
   down) action=(down) ;;
-  restart) action=(restart) ;;
+  restart) action=(up -d --force-recreate) ;;
   logs) action=(logs --tail 50) ;;
   status) action=(ps) ;;
   esac

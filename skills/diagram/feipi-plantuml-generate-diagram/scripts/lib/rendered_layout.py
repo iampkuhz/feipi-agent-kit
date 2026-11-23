@@ -6,6 +6,7 @@ import math
 import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from unicodedata import east_asian_width
 
 NUMBER = r"[-+]?(?:\d*\.\d+|\d+\.?\d*)(?:[eE][-+]?\d+)?"
 IDENTITY = (1., 0., 0., 1., 0., 0.)
@@ -262,6 +263,7 @@ def inspect_rendered_layout(path: str | Path) -> dict:
         root = ET.parse(path).getroot()
     except (ET.ParseError, OSError) as exc:
         return dict(status="review_required", text_count=0, connector_count=0, issues=[str(exc)])
+    diagram_type = root.get("data-diagram-type", "").upper()
     order = 0
     def walk(element, matrix=IDENTITY, inherited=None, context="", role=""):
         nonlocal order
@@ -337,7 +339,7 @@ def inspect_rendered_layout(path: str | Path) -> dict:
                 decoration = role in ("entity", "cluster", "title", "legend") or context.startswith(("entity_", "cluster_"))
                 connector = (tag in ("line", "polyline") or (tag == "path" and fill == "none")
                              or (tag == "polygon" and (role == "link" or context.startswith("link_")))) and not decoration
-                if root.get("data-diagram-type", "").upper() == "SEQUENCE":
+                if diagram_type == "SEQUENCE":
                     # 生命线属于结构标记；只检查 message 组中的真实消息箭头。
                     connector = connector and role == "message"
                 if connector and style.get("stroke", "none").lower() not in ("none", "transparent"):
@@ -363,8 +365,14 @@ def inspect_rendered_layout(path: str | Path) -> dict:
             try:
                 if child_count:
                     raise ValueError("tspan/textPath 文字布局需要复核")
-                width = number(style.get("textLength", ""))
                 size = number(style.get("font-size", ""))
+                text_length = style.get("textLength")
+                # PlantUML 可省略单个全宽字和时序编号的宽度，以 1 em 保守检查。
+                if text_length is None and diagram_type and len(content) == 1 and (
+                    east_asian_width(content) in ("W", "F") or (diagram_type == "SEQUENCE" and content in "0123456789")
+                ):
+                    text_length = size
+                width = number(text_length if text_length is not None else "")
                 x = number(style.get("x", "0")) + number(style.get("dx", "0"))
                 y = number(style.get("y", "0")) + number(style.get("dy", "0"))
                 anchor = style.get("text-anchor", "start")

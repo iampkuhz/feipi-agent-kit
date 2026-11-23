@@ -83,7 +83,7 @@ def make_preview(svg: Path, png: Path, log: Path) -> None:
         temporary.unlink(missing_ok=True)
 
 
-def run(brief: Path, out: Path, server_url: str = "auto", existing_only: bool = False) -> dict:
+def run(brief: Path, out: Path, server_url: str = "auto") -> dict:
     brief, out = brief.expanduser().resolve(), out.expanduser().resolve()
     paths = {key: out / filename for key, filename in ARTIFACTS.items()}
     stage = "prepare"
@@ -119,7 +119,6 @@ def run(brief: Path, out: Path, server_url: str = "auto", existing_only: bool = 
         code = invoke([
             "bash", str(SCRIPTS / "preflight_renderer.sh"), "--out", str(paths["preflight"]),
             "--server-url", server_url,
-            *(["--existing-only"] if existing_only else []),
         ], stage, paths["log"])
         receipt = read_receipt(paths["preflight"], stage)
         if code or receipt.get("final_status") != "success" or not receipt.get("renderer_url"):
@@ -159,9 +158,8 @@ def main() -> int:
     parser.add_argument("--brief", required=True)
     parser.add_argument("--out-dir", required=True)
     parser.add_argument("--server-url", default="auto", help="沿用预检的 loopback 地址覆盖；默认读取既有端口配置")
-    parser.add_argument("--existing-only", action="store_true", help="预检失败时禁止启动 Podman")
     args = parser.parse_args()
-    result = run(Path(args.brief), Path(args.out_dir), args.server_url, args.existing_only)
+    result = run(Path(args.brief), Path(args.out_dir), args.server_url)
     print(json.dumps(result, ensure_ascii=False))
     return 0 if result["status"] == "success" else 1
 

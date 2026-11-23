@@ -8,7 +8,7 @@ services:
     image: docker.io/searxng/searxng:2026.4.17-e8299a4c3
     container_name: searxng
     ports:
-      - "8873:8080"
+      - "127.0.0.1:8873:8080"
     volumes:
       - ../settings:/etc/searxng:rw
     cap_drop:

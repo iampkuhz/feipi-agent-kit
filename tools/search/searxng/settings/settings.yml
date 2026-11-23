@@ -66,7 +66,7 @@ outgoing:
 #     engine: 引擎类名（必须指定才能正确覆盖默认配置）
 #     disabled: true                # 禁用该引擎
 #   - name: 引擎名称
-#     enabled: true                 # 启用该引擎
+#     disabled: false               # 默认参与搜索
 # ------------------------------------------------------------
 engines:
   # --- 需要禁用的引擎（避免启动报错）---
@@ -87,7 +87,7 @@ engines:
   - name: google
     enabled: true
   - name: bing
-    enabled: true
+    disabled: false
   - name: duckduckgo
     enabled: true
 

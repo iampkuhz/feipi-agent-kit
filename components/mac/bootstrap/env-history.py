@@ -11,12 +11,14 @@ import sys
 import tempfile
 
 LABEL = 'com.feipi.env-history'
+STATE = Path('.local/state/feipi-workbench')
+
+
+def fingerprint(info):
+    return info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns
 
 
 def read_env(source):
-    def fingerprint(info):
-        return info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns
-
     try:
         with os.fdopen(os.open(source, os.O_RDONLY | os.O_NONBLOCK), 'rb') as stream:
             before = os.fstat(stream.fileno())
@@ -35,7 +37,7 @@ def snapshot(home):
     source = home/'.env'
     if not source.is_file():
         return
-    repo = home/'.local/state/feipi-workbench/env-history.git'
+    repo = home/STATE/'env-history.git'
     if repo.resolve() != repo:
         raise ValueError('环境历史路径经过符号链接，未写入。')
     repo.mkdir(parents=True, mode=0o700, exist_ok=True)
@@ -78,7 +80,61 @@ def snapshot(home):
         git('update-ref', 'refs/heads/main', commit, previous or '0'*len(commit))
 
 
+def ensure_env_link(home):
+    source = home/'.env'
+    directory = home/STATE/'env-history'
+    target = directory/'.env'
+    linked = source.is_symlink()
+    if linked and source.resolve() != target:
+        if not source.is_file():
+            raise ValueError('现有 ~/.env 链接未指向普通文件，请检查链接目标。')
+        return  # 保留用户已经设好的 vault 链接。
+    if directory.resolve() != directory or target.is_symlink():
+        raise ValueError('受管环境文件路径经过符号链接，未写入。')
+    directory.mkdir(parents=True, mode=0o700, exist_ok=True)
+    info = directory.stat()
+    if info.st_uid != os.getuid() or info.st_mode & 0o077:
+        raise ValueError('受管环境文件目录必须由当前用户独占。')
+
+    if target.exists():
+        if not target.is_file() or target.stat().st_uid != os.getuid():
+            raise ValueError('受管环境目标不是当前用户的普通文件，未覆盖。')
+        if linked:
+            target.chmod(0o600)
+            return
+
+    original = source.lstat() if source.exists() else None
+    if original and not stat.S_ISREG(original.st_mode):
+        raise ValueError('现有 ~/.env 不是普通文件，未替换。')
+    data = read_env(source) if original else b''
+    if data is None:
+        raise ValueError('~/.env 读取期间发生变化，请稍后重试。')
+    if target.exists():
+        if original and read_env(target) != data:
+            raise ValueError('~/.env 与受管环境文件内容不同，两份文件均已保留。')
+        target.chmod(0o600)
+    else:
+        with tempfile.TemporaryDirectory(prefix='.feipi-env-', dir=directory) as scratch:
+            pending = Path(scratch)/'.env'
+            pending.write_bytes(data)
+            pending.chmod(0o600)
+            os.link(pending, target)
+    relative = target.relative_to(home)
+    if linked:
+        return  # 补齐受管链接缺失的目标。
+    if not original:
+        source.symlink_to(relative)
+        return
+    with tempfile.TemporaryDirectory(prefix='.feipi-env-', dir=home) as scratch:
+        link = Path(scratch)/'.env'
+        link.symlink_to(relative)
+        if fingerprint(source.lstat()) != fingerprint(original):
+            raise ValueError('~/.env 在切换链接前发生变化，请检查原文件。')
+        os.replace(link, source)
+
+
 def install(home, program):
+    ensure_env_link(home)
     snapshot(home)
     plist = home/'Library/LaunchAgents'/(LABEL+'.plist')
     plist.parent.mkdir(parents=True, exist_ok=True)

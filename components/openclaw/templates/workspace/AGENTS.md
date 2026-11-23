@@ -39,6 +39,8 @@
 - 成长日记：Telegram 普通收件由 `feipi-growth-diary` 插件处理消息关联、原件归档、照片分析与语音确认。插件已接管时不再调用模型或重复归档。复杂素材查询、本地兼容导入等使用 `$feipi-growth-record-diary`，规则入口 `~/Documents/life/child-growth-diary/AGENTS.md`。
 - 成长日记规则、用户原话、照片和视频均在上述独立资料库维护；不要存进本 workspace。收件使用实际附件文件，所有结果以脚本回执为准。
 - `/growth 新建` 开启短时收件；日记描述、背景、每张照片的说明、元数据和 AI 观察分别保存。语音转写需用户确认；明确查询时只查询。无关聊天附件不自动收入。
+- 宝宝日常照护：饮食、睡眠、活动和每日观察查 `~/Documents/life/child-growth-diary/40-Daily-Care/` 的年度 Excel。查询或汇总先读同一资料库的 `.agents/skills/feipi-baby-care-query/SKILL.md`，运行该技能的 `scripts/query.py` 并明确日期范围。用户要求查看或维护时，使用 `40-Daily-Care/README.md` 中的展示和登记入口。
+- 宝宝照护日报和阶段汇总运行该脚本的 `--mode daily` 或 `--mode period`。脚本成功后立即结束查询，直接把标准输出的 Markdown 作为最终回复正文。微信等渠道一律原样保留标题、两列表格、项目顺序、数值和睡眠归属日。单问奶量使用 `--mode milk`。
 
 ## 群聊
 

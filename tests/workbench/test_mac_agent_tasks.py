@@ -18,7 +18,6 @@ class AgentTasks(unittest.TestCase):
         self.base = Path(self.temp.name)
         self.home = self.base/'home'; self.home.mkdir()
         self.bin = self.base/'bin'; self.bin.mkdir()
-        versions = json.loads((ROOT/'components/mac/config/cli-versions.json').read_text())
         for name in ('qwen', 'claude'):
             program = self.bin/name
             program.write_text('''#!/usr/bin/env python3
@@ -31,7 +30,7 @@ elif os.environ.get('TEST_PROOF_SYMLINK'):
     pathlib.Path('proof.txt').symlink_to(os.environ['TEST_PROOF_SYMLINK'])
 else:
     pathlib.Path('proof.txt').write_bytes(b'FEIPI_NEW_MAC_OK\\n')
-'''.replace('VERSION', repr(versions[name]['version'])))
+'''.replace('VERSION', repr(f'{name} 9.9.9')))
             program.chmod(0o755)
 
     def verify(self, names, extra=None):
@@ -53,6 +52,7 @@ else:
         self.assertFalse(report['checks']['qwen']['proof_matches'])
         self.assertFalse(report['checks']['qwen']['passed'])
         self.assertTrue(report['checks']['claude']['passed'])
+        self.assertEqual(report['checks']['claude']['version'], 'claude 9.9.9')
         self.assertNotEqual(report['checks']['qwen']['workspace'], report['checks']['claude']['workspace'])
 
     def test_symlink_to_existing_correct_file_does_not_count_as_new_artifact(self):

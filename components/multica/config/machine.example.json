@@ -1,22 +1,19 @@
 {
   "schema": 1,
   "role": "primary",
-  "profile": "personal",
+  "profile": "cloud",
   "workspace_id": "REPLACE",
   "daemon_id": "REPLACE",
   "device_name": "Mac-mini",
-  "server_url": "http://localhost:8080",
-  "app_url": "http://localhost:3000",
+  "server_url": "https://api.multica.ai",
+  "app_url": "https://multica.ai",
   "workspaces_root": "~/multica_workspaces",
   "runtimes": {},
   "agents": {},
   "projects": {},
   "agent_kit": "~/Documents/tools/llm/feipi-agent-kit",
-  "startup": {
-    "podman_machine": "podman-machine-default"
-  },
   "commands": {
-    "multica": "~/.local/bin/multica",
+    "multica": "multica",
     "codex": "/opt/homebrew/bin/codex"
   }
 }

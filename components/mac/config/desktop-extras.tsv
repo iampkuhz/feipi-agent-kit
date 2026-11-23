@@ -1,6 +1,5 @@
-# 固定官方发布包；字段：名称、版本、格式、包内目标、Bundle ID、SHA-256、URL。
+# 固定官方发布包；字段：名称、版本、包内目标、Bundle ID、SHA-256、URL。
 # 来源与平台边界见 docs/setup.md；已有安装保留，不借初始化隐式升级。
-flclash	0.9.3	dmg	FlClash for oixCloud.app	com.oixcloud.clash	c756812b8c7b41bfe012a149a6c7e2f2f332544d326835e8a2e40ed973f222a7	https://github.com/pickrui/FlClash/releases/download/v0.9.3/flclash-macos-arm64.dmg
-omlx	0.4.4	dmg	oMLX.app	app.omlx	6df56b115426f7890a0c734ff81d89e55e4859dfca21543e124041321f5558fd	https://github.com/jundot/omlx/releases/download/v0.4.4/oMLX-0.4.4-macos26-27.dmg
-omlx-macos15	0.4.4	dmg	oMLX.app	app.omlx	b03b81f232f3a55d0eee05a79b46fe919d246ddaae81edae59880bc0f79c3fed	https://github.com/jundot/omlx/releases/download/v0.4.4/oMLX-0.4.4-macos15.dmg
-session-browser	0.5.2	tar.gz	app-cli	-	ea76de8de604b317cf684a06db7bc537ba178ad399d807e0e7556fe809315f7c	https://github.com/iampkuhz/feipi-session-browser/releases/download/v0.5.2/app-cli-0.5.2-runtime-macos-arm64.tar.gz
+flclash	0.9.3	FlClash for oixCloud.app	com.oixcloud.clash	c756812b8c7b41bfe012a149a6c7e2f2f332544d326835e8a2e40ed973f222a7	https://github.com/pickrui/FlClash/releases/download/v0.9.3/flclash-macos-arm64.dmg
+omlx	0.4.4	oMLX.app	app.omlx	6df56b115426f7890a0c734ff81d89e55e4859dfca21543e124041321f5558fd	https://github.com/jundot/omlx/releases/download/v0.4.4/oMLX-0.4.4-macos26-27.dmg
+omlx-macos15	0.4.4	oMLX.app	app.omlx	b03b81f232f3a55d0eee05a79b46fe919d246ddaae81edae59880bc0f79c3fed	https://github.com/jundot/omlx/releases/download/v0.4.4/oMLX-0.4.4-macos15.dmg

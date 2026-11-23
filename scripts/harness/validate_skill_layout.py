@@ -206,21 +206,25 @@ def validate_retired_entries(root: Path, link_root: Path, project: Path, env: di
             if (result.returncode == 0) != expect_success:
                 fail(f"同步清理验证失败：{command}\n{result.stdout[-1200:]}\n{result.stderr[-1200:]}")
             if expect_success:
-                for message in ("目标：", "[清理] 移除", "小计：新增", "总计：新增"):
+                for message in ("目标：", "小计：新增", "总计：新增"):
                     if message not in result.stdout:
                         fail(f"安装日志未输出到终端：{command}，缺少 {message}")
                 if re.search(r"^\d+ \d+$", result.stdout, re.MULTILINE):
                     fail(f"内部安装计数泄漏到终端：{command}")
-            elif "[清理]" in result.stdout:
+            elif "[删除]" in result.stdout:
                 fail(f"注册表无效时开始了清理：{command}")
             outputs[destination] = result.stdout
         return outputs
 
-    def assert_counts(outputs: dict[Path, str], changes: dict[Path, int], total: int, added: int = 0) -> None:
+    def assert_counts(outputs: dict[Path, str], changes: dict[Path, int], total: int, added: int = 0,
+                      deleted: dict[Path, int] | None = None, preserved: int = 0) -> None:
         for destination, output in outputs.items():
             count = changes.get(destination, 0)
-            if f"总计：新增 {added} · 更新 {count - added} · 跳过 {total - count} · 警告 0" not in output:
-                fail(f"重复安装或跳过计数不正确：{destination}\n{output[-1000:]}")
+            deletion_count = deleted.get(destination, 0) if deleted else 0
+            counts = (f"新增 {added} · 更新 {count - added} · 删除 {deletion_count} · 保留 {preserved}"
+                      f" · 跳过 {total - count} · 警告 0")
+            if f"总计：{counts}" not in output or f"小计：{counts}" not in output:
+                fail(f"安装计数不正确：{destination}\n{output[-1000:]}")
 
     current = create_skill("feipi-current")
     retired = create_skill("feipi-retired")
@@ -292,6 +296,14 @@ def validate_retired_entries(root: Path, link_root: Path, project: Path, env: di
             fail(f"共享资源未同步：{destination}")
     assert_counts(install(), {}, total=4)
 
+    unmarked_copy_name = "feipi-unmarked-copy"
+    historical = create_skill(unmarked_copy_name, resources=False)
+    subprocess.run(["git", "add", "--", str(historical / "SKILL.md")], cwd=repo, check=True)
+    subprocess.run(["git", "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+                    "-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null",
+                    "commit", "--quiet", "-m", "Add historical skill"], cwd=repo, check=True)
+    shutil.rmtree(historical)
+
     preserved = {}
     removed = []
     foreign_source = root / "other source/skills/feipi-foreign"
@@ -334,11 +346,11 @@ def validate_retired_entries(root: Path, link_root: Path, project: Path, env: di
         ))
         removed.append(legacy)
 
-        for name in ("feipi-foreign", "feipi-unmarked-copy", "feipi-mixed", "feipi-foreign-marked"):
+        for name in ("feipi-foreign", unmarked_copy_name, "feipi-mixed", "feipi-foreign-marked"):
             entry = destination / name
             entry.mkdir()
             (entry / "SKILL.md").write_text("preserve me", encoding="utf-8")
-            if name != "feipi-unmarked-copy":
+            if name != unmarked_copy_name:
                 resource_source = source_root / "integration" / name if name == "feipi-foreign-marked" else foreign_source
                 (entry / "scripts").symlink_to(resource_source / "scripts")
             if name in {"feipi-mixed", "feipi-foreign-marked"}:
@@ -410,20 +422,22 @@ def validate_retired_entries(root: Path, link_root: Path, project: Path, env: di
     write_registry([moved, renamed])
     for iteration in range(2):
         outputs = install()
+        deleted = {dest: sum(entry.parent == dest for entry in removed) for _, dest, _ in commands}
         assert_counts(outputs, {dest: 2 for _, dest, _ in commands} if iteration == 0 else {},
-                      total=3, added=1 if iteration == 0 else 0)
+                      total=3, added=1 if iteration == 0 else 0, deleted=deleted if iteration == 0 else None,
+                      preserved=1)
         for destination, output in outputs.items():
             expected = [entry for entry in removed if entry.parent == destination] if iteration == 0 else []
-            messages = [line for line in output.splitlines() if "已移除本仓库旧入口：" in line]
+            messages = [line for line in output.splitlines() if "[删除] 已移除本仓库旧入口：" in line]
             if len(messages) != len(expected) or any(
                 not any(line.endswith(f"/{entry.name}") for line in messages) for entry in expected
             ):
                 fail(f"删除日志与实际清理不一致：{destination}")
-            if f"[清理] 移除 {len(expected)} · 保留" not in output:
-                fail(f"缺少清理结果日志：{destination}")
-            if not any("[保留]" in line and "/feipi-unmarked-copy" in line
-                       and "无来源标记" in line for line in output.splitlines()):
-                fail(f"未说明纯实拷旧入口的保留原因：{destination}")
+            preservation_messages = [line for line in output.splitlines() if "[保留]" in line]
+            if len(preservation_messages) != 1 or f"/{unmarked_copy_name}（与仓库历史 Skill 同名" not in preservation_messages[0]:
+                fail(f"保留明细应只包含归属未确认的历史同名入口：{destination}")
+            if "[清理]" in output or str(destination / "feipi-foreign") in output:
+                fail(f"输出了重复汇总或其他来源的入口：{destination}")
         for entry in removed:
             if os.path.lexists(entry):
                 fail(f"本仓库旧入口未清理：{entry}")

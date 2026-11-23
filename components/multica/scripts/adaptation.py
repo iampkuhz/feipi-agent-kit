@@ -10,7 +10,7 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parent.parent
-MACHINE = Path(os.environ.get('MULTICA_MACHINE_CONFIG', str(Path.home() / '.config/multica-selfhost/machine.json')))
+MACHINE = Path(os.environ.get('MULTICA_MACHINE_CONFIG', str(Path.home() / '.config/feipi-multica/machine.json')))
 STATE = Path(os.environ.get('MULTICA_OPS_STATE', str(Path.home() / '.local/state/multica/adaptation')))
 ACTIVE = {'queued', 'dispatched', 'running', 'waiting_local_directory', 'pending'}
 

@@ -33,27 +33,17 @@ curl -s http://localhost:4000/v1/models \
 
 ---
 
-### 1.4 新增 DeepSeek（百炼 Token Plan）
+### 1.4 DeepSeek（百炼 Token Plan）
 
-客户端模型名为 `litellm-token-plan-deepseek`，默认上游为 `deepseek-v4.1-flash-1017`。两个套餐分开配置：
+OpenAI 和 Anthropic 兼容客户端都使用模型名 `litellm-token-plan-deepseek`。网关固定转发到百炼北京 Token Plan 的 OpenAI 兼容端点，上游模型为 `deepseek-v4.1-flash-1017`。
 
-| 接入 | 客户端模型名 | 上游凭证与地址 |
-|------|------|------|
-| 既有 Coding Plan | `litellm-code-openai` / `litellm-code-anthropic` | 读取 `~/.env` 中的 `LITELLM_UPSTREAM_CODE_MODEL_*`、`BAILIAN_CODING_PLAN_*` 配置 |
-| 新增 Token Plan | `litellm-token-plan-deepseek` | 单独使用 `BAILIAN_TOKEN_PLAN_API_KEY` 和 Token Plan 专属端点 |
-
-在 **`~/.env`** 填入以下变量：
+在 `~/.env` 中配置 Token Plan 专属凭据：
 
 ```dotenv
 BAILIAN_TOKEN_PLAN_API_KEY=替换为你的TokenPlan专属Key
-# 以下默认值已内置，仅在需要覆盖时取消注释。
-# LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_NAME=openai/deepseek-v4.1-flash-1017
-# BAILIAN_TOKEN_PLAN_OPENAI_BASE_URL=https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1
 ```
 
-Token Plan 的端点与凭证按[百炼官方接入文档](https://help.aliyun.com/zh/model-studio/token-plan-personal-quick-start)配置，模型 ID 见[支持的模型](https://help.aliyun.com/zh/model-studio/token-plan-personal-overview)。该入口不会回退使用 `BAILIAN_CODING_PLAN_API_KEY`、`BAILIAN_API_KEY` 或 Coding Plan 的地址；未填 Key 时保留模型入口，但无法成功调用。
-
-填好 Key 后，在仓库根目录执行 `./workbench service litellm restart`，让容器重新加载环境变量。如果客户端使用了限制模型范围的 Virtual Key，需要在 Dashboard 中允许 `litellm-token-plan-deepseek`；客户端仍使用自己的 LiteLLM Virtual Key，上游 Token Plan Key 只配置在网关中。
+修改后执行 `./workbench service litellm restart`。使用 Virtual Key 的客户端需要允许 `litellm-token-plan-deepseek`。OpenAI 和 Anthropic 协议客户端各自使用网关 Virtual Key，上游 Token Plan 凭据保存在网关侧。 [百炼支持的模型](https://help.aliyun.com/zh/model-studio/token-plan-personal-overview)
 
 配置来源固定为 `~/.env`，不提供其他文件路径覆盖。该文件使用 Shell 赋值语法，由脚本加载并导出；Compose 使用 `--env-file /dev/null`，防止再次加载项目或当前目录的 dotenv 文件。
 
@@ -106,8 +96,8 @@ export LITELLM_CONTAINER_HTTPS_PROXY=http://host.containers.internal:7890
 
 | 客户端类型 | 环境变量 | 典型模型 |
 |------|------|------|
-| OpenAI / Codex / OpenAI-compatible | `LITELLM_API_KEY_OPENAI` | `gpt-5.5`、`gpt-5.4`、`gpt-5.4-mini`、`gpt-5.3-codex`、`gpt-5.3-codex-spark`、`gpt-5.2`、`litellm-code-openai` |
-| Anthropic / Claude-code / Anthropic-compatible | `LITELLM_API_KEY_ANTHROPIC` | `litellm-code-anthropic` |
+| OpenAI / Codex / OpenAI-compatible | `LITELLM_API_KEY_OPENAI` | `gpt-5.5`、`gpt-5.4`、`gpt-5.4-mini`、`gpt-5.3-codex`、`gpt-5.3-codex-spark`、`gpt-5.2`、`litellm-token-plan-deepseek` |
+| Anthropic / Claude-code / Anthropic-compatible | `LITELLM_API_KEY_ANTHROPIC` | `litellm-token-plan-deepseek` |
 
 这两个客户端 private key 不参与容器启动。如果是首次搭建、还没有创建 Virtual Keys，可以先只配置 `LITELLM_MASTER_KEY`，启动 Dashboard 后创建 private key，再补进 `~/.env` 并打开新的 zsh。
 
@@ -120,7 +110,7 @@ gpt-5.4-mini
 gpt-5.3-codex
 gpt-5.3-codex-spark
 gpt-5.2
-litellm-code-openai
+litellm-token-plan-deepseek
 litellm-autocomplate-openai
 ```
 
@@ -159,13 +149,7 @@ LiteLLM 的 `chatgpt/` provider 会打开 `https://auth.openai.com/codex/device`
 
 修改 `~/.env` 后直接执行 `restart-chatgpt` 即可重新加载配置。`restart` 和 `restart-chatgpt` 使用 `--no-deps`，只重建 LiteLLM，不重建 PostgreSQL；它们要求数据库已经启动。首次搭建使用 `up`，需要重建整个服务栈时使用 `recreate`。
 
-启动脚本会自动创建 PostgreSQL 数据目录和 ChatGPT OAuth token 持久化目录。启用 `chatgpt/` provider 后，LiteLLM 可能会在启动阶段就触发 OAuth device flow；如果健康检查暂时没有 ready，先看日志并完成登录：
-
-```bash
-./scripts/litellm.sh logs litellm
-```
-
-日志中出现 device code 后，打开提示的 URL，使用 ChatGPT 订阅账号登录并输入 code。
+首次使用先通过工作台发布并启动 LiteLLM。没有本机 OAuth 凭据时，网关暂缓加载 `chatgpt/` 模型，其他模型可以正常启动。需要使用 ChatGPT 订阅时，执行上面的 `restart-chatgpt`，在终端按设备授权提示操作。授权完成后，该命令会重建网关并加载订阅模型。
 
 #### 2.2.5 确认 Codex 标准模型名已被当前容器加载
 
@@ -392,16 +376,7 @@ rm "${AGENT_SERVICE_DATA_DIR:-$HOME/Documents/service-data}/litellm/chatgpt-toke
 | `LITELLM_MASTER_KEY` | 网关管理密钥，用于 Dashboard、脚本诊断和管理接口 | `sk-litellm-local-dev` |
 | `LITELLM_API_KEY_OPENAI` | OpenAI / Codex / OpenAI-compatible 客户端访问 LiteLLM 的 private key | 无 |
 | `LITELLM_API_KEY_ANTHROPIC` | Anthropic / Claude-code / Anthropic-compatible 客户端访问 LiteLLM 的 private key | 无 |
-| `LITELLM_UPSTREAM_CODE_MODEL_OPENAI_NAME` | `litellm-code-openai` 的百炼 OpenAI 兼容上游模型 | `openai/qwen-plus` |
-| `LITELLM_UPSTREAM_CODE_MODEL_OPENAI_BASE` | `litellm-code-openai` 的百炼 OpenAI 兼容 base URL | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
-| `LITELLM_UPSTREAM_CODE_MODEL_OPENAI_KEY` | `litellm-code-openai` 的百炼 API key；脚本会优先复用 `BAILIAN_CODING_PLAN_API_KEY` 或 `BAILIAN_API_KEY` | `dummy-key` |
-| `LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_NAME` | `litellm-code-anthropic` 的百炼 Anthropic 兼容上游模型 | `anthropic/qwen-plus` |
-| `LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_BASE` | `litellm-code-anthropic` 的百炼 Anthropic 兼容 base URL | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
-| `LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_KEY` | `litellm-code-anthropic` 的百炼 API key；脚本会优先复用 `BAILIAN_CODING_PLAN_API_KEY` 或 `BAILIAN_API_KEY` | `dummy-key` |
-| `BAILIAN_TOKEN_PLAN_API_KEY` | 新增 DeepSeek 的 Token Plan 专属 Key，写入 `~/.env` | 无；未配置时不可调用 |
-| `BAILIAN_TOKEN_PLAN_OPENAI_BASE_URL` | Token Plan OpenAI 兼容端点 | `https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1` |
-| `LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_NAME` | `litellm-token-plan-deepseek` 的上游模型 | `openai/deepseek-v4.1-flash-1017` |
-| `LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_BASE` / `LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_KEY` | 按需覆盖上述 Token Plan 地址 / Key，不读取 Coding Plan 变量 | 使用上述 Token Plan 配置 |
+| `BAILIAN_TOKEN_PLAN_API_KEY` | 百炼 Token Plan 专属 Key，写入 `~/.env` | 无；未配置时不可调用 |
 | `LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_NAME` | 本地补全 OpenAI 兼容上游模型 | `openai/qwen-turbo` |
 | `LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_BASE` | 本地补全 OpenAI 兼容 base URL | `http://host.containers.internal:11434/v1` |
 | `LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_KEY` | 本地补全 OpenAI 兼容 API key | `dummy-key` |
@@ -415,14 +390,12 @@ rm "${AGENT_SERVICE_DATA_DIR:-$HOME/Documents/service-data}/litellm/chatgpt-toke
 | PostgreSQL 数据目录 | `$HOME/Documents/service-data/postgres` |
 | ChatGPT OAuth token 目录 | `$HOME/Documents/service-data/litellm/chatgpt-tokens` |
 | LiteLLM 镜像 | `docker.litellm.ai/berriai/litellm:v1.94.2` |
-| OpenAI 兼容逻辑模型 | `litellm-code-openai` |
-| Anthropic 兼容逻辑模型 | `litellm-code-anthropic` |
 | Token Plan DeepSeek 逻辑模型 | `litellm-token-plan-deepseek` |
 | 本地补全逻辑模型 | `litellm-autocomplate-openai` |
 
 两项数据目录均由当前用户推导，可用一个 `AGENT_SERVICE_DATA_DIR` 覆盖共同根目录。macOS 先准备本地 Podman machine；新机步骤见 [重建说明](../../../docs/setup-new-mac.md)。本地凭据通过自己的安全渠道恢复或重新登录，不复制整个容器。
 
-这些逻辑模型名在 `compose/docker-compose.yml` 和 `config/config.yaml` 中维护，不要求写入 `~/.env`。如果只是切换百炼上游模型、base URL 或 API key，优先使用上面的环境变量覆盖，不需要修改 `config.yaml`。
+逻辑模型名和百炼上游模型、端点在 `config/config.yaml` 中维护。凭据从 `~/.env` 读取。
 
 ---
 
@@ -486,7 +459,7 @@ client = OpenAI(
 )
 
 response = client.chat.completions.create(
-    model="litellm-code-openai",
+    model="litellm-token-plan-deepseek",
     messages=[{"role": "user", "content": "你好"}]
 )
 print(response.choices[0].message.content)
@@ -499,7 +472,7 @@ curl -s http://localhost:4000/v1/chat/completions \
   -H "Authorization: Bearer ${LITELLM_API_KEY_OPENAI}" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "litellm-code-openai",
+    "model": "litellm-token-plan-deepseek",
     "messages": [{"role": "user", "content": "你好"}],
     "stream": false
   }' | jq .
@@ -515,7 +488,7 @@ curl -s http://localhost:4000/v1/messages \
   -H "anthropic-version: 2023-06-01" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "litellm-code-anthropic",
+    "model": "litellm-token-plan-deepseek",
     "max_tokens": 256,
     "messages": [{"role": "user", "content": "你好"}]
   }' | jq .
@@ -551,7 +524,7 @@ curl -s http://localhost:4000/v1/messages \
 ./scripts/litellm.sh check-chatgpt-runtime
 ```
 
-如果 `/v1/models` 只返回 `litellm-code-openai`、`litellm-code-anthropic`、`litellm-autocomplate-openai` 这 3 个模型，说明当前运行中的 LiteLLM 进程没有加载 Codex/Responses 那条配置。直接执行：
+用管理密钥查询 `/v1/models` 时，如果只有 `litellm-token-plan-deepseek` 和 `litellm-autocomplate-openai`，检查 ChatGPT OAuth 是否已授权：
 
 ```bash
 ./scripts/litellm.sh check-chatgpt-network
@@ -563,7 +536,7 @@ curl -s http://localhost:4000/v1/messages \
 
 ```txt
 Error creating deployment ... chatgpt/... Polling failed ... timed out
-Initialized Model List ['litellm-code-openai', ...]
+Initialized Model List ['litellm-token-plan-deepseek', ...]
 ```
 
 这表示 LiteLLM 启动时访问 ChatGPT OAuth 地址超时，于是跳过了 Codex Responses deployment。先确保宿主机代理可用，再执行：

@@ -3,15 +3,16 @@ return {
   dependencies = { "nvim-lua/plenary.nvim" },
   event = { "BufNewFile", "BufReadPost", "BufEnter" },
 
-  opts = function()
-    local api_base = os.getenv("AUTOCOMPLETE_API_BASE")
-    if not api_base then
-      return { enabled = false }
-    end
+  config = function()
+    local api_base = os.getenv("AUTOCOMPLETE_API_BASE") or ""
     local api_key = os.getenv("AUTOCOMPLETE_API_KEY") or ""
-    local model = os.getenv("AUTOCOMPLETE_MODEL")
+    local model = os.getenv("AUTOCOMPLETE_MODEL") or ""
+    -- Without credentials, Minuet's FIM request cannot build its Authorization header.
+    if not (api_base:match("%S") and api_key:match("%S") and model:match("%S")) then
+      return
+    end
 
-    return {
+    require("minuet").setup({
       virtualtext = {
         auto_trigger_ft = { "*" },
         auto_trigger_ignore_ft = {},
@@ -54,6 +55,6 @@ return {
       debounce = 250,
       after_cursor_filter_length = 15,
       before_cursor_filter_length = 5,
-    }
+    })
   end,
 }

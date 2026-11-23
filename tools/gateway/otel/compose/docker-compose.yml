@@ -7,8 +7,8 @@ services:
       # 日志默认跟随当前用户，支持与 LiteLLM 共用的数据根目录覆盖。
       - ${AGENT_SERVICE_DATA_DIR:-${HOME}/Documents/service-data}/otel:/data:rw
     ports:
-      - "4317:4317"
-      - "4318:4318"
+      - "127.0.0.1:4317:4317"
+      - "127.0.0.1:4318:4318"
     command: ["--config", "/etc/otelcol/otel-collector.yaml"]
     restart: unless-stopped
 

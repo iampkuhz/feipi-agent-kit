@@ -43,3 +43,5 @@ async def search_web(
         return SearchWebOutput(query=query, results=results, total_returned=len(results)).model_dump()
     except Exception as e:
         return {"query": query, "results": [], "total_returned": 0, "error": str(e)}
+    finally:
+        await client.close()

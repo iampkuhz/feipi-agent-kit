@@ -1,0 +1,14 @@
+FROM docker.io/library/python:3.13-slim
+
+COPY pyproject.toml /tmp/pyproject.toml
+RUN python -c 'import tomllib; print("\n".join(tomllib.load(open("/tmp/pyproject.toml", "rb"))["project"]["dependencies"]))' > /tmp/requirements.txt \
+    && pip install --no-cache-dir -r /tmp/requirements.txt \
+    && rm /tmp/pyproject.toml /tmp/requirements.txt
+
+WORKDIR /app
+COPY __init__.py runtime.py /app/runtimes/fastmcp/
+COPY gateway /app/runtimes/fastmcp/gateway/
+COPY searxng/src /app/runtimes/fastmcp/searxng/src/
+COPY shared /app/runtimes/fastmcp/shared/
+USER 65534:65534
+CMD ["python", "-m", "runtimes.fastmcp.gateway.server"]

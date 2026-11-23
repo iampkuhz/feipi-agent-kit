@@ -20,11 +20,11 @@ class LocalRebind(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory(prefix='multica local rebind ')
         self.addCleanup(temporary.cleanup)
         self.home = Path(temporary.name).resolve()
-        self.machine = self.home/'.config/multica-selfhost/machine.json'
+        self.machine = self.home/'.config/feipi-multica/machine.json'
         self.machine.parent.mkdir(parents=True)
         self.did = '11111111-1111-4111-8111-111111111111'
         self.m = {'schema':1, 'role':'primary', 'profile':'personal', 'workspace_id':'restored-workspace',
-                  'device_name':'new-machine', 'server_url':'http://localhost:8080', 'app_url':'http://localhost:3000',
+                  'device_name':'new-machine', 'server_url':'https://api.multica.ai', 'app_url':'https://multica.ai',
                   'workspaces_root':str(self.home/'task workspaces'), 'daemon_id':None,
                   'runtimes':{'codex':{'id':None,'provider':'codex','profile_id':None,'keep':'logical'}},
                   'agents':{'coder':'logical-agent'}, 'projects':{'project':{'id':'logical-project'}}}
@@ -36,10 +36,8 @@ class LocalRebind(unittest.TestCase):
                                       'workspaces_root':self.m['workspaces_root'], 'max_concurrent_tasks':1,
                                       'disable_auto_update':True,'token':'mul_fixture-only'}))
         self.identity = self.home/'.multica/daemon.id'; self.identity.write_text(self.did+'\n')
-        pinned = json.loads((ROOT/'versions.json').read_text())
         self.health = {'status':'running','profile':'personal','device_name':'new-machine',
                        'server_url':self.m['server_url'],'os':sys.platform,
-                       'cli_version':pinned['release'].lstrip('v'),'cli_commit':pinned['upstream_commit'][:9],
                        'daemon_id':self.did,'active_task_count':0,
                        'workspaces':[{'id':self.m['workspace_id'],'runtimes':['local-runtime']}]}
         self.rows = [{'id':'other-device','provider':'codex','profile_id':None,'daemon_id':'other','status':'online'},
@@ -90,7 +88,7 @@ class LocalRebind(unittest.TestCase):
 
     def test_identity_fingerprint_conflicts_fail_before_writing(self):
         changes = [{'profile':'another'}, {'device_name':'another'}, {'server_url':'https://other.invalid'},
-                   {'server_url':None}, {'os':'another'}, {'cli_version':'9.9.9'}, {'cli_commit':'unknown'},
+                   {'server_url':None}, {'os':'another'},
                    {'daemon_id':'other'}, {'port_conflict':{'profile':'other'}}]
         original = self.health
         for change in changes:
@@ -133,7 +131,7 @@ class LocalRebind(unittest.TestCase):
             self.assertEqual(native.call_count,1)
         self.profile.unlink()
         with patch.object(adapt,'cli') as native:
-            with self.assertRaisesRegex(ValueError,'profile 尚未就绪'):
+            with self.assertRaisesRegex(base.AdaptError,'profile 尚未就绪'):
                 adapt.rebind_local()
             native.assert_not_called()
 

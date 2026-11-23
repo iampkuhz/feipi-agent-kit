@@ -4,17 +4,17 @@
 
 ## 配置只保留一个来源
 
-机器连接、项目 UUID 和路径继续由 `~/.config/multica-selfhost/machine.json` 维护；自定义位置沿用 `MULTICA_MACHINE_CONFIG`。不在仓库复制 token、完整机器配置或第二份服务地址。
+机器连接、项目 UUID 和路径继续由 `~/.config/feipi-multica/machine.json` 维护；自定义位置沿用 `MULTICA_MACHINE_CONFIG`。不在仓库复制 token、完整机器配置或第二份服务地址。
 
 `scripts/project.py context --directory 当前目录` 读取以下现有字段：
 
 ```json
 {
   "schema": 1,
-  "profile": "personal",
+  "profile": "cloud",
   "workspace_id": "工作区UUID",
-  "server_url": "http://localhost:8080",
-  "app_url": "http://localhost:3000",
+  "server_url": "https://api.multica.ai",
+  "app_url": "https://multica.ai",
   "projects": {
     "project-key": {
       "id": "项目UUID",

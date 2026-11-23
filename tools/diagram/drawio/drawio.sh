@@ -8,9 +8,9 @@ SHA256=90acf10c43751f245873506e6748d868e24da8bd863e96dd0aeeb48ba32baee7
 ACTION="${1:-help}"
 case "$ACTION" in
 help|-h|--help)
-  echo '用法：drawio.sh ensure|prepare|up|status|down|logs（仅 Podman 本地服务）'
+  echo '用法：drawio.sh ensure|prepare|up|restart|status|down|logs（仅 Podman 本地服务）'
   exit 0 ;;
-ensure|prepare|up|status|down|logs) ;;
+ensure|prepare|up|restart|status|down|logs) ;;
 *) echo "未知操作：$ACTION" >&2; exit 1 ;;
 esac
 for dependency in python3 podman; do

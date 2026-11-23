@@ -22,14 +22,16 @@ HOME = Path.home()
 STATE = HOME / '.local/state/feipi-workbench'
 RUNTIME = HOME / '.local/share/feipi-workbench'
 ENV_HISTORY_LABEL = 'com.feipi.env-history'
-CONFIG_COMPONENTS = ('mac', 'skills', 'services', 'openclaw', 'openclash')
-COMPONENTS = (*CONFIG_COMPONENTS, 'multica')
+COMPONENTS = ('mac', 'skills', 'services', 'openclaw', 'openclash')
 SERVICE_SCRIPTS = {'litellm': 'gateway/litellm/scripts/litellm.sh',
                    'searxng': 'search/searxng/scripts/searxng.sh',
                    'crawl4ai': 'crawl/crawl4ai/scripts/crawl4ai.sh',
+                   'diagrams': 'diagram/diagrams.sh',
+                   'fastmcp': 'gateway/fastmcp/scripts/fastmcp.sh',
                    'otel': 'gateway/otel/scripts/otel.sh'}
 SERVICE_ACTIONS = {name: ('up', 'down', 'restart', 'status', 'logs') for name in SERVICE_SCRIPTS}
 SERVICE_ACTIONS['omlx'] = ('up', 'down', 'restart', 'status', 'logs')
+SERVICE_ACTIONS['openclaw'] = ('up', 'down', 'restart', 'status', 'logs')
 SERVICE_ACTIONS['podman'] = ('check', 'ensure')
 SERVICE_ACTIONS['startup'] = ('install', 'start', 'check')
 
@@ -86,6 +88,10 @@ def mappings(component):
     elif component == 'services':
         for src in source_files(ROOT/'tools'):
             if any(x in src.parts for x in ['config', 'settings', 'compose']):
+                rel = str(src.relative_to(ROOT))
+                result[rel] = (src, RUNTIME/'services'/rel)
+        for src in source_files(ROOT/'runtimes/fastmcp'):
+            if src.suffix == '.py' or src.name in ('Containerfile', 'pyproject.toml'):
                 rel = str(src.relative_to(ROOT))
                 result[rel] = (src, RUNTIME/'services'/rel)
     elif component == 'skills':
@@ -151,9 +157,6 @@ def install(component, agent=None, skill=None):
         skill_args += ['--skill', skill]
     if component == 'openclash':
         run([sys.executable, ROOT/'components/openclash/router.py', 'apply'])
-        return
-    if component == 'multica':
-        run([sys.executable, ROOT/'components/multica/scripts/install-native.py', 'install'])
         return
     base = ROOT/'components'/component
     pairs = mappings(component)
@@ -226,6 +229,7 @@ def install(component, agent=None, skill=None):
             run(['bash', ROOT/'scripts/install_skills.sh', '--copy', *skill_args])
         elif component == 'services':
             snapshot(ROOT/'tools', RUNTIME/'services/tools')
+            snapshot(ROOT/'runtimes/fastmcp', RUNTIME/'services/runtimes/fastmcp')
             print('运行定义已安装。对需要更新的服务执行 ./workbench service <名称> restart。')
         else:
             run(['bash', base/'scripts/deploy.sh', '--yes'])
@@ -263,17 +267,12 @@ def doctor(component):
             failed |= not services_ready()
         elif name == 'openclaw':
             try:
-                proc = subprocess.run(['openclaw', 'gateway', 'status', '--json'],
-                                      capture_output=True, text=True, timeout=30)
-                status = json.loads(proc.stdout)
+                status = openclaw_status()
                 ok = status['service']['runtime']['status'] == 'running' and status['rpc']['ok']
                 print('Gateway: '+('运行且 RPC 可连接；真实交互需另验' if ok else '未就绪'))
                 failed |= not ok
-            except (OSError, subprocess.TimeoutExpired, ValueError, KeyError, TypeError):
+            except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
                 print('Gateway 状态未能核实'); failed = True
-        elif name == 'multica':
-            failed |= not multica_ready()
-            continue  # 第三方程序状态无需工作台发布回执。
         elif name == 'openclash':
             proc = subprocess.run(['python3', str(ROOT/'components/openclash/router.py'), 'doctor'])
             failed |= proc.returncode != 0
@@ -299,22 +298,37 @@ def services_ready():
         return False
 
 
-def multica_ready():
-    native = HOME/'.local/bin/multica'
-    if not native.is_file() or not os.access(native, os.X_OK):
-        print('缺少本机 Multica CLI。运行 ./workbench install multica。')
-        return False
-    try:
-        result = subprocess.run([str(native), '--profile', 'personal', 'daemon', 'status', '--output', 'json'],
-                                capture_output=True, text=True, timeout=10)
-        status = json.loads(result.stdout)['status'] if result.returncode == 0 else None
-    except (OSError, subprocess.TimeoutExpired, ValueError, KeyError, TypeError):
-        status = None
-    if status in ('running', 'starting', 'stopped'):
-        print('Multica daemon：' + status)
+def openclaw_gateway(*args):
+    environment = ROOT/'components/mac/bootstrap/environment.sh'
+    return ['bash', '-c', 'set -e; source "$1"; shift; exec openclaw gateway "$@"', '--', environment, *args]
+
+
+def openclaw_status(*args):
+    result = run(openclaw_gateway('status', '--json', *args), capture_output=True, text=True, timeout=30)
+    return json.loads(result.stdout)
+
+
+def openclaw_service(action):
+    if action == 'logs':
+        run(['tail', '-n', '50', HOME/'Library/Logs/openclaw/gateway.log'])
+    elif action == 'status':
+        run(openclaw_gateway('status', '--require-rpc'), timeout=30)
+    elif action == 'down':
+        run(openclaw_gateway('stop', '--force'), timeout=60)
     else:
-        print('未能核实 Multica daemon 状态。')
-    return status == 'running'
+        status = openclaw_status('--no-probe')
+        gateway = status.get('gateway', {})
+        port = gateway.get('port')
+        if gateway.get('bindMode') != 'loopback' or not isinstance(port, int) or not 1 <= port <= 65535:
+            raise ValueError('仅支持有效本机回环地址上的 OpenClaw Gateway。')
+        installed = status.get('service', {})
+        if not installed.get('command'):
+            run(openclaw_gateway('install'), timeout=60)
+        elif installed.get('runtime', {}).get('status') != 'running':
+            run(openclaw_gateway('start'), timeout=60)
+        elif action == 'restart':
+            run(openclaw_gateway('restart'), timeout=60)
+        wait_service('openclaw', f'http://127.0.0.1:{port}/readyz', seconds=45)
 
 
 def service(component, args):
@@ -328,14 +342,15 @@ def service(component, args):
         run([sys.executable, ROOT/'tools/runtime/podman.py', *args])
     elif component == 'omlx':
         run([sys.executable, ROOT/'scripts/workbench/omlx_service.py', *args])
+    elif component == 'openclaw':
+        openclaw_service(action)
     elif component == 'startup':
         script = RUNTIME/'services/tools/runtime/startup.py'
         if not script.is_file():
             raise ValueError('先 workbench install services，发布独立自启运行副本。')
         if args == ['install']:
-            paths = [HOME/'Library/LaunchAgents'/(label+'.plist') for label in
-                     ['com.feipi.podman-services', 'com.feipi.session-browser']]
-            with rollback_on_failure(paths):
+            plist = HOME/'Library/LaunchAgents/com.feipi.podman-services.plist'
+            with rollback_on_failure([plist]):
                 run([sys.executable, script, *args])
         else:
             run([sys.executable, script, *args])
@@ -346,6 +361,7 @@ def service(component, args):
         run(['bash', script, *args])
         endpoints = {'litellm': 'http://localhost:4000/health/readiness',
                      'searxng': 'http://127.0.0.1:8873/healthz',
+                     'fastmcp': 'http://127.0.0.1:18080/healthz',
                      'crawl4ai': 'http://127.0.0.1:11235/health'}
         if component in endpoints and action in ('up', 'restart'):
             wait_service(component, endpoints[component])

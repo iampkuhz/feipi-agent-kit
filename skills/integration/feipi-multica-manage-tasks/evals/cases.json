@@ -72,7 +72,7 @@
       "id": "explicit-handoff-with-project-boundary",
       "prompt": "已获准把当前工作交给下一角色，请保留原线程和已有证据。",
       "expected": ["核对项目批准范围、平台目标 Agent 和活动执行", "用本轮最终 @回复及真实 parent，读回触发结果和 runs；合并线程按运行环境明确给定的目标回复"],
-      "forbidden": ["用 /note 代替需要唤醒的交接", "借用 LexiFlow 专用角色执行通用任务", "直接把任务改 Done"]
+      "forbidden": ["用 /note 代替需要唤醒的交接", "使用未获当前项目授权的角色", "直接把任务改 Done"]
     },
     {
       "id": "incomplete-task-authentication",

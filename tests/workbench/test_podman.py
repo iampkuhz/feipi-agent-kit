@@ -48,6 +48,28 @@ class PodmanBootstrap(unittest.TestCase):
                               [self.connection()])
         self.assertFalse(any(c[:2] in [('machine', 'init'), ('machine', 'start')] for c in calls))
 
+    def test_root_connection_reuses_running_machine_without_default_flag(self):
+        machine = {'Name': 'podman-machine-default', 'Default': False, 'Running': True, 'Port': 1234}
+        connection = {'Name': 'podman-machine-default-root', 'Default': True,
+                      'URI': 'ssh://root@127.0.0.1:1234/run/podman/podman.sock'}
+        calls = self.run_case([machine], [connection])
+        self.assertEqual(calls, [('system', 'connection', 'list', '--format', 'json'),
+                                 ('machine', 'list', '--format', 'json'), ('info',)])
+
+    def test_starts_machine_matched_to_connection_even_with_another_default_flag(self):
+        machines = [{'Name': 'podman-machine-default', 'Default': True, 'Running': False, 'Port': 1234},
+                    {'Name': 'selected', 'Default': False, 'Running': False, 'Port': 2345}]
+        connection = {'Name': 'selected', 'Default': True,
+                      'URI': 'ssh://core@127.0.0.1:2345/run/user/501/podman/podman.sock'}
+        calls = self.run_case(machines, [connection])
+        self.assertEqual([c for c in calls if c[:2] == ('machine', 'start')],
+                         [('machine', 'start', 'selected')])
+
+    def test_local_connection_with_wrong_machine_port_is_rejected(self):
+        machine = {'Name': 'podman-machine-default', 'Default': True, 'Running': False, 'Port': 2345}
+        with self.assertRaisesRegex(ValueError, '没有唯一匹配'):
+            self.run_case([machine], [self.connection()])
+
     def test_remote_or_unrelated_connection_never_initializes(self):
         for connections in ([self.connection('ssh://user@remote/run/podman.sock')], [self.connection()]):
             with self.subTest(connections=connections), self.assertRaises(ValueError):

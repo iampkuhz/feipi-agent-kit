@@ -38,12 +38,6 @@ apply_defaults() {
   POSTGRES_DATA_DIR="$AGENT_SERVICE_DATA_DIR/postgres"
   CHATGPT_TOKEN_HOST_DIR="$AGENT_SERVICE_DATA_DIR/litellm/chatgpt-tokens"
   export LITELLM_MASTER_KEY="${LITELLM_MASTER_KEY:-sk-litellm-local-dev}"
-  export LITELLM_UPSTREAM_CODE_MODEL_OPENAI_NAME="${LITELLM_UPSTREAM_CODE_MODEL_OPENAI_NAME:-openai/qwen-plus}"
-  export LITELLM_UPSTREAM_CODE_MODEL_OPENAI_BASE="${LITELLM_UPSTREAM_CODE_MODEL_OPENAI_BASE:-${BAILIAN_CODING_PLAN_OPENAI_BASE_URL:-${BAILIAN_OPENAI_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}}}"
-  export LITELLM_UPSTREAM_CODE_MODEL_OPENAI_KEY="${LITELLM_UPSTREAM_CODE_MODEL_OPENAI_KEY:-${BAILIAN_CODING_PLAN_API_KEY:-${BAILIAN_API_KEY:-dummy-key}}}"
-  export LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_NAME="${LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_NAME:-anthropic/qwen-plus}"
-  export LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_BASE="${LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_BASE:-${BAILIAN_CODING_PLAN_ANTHROPIC_BASE_URL:-${BAILIAN_ANTHROPIC_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}}}"
-  export LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_KEY="${LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_KEY:-${BAILIAN_CODING_PLAN_API_KEY:-${BAILIAN_API_KEY:-dummy-key}}}"
   export LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_NAME="${LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_NAME:-openai/qwen-turbo}"
   export LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_BASE="${LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_BASE:-http://host.containers.internal:11434/v1}"
   export LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_KEY="${LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_KEY:-dummy-key}"
@@ -162,7 +156,7 @@ check_chatgpt_env() {
     fi
   done
 
-  echo "✅ ChatGPT 订阅配置已就绪（Codex 标准模型名由 config.yaml 严格转发）"
+  echo "Codex 标准模型名由 config.yaml 指定，ChatGPT 订阅模型在设备授权后加载。"
 }
 
 check_client_env() {
@@ -533,8 +527,9 @@ case "${1:-up}" in
     ;;
 
   restart-chatgpt)
-    check_chatgpt_env
     prepare_runtime
+    echo "检查 ChatGPT 订阅授权。首次使用时请按设备登录提示操作。"
+    podman_exec_litellm python -u -c 'from litellm.llms.chatgpt.authenticator import Authenticator; Authenticator().get_access_token()'
     echo "🔄 仅重新创建 LiteLLM（ChatGPT 订阅模式，保留 PostgreSQL 容器）..."
     compose up -d --no-deps --force-recreate litellm
     echo "✅ LiteLLM 已重新创建"

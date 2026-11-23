@@ -11,7 +11,7 @@ import urllib.parse
 
 def command(*args, timeout=15, capture=True):
     result = subprocess.run(['podman', *args], check=True, timeout=timeout,
-                            capture_output=capture, text=True)
+                            stdin=subprocess.DEVNULL, capture_output=capture, text=True)
     return result.stdout if capture else ''
 
 
@@ -45,13 +45,18 @@ def ensure():
             command('machine', 'init', timeout=900, capture=False)
             connection = local_connection()
             machines = json.loads(command('machine', 'list', '--format', 'json')) or []
-        candidates = [item for item in machines if item.get('Default')]
+        if not connection:
+            raise ValueError('缺少默认 Podman 连接，未启动虚拟机。')
+        uri = urllib.parse.urlsplit(connection['URI'])
+        port = (uri.port or 22) if uri.scheme == 'ssh' else None
+        # machine 列表中的 Default 与当前连接的 Default 独立，root 连接时可为 false。
+        candidates = [item for item in machines
+                      if connection['Name'] in {item['Name'], item['Name']+'-root'}
+                      and (port is None or not item.get('Port') or int(item['Port']) == port)]
         if len(candidates) != 1:
-            raise ValueError('未找到唯一默认 machine，拒绝选择其他虚拟机。')
+            raise ValueError('默认连接没有唯一匹配的本机 machine；未切换连接或启动虚拟机。')
         machine = candidates[0]
         name = machine['Name']
-        if not connection or connection.get('Name') not in {name, name+'-root'}:
-            raise ValueError('默认连接与默认 machine 不一致，未切换连接或启动虚拟机。')
         if not machine.get('Running') and not machine.get('Starting'):
             print('启动已有默认 machine：'+name, flush=True)
             command('machine', 'start', name, timeout=300, capture=False)

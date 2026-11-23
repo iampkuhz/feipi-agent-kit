@@ -9,8 +9,9 @@ import signal
 import subprocess
 import tempfile
 
-from agents import ROOT, specs, version
+from agents import INSTALL_COMMANDS
 
+ROOT = Path(__file__).resolve().parents[3]
 PROOF = b'FEIPI_NEW_MAC_OK\n'
 PROMPT = ('Create a file named proof.txt in the current directory containing exactly '
           'FEIPI_NEW_MAC_OK followed by one newline. Use the file writing tool, then finish. '
@@ -33,20 +34,20 @@ def arguments(name):
             '--print', PROMPT]
 
 
-def check(spec, base):
-    name = spec['name']
+def check(name, base):
     folder = base/name
     work = folder/'workspace'
     work.mkdir(parents=True)
-    result = {'passed': False, 'expected_version': spec['version'], 'workspace': str(work)}
-    actual = version(name)
-    result['version'] = actual
-    if actual != spec['version']:
-        result['failure'] = 'missing_cli' if actual is None else 'version_mismatch'
+    result = {'passed': False, 'workspace': str(work)}
+    binary = shutil.which(name)
+    if binary is None:
+        result['failure'] = 'missing_cli'
         return result
     environment = dict(os.environ, DISABLE_AUTOUPDATER='1')
+    result['version'] = subprocess.check_output([binary, '--version'], text=True,
+                                                 env=environment, timeout=30).strip()
     with (folder/'stdout.log').open('w') as output, (folder/'stderr.log').open('w') as error:
-        process = subprocess.Popen([shutil.which(name), *arguments(name)], cwd=work,
+        process = subprocess.Popen([binary, *arguments(name)], cwd=work,
                                    env=environment, stdin=subprocess.DEVNULL, stdout=output,
                                    stderr=error, start_new_session=True)
         try:
@@ -72,7 +73,7 @@ def check(spec, base):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--cli', choices=('codex', 'qwen', 'claude', 'qodercli'), action='append',
+    parser.add_argument('--cli', choices=tuple(INSTALL_COMMANDS), action='append',
                         help='只验收所选 CLI；默认逐项验收全部四个，单项失败不跳过其余项')
     args = parser.parse_args()
     os.umask(0o077)
@@ -89,12 +90,11 @@ def main():
     }
     path = base/'report.json'
     print('私有日志及验收报告：'+str(path), flush=True)
-    for spec in specs():
-        name = spec['name']
+    for name in INSTALL_COMMANDS:
         if args.cli and name not in args.cli:
             continue
         try:
-            result = check(spec, base)
+            result = check(name, base)
         except (OSError, ValueError, subprocess.SubprocessError) as error:
             result = {'passed': False, 'failure': type(error).__name__}
         report['checks'][name] = result

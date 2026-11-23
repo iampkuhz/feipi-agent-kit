@@ -88,29 +88,24 @@ class RenderPermissionTests(unittest.TestCase):
         self.assertEqual(receipt["issue"], self.error)
         self.assertEqual(receipt["probe_attempts"], 1)
         self.assertEqual(receipt["http_requests"], 1)
-        self.assertFalse(receipt["podman_start_attempted"])
-        self.assertEqual(receipt["podman_start_result"], "skipped_access_denied")
-        self.assertEqual(receipt["startup_policy"], "podman_once")
         self.assertFalse(receipt["process_management_allowed"])
         self.assertFalse((self.root / "podman.log").exists())
 
-    def test_existing_only_preserves_all_failures_and_never_starts_podman(self):
+    def test_preflight_preserves_all_failures_and_never_starts_podman(self):
         for code, error in ((7, "curl: (7) Failed to connect: Connection refused"),
                             (28, "curl: (28) Operation timed out"), (7, self.error)):
             with self.subTest(code=code, error=error):
                 self.env.update(FAKE_CURL_EXIT=str(code), FAKE_CURL_ERROR=error)
                 output = self.root / "readonly.json"
-                result = self.call("preflight_renderer.sh", "--existing-only", "--out", output)
+                result = self.call("preflight_renderer.sh", "--out", output)
                 self.assertEqual(result.returncode, 5 if error == self.error else 4)
                 data = json.loads(output.read_text())
-                self.assertEqual(data["startup_policy"], "existing_only")
                 self.assertEqual(data["render_target"], "http://127.0.0.1:8199")
                 self.assertEqual(data["curl_exit_code"], code)
                 self.assertEqual(data["http_status"], "000")
                 self.assertEqual(data["issue"], error)
                 self.assertIn(error, data["probes"][0]["diagnostic"])
                 self.assertEqual(data["probe_attempts"], 1)
-                self.assertFalse(data["podman_start_attempted"])
                 self.assertFalse((self.root / "podman.log").exists())
                 self.assertGreater(data["elapsed_ms"], 0)
                 if error != self.error:

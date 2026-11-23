@@ -7,12 +7,10 @@
 先用 Mac 安装流程准备 Podman、Compose provider 和 Python 3.10+。 [Mac 安装指南](../components/mac/docs/setup.md)
 
 ```bash
-./workbench service podman ensure
-./workbench service podman check
 ./workbench install services
 ```
 
-`ensure` 会复用运行中的默认本机 machine，发现远端或不明确的默认连接时停止。首次初始化最多等 15 分钟，启动最多等 5 分钟，随后等待引擎就绪。失败时保留已有 machine。`install services` 检查本地连接和 Compose，再发布服务定义。
+Podman 尚未就绪时，先运行 `./workbench service podman ensure`。它按当前默认连接的名称和 SSH 端口匹配本机 machine，支持普通连接及同一台 machine 的 `-root` 连接。运行中的 machine 会直接复用，默认连接保持原设置。发现远端或匹配不唯一时停止。首次初始化最多等 15 分钟，启动最多等 5 分钟，随后等待引擎就绪。`install services` 检查本地连接和 Compose，再发布服务定义。只读排障时可单独运行 `./workbench service podman check`。
 
 ## 按需启动
 
@@ -22,13 +20,29 @@
 | --- | --- |
 | SearXNG | `./workbench service searxng up` |
 | Crawl4AI | `./workbench service crawl4ai up` |
+| FastMCP 搜索网关 | `./workbench service fastmcp up`，需要已启动的 SearXNG |
 | LiteLLM + PostgreSQL | `./workbench service litellm up` |
 | OTel collector/cleaner | `./workbench service otel up` |
-| draw.io | `bash tools/diagram/drawio/drawio.sh ensure` |
+| draw.io、PlantUML、Mermaid | `./workbench service diagrams up` |
 
-工作台启动 LiteLLM、SearXNG 和 Crawl4AI 时会等待 HTTP 就绪，最多 10 分钟。超时返回非零并保留容器，可查看 `./workbench service <服务> logs`。随后用实际客户端确认模型调用、搜索或抓取。 [服务验收指南](verification/README.md)
+服务端口默认绑定 `127.0.0.1`。LiteLLM 使用 `4000`，PostgreSQL 使用 `5432`，SearXNG 使用 `8873`，Crawl4AI 使用 `11235`，FastMCP 使用 `18080`，OTel 使用 `4317` 和 `4318`。
 
-draw.io 复用固定源码快照，启动后用同一脚本的 `status` 检查。 [draw.io](../tools/diagram/drawio/README.md)
+工作台启动 LiteLLM、SearXNG、Crawl4AI 和 FastMCP 时会等待 HTTP 就绪，最多 10 分钟。超时返回非零并保留容器，可查看 `./workbench service <服务> logs`。随后用实际客户端确认模型调用、搜索或抓取。 [服务验收指南](verification/README.md)
+
+修改仓库中的服务配置后，先运行 `./workbench install services` 发布，再运行 `./workbench service <服务> restart` 重建所选服务的容器。LiteLLM 只重建网关容器，PostgreSQL 继续运行。
+
+图表服务使用三个 Podman 容器，只监听 `127.0.0.1`。首次启动会构建 draw.io 镜像，并拉取 PlantUML 和 Mermaid 的固定版本。用 `./workbench service diagrams status` 查看状态，失败时用 `./workbench service diagrams logs` 查看日志。
+
+| 图表 | 本机 HTTP 接口 |
+| --- | --- |
+| draw.io | `POST :8200/render`，发送含 `xml` 字段的 JSON，返回 SVG、PNG 和渲染几何 |
+| PlantUML | `POST :8199/svg`，请求体直接发送 PlantUML 源码 |
+| Mermaid | `POST :8201/svg` 或 `POST :8201/png`，请求体直接发送 Mermaid 源码 |
+
+```bash
+curl --noproxy '*' -fsS -H 'Content-Type: text/plain' --data-binary @diagram.puml http://127.0.0.1:8199/svg -o plantuml.svg
+curl --noproxy '*' -fsS -H 'Content-Type: text/plain' --data-binary @diagram.mmd http://127.0.0.1:8201/svg -o mermaid.svg
+```
 
 ## 恢复已有 LiteLLM 数据
 
@@ -42,22 +56,17 @@ draw.io 复用固定源码快照，启动后用同一脚本的 `status` 检查�
 
 ```bash
 ./workbench service startup install
-./workbench service startup check
 ./workbench service startup start
 ```
 
-`~/.env` 由用户在本机维护。服务自启负责启动服务。升级后的 `startup start` 会停用并移除同一运行副本过去生成的 `com.local.envvault` 任务。
-Podman 自启复用默认本机 ensure，然后分别启动 LiteLLM、SearXNG、Crawl4AI 并等待就绪；
-一个服务失败仍继续其他独立服务，最终返回失败并保留日志。
+`startup start` 在加载前会校验 Podman 服务自启文件。只需确认文件时，可单独运行 `./workbench service startup check`。
 
-已安装原生 `~/.local/bin/session-browser` 时，同一入口额外安装独立的
-`com.feipi.session-browser` 任务，直接运行原生 `serve`，只监听 `127.0.0.1:8848`。
-不依赖 Podman，也不复制索引缓存；未安装该可选应用时只创建 Podman 服务任务。
-退出或启动失败后保留原生日志，不循环重试掩盖端口冲突。
+`~/.env` 由用户在本机维护。服务自启负责启动服务。升级后的 `startup start` 会停用并移除同一运行副本过去生成的 `com.local.envvault` 任务。
+Podman 自启复用默认本机 ensure，启动 LiteLLM、SearXNG、FastMCP、Crawl4AI 和图表服务，并等待就绪。
+一个服务失败时继续启动其他独立服务，最后返回失败并保留日志。OTel 按需启动。
 
 日志位于 `~/.local/state/feipi-workbench/logs/` 下对应任务名的 `.log` 和 `.error.log`。
-加载成功只表示 LaunchAgent 注册完成；完整重启、三个服务的真实业务请求，以及 OpenClaw、Multica、
-oMLX、图表渲染服务的各自恢复与验收仍须完成。
+加载成功后先看任务日志，再验收自启服务的真实请求。整机重启以及 OpenClaw 和 oMLX 的恢复分别验收。Multica 执行机通过 [官方 CLI 连接 Cloud](../components/multica/README.md)。
 
 ### oMLX 登录启动
 
@@ -102,6 +111,8 @@ export AGENT_SERVICE_DATA_DIR="$HOME/LocalServiceData"
 路径支持空格，不包含旧机用户名。启动前检查本地引擎；只有明确启动 LiteLLM/OTel 时才创建其本机数据目录。
 
 镜像由仓库指定版本重新拉取。新数据库和重新授权可重建的状态不要求迁移；确有独有业务记录或必须保留的网关配置时，单独确定最小数据迁移范围，不能把启动定义等同于业务数据。
+
+LiteLLM 使用新数据库时，需在本机 Dashboard 重新创建客户端 Virtual Key，再更新 `~/.env` 中对应的客户端变量。百炼模型可以在网关启动后使用，ChatGPT 订阅模型在单独完成设备授权后加载。
 
 ## 验证
 

@@ -1,12 +1,14 @@
 # 本机验收记录
 
+以下为自建时期的历史证据。自建服务与隔离平台测试已于 2026-11-21 退役。
+
 ## 2026-11-05：请求恢复与当前 Codex 通路
 
 55项确定性回归通过；新增覆盖 bind 预检失败后的同意图恢复、交接包类型、recover 评论与附件定位、部分交付、交接和实机验收反例。协作 skill v2 已发布，8条行为用例同步当前执行范围。
 
 新 run `01a1a77f-db0e-7214-822c-bb61d8bbfff5` completed；实际探针、完整任务认证、当前 Agent/runtime/工作区/目录、探针 SHA-256、评论来源与 parent、唯一进度及交付、JSON 附件下载全部通过，Issue 保持 in_review。相同派发 request-id 返回原评论；另一独立交互 Issue 的 record/bind/note/deliver 重试均无额外副作用、0个 run。活动 run 阻止 bind 时不留下 pending，终态后原意图绑定成功。
 
-旧 fixture 会先确认排空再刷新探针；验收指纹包含运行代码，防止代码变化后沿用旧通过记录。当前 doctor 静态通过、运行证据指纹匹配。完整范围、发布备份和其余能力回归见 [工作台验收](../../docs/workbench-validation.md)。LexiFlow 专用链、必需 MCP、停用执行器和跨机器恢复未纳入本轮实际执行。
+旧 fixture 会先确认排空再刷新探针；验收指纹包含运行代码，防止代码变化后沿用旧通过记录。当前 doctor 静态通过、运行证据指纹匹配。完整范围、发布备份和其余能力回归见 [工作台验收](../../docs/workbench-validation.md)。必需 MCP、停用执行器和跨机器恢复未纳入本轮实际执行。
 
 ## 2026-11-04：工作台集成复验
 
@@ -14,13 +16,13 @@
 
 ## 2026-10-31：单主机适配落地
 
-本节保留当时的多执行器部署证据，不代表当前启用范围。实际入口见 [操作手册](docs/adaptation-runbook.md)、[适配清单](docs/adapter-inventory.md) 和 [Mac mini 流程](docs/mac-mini-migration.md)。
+本节保留当时的多执行器部署证据，不代表当前启用范围。实际入口见 [操作手册](docs/adaptation-runbook.md)和 [适配清单](docs/adapter-inventory.md)。
 
 - 新增声明配置、私有机器绑定、plan/apply/verify/doctor、统一任务入口与共享 Skill；既有 6 个 Agent 保留职责，新建 Qoder Worker；7 个受管 Agent 的并发均为 1。首次应用 15 项，重复应用 0 项，读回零差异。不创建小队或新的项目流水线控制器。
 - 精确核对 daemon/runtime/provider/profile；runtime 切换和 UI 字段漂移受计划摘要约束；派发前再次核对预期 runtime、model、thinking、并发及 runtime_config，漂移时拒绝启动。写前有私有快照，局部失败不自动删除对象。源配置与后台副本分开发布。
 - 认证、缺任务字段失败、不泄漏测试 token、同 provider 身份区别、完整技能内容漂移、分页排空检查、静默/派发区别、成功请求防重及响应丢失后拒绝盲重试：12 个确定性测试通过。模拟服务失败不等于真实上游故障演练。
 - Agent Kit 新技能结构校验及安装检查通过；Codex/Qoder/个人 OpenClaw 均安装完整技能。共享协作技能和视频技能的说明、脚本、引用及依赖文件内容一致。既有安装器同步了本仓库其他登记技能的现有版本，未改其源码；重复安装三个客户端均新增 0、更新 0、跳过 10，其他来源条目保留。
-- Codex CLI 0.162.1、Qoder CLI 1.1.54、OpenClaw 2026.9.2、Multica 0.6.3 为本次实际组合。额外发现 Homebrew Qoder 1.1.68 与用户目录 1.1.54 并存；机器绑定固定到已实测的用户目录版本，doctor 核对路径和版本，不自动切换。
+- Codex CLI 0.162.1、Qoder CLI 1.1.54、OpenClaw 2026.9.2、Multica 0.6.3 为本次实测组合。验收时还发现 Homebrew Qoder 1.1.68 与用户目录 1.1.54 并存。当前 doctor 对 Codex 核对机器绑定路径，版本由安装渠道维护。
 
 | 独立验收 | 结果与证据 |
 |---|---|
@@ -40,7 +42,7 @@
 
 一致性备份已包含数据库、附件、服务密钥、机器参考绑定、防重回执、声明及经清单核对的已发布运行副本。无网络临时 PostgreSQL 恢复验证通过：issue=39、comment=37、attachment=9、agent=8（包括历史归档对象）；临时容器已清理。恢复检查采用 TCP readiness，避免误判 PostgreSQL 初始化临时 Unix socket。Podman exec 在 dump 目录检查阶段曾输出 attach reset 提示，命令返回成功；完整隔离 pg_restore 和记录数核对验证了备份可读。
 
-未执行：Mac mini 真机迁移、整机重启/FileVault 登录测试、真实上游模型错误或断网中断演练、桌面 MCP 专项后台调用。MCP 实际调用在验收记录中为 not-tested，必需 MCP 的自动派发当前会明确拒绝。视频技能安装一致性不等于隔离 OpenClaw 已完成视频处理验收。未执行 LexiFlow 正式工作包、外部消息发送、远程推送或 Git 提交。
+未执行：Mac mini 真机迁移、整机重启/FileVault 登录测试、真实上游模型错误或断网中断演练、桌面 MCP 专项后台调用。MCP 实际调用在验收记录中为 not-tested，必需 MCP 的自动派发当前会明确拒绝。视频技能安装一致性不等于隔离 OpenClaw 已完成视频处理验收。未执行外部消息发送、远程推送或 Git 提交。
 
 
 2026-10-19 开始部署，2026-10-20 完成本机验证（Asia/Shanghai）。范围为用户明确授权的本地部署、Codex/OpenClaw 协作与迁移准备。

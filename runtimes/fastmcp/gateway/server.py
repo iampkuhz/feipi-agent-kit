@@ -1,20 +1,4 @@
-"""FastMCP Gateway - 统一 MCP 服务入口
-
-支持通过不同 URL 路径访问不同的 MCP 服务：
-- /mcp              - 聚合所有服务的统一入口
-- /mcp/{service}    - 通过 path_info 区分服务（需要客户端支持）
-
-架构说明：
-    所有服务通过 mount() 聚合到一个主 MCP 服务器
-    工具名称使用 namespace 前缀：{service}_{tool_name}
-
-    例如：
-    - searxng_search_web
-    - file_manager_read_file
-
-用法：
-    python -m runtimes.fastmcp.gateway.server
-"""
+"""将 MCP 工具聚合到 /mcp，并为服务管理提供 /healthz。"""
 
 import logging
 import os
@@ -22,6 +6,7 @@ from pathlib import Path
 from typing import Dict, Optional
 
 from fastmcp import FastMCP
+from starlette.responses import JSONResponse
 
 # 配置日志
 logging.basicConfig(
@@ -68,15 +53,14 @@ def register_service(
         mount_to_main: 是否挂载到主 MCP 服务器
     """
     try:
-        # 保存到服务注册表
-        _registered_services[name] = service_mcp
-        logger.info(f"Registered service: {name}")
-
         # 挂载到主 MCP 服务器（带 namespace 前缀）
         if mount_to_main:
             main = get_main_mcp()
             main.mount(service_mcp, namespace=name)
             logger.info(f"  -> Mounted to main with namespace '{name}'")
+
+        _registered_services[name] = service_mcp
+        logger.info(f"Registered service: {name}")
 
     except Exception as e:
         logger.error(f"Failed to register service {name}: {e}")
@@ -141,12 +125,17 @@ def load_service(service_name: str, module_path: str) -> Optional[FastMCP]:
         return None
 
 
-async def run_server(host: str = "0.0.0.0", port: int = 18080) -> None:
+async def run_server(host: str = "127.0.0.1", port: int = 18080) -> None:
     """启动 MCP 服务器
 
     使用 FastMCP 内置的 HTTP 服务器，支持 streamable-http 传输
     """
     mcp = get_main_mcp()
+
+    @mcp.custom_route("/healthz", methods=["GET"])
+    async def health(_request):
+        return JSONResponse({"services": list_services()}, status_code=200 if _registered_services else 503)
+
     logger.info(f"Starting MCP server '{mcp.name}' on http://{host}:{port}")
     logger.info(f"Transport: streamable-http")
     logger.info(f"Endpoint: /mcp")
@@ -175,7 +164,7 @@ def main():
 
     # 启动服务器
     port = int(os.getenv("MCP_PORT", "18080"))
-    host = os.getenv("MCP_HOST", "0.0.0.0")
+    host = os.getenv("MCP_HOST", "127.0.0.1")
 
     import asyncio
     asyncio.run(run_server(host=host, port=port))

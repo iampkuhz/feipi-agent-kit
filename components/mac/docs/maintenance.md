@@ -41,6 +41,7 @@ bash components/mac/bootstrap/ohmyzsh.sh install
 
 # 只有主动选择才升级
 bash components/mac/bootstrap/brew.sh upgrade
+brew upgrade --cask codex
 bash components/mac/bootstrap/node.sh upgrade      # 仅 npm 工具，不升级 Node/nvm
 bash components/mac/bootstrap/rust.sh upgrade
 bash components/mac/bootstrap/ohmyzsh.sh upgrade

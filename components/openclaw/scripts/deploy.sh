@@ -16,7 +16,7 @@ usage() {
   scripts/deploy.sh --yes
 
 从空的 ~/.openclaw 一次部署 OpenClaw、锁定的 provider/微信插件、受管运行文件、
-workspace 模板和 managed skills。通过 OpenClaw 原生命令启动 Gateway。
+workspace 模板和 managed skills。用 workbench service openclaw up 启动 Gateway。
 
 参数：
   --check  只检查前提和当前状态
@@ -100,7 +100,6 @@ required_env=(
   CLASH_PROXY
   LITELLM_API_KEY_OPENAI
   LITELLM_BASE_URL
-  LITELLM_CODE_MODEL_OPENAI
   OPENCLAW_GATEWAY_TOKEN
   OPENCLAW_TG_BOT_TOKEN
 )
@@ -158,9 +157,25 @@ fi
 if [[ "$current_openclaw" == "$required_openclaw" ]]; then
   echo "[1/4] OpenClaw $required_openclaw 已安装"
 else
+  if launchctl print "gui/$(id -u)/ai.openclaw.gateway" >/dev/null 2>&1; then
+    echo "切换 OpenClaw 版本前请停止 Gateway：./workbench service openclaw down" >&2
+    exit 1
+  fi
   echo "[1/4] 安装 OpenClaw $required_openclaw"
-  npm install --global "openclaw@$required_openclaw"
+  npm_version="$(npm --version)"
+  npm_major="${npm_version%%.*}"
+  npm_minor="${npm_version#*.}"
+  npm_minor="${npm_minor%%.*}"
+  npm_install=(--global)
+  if (( npm_major > 11 || (npm_major == 11 && npm_minor >= 16) )); then
+    npm_install+=(--allow-scripts=openclaw)
+  fi
+  npm install "${npm_install[@]}" "openclaw@$required_openclaw"
   hash -r
+  if [[ -f "$STATE_DIR/openclaw.json" || -f "$STATE_DIR/state/openclaw.sqlite" ]]; then
+    echo "迁移现有 OpenClaw 数据库和配置"
+    openclaw doctor --fix --non-interactive
+  fi
 fi
 
 # 完整声明会引用尚未安装的本地插件；先用原生临时空配置准备依赖。
@@ -183,7 +198,7 @@ while IFS=$'\t' read -r plugin_id plugin_package required_version; do
     echo "$plugin_id $required_version 已安装"
   else
     echo "安装 $plugin_id $required_version"
-    OPENCLAW_CONFIG_PATH="$bootstrap_config" openclaw plugins install "$plugin_package@$required_version" --force --pin
+    OPENCLAW_CONFIG_PATH="$bootstrap_config" openclaw plugins install "npm:$plugin_package@$required_version" --force --pin
   fi
 done < <(jq -r '.plugins | to_entries[] | [.key, .value.package, .value.version] | @tsv' "$REPO_DIR/versions.json")
 
@@ -195,5 +210,5 @@ echo "[4/4] 发布并校验配置"
 "$REPO_DIR/scripts/install-runtime.sh" --write --yes
 OPENCLAW_CONFIG_PATH="$REPO_DIR/openclaw.json" bash "$REPO_DIR/scripts/validate-config.sh"
 
-printf '%s\n' '安装完成。首次启动运行 openclaw gateway install --force，再运行 openclaw gateway restart。' \
-  '已有 Gateway 时，配置发布后按需运行 openclaw gateway restart。'
+printf '%s\n' '安装完成。首次启动运行 ./workbench service openclaw up。' \
+  '已有 Gateway 时，配置发布后运行 ./workbench service openclaw restart。'

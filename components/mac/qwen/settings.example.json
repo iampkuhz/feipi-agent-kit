@@ -2,22 +2,10 @@
   "modelProviders": {
     "openai": [
       {
-        "id": "qwen3.5-plus",
-        "name": "[Bailian Coding Plan] qwen3.5-plus",
-        "baseUrl": "https://coding.dashscope.aliyuncs.com/v1",
-        "envKey": "BAILIAN_CODING_PLAN_API_KEY",
-        "generationConfig": {
-          "extra_body": {
-            "enable_thinking": true
-          },
-          "contextWindowSize": 1000000
-        }
-      },
-      {
-        "id": "qwen3-coder-plus",
-        "name": "[Bailian Coding Plan] qwen3-coder-plus",
-        "baseUrl": "https://coding.dashscope.aliyuncs.com/v1",
-        "envKey": "BAILIAN_CODING_PLAN_API_KEY",
+        "id": "litellm-token-plan-deepseek",
+        "name": "DeepSeek V4.1 Flash (Token Plan)",
+        "baseUrl": "http://127.0.0.1:4000/v1",
+        "envKey": "LITELLM_API_KEY_OPENAI",
         "generationConfig": {
           "contextWindowSize": 1000000
         }
@@ -28,7 +16,7 @@
     "auth": {}
   },
   "model": {
-    "name": "qwen3.5-plus"
+    "name": "litellm-token-plan-deepseek"
   },
   "$version": 4
 }

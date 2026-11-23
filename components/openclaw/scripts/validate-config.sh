@@ -18,8 +18,7 @@ done
 export OPENCLAW_CONFIG_PATH="${OPENCLAW_CONFIG_PATH:-$REPO_DIR/openclaw.json}"
 
 # 仅供离线校验；已有真实环境变量时绝不覆盖。
-export LITELLM_BASE_URL="${LITELLM_BASE_URL:-http://127.0.0.1:4000}"
-export LITELLM_CODE_MODEL_OPENAI="${LITELLM_CODE_MODEL_OPENAI:-validation-model}"
+export LITELLM_BASE_URL="${LITELLM_BASE_URL:-http://127.0.0.1:4000/v1}"
 export LITELLM_API_KEY_OPENAI="${LITELLM_API_KEY_OPENAI:-validation-placeholder}"
 export OPENCLAW_GATEWAY_TOKEN="${OPENCLAW_GATEWAY_TOKEN:-validation-placeholder}"
 export OPENCLAW_TG_BOT_TOKEN="${OPENCLAW_TG_BOT_TOKEN:-validation-placeholder}"
@@ -117,7 +116,8 @@ jq -e '
   and (.commands | has("ownerDisplay") | not)
   and (.tools.sessions.visibility == "tree")
   and (.tools.agentToAgent.enabled == false)
-  and (.mcp.servers["fastmcp-gateway"].enabled == false)
+  and (.mcp.servers["fastmcp-gateway"] | .enabled == true
+    and .url == "http://127.0.0.1:18080/mcp" and .transport == "streamable-http")
   and ((.mcp.servers.crawl4ai.enabled // true) == true)
   and (.tools.media.audio | has("models") | not)
   and any(.tools.media.models[];
@@ -142,5 +142,5 @@ while IFS=$'\t' read -r plugin_id expected_version; do
 done < <(jq -r '.plugins | to_entries[] | [.key, .value.version] | @tsv' "$REPO_DIR/versions.json")
 
 openclaw config validate --json
-openclaw secrets audit --check --json
+bash "$REPO_DIR/scripts/validate-secrets.sh"
 openclaw mcp doctor --json

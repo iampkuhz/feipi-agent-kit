@@ -10,26 +10,14 @@ RAW_PATH = "/data/claude-code-otel.raw"
 CLEAN_PATH = "/data/claude-code-otel.jsonl"
 
 def extract_json_objects(text):
-    """Extract top-level JSON objects from text by tracking brace depth."""
-    results = []
-    depth = 0
-    start = None
-    for i, ch in enumerate(text):
-        if ch == '{':
-            if depth == 0:
-                start = i
-            depth += 1
-        elif ch == '}':
-            depth -= 1
-            if depth == 0 and start is not None:
-                obj_str = text[start:i+1]
-                try:
-                    obj = json.loads(obj_str)
-                    results.append(obj)
-                except json.JSONDecodeError:
-                    pass
-                start = None
-    return results
+    """Read the collector's newline-delimited JSON, ignoring NUL padding."""
+    for line in text.split('\n'):
+        try:
+            record = json.loads(line.replace('\0', ''))
+        except json.JSONDecodeError:
+            continue
+        if isinstance(record, dict):
+            yield record
 
 def main():
     # Wait for raw file to appear

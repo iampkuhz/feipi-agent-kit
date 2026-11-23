@@ -1,7 +1,6 @@
-"""锁定 CLI 安装的冲突、摘要与只读边界；真实下载/执行另在干净 Mac 验收。"""
+"""覆盖 Agent CLI 查找、补装渠道和只读边界。"""
 import importlib.util
 from pathlib import Path
-import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -12,40 +11,44 @@ spec.loader.exec_module(agents)
 
 
 class AgentInstaller(unittest.TestCase):
-    def test_conflict_is_found_before_any_install(self):
-        with patch.object(agents, 'version', side_effect=[None, '9.9.9']), \
-                patch.object(agents, 'command') as command, \
-                patch('sys.argv', ['agents.py', 'install']), self.assertRaises(ValueError):
+    def test_existing_codex_is_preserved_while_missing_qwen_is_installed(self):
+        paths = ['/brew/bin/codex', None, '/local/bin/claude', '/local/bin/qodercli', '/npm/bin/qwen']
+        with patch.object(agents.shutil, 'which', side_effect=paths), \
+                patch.object(agents.subprocess, 'run') as run, \
+                patch('sys.argv', ['agents.py', 'install']):
             agents.main()
-        command.assert_not_called()
+        self.assertEqual(run.call_count, 1)
+        self.assertEqual(run.call_args.args[0],
+                         ('npm', 'install', '-g', '--no-audit', '--no-fund', '@qwen-code/qwen-code@latest'))
+
+    def test_missing_codex_is_installed_with_homebrew(self):
+        paths = [None, '/npm/bin/qwen', '/local/bin/claude', '/local/bin/qodercli', '/brew/bin/codex']
+        with patch.object(agents.shutil, 'which', side_effect=paths), \
+                patch.object(agents.subprocess, 'run') as run, \
+                patch('sys.argv', ['agents.py', 'install']):
+            agents.main()
+        self.assertEqual(run.call_count, 1)
+        self.assertEqual(run.call_args.args[0], ('brew', 'install', '--cask', 'codex'))
 
     def test_plan_does_not_download_or_install(self):
-        with patch.object(agents, 'version', return_value=None), \
-                patch.object(agents, 'command') as command, patch('sys.argv', ['agents.py', 'plan']):
+        with patch.object(agents.shutil, 'which', return_value=None), \
+                patch.object(agents.subprocess, 'run') as run, patch('sys.argv', ['agents.py', 'plan']):
             agents.main()
-        command.assert_not_called()
+        run.assert_not_called()
 
-    def test_registry_integrity_mismatch_stops_before_npm_install(self):
-        with patch.object(agents, 'version', return_value=None), \
-                patch.object(agents, 'command', return_value='"sha512-changed"') as command, \
-                patch('sys.argv', ['agents.py', 'install']), self.assertRaises(ValueError):
+    def test_check_fails_without_installing_missing_tools(self):
+        with patch.object(agents.shutil, 'which', return_value=None), \
+                patch.object(agents.subprocess, 'run') as run, \
+                patch('sys.argv', ['agents.py', 'check']), self.assertRaisesRegex(ValueError, '缺少 Agent CLI'):
             agents.main()
-        self.assertEqual(len(command.call_args_list), 1)
-        self.assertEqual(command.call_args.args[0][:2], ['npm', 'view'])
+        run.assert_not_called()
 
-    def test_native_hash_mismatch_never_publishes_program(self):
-        with tempfile.TemporaryDirectory(prefix='feipi agent integrity ') as scratch:
-            home = Path(scratch)
-            def download(args, **kwargs):
-                Path(args[-1]).write_bytes(b'corrupt download')
-            spec = next(item for item in agents.specs() if item['name'] == 'claude')
-            with patch.object(agents, 'HOME', home), \
-                    patch.object(agents.platform, 'system', return_value='Darwin'), \
-                    patch.object(agents.platform, 'machine', return_value='arm64'), \
-                    patch.object(agents, 'command', side_effect=download), self.assertRaises(ValueError):
-                agents.native_install(spec)
-            self.assertFalse((home/'.local/bin/claude').exists())
-            self.assertFalse((home/'.local/share/feipi-workbench/cli/claude'/spec['version']).exists())
+    def test_successful_install_must_put_command_on_path(self):
+        paths = [None, '/npm/bin/qwen', '/local/bin/claude', '/local/bin/qodercli', None]
+        with patch.object(agents.shutil, 'which', side_effect=paths), \
+                patch.object(agents.subprocess, 'run'), patch('sys.argv', ['agents.py', 'install']), \
+                self.assertRaisesRegex(ValueError, 'codex 安装后未出现在 PATH'):
+            agents.main()
 
 
 if __name__ == '__main__':

@@ -46,7 +46,7 @@ services:
     mem_reservation: 1024m
     pids_limit: 256
     ports:
-      - "4000:4000"
+      - "127.0.0.1:4000:4000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -54,18 +54,7 @@ services:
       # ===== 只保留需要从宿主机传入的少量变量 =====
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-litellm-local-dev}
       LITELLM_SALT_KEY: sk-litellm-local-salt
-      # 百炼 OpenAI 兼容模型
-      LITELLM_UPSTREAM_CODE_MODEL_OPENAI_NAME: ${LITELLM_UPSTREAM_CODE_MODEL_OPENAI_NAME:-openai/qwen-plus}
-      LITELLM_UPSTREAM_CODE_MODEL_OPENAI_BASE: ${LITELLM_UPSTREAM_CODE_MODEL_OPENAI_BASE:-https://dashscope.aliyuncs.com/compatible-mode/v1}
-      LITELLM_UPSTREAM_CODE_MODEL_OPENAI_KEY: ${LITELLM_UPSTREAM_CODE_MODEL_OPENAI_KEY:-dummy-key}
-      # 百炼 Anthropic 兼容模型
-      LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_NAME: ${LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_NAME:-anthropic/qwen-plus}
-      LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_BASE: ${LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_BASE:-https://dashscope.aliyuncs.com/compatible-mode/v1}
-      LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_KEY: ${LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_KEY:-dummy-key}
-      # 百炼 Token Plan：启动脚本从 ~/.env 导出，不回退到 Coding Plan / 通用百炼 Key。
-      LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_NAME: ${LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_NAME:-openai/deepseek-v4.1-flash-1017}
-      LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_BASE: ${LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_BASE:-${BAILIAN_TOKEN_PLAN_OPENAI_BASE_URL:-https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1}}
-      LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_KEY: ${LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_KEY:-${BAILIAN_TOKEN_PLAN_API_KEY:-dummy-key}}
+      BAILIAN_TOKEN_PLAN_API_KEY: ${BAILIAN_TOKEN_PLAN_API_KEY:-dummy-key}
       # 本地补全模型
       LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_NAME: ${LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_NAME:-openai/qwen-turbo}
       LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_BASE: ${LITELLM_UPSTREAM_AUTOCOMPLETE_MODEL_OPENAI_BASE:-http://host.containers.internal:11434/v1}
@@ -85,15 +74,15 @@ services:
       # Podman Compose 不保证 container_name 自动成为可解析别名，
       # 这里固定使用 postgres 服务暴露出的 litellm-db 网络别名连接数据库。
       DATABASE_URL: postgresql://litellm:${POSTGRES_PASSWORD:-litellm_password}@litellm-db:5432/litellm
+    entrypoint: ["python", "/app/start-gateway.py"]
     command:
-      - "--config"
-      - "/app/config.yaml"
       - "--port"
       - "4000"
       # 绕过有问题的迁移检查路径
       - "--use_prisma_db_push"
     volumes:
       - ../config/config.yaml:/app/config.yaml:ro
+      - ../scripts/start-gateway.py:/app/start-gateway.py:ro
       # ChatGPT OAuth token 持久化目录（宿主机 <-> 容器）
       - type: bind
         source: ${AGENT_SERVICE_DATA_DIR:-${HOME}/Documents/service-data}/litellm/chatgpt-tokens

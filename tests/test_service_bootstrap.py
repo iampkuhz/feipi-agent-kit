@@ -3,6 +3,7 @@
 import json
 import os
 from pathlib import Path
+import runpy
 import shutil
 import subprocess
 import sys
@@ -10,6 +11,15 @@ import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+class OtelCleanerTests(unittest.TestCase):
+    def test_jsonl_preserves_braces_and_escaped_characters_in_log_body(self):
+        extract = runpy.run_path(str(ROOT / 'tools/gateway/otel/scripts/clean-otel.py'))['extract_json_objects']
+        first = {'body': 'closing brace } and an escaped quote "\\\n\0\u2028 {{'}
+        second = {'body': 'next record'}
+        raw = '\0' + json.dumps(first, ensure_ascii=False) + '\n{broken\n' + json.dumps(second) + '\n'
+        self.assertEqual(list(extract(raw)), [first, second])
 
 
 class ServiceBootstrapTests(unittest.TestCase):
@@ -77,6 +87,12 @@ elif args == ['--version']:
         self.assertTrue(any(row["args"][:1] == ["compose"] and row["args"][-1:] == ["ps"]
                             for row in self.calls()))
 
+    def test_searxng_restart_recreates_with_current_compose_configuration(self):
+        p = self.run_script("tools/search/searxng/scripts/searxng.sh", "restart")
+        self.assertEqual(p.returncode, 0, p.stderr)
+        [compose] = [row["args"] for row in self.calls() if row["args"][:1] == ["compose"]]
+        self.assertEqual(compose[-3:], ["up", "-d", "--force-recreate"])
+
     def test_crawl_clean_checkout_uses_tracked_configuration(self):
         # 模拟克隆后没有本机环境文件、且仓库路径带空格的情况。
         clone = self.base / "clone with spaces"
@@ -142,7 +158,7 @@ elif args == ['--version']:
         self.assertTrue(any(row["args"][-1:] == ["ps"] for row in self.calls()))
 
     @unittest.skipUnless(shutil.which("docker-compose"), "Token Plan 隔离校验需要 docker-compose 客户端")
-    def test_litellm_only_loads_home_env_and_isolates_credentials(self):
+    def test_litellm_only_loads_token_plan_key_from_home_env(self):
         # 走真实启动脚本，但将 up 替换成静态 config；项目文件和旧 shell 值都不能生效。
         root = self.base / "isolated repo"
         for relative in ["tools/gateway/litellm/scripts/litellm.sh", "tools/lib/podman.sh",
@@ -174,43 +190,63 @@ raise SystemExit(p.returncode)
                       'BAILIAN_CODING_PLAN_OPENAI_BASE_URL="https://coding.test/v1"\n'
                       'LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_KEY=${BAILIAN_CODING_PLAN_API_KEY}\n')
         cases = [
-            (None, {}, "dummy-key", "openai/deepseek-v4.1-flash-1017"),
-            ("BAILIAN_TOKEN_PLAN_API_KEY=\n", {}, "dummy-key", "openai/deepseek-v4.1-flash-1017"),
+            (None, {}, "dummy-key"),
+            ("BAILIAN_TOKEN_PLAN_API_KEY=\n", {}, "dummy-key"),
             ("BAILIAN_TOKEN_PLAN_API_KEY=token-file-key\n"
-             "LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_NAME=openai/deepseek-v4.1-flash\n",
-             {}, "token-file-key", "openai/deepseek-v4.1-flash"),
+             "LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_KEY=old-override-key\n",
+             {}, "token-file-key"),
             ("BAILIAN_TOKEN_PLAN_API_KEY=token-file-key\n",
-             {"BAILIAN_TOKEN_PLAN_API_KEY": "token-shell-key"}, "token-file-key", "openai/deepseek-v4.1-flash-1017"),
+             {"BAILIAN_TOKEN_PLAN_API_KEY": "token-shell-key"}, "token-file-key"),
             ("BAILIAN_TOKEN_PLAN_API_KEY=token-file-key\n",
-             {"LITELLM_COMPOSE_ENV_FILE": str(root / "other.env")}, "token-file-key", "openai/deepseek-v4.1-flash-1017"),
+             {"LITELLM_COMPOSE_ENV_FILE": str(root / "other.env")}, "token-file-key"),
         ]
-        for index, (dotenv, overrides, expected_key, expected_model) in enumerate(cases):
+        for index, (dotenv, overrides, expected_key) in enumerate(cases):
             with self.subTest(case=index):
                 if dotenv is not None:
                     (self.home / ".env").write_text(coding_env + dotenv)
                 p = self.run_script("tools/gateway/litellm/scripts/litellm.sh", "up",
                                     env=dict(env, **overrides), root=root)
                 self.assertEqual(p.returncode, 0, p.stderr)
-                actual = json.loads(output.read_text())["services"]["litellm"]["environment"]
-                self.assertEqual(actual["LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_KEY"], expected_key)
-                self.assertEqual(actual["LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_NAME"], expected_model)
-                self.assertEqual(actual["LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_OPENAI_BASE"],
-                                 "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1")
-                coding_key = "coding-test-key" if dotenv is not None else "dummy-key"
-                self.assertEqual(actual["LITELLM_UPSTREAM_CODE_MODEL_OPENAI_KEY"], coding_key)
-                self.assertEqual(actual["LITELLM_UPSTREAM_CODE_MODEL_ANTHROPIC_KEY"], coding_key)
-                self.assertEqual(actual["LITELLM_UPSTREAM_CODE_MODEL_OPENAI_BASE"],
-                                 "https://coding.test/v1" if dotenv is not None
-                                 else "https://dashscope.aliyuncs.com/compatible-mode/v1")
+                services = json.loads(output.read_text())["services"]
+                self.assertEqual([(port["host_ip"], int(port["published"])) for port in services["litellm"]["ports"]],
+                                 [("127.0.0.1", 4000)])
+                self.assertEqual([(port["host_ip"], int(port["published"])) for port in services["postgres"]["ports"]],
+                                 [("127.0.0.1", 5432)])
+                actual = services["litellm"]["environment"]
+                bailian_env = {name: value for name, value in actual.items()
+                               if name.startswith(("BAILIAN_", "LITELLM_UPSTREAM_CODE_MODEL_",
+                                                   "LITELLM_UPSTREAM_TOKEN_PLAN_MODEL_"))}
+                self.assertEqual(bailian_env, {"BAILIAN_TOKEN_PLAN_API_KEY": expected_key})
+
+    def test_litellm_start_only_loads_chatgpt_models_after_authorization(self):
+        namespace = runpy.run_path(str(ROOT / "tools/gateway/litellm/scripts/start-gateway.py"))
+        authorized_models = namespace["authorized_models"]
+        deepseek = {"model_name": "litellm-token-plan-deepseek",
+                    "litellm_params": {"model": "openai/deepseek-v4.1-flash-1017"}}
+        chatgpt = {"model_name": "gpt-5.5", "litellm_params": {"model": "chatgpt/gpt-5.5"}}
+        models = [deepseek, chatgpt]
+        auth = self.base / "auth.json"
+        self.assertEqual(authorized_models(models, auth), [deepseek])
+        auth.write_text('{"device_code_requested_at": 1}')
+        self.assertEqual(authorized_models(models, auth), [deepseek])
+        auth.write_text('{"access_token": "test-token"}')
+        self.assertEqual(authorized_models(models, auth), models)
 
     def test_litellm_restart_only_recreates_proxy(self):
         for command in ["restart", "restart-chatgpt"]:
             with self.subTest(command=command):
+                before = len(self.calls())
                 p = self.run_script("tools/gateway/litellm/scripts/litellm.sh", command)
                 self.assertEqual(p.returncode, 0, p.stderr)
-                compose = [row for row in self.calls() if row["args"][:1] == ["compose"]][-1]
-                self.assertEqual(compose["args"][-5:],
+                changes = [row["args"] for row in self.calls()[before:]
+                           if row["name"] == "podman" and row["args"][0] in ("exec", "compose")]
+                self.assertEqual(changes[-1][-5:],
                                  ["up", "-d", "--no-deps", "--force-recreate", "litellm"])
+                if command == "restart-chatgpt":
+                    self.assertEqual(changes[0][:5], ["exec", "litellm-proxy-podman", "python", "-u", "-c"])
+                    self.assertIn("Authenticator().get_access_token()", changes[0][5])
+                else:
+                    self.assertEqual(len(changes), 1)
 
     def test_litellm_client_check_loads_home_env_without_export(self):
         (self.home / ".env").write_text('LITELLM_API_KEY_OPENAI="openai-client-key"\n'
@@ -231,11 +267,12 @@ raise SystemExit(p.returncode)
 
 class ComposePortabilityTests(unittest.TestCase):
     @unittest.skipUnless(shutil.which("podman-compose"), "静态展开校验需要 podman-compose")
-    def test_podman_provider_accepts_all_four_definitions_on_new_home(self):
+    def test_podman_provider_accepts_service_definitions_on_new_home(self):
         with tempfile.TemporaryDirectory(prefix="feipi podman config ") as folder:
             env = {"PATH": os.environ["PATH"], "HOME": folder}
             for rel in ["tools/search/searxng/compose/docker-compose.yml",
                         "tools/crawl/crawl4ai/compose/docker-compose.yml",
+                        "tools/gateway/fastmcp/compose/docker-compose.yml",
                         "tools/gateway/litellm/compose/docker-compose.yml",
                         "tools/gateway/otel/compose/docker-compose.yml"]:
                 with self.subTest(file=rel):
@@ -250,7 +287,9 @@ class ComposePortabilityTests(unittest.TestCase):
             home = Path(folder) / "new Mac home"
             home.mkdir()
             env = {"PATH": os.environ["PATH"], "HOME": str(home)}
-            files = ["tools/gateway/litellm/compose/docker-compose.yml",
+            files = ["tools/search/searxng/compose/docker-compose.yml",
+                     "tools/gateway/fastmcp/compose/docker-compose.yml",
+                     "tools/gateway/litellm/compose/docker-compose.yml",
                      "tools/gateway/otel/compose/docker-compose.yml",
                      "tools/crawl/crawl4ai/compose/docker-compose.yml"]
             for override in [None, str(Path(folder) / "custom data")]:
@@ -265,14 +304,33 @@ class ComposePortabilityTests(unittest.TestCase):
                                            capture_output=True, text=True, timeout=20)
                         self.assertEqual(p.returncode, 0, p.stderr)
                         services = json.loads(p.stdout)["services"]
+                        if "searxng" in services:
+                            [port] = services["searxng"]["ports"]
+                            self.assertEqual((port["host_ip"], int(port["published"])), ("127.0.0.1", 8873))
+                        if "gateway" in services:
+                            gateway = services["gateway"]
+                            [port] = gateway["ports"]
+                            self.assertEqual((port["host_ip"], int(port["published"])), ("127.0.0.1", 18080))
+                            self.assertEqual(Path(gateway["build"]["context"]), ROOT / "runtimes/fastmcp")
                         if "postgres" in services:
                             self.assertEqual(services["postgres"]["volumes"][0]["source"], str(expected/"postgres"))
-                            self.assertEqual(services["litellm"]["volumes"][1]["source"], str(expected/"litellm/chatgpt-tokens"))
+                            proxy = services["litellm"]
+                            mounts = {mount["target"]: mount["source"] for mount in proxy["volumes"]}
+                            self.assertEqual(mounts["/app/chatgpt-tokens"], str(expected / "litellm/chatgpt-tokens"))
+                            self.assertEqual(mounts["/app/start-gateway.py"],
+                                             str(ROOT / "tools/gateway/litellm/scripts/start-gateway.py"))
+                            self.assertEqual(proxy["entrypoint"], ["python", "/app/start-gateway.py"])
                         if "otel-collector" in services:
-                            self.assertEqual(services["otel-collector"]["volumes"][1]["source"], str(expected/"otel"))
+                            collector = services["otel-collector"]
+                            self.assertEqual(collector["volumes"][1]["source"], str(expected / "otel"))
+                            self.assertEqual([(port["host_ip"], int(port["published"])) for port in collector["ports"]],
+                                             [("127.0.0.1", 4317), ("127.0.0.1", 4318)])
                         if "crawl4ai" in services:
-                            self.assertNotIn("HTTP_PROXY", services["crawl4ai"]["environment"])
-                            self.assertEqual(services["crawl4ai"]["shm_size"], "1073741824")
+                            crawler = services["crawl4ai"]
+                            self.assertNotIn("HTTP_PROXY", crawler["environment"])
+                            self.assertEqual(crawler["shm_size"], "1073741824")
+                            [port] = crawler["ports"]
+                            self.assertEqual((port["host_ip"], int(port["published"])), ("127.0.0.1", 11235))
 
 
 if __name__ == "__main__":

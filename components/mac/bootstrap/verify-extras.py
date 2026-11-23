@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""在隔离数据目录实际启动 Session Browser/oMLX；不使用现有服务端口和登录资料。"""
+"""在隔离数据目录验证 oMLX 的文本与语音推理。"""
 import argparse
 from contextlib import contextmanager
 import hashlib
@@ -57,54 +57,6 @@ def ready(process, url, headers=None):
         except OSError:
             time.sleep(0.5)
     raise TimeoutError('验证服务 120 秒内未就绪。')
-
-
-def session_browser(base, environment):
-    home = base/'session-home'
-    sessions = home/'.codex/sessions/2026/11/15'
-    sessions.mkdir(parents=True)
-    session_id = str(uuid.uuid4())
-    text = 'Feipi new Mac synthetic session'
-    rows = [
-        {'type': 'session_meta', 'payload': {'id': session_id, 'cwd': '/synthetic/new-mac', 'source': 'cli'}},
-        {'type': 'response_item', 'payload': {'type': 'message', 'role': 'user',
-         'content': [{'type': 'input_text', 'text': text}]}},
-        {'type': 'response_item', 'payload': {'type': 'message', 'role': 'assistant',
-         'content': [{'type': 'output_text', 'text': 'Verified local runtime.'}]}},
-    ]
-    for row in rows:
-        row['timestamp'] = '2026-11-15T00:00:00Z'
-    (sessions/('rollout-'+session_id+'.jsonl')).write_text(''.join(json.dumps(row)+'\n' for row in rows))
-    (home/'.codex/session_index.jsonl').write_text(json.dumps({
-        'id': session_id, 'thread_name': text, 'updated_at': '2026-11-15T00:00:00Z'})+'\n')
-    endpoint = 'http://127.0.0.1:'+str(port())
-    # HOME 与 JVM user.home 同时隔离，避免扫描操作者真实会话。
-    env = dict(environment, HOME=str(home), JAVA_TOOL_OPTIONS='-Duser.home="'+str(home)+'"')
-    command = [str(Path.home()/'.local/bin/session-browser'), 'serve', '--host', '127.0.0.1',
-               '--port', endpoint.rsplit(':', 1)[1], '--index-dir='+str(base/'session-index')]
-    with server(command, base/'session-browser.log', env) as process:
-        ready(process, endpoint+'/healthz')
-        deadline = time.monotonic()+120
-        while time.monotonic() < deadline:
-            summary = request(endpoint+'/api/sessions/summary')
-            status = json.loads(request(endpoint+'/api/scan-status'))
-            if (status.get('status') == 'success' and status.get('processedCount') == 1
-                    and status.get('publishedProcessedCount') == 1 and status.get('errorCount') == 0
-                    and json.loads(summary).get('totalCount') == 1):
-                break
-            if status.get('status') == 'failure':
-                raise RuntimeError('Session Browser 合成会话扫描失败。')
-            if process.poll() is not None:
-                raise RuntimeError('Session Browser 扫描期间退出。')
-            time.sleep(0.5)
-        else:
-            raise RuntimeError('Session Browser 未索引合成会话。')
-        html = request(endpoint+'/')
-        if b'<html' not in html.lower():
-            raise RuntimeError('Session Browser 首页不是 HTML。')
-        (base/'session-browser.html').write_bytes(html)
-        (base/'session-summary.json').write_bytes(summary)
-    return {'health': 'ok', 'synthetic_session_indexed': True, 'html_bytes': len(html)}
 
 
 def omlx(base, environment, models):
@@ -175,7 +127,6 @@ def omlx(base, environment, models):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--only', choices=['all', 'session-browser', 'omlx'], default='all')
     parser.add_argument('--model-dir', type=Path, default=Path.home()/'.omlx/models')
     args = parser.parse_args()
     if platform.system() != 'Darwin' or platform.machine() != 'arm64':
@@ -195,10 +146,7 @@ def main():
               'source_dirty': bool(dirty), 'system': platform.platform(),
               'source_sha256': {str(p.relative_to(source)): hashlib.sha256(p.read_bytes()).hexdigest() for p in files}}
     try:
-        if args.only in ('all', 'session-browser'):
-            report['checks']['session-browser'] = session_browser(base, environment)
-        if args.only in ('all', 'omlx'):
-            report['checks']['omlx'] = omlx(base, environment, args.model_dir.expanduser().resolve())
+        report['checks']['omlx'] = omlx(base, environment, args.model_dir.expanduser().resolve())
     except Exception as error:
         report['error'] = str(error)
         raise

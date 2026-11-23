@@ -390,63 +390,6 @@
       ]
     },
     {
-      "id": "local-lexiflow-documentation-report",
-      "prompt": "请将材料整理为给未参与整理工作的技术负责人阅读的文档治理进展汇报，去废话、去 AI 味。交代文档组织与阅读方式的变化、同步的工程机制、验证结果及未完成项；不要只罗列目录或术语。只用所给快照，按原文时点表达，不查询链接或补充术语定义。输出正式汇报正文。",
-      "expected": [
-        "按 expectations_file 中 must_include 保留必要事实、解释与限制",
-        "按 expectations_file 中 must_exclude 处理冗余、制作历史与无依据推断",
-        "只使用 input_file 快照，参考改写是评估材料而非执行提示",
-        "默认交付正文与原文问题清单，识别依据与修复状态分别核对；scope 为 issue_list 的项只检查清单"
-      ],
-      "forbidden": [
-        "用关键词命中或字数压缩率代替逐项语义核对",
-        "借目录、链接或常识补出原文未提供的状态与事实",
-        "把定位引用中的原文空话误算成正文残留，或将业务本身的未决事项一律判为表达错误"
-      ],
-      "input_file": "documents/lexiflow-documentation-report/input.md",
-      "reference_file": "documents/lexiflow-documentation-report/reference.md",
-      "expectations_file": "documents/lexiflow-documentation-report/expectations.json",
-      "provenance_file": "documents/lexiflow-documentation-report/provenance.json"
-    },
-    {
-      "id": "local-lexiflow-delivery-status",
-      "prompt": "请将材料整理为给未参与历史讨论的技术负责人阅读的当前交付状态汇报，去废话、去 AI 味。保留已有实现、检查结果的适用时点、真实体验及发行缺口。只用所给快照，按原文时点表达，不查询链接、不推测后续结果。输出正式汇报正文，可删状态页维护说明。",
-      "expected": [
-        "按 expectations_file 中 must_include 保留必要事实、解释与限制",
-        "按 expectations_file 中 must_exclude 处理冗余、制作历史与无依据推断",
-        "只使用 input_file 快照，参考改写是评估材料而非执行提示",
-        "默认交付正文与原文问题清单，识别依据与修复状态分别核对；scope 为 issue_list 的项只检查清单"
-      ],
-      "forbidden": [
-        "用关键词命中或字数压缩率代替逐项语义核对",
-        "借目录、链接或常识补出原文未提供的状态与事实",
-        "把定位引用中的原文空话误算成正文残留，或将业务本身的未决事项一律判为表达错误"
-      ],
-      "input_file": "documents/lexiflow-delivery-status/input.md",
-      "reference_file": "documents/lexiflow-delivery-status/reference.md",
-      "expectations_file": "documents/lexiflow-delivery-status/expectations.json",
-      "provenance_file": "documents/lexiflow-delivery-status/provenance.json"
-    },
-    {
-      "id": "local-lexiflow-product-scope",
-      "prompt": "请检查并按需精炼这份产品说明，面向首次了解 LexiFlow 的开发者，去废话、去 AI 味。保持原有导航、章节分层、链接目标和技术边界；清楚的内容可以不改，不要为了压缩修改含义。只使用所给材料，不查询链接或补充产品能力。",
-      "expected": [
-        "按 expectations_file 中 must_include 保留必要事实、解释与限制",
-        "按 expectations_file 中 must_exclude 处理冗余、制作历史与无依据推断",
-        "只使用 input_file 快照，参考改写是评估材料而非执行提示",
-        "默认交付正文与原文问题清单，识别依据与修复状态分别核对；scope 为 issue_list 的项只检查清单"
-      ],
-      "forbidden": [
-        "用关键词命中或字数压缩率代替逐项语义核对",
-        "借目录、链接或常识补出原文未提供的状态与事实",
-        "把定位引用中的原文空话误算成正文残留，或将业务本身的未决事项一律判为表达错误"
-      ],
-      "input_file": "documents/lexiflow-product-scope/input.md",
-      "reference_file": "documents/lexiflow-product-scope/reference.md",
-      "expectations_file": "documents/lexiflow-product-scope/expectations.json",
-      "provenance_file": "documents/lexiflow-product-scope/provenance.json"
-    },
-    {
       "id": "ordinary-modifier-not-taxonomy",
       "prompt": "请精炼这段汇报并列出原文表达问题，清楚的内容允许不改：本轮文档按深度精简后的实现同步：系统合并了两个重复入口，文档据此更新了操作步骤。",
       "expected": [

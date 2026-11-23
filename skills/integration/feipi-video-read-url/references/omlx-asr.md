@@ -11,7 +11,7 @@
 
 所有来源的 `whisper` 模式统一使用 `scripts/lib/omlx_transcribe.py`（站点通过同名 `.sh` 包装器）调用本地 `/v1/audio/transcriptions`。本地文件由 `read_local_media.py` 提取首条完整音轨后复用该客户端；没有平台字幕回退。模式名、`.whisper.wav` 和 `whisper_profile` 保留兼容含义，不再使用 whisper.cpp。
 
-默认服务为 `http://127.0.0.1:8037/v1`，可以通过 `AGENT_OMLX_BASE_URL` 指定其他本机 HTTP(S) 端口；仅接受 localhost、127.0.0.1、::1。认证仅通过 `os.environ` 读取 `OMLX_API_KEY`，有值时添加 Bearer 请求头；变量缺失时不从文件补读。skill 不读取 `~/.env` 或其他 dotenv 文件，不主动执行 shell 启动文件，不输出密钥，也不将其写入仓库。请求不经过系统代理。
+默认服务为 `http://127.0.0.1:8000/v1`，可以通过 `AGENT_OMLX_BASE_URL` 指定其他本机 HTTP(S) 端口；仅接受 localhost、127.0.0.1、::1。认证仅通过 `os.environ` 读取 `OMLX_API_KEY`，有值时添加 Bearer 请求头；变量缺失时不从文件补读。skill 不读取 `~/.env` 或其他 dotenv 文件，不主动执行 shell 启动文件，不输出密钥，也不将其写入仓库。请求不经过系统代理。
 
 环境变量应由调用方传入。终端中的 Codex CLI 继承启动它的 shell 已导出的变量；Codex 桌面端应以当前命令环境是否含有该变量为准，不能假设每条命令都会重新执行 `.zshrc`。排查时仅检查变量是否存在，不打印其值；HTTP 401 提示检查 `OMLX_API_KEY`，不展示配置内容。
 

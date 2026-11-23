@@ -58,9 +58,6 @@ brew "whisper.cpp"
 # 本地服务运行时
 brew "podman"
 brew "podman-compose"
-# Multica 固定使用 Docker CLI/Compose 协议连接本机 Podman，不安装 Docker Desktop。
-brew "docker"
-brew "docker-compose"
 
 # 补齐旧机主动安装的工具；第三方 tap 使用全名，首次安装由 Bundle 准备对应 tap。
 tap "sdkman/tap"
@@ -80,6 +77,11 @@ brew "smartmontools"
 brew "svgo"
 brew "tailscale"
 brew "zsh"
+# Codex CLI 统一由 Homebrew 管理，供终端与 Multica 共用。
+cask "codex"
+# Multica Cloud 使用官方 CLI；Bundle 仅信任该配方。
+tap "multica-ai/tap"
+brew "multica-ai/tap/multica", trusted: true
 # 保留旧机主动安装的 Python 3.14；不替换上面的默认 Python。
 brew "python@3.14"
 # Node/Rust 已由 node.sh/rust.sh 管理；Prettier、prettierd、Yarn 由 node.sh 管理。

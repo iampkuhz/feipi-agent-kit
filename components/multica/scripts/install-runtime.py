@@ -19,8 +19,7 @@ parser.add_argument('--remove', action='append', default=[], metavar='RELATIVE_F
 args = parser.parse_args()
 target.mkdir(mode=0o700, parents=True, exist_ok=True)
 target.chmod(0o700)
-files = [source / 'versions.json']
-files += sorted((source / 'scripts').glob('*.py'))
+files = sorted((source / 'scripts').glob('*.py'))
 files += sorted(p for p in (source / 'config').rglob('*') if p.is_file())
 files += sorted(path for path in (source / 'bin').iterdir() if path.is_file())
 manifest = {}

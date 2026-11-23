@@ -58,16 +58,17 @@ def main():
                     '</style></head><body><font face="Noto Sans CJK SC"><h1>New Mac validation</h1>'
                     '<p>新机器文档转换与浏览器验收。</p></font></body></html>', encoding='utf-8')
 
-    def inspect_pdf(name, path):
+    def inspect_pdf(name, path, chinese_fonts):
         if not path.is_file() or path.stat().st_size < 100:
             raise RuntimeError('没有生成有效 PDF：'+path.name)
         text = command(name+'-text', ['pdftotext', path, '-'])
         if 'New Mac validation' not in text or '新机器文档转换与浏览器验收。' not in text:
             raise RuntimeError('PDF 未包含完整中英文验收正文')
         fonts = command(name+'-fonts', ['pdffonts', path])
-        embedded = [line for line in fonts.splitlines() if 'NotoSansCJKsc' in line and 'yes' in line]
-        if not embedded:
-            raise RuntimeError('PDF 未嵌入指定中文字体；即使文字可抽取也可能显示空白')
+        embedded = {fields[0] for line in fonts.splitlines()[2:]
+                    if len(fields := line.split()) >= 6 and fields[-5] == 'yes'}
+        if not any(font in family for family in embedded for font in chinese_fonts):
+            raise RuntimeError('PDF 未嵌入所需的中文字体')
         command(name+'-render', ['pdftoppm', '-f', '1', '-singlefile', '-scale-to', '1000', '-png', path, artifacts/name])
         if not (artifacts/(name+'.png')).is_file():
             raise RuntimeError('PDF 渲染未生成 PNG')
@@ -81,7 +82,7 @@ def main():
                                  '--disable-component-update', '--metrics-recording-only',
                                  '--user-data-dir='+str(artifacts/'chrome-profile'),
                                  '--print-to-pdf='+str(output), html.as_uri()])
-        inspect_pdf('chrome', output)
+        inspect_pdf('chrome', output, ('NotoSansCJKsc', 'PingFangSC'))
 
     def office():
         program = '/Applications/LibreOffice.app/Contents/MacOS/soffice'
@@ -98,7 +99,7 @@ def main():
         report['libreoffice_version'] = command('office-version', [program, '--version'])
         command('office-export', [program, '-env:UserInstallation='+(artifacts/'office-profile').as_uri(),
                                  '--headless', '--convert-to', 'pdf', '--outdir', artifacts, html], env=environment)
-        inspect_pdf('office', artifacts/'sample.pdf')
+        inspect_pdf('office', artifacts/'sample.pdf', ('NotoSansCJKsc',))
 
     def java():
         java_home = Path(command('java-home', ['/usr/libexec/java_home', '-v', '25']))

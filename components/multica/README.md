@@ -1,75 +1,20 @@
-# 本机 Multica 运维
+# Multica Cloud
 
-从仓库根目录用 `./workbench install multica` 安装固定版 CLI 和 Compose。用 `./workbench doctor multica` 查看 personal profile 的 daemon 状态。任务操作使用官方 CLI 或 Web，本机部署维护见下文。
-
-服务采用 Multica v0.6.3，所需官方 Compose 固定到上游提交并保存于 `~/.local/share/multica/server`，Web/API/PostgreSQL 镜像由 `config/compose.pinned.yml` 锁定 digest。`python3 scripts/install-native.py install|check` 准备或核对固定 CLI 和单个 Compose，无需克隆整份上游源码；保留匹配的既有文件，版本或内容冲突即停止。当前目录不保存真实凭据或业务数据。后台运行副本位于 `~/.local/share/multica/ops`，通过 `scripts/install-runtime.py` 发布，避免 launchd 直接读取 Documents 被 macOS 拒绝；运行副本不手工编辑。
-
-## 当前运行选择（2026-11-04）
-
-已回收本机11月1日正式发布的声明：当前仅启用 Codex Builder 及 LexiFlow 的 Coordinator、Validator、Reviewer，机器只绑定 Codex runtime。合并历史能力不重新启用 Qoder、OpenClaw Assistant 或 LiteLLM Coder；相关实现和历史说明保留，启用前需显式补齐声明、机器身份及实际验收。
-
-`acceptance.py` 按当前声明选择代表性角色，不强制运行已停用的角色；已声明但缺少机器绑定仍明确失败。当前完整路径以 Codex Builder 验证任务凭据、执行、回写与附件，不能将10月31日的其他执行器结果当作本次通过。
-
-11月1日已发布的持续监督器、停止等待与局部发布功能一并回收：监督器复用现有 Multica 容器，每60秒检查就绪并维护唯一 daemon；共享 Podman VM 启动脱离 LaunchAgent 进程组。发布前排空任务，启动脚本更新先停止监督器。验收附件按原生下载命令取回，失败时检查返回非零。
-
-## 适配与配置管理（2026-10-31）
-
-`multica-ops plan/apply/verify/doctor` 管理本机部署。普通项目与任务操作默认使用官方 `multica`；`multica-work` 仅为可选本机操作回执，不读取受管 Agent 名单或机器映射。日常操作以 [适配操作手册](docs/adaptation-runbook.md) 为准；Mac mini 单主机切换见 [迁移流程](docs/mac-mini-migration.md)。声明与机器绑定分开；共享 Skill 由 Agent Kit 维护。
-
-任务预检失败可在缺口解除后复用原 request-id；真实请求结果不明仍保留 pending，先 recover 核对运行、评论与附件。实机验收将身份、目录、探针版本、评论线程和下载附件绑定到最新执行；doctor 的静态通过不替代当前运行证据。
-
-## 日常入口
+从仓库根目录执行 `./workbench install mac`，Homebrew 会安装官方 `multica-ai/tap/multica`。把 Mac 接为执行机时，使用官方 CLI 登录并查看 daemon 状态。
 
 ```bash
-multica-service ps
-curl -fsS http://localhost:8080/readyz
-multica-task daemon status
-multica --profile "$profile" --workspace-id "$workspace_id" issue list --project "$project_id"
-multica --profile "$profile" --workspace-id "$workspace_id" issue get "$issue_id"
-multica --profile "$profile" --workspace-id "$workspace_id" issue runs "$issue_id"
+multica setup cloud --profile cloud
+multica daemon status --profile cloud
 ```
 
-网页为 `http://localhost:3000`。`multica-task` 在普通终端、Codex 或 OpenClaw 中使用本机 personal profile；在 Multica 管理的任务内沿用注入的任务认证，不复制个人 token。
+Multica Cloud 提供平台服务。Mac 上的 daemon 执行绑定到本机的任务，登录自启按需使用 `multica daemon autostart enable --profile cloud`。用 `type -a multica` 可以核对终端实际调用的版本。 [官方运行时说明](https://multica.ai/docs/daemon-runtimes)
 
-**当前没有配置 SMTP/Resend，不会发送验证码邮件。** 页面请求登录码后，在本机终端运行 `multica-service logs --tail 30 backend`，读取自己邮箱对应的一次性验证码并填入页面。保持 production 模式，不使用固定验证码。首次账户已建立，注册已关闭并限制为本人的邮箱；以后需要真正邮件投递时再单独配置邮件服务凭据。
+## 仓库维护的配置
 
-创建任务前核对工作区与项目，正文写清目标、范围、来源、验收与交付。以下个人 profile 示例只用于交互终端；后台直接使用注入身份。派发与回执的完整核对步骤见 [Skill 操作参考](../../skills/integration/feipi-multica-manage-tasks/references/operations.md)。
-
-```bash
-multica --profile "$profile" --workspace-id "$workspace_id" issue create --project "$project_id" --title "任务标题" --description-file ./task.md
-# 可选回执；agent_id 从平台查询，不是本机逻辑键
-multica-work dispatch "$issue_id" --project "$project_id" --profile "$profile" --agent "$agent_id" --packet ./handoff.json --request-id "$request_id"
-```
-
-未明确要求后台执行的事项先不指定 Agent；仅记录负责人时使用 `issue assign ... --no-start`。同一事项避免同时在 Codex 客户端和后台 Agent 中重复执行。发布材料与改变状态分开，按整单实际完成情况申请验收；后台遵守当前运行环境的一轮最终评论和线程规则。
-
-## 配置与秘密
-
-`scripts/configure.py --init-secrets` 只在缺失时生成三项 Multica 秘密并追加至现有 `~/.env` 指向的 env vault；保存私有回退副本，之后不轮换原值。服务投影为 `~/.config/multica-selfhost/server.env`，0600。`--email` 设置注册邮箱白名单，首次登录完成后用 `--lock-signup` 关闭新增注册。
-
-服务使用单独的 Docker 匿名认证配置，同时保留本机 Compose plugin 路径。它不覆盖 `~/.docker/config.json` 中其他服务的认证。Compose 进程只继承必要的路径与本机 Docker socket，避免 shell 中其他项目的 POSTGRES_PASSWORD、端口等覆盖本服务投影。仅接受不展开秘密的 `config --quiet/--images/--services`；不要将真实 env 或展开的 Compose 配置粘贴到聊天。
-
-新 Mac 的共享 Brewfile 同时安装 `docker` 和 `docker-compose`，通过 Docker API 使用本机 Podman，无需 Docker Desktop。生成隔离配置时自动发现 Homebrew Compose 插件目录，空白 HOME 也可运行。入口按机器绑定读取运行中 Podman 的实际 Unix socket，不依赖旧机 `/var/run/docker.sock` helper；显式 `DOCKER_HOST` 也只接受存在的本机 Unix socket，不切换远端引擎。
-
-若 Podman 服务端直接拉取慢，可以只为一次拉取设置指向宿主代理的 HTTP_PROXY/HTTPS_PROXY；不更改容器引擎的全局代理。实际拉取结果和本机验收见 `VALIDATION.md`。
-
-## 运维与迁移
-
-前端/API 绑定 loopback，数据库没有宿主端口。CLI 自动升级关闭，初期 daemon 和 Agent 并发都为 1。
-
-已安装 `local.multica.personal` LaunchAgent，负责登录启动、持续服务检查和 daemon 退出恢复；按机器绑定启动已存在的 Podman VM、本服务，等待 API/Web 就绪。不创建或升级容器，当前 Codex 流程不依赖 LiteLLM。管理入口：
-
-```bash
-python3 ~/Documents/tools/llm/feipi-agent-kit/components/multica/scripts/manage-runtime.py status
-python3 ~/Documents/tools/llm/feipi-agent-kit/components/multica/scripts/manage-runtime.py stop
-python3 ~/Documents/tools/llm/feipi-agent-kit/components/multica/scripts/manage-runtime.py start
-```
-
-停止请使用上述 stop；单独 `multica-task daemon stop` 会被守护重新拉起。stop 保留 Web/API。需要维护配置或升级时，先排空运行中的任务。更新本目录 bin、镜像锁定或后台启动脚本后，执行 `scripts/install-runtime.py` 发布运行副本；更新启动定义时先 stop，再运行 `scripts/manage-runtime.py install`。
-
-新机先执行 `python3 scripts/configure.py --personal-profile` 准备原生 CLI 本地设置，再登录并准确 `workspace switch`；完整命令见[迁机手册](docs/mac-mini-migration.md)。install/start 会先核对配置和凭据存在性，缺项不加载 LaunchAgent；stop/status 不依赖登录状态。原生 `auth status` 的成功退出不能证明认证有效。
-
-原 Gateway 可通过 `multica-task` 录入和查询。以下为历史可选 OpenClaw 执行方案：`OpenClaw Assistant` 绑定 `OpenClaw Multica` 自定义 runtime，使用独立状态目录 `~/.local/share/multica/openclaw-state`。`scripts/configure-openclaw.py` 从声明组件读取原模型定义，再合并 LiteLLM 角色；从全局 `~/.env` 只投影三项所需 provider 变量，不复制原渠道、插件或个人记忆。隔离执行端关闭 memory 插件，避免无关 embedding 请求。原 Gateway 不切换入口、不重启。
+- `config/agents.json` 和 `config/instructions/` 维护 Agent 声明、模型、推理档位、并发和角色指令。当前默认声明 Codex Builder。
+- 可选的 `config/machine.example.json` 提供 Cloud 机器绑定示例。使用 `~/.config/feipi-multica/machine.json` 保存准确的 Cloud 工作区、daemon、runtime 和项目 UUID。本机登录态由官方 CLI 管理。
+- 任务操作走官方 `multica` 或 Web。需要本机操作回执时可选用 `multica-work`。配置差异和运行验收见 [操作手册](docs/adaptation-runbook.md)，任务协作见 [Skill 操作参考](../../skills/integration/feipi-multica-manage-tasks/references/operations.md)。
+- 可选的本机工具通过 `python3 scripts/install-runtime.py` 发布到 `~/.local/share/multica/ops`。只用官方 CLI 的机器可以直接通过 Cloud 管理任务。
 
 ## 历史可选方案：LiteLLM Agent
 
@@ -77,7 +22,7 @@ python3 ~/Documents/tools/llm/feipi-agent-kit/components/multica/scripts/manage-
 
 | Multica Agent | OpenClaw Agent ID | LiteLLM 模型别名 | 用途 |
 |---|---|---|---|
-| LiteLLM Coder | litellm-coder | litellm-code-openai | 编码、测试与代码交付 |
+| LiteLLM Coder | litellm-coder | litellm-token-plan-deepseek | 编码、测试与代码交付 |
 
 2026-10-23 实查编码入口上游为 Qwen3.7 Plus；模型上游以后随 LiteLLM 别名路由更新。Agent 并发 1，声明保守的 128000 上下文预算与 8192 最大输出，不配置跨模型回退；没有启用后台 heartbeat。先前创建的 LiteLLM Analyst 已归档，并从运行配置与声明移除；历史验收 TASK-9 保留。原 Codex Builder 保持现有路由。
 
@@ -100,12 +45,6 @@ multica-ops verify
 
 多 Agent 采用显式 ownership；Multica 的 OpenClaw “model” 字段实际是注册 Agent ID，不能直接填 LiteLLM 别名。原 `OpenClaw Assistant` 已显式选择 `main`。生成器会为有变化的私有配置保存回退副本；新配置工具只维护机器绑定中的准确 UUID；旧同步脚本已停用，避免双重配置真源。私有投影和回退副本都不进入 Git。
 
-## 数据备份与版本迁移
+## 历史记录
 
-创建同一任务后通过评论继续，首次代码验收为 TASK-2；OpenClaw 查询验收为 TASK-3。临时 worktree 会被运行时回收，交付应保存在提交/PR、附件或补丁中，不仅记录临时路径。
-
-本机一致性备份（先排空任务）：`python3 scripts/backup.py --apply`。脚本短暂停止 Web/API 写入，导出并校验数据库，复制附件和服务密钥投影，生成校验清单，再恢复原服务。批次在 `~/.local/state/multica/backups`；其中含真实秘密，向 NAS 传输前加密，不能提交 Git。
-
-修改服务 env 后用 `multica-service up -d`，仅 restart 不重新载入环境。升级前先暂停派发、排空任务、停写并保存同批数据库、附件和服务加密密钥；迁移先恢复相同版本再升级。不要复制 CLI 设备身份给第二台机器，Mac mini 重新登录和注册 runtime。
-
-当前单主机流程维护在 [Mac mini 迁移手册](docs/mac-mini-migration.md)；早期迁移工作台仅供历史参考。正式运行和后续恢复状态以本目录 `VALIDATION.md` 为准。
+自建部署及退出前的实机证据见 [历史验收](VALIDATION.md)。本机退役后遗留的数据库卷和附件卷属于私有数据。

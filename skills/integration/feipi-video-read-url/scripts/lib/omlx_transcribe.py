@@ -239,7 +239,7 @@ def main():
     parser.add_argument("--max-seconds", type=float, default=DEFAULT_MAX_SECONDS)
     args = parser.parse_args()
     validate_max_seconds(args.max_seconds)
-    base = os.environ.get("AGENT_OMLX_BASE_URL", "http://127.0.0.1:8037/v1").rstrip("/")
+    base = os.environ.get("AGENT_OMLX_BASE_URL", "http://127.0.0.1:8000/v1").rstrip("/")
     # 明确限制本机，保留用户期望的本地服务边界。
     from urllib.parse import urlsplit
     parsed = urlsplit(base)

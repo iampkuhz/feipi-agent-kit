@@ -34,8 +34,8 @@
 
 ## 安装范围与授权
 
-共享 `Brewfile` 对 SDKMAN 官方 tap 中的 `sdkman/tap/sdkman-cli` 声明配方级信任。
-Homebrew Bundle 会在安装前将该配方写入本机信任记录，信任范围限于该配方。
+共享 `Brewfile` 对官方的 `sdkman/tap/sdkman-cli` 和 `multica-ai/tap/multica` 声明配方级信任。
+Homebrew Bundle 会在安装前将这两个配方写入本机信任记录。
 
 桌面应用按缺项补装，终端实时显示 Homebrew 的下载与安装输出。批量安装设置 `HOMEBREW_NO_SUDO=1`。需要 macOS 系统安装器的 PKG
 列在 `Brewfile.apps.admin`，由本人逐项决定是否安装。查看当前缺项，以及查阅单项 cask 的安装类型：
@@ -70,7 +70,7 @@ oMLX 服务配置由 `config/omlx-service.json` 管理。修改 host、port 或�
 ### 固定桌面应用
 
 `install mac` 还会调用 `bootstrap/desktop-extras.sh install`，补齐固定官方发布包的
-FlClash for oixCloud 0.9.3、oMLX 0.4.4 GUI 和 Session Browser 0.5.2。下载后核对 SHA-256，
+FlClash for oixCloud 0.9.3 和 oMLX 0.4.4 GUI。下载后核对 SHA-256，
 DMG 检查应用身份、版本和代码签名；保留已有安装，不借初始化升级。固定来源与摘要见
 `config/desktop-extras.tsv`，只支持 Apple Silicon；oMLX 区分 macOS 15 与 26/27 包。
 DMG 缺项需要当前用户可写 `/Applications`，否则在下载前提示单独处理。
@@ -83,33 +83,31 @@ oMLX 固定包的应用缺少随包公证票据；安装入口使用 CLT 的 App
 此步骤不影响可在 CLT 前安装 FlClash 的入口。
 安装后用 `bash components/mac/bootstrap/desktop-extras.sh check` 只读检查实际签名、
 oMLX 公证票据及 CLI 入口；实际启动仍需单独验收。
-`session-browser serve` 使用官方自包含 Java runtime，`omlx` 使用应用自带 CLI；
-两者的 HOME 配置、会话数据、模型和真实业务请求另行恢复验收。
+`omlx` 使用应用自带 CLI。模型和真实业务请求另行验收。
 非交互脚本先 `source components/mac/bootstrap/environment.sh`；它和交互 Zsh 都预留 `~/.omlx/bin`，优先使用应用原生入口，尚未打开应用时回退到 `~/.local/bin`。原生入口由 oMLX 创建并读取其数据目录设置；不会为此向 shell 启动文件追加另一份配置。
 恢复三个既用 oMLX 模型后运行 `python3 components/mac/bootstrap/verify-extras.py`：
-用合成 Codex 会话验证原生索引与网页，用随机本机端口验证文本推理及两套语音识别。
+用随机本机端口验证文本推理及两套语音识别。
 仅创建本次隔离状态和公开验证音频，结束清理自有进程，保留私有日志、源码摘要及结果报告。
-可用 `--only session-browser` 或 `--only omlx` 单独复验；模型不在默认位置时传 `--model-dir 路径`。
+模型不在默认位置时传 `--model-dir 路径`。
 参考：[FlClash 官方发布](https://github.com/pickrui/FlClash/releases/tag/v0.9.3)、
 [代理备份范围](https://docs.dler.io/en/flclash/backup.html)、
-[oMLX 官方发布](https://github.com/jundot/omlx/releases/tag/v0.4.4)、
-[Session Browser 官方发布](https://github.com/iampkuhz/feipi-session-browser/releases/tag/v0.5.2)。
+[oMLX 官方发布](https://github.com/jundot/omlx/releases/tag/v0.4.4)。
 
 ## 依赖与配置发布顺序
 
 `install mac` 依次补装 Homebrew 依赖、Node/npm、Rust、Agent CLI、oh-my-zsh、Homebrew 桌面清单和固定发布包。补全在 CLI 就绪后统一生成。
 安装中断时保留已完成的软件，处理报错后重跑。依赖就绪后，同一次安装会发布配置。
 
-全新 nvm 固定安装 Node 24.22.3；已有 nvm default 或系统 Node 保留。当前 Qwen 0.12.3 在 Node 26 上会因内置网络库不兼容而请求失败，即使退出码为 0；验收须检查真实请求和工具产物，不能只检查版本或退出码。
+全新 nvm 安装 Node 24.22.3；已有 nvm default 或系统 Node 保留。Agent CLI 的验收应检查真实请求和工具产物。
 安装完成后再发布应用配置。
 单独执行 ohmyzsh.sh 时，生成补全所需的工具也应已在当前 PATH；全量入口会重新激活 nvm default。
 
-`install mac` 在依赖阶段后运行 `bootstrap/agents.sh install`：Codex 版本从 Multica 的
-`config/agents.json` 兼容声明派生，Qwen 使用固定 npm 包和完整性摘要；Claude/Qoder 使用
-已与旧机程序核对的 Apple Silicon 原生发布包，不通过可漂移的 Homebrew cask 安装 CLI。
-已有相同版本直接保留，其他版本先报冲突，下载摘要或执行版本不符则停止。安装不会复制认证状态，
-完成后还需在新机登录或恢复受支持的 API 配置，再执行真实小任务。
-只读核对：`bash components/mac/bootstrap/agents.sh check`；版本清单见 `config/cli-versions.json`。
+`install mac` 从共享 Homebrew 清单补齐 Codex，并在依赖阶段后运行 `bootstrap/agents.sh install` 补齐其他缺失 CLI。Qwen 使用 npm 的 `latest`，Claude Code 和 Qoder CLI 使用各自的 Homebrew cask。安装后检查 CLI 是否已进入 PATH。版本和发布包校验由各安装渠道管理。
+
+Multica CLI 也由共享 Homebrew 清单安装。登录 Cloud 和检查 daemon 的命令见 [Multica 使用说明](../../multica/README.md#multica-cloud)。
+
+升级 Codex 使用 `brew upgrade --cask codex`。从旧 npm 安装迁移时，先用 `"$(brew --prefix)/bin/codex" --version` 核对 Homebrew 入口，然后在安装了旧包的 Node 环境执行 `npm uninstall -g @openai/codex`。用 `type -a codex` 核对终端入口。Multica 自托管配置如绑定了 npm 路径，改用 Homebrew 的 `bin/codex` 入口，排空任务后重启 daemon。
+新机安装后需登录或配置受支持的 API，再执行真实小任务。只读核对可运行 `bash components/mac/bootstrap/agents.sh check`。
 Agent CLI 就绪后统一补装 oh-my-zsh 插件并生成补全。
 
 安装组件软件前检查配置目录和父路径。发布中断时尝试还原本机目标。
@@ -152,6 +150,8 @@ bash components/mac/bootstrap/neovim.sh
 任务超时或任一检查失败返回非零，保留成功安装项，可修复后重跑；不会打开浏览器或修改业务文件。
 仍可在编辑器中用 `:checkhealth` 和实际项目检查更多功能。
 私密环境变量按自己的安全备份渠道恢复，不在仓库保存真实 `.env`。
+Minuet AI 行内补全需要当前 Neovim 进程收到 `AUTOCOMPLETE_API_BASE`、`AUTOCOMPLETE_API_KEY` 和 `AUTOCOMPLETE_MODEL`。
+缺少任意一项时跳过 AI 补全初始化。补齐后从已加载 `~/.env` 的交互 Zsh 重新打开 Neovim。
 
 HHKB/iTerm2 所需应用与字体已列入 `components/mac/Brewfile.apps`；完整新机安装需要显式安装该清单，
 `workbench install mac` 会复制仓库配置。
@@ -163,8 +163,9 @@ HHKB/iTerm2 所需应用与字体已列入 `components/mac/Brewfile.apps`；完�
 python3 components/mac/bootstrap/verify-apps.py
 ```
 
-它用独立临时浏览器/Office Profile 导出中英文 PDF，检查正文及中文字体嵌入，渲染 PNG；
-另用 JDK 25 编译并运行小程序。报告、日志、源码版本和产物保存在
+它用独立临时浏览器和 Office Profile 导出中英文 PDF，检查正文及中文字体嵌入并渲染 PNG。
+Chrome 可嵌入 Noto Sans CJK SC 或系统苹方，LibreOffice 须嵌入 Noto Sans CJK SC。
+Java 验收用本机 JDK 25 编译并运行小程序。报告、日志、源码版本和产物保存在
 `~/.local/state/feipi-workbench/validation/mac-apps-*`。此检查不代表各客户端登录或键盘权限已完成。
 共享清单显式包含 Fontconfig，应用清单包含 Noto Sans CJK SC；新终端默认使用 Homebrew 的
 `fonts.conf`，保留已有 `FONTCONFIG_FILE`。非交互验收也显式使用同一配置，避免 LibreOffice

@@ -2,7 +2,7 @@
 
 ## 目标
 - 用仓库管理可复用的 `~/.qwen/` 配置，避免把机器状态或密钥入库。
-- `workbench install mac` 用 Stow 链接 `.qwen/` 下的公开配置。`settings.example.json` 保留在发布目录之外，主配置由本机维护，可包含认证与 `codingPlan` 字段。
+- `workbench install mac` 用 Stow 链接 `.qwen/` 下的公开配置。`settings.example.json` 保留在发布目录之外，主配置由本机维护。
 
 ## 已纳入的配置
 - `./settings.example.json`
@@ -20,10 +20,10 @@
 
 ## 密钥与本地覆盖
 - `settings.example.json` 使用环境变量名引用密钥。
-- 请在本机环境变量中提供密钥，例如（示例）：
+- 示例配置通过本机 LiteLLM 调用百炼 Token Plan。客户端密钥来自 LiteLLM Virtual Keys，需允许 `litellm-token-plan-deepseek`。
 
 ```bash
-export BAILIAN_CODING_PLAN_API_KEY="YOUR_KEY"
+export LITELLM_API_KEY_OPENAI="YOUR_LITELLM_VIRTUAL_KEY"
 ```
 
 ## 变更说明

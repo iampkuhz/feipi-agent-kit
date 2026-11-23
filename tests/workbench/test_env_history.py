@@ -22,6 +22,7 @@ class EnvHistory(unittest.TestCase):
         self.home = Path(self.scratch.name).resolve()/'新用户'
         self.home.mkdir()
         self.repo = self.home/'.local/state/feipi-workbench/env-history.git'
+        self.target = self.home/'.local/state/feipi-workbench/env-history/.env'
 
     def snapshot(self):
         result = subprocess.run([sys.executable, SCRIPT], check=True, capture_output=True,
@@ -56,12 +57,15 @@ class EnvHistory(unittest.TestCase):
         self.assertFalse((self.home/'other.git').exists())
         self.assertFalse((self.repo/'.env').exists())
 
-    def test_install_writes_schedule_even_without_env_and_loads_it_once(self):
+    def test_install_creates_link_and_watches_both_paths(self):
         domain = 'gui/'+str(os.getuid())
         label = domain+'/'+history.LABEL
         calls = []
+        run = subprocess.run
 
         def launch(args, **kwargs):
+            if args[0] != '/bin/launchctl':
+                return run(args, **kwargs)
             calls.append(args)
             if args[1:3] == ['print', label]:
                 status = 0 if any(command[1] == 'bootstrap' for command in calls) else 1
@@ -75,8 +79,36 @@ class EnvHistory(unittest.TestCase):
         plist = self.home/'Library/LaunchAgents'/(history.LABEL+'.plist')
         definition = plistlib.loads(plist.read_bytes())
         self.assertEqual(definition['ProgramArguments'][1:], [str(SCRIPT)])
-        self.assertEqual(definition['WatchPaths'], [str(self.home/'.env')])
+        self.assertEqual(definition['WatchPaths'], [str(self.home/'.env'), str(self.target)])
         self.assertTrue(definition['RunAtLoad'])
         self.assertEqual(definition['StartInterval'], 60)
         self.assertEqual([args[1:] for args in calls if args[1] != 'print'], [['bootstrap', domain, str(plist)]])
-        self.assertFalse(self.repo.exists())
+        self.assertTrue((self.home/'.env').is_symlink())
+        self.assertEqual((self.home/'.env').resolve(), self.target)
+        self.assertEqual(self.target.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(self.git('rev-list', '--count', 'HEAD'), b'1\n')
+        self.assertEqual(self.git('show', 'HEAD:.env'), b'')
+
+    def test_adopts_existing_file_and_keeps_history(self):
+        source = self.home/'.env'
+        source.write_bytes(b'FIXTURE=value\n')
+        source.chmod(0o644)
+        self.snapshot()
+        before = self.git('rev-parse', 'HEAD')
+        history.ensure_env_link(self.home)
+        self.snapshot()
+        self.assertEqual(source.resolve(), self.target)
+        self.assertEqual(source.read_bytes(), b'FIXTURE=value\n')
+        self.assertEqual(self.target.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(self.git('rev-parse', 'HEAD'), before)
+
+    def test_conflicting_existing_files_are_preserved(self):
+        source = self.home/'.env'
+        source.write_bytes(b'active\n')
+        self.target.parent.mkdir(mode=0o700, parents=True)
+        self.target.write_bytes(b'other\n')
+        with self.assertRaisesRegex(ValueError, '两份文件均已保留'):
+            history.ensure_env_link(self.home)
+        self.assertFalse(source.is_symlink())
+        self.assertEqual(source.read_bytes(), b'active\n')
+        self.assertEqual(self.target.read_bytes(), b'other\n')

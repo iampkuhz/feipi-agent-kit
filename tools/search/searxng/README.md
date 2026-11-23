@@ -28,17 +28,17 @@ tools/search/searxng/
 ### 1. 启动服务
 
 ```bash
-cd tools/search/searxng
-./scripts/searxng.sh up
+./workbench install services
+./workbench service searxng up
 ```
 
-说明：`compose/docker-compose.yml` 已固定 Compose 项目名为 `searxng`，避免和仓库里其它 `tools/**/compose` 目录的服务共享默认的 `compose` 项目名。
+在仓库根目录运行，服务默认只监听 `127.0.0.1:8873`。Compose 项目名固定为 `searxng`。
 
 ### 2. 验证启动
 
 ```bash
 # 检查容器状态
-podman compose -f compose/docker-compose.yml ps
+./workbench service searxng status
 
 # 检查健康端点
 curl http://localhost:8873/healthz
@@ -78,7 +78,7 @@ engines:
   - name: google
     enabled: true
   - name: bing
-    enabled: true
+    disabled: false
 ```
 
 ### 搜索引擎分类
@@ -101,7 +101,7 @@ engines:
 # 停止
 ./scripts/searxng.sh down
 
-# 重启
+# 按当前 Compose 配置重建并启动
 ./scripts/searxng.sh restart
 
 # 查看日志

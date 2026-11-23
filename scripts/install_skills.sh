@@ -76,18 +76,23 @@ heading() {
 }
 
 print_counts() {
-  local installed_style=2 updated_style=2 warning_style=2
+  local installed_style=2 updated_style=2 deleted_style=2 warning_style=2
   if [[ "$2" -gt 0 ]]; then installed_style='1;32'; fi
   if [[ "$3" -gt 0 ]]; then updated_style='1;34'; fi
-  if [[ "$5" -gt 0 ]]; then warning_style='1;33'; fi
+  if [[ "$4" -gt 0 ]]; then deleted_style='1;33'; fi
+  if [[ "$7" -gt 0 ]]; then warning_style='1;33'; fi
   styled 1 "$1"
   styled "$installed_style" "新增 $2"
   printf ' · '
   styled "$updated_style" "更新 $3"
   printf ' · '
-  styled 2 "跳过 $4"
+  styled "$deleted_style" "删除 $4"
   printf ' · '
-  styled "$warning_style" "警告 $5"
+  styled 2 "保留 $5"
+  printf ' · '
+  styled 2 "跳过 $6"
+  printf ' · '
+  styled "$warning_style" "警告 $7"
   printf '\n'
 }
 
@@ -614,13 +619,14 @@ cleanup_retired_skills() {
   local repository_origin
   repository_origin="$(git -C "$REPO_ROOT" config --get remote.origin.url 2>/dev/null || true)"
   local use_color=false
-  if color_enabled; then use_color=true; fi
+  if color_enabled >&3; then use_color=true; fi
   FEIPI_INSTALL_COLOR="$use_color" \
     python3 - "$SRC_ROOT" "$dest_root" "$INSTALL_SOURCE_MARKER" "$repository_origin" "$@" <<'PYEOF'
 import json
 import os
 from pathlib import Path
 import shutil
+import subprocess
 import sys
 from urllib.parse import urlsplit
 
@@ -628,6 +634,19 @@ source_root = Path(os.path.realpath(sys.argv[1]))
 destination = Path(sys.argv[2])
 marker_name = sys.argv[3]
 active_names = {Path(source).name for source in sys.argv[5:]}
+
+
+def historical_skill_names():
+    # 同名只用于决定是否提示保留，不能证明安装来源。
+    try:
+        history = subprocess.run(
+            ["git", "-C", str(source_root.parent), "log", "--format=", "--name-only", "-z",
+             "--no-renames", "HEAD", "--", ":(glob)skills/*/SKILL.md", ":(glob)skills/*/*/SKILL.md"],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return set()
+    return {Path(os.fsdecode(path)).parent.name for path in history.stdout.split(b"\0") if path}
 
 
 def repository_identity(url):
@@ -720,34 +739,34 @@ def belongs_to_repository(entry):
     )
 
 
+progress = os.fdopen(3, "w", encoding=sys.stdout.encoding, errors=sys.stdout.errors)
+
+
 def report(label, text, style):
     badge = f"[{label}]"
     if os.environ["FEIPI_INSTALL_COLOR"] == "true":
         badge = f"\033[{style}m{badge}\033[0m"
-    print(f"  {badge} {text}", flush=True)
+    print(f"  {badge} {text}", file=progress, flush=True)
 
 
-cleaned = 0
+historical_names = historical_skill_names()
+deleted = 0
 preserved = 0
 for entry in sorted(destination.iterdir()):
     if entry.name.startswith(".") or entry.name in active_names:
         continue
     if not belongs_to_repository(entry):
-        reason = "无法确认属于本仓库"
-        if not entry.is_symlink() and os.path.lexists(entry / ".openclaw/source-origin.json"):
-            reason = "OpenClaw 来源不属于本仓库或记录无效"
-        elif entry.is_dir() and not entry.is_symlink() and not os.path.lexists(entry / marker_name):
-            reason = "无来源标记，内部链接不足以确认归属"
-        report("保留", f"{entry}（{reason}）", "2")
-        preserved += 1
+        if entry.name in historical_names:
+            report("保留", f"{entry}（与仓库历史 Skill 同名，无法确认归属）", "2")
+            preserved += 1
         continue
     if entry.is_symlink():
         entry.unlink()
     else:
         shutil.rmtree(entry)
-    report("清理", f"已移除本仓库旧入口：{entry}", "1;33")
-    cleaned += 1
-report("清理", f"移除 {cleaned} · 保留 {preserved}（其他来源或归属未确认）", "2")
+    report("删除", f"已移除本仓库旧入口：{entry}", "1;33")
+    deleted += 1
+print(f"{deleted} {preserved}")
 PYEOF
 }
 
@@ -822,9 +841,16 @@ install_skills() {
     done < <(collect_all_skills "$SRC_ROOT")
   fi
 
-  if [[ -z "$SKILL_NAME" ]] && ! cleanup_retired_skills "$dest_root" "${skill_paths[@]}"; then
-    status_line failed "清理旧入口失败：$dest_root" >&2
-    return 1
+  local deleted=0 preserved=0 cleanup_counts
+  if [[ -z "$SKILL_NAME" ]]; then
+    # 只捕获计数，明细经 FD 3 实时写到原来的 stdout。
+    if ! { cleanup_counts="$(cleanup_retired_skills "$dest_root" "${skill_paths[@]}")"; } 3>&1; then
+      status_line failed "清理旧入口失败：$dest_root" >&2
+      return 1
+    fi
+    read -r deleted preserved <<< "$cleanup_counts"
+    total_deleted=$((total_deleted + deleted))
+    total_preserved=$((total_preserved + preserved))
   fi
 
   local installed=0
@@ -870,11 +896,13 @@ install_skills() {
     done <<< "$shared_roots_text"
   fi
 
-  print_counts "  小计：" "$installed" "$updated" "$skipped" "$warnings"
+  print_counts "  小计：" "$installed" "$updated" "$deleted" "$preserved" "$skipped" "$warnings"
 }
 
 total_installed=0
 total_updated=0
+total_deleted=0
+total_preserved=0
 total_skipped=0
 total_warnings=0
 
@@ -947,7 +975,7 @@ else
 fi
 
 echo ""
-print_counts "总计：" "$total_installed" "$total_updated" "$total_skipped" "$total_warnings"
+print_counts "总计：" "$total_installed" "$total_updated" "$total_deleted" "$total_preserved" "$total_skipped" "$total_warnings"
 if [[ "$total_warnings" -gt 0 ]]; then
   status_line warning "有 ${total_warnings} 项因警告跳过，请查看上方原因。"
 fi

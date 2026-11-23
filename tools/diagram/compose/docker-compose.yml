@@ -1,0 +1,14 @@
+name: feipi-diagrams
+
+services:
+  plantuml:
+    image: docker.io/plantuml/plantuml-server:jetty-v1.2026.10
+    environment:
+      PLANTUML_SECURITY_PROFILE: SANDBOX
+    ports:
+      - "127.0.0.1:8199:8080"
+
+  mermaid:
+    image: docker.io/yuzutech/kroki-mermaid:0.36.0
+    ports:
+      - "127.0.0.1:8201:8002"

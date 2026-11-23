@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 # 任务上下文必须完整；不能因环境被过滤而退回个人身份。
-cli="${MULTICA_CLI_BIN:-$HOME/.local/bin/multica}"
+cli="${MULTICA_CLI_BIN:-multica}"
 if [[ -n "${MULTICA_TOKEN:-}${MULTICA_TASK_ID:-}${MULTICA_AGENT_ID:-}${MULTICA_WORKSPACE_ID:-}${MULTICA_TASK_CONFIG_ROOT:-}" ]]; then
   for name in MULTICA_TOKEN MULTICA_TASK_ID MULTICA_AGENT_ID MULTICA_WORKSPACE_ID MULTICA_SERVER_URL; do
     if [[ -z "${!name:-}" ]]; then
@@ -15,4 +15,7 @@ if [[ -n "${MULTICA_TOKEN:-}${MULTICA_TASK_ID:-}${MULTICA_AGENT_ID:-}${MULTICA_W
   fi
   exec "$cli" "$@"
 fi
-exec "$cli" --profile "${MULTICA_PERSONAL_PROFILE:-personal}" "$@"
+if [[ -n "${MULTICA_PERSONAL_PROFILE:-}" ]]; then
+  exec "$cli" --profile "$MULTICA_PERSONAL_PROFILE" "$@"
+fi
+exec "$cli" "$@"

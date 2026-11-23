@@ -43,7 +43,7 @@ def task_identity(profile=None, workspace_id=None, server_url=None):
 
 def machine():
     path = Path(os.environ.get('MULTICA_MACHINE_CONFIG',
-                              str(Path.home() / '.config/multica-selfhost/machine.json')))
+                              str(Path.home() / '.config/feipi-multica/machine.json')))
     value = json.loads(path.read_text())
     if value.get('schema') != 1 or not isinstance(value.get('projects'), dict):
         raise ContextError('机器绑定缺少 schema=1 或 projects；请使用 Multica 运维入口配置。')

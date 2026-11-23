@@ -1,9 +1,9 @@
 {
-  "openclaw": "2026.9.2",
+  "openclaw": "2026.11.5",
   "plugins": {
     "qwen": {
       "package": "@openclaw/qwen-provider",
-      "version": "2026.9.2"
+      "version": "2026.11.5"
     },
     "openclaw-weixin": {
       "package": "@tencent-weixin/openclaw-weixin",

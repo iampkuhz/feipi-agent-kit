@@ -135,7 +135,7 @@ python3 <本 skill>/scripts/extract_content.py '<URL>' '<OUTPUT_DIR>'
 3. 转写严格性（强制）
 - 统一调用本 skill 的 `scripts/lib/omlx_transcribe.sh`，通过本地 oMLX `/v1/audio/transcriptions` 识别。
 - 默认和 `fast` 使用 `sensevoicesmall`（SenseVoiceSmall）；`accurate` 使用 `qwen3-asr-1.7b`（Qwen3-ASR-1.7B）。按 `/v1/models` 解析实际模型 ID；缺失或同一家族多个候选时明确失败，不切换其他模型。
-- 服务默认 `http://127.0.0.1:8037/v1`；自定义本机端口用 `AGENT_OMLX_BASE_URL`，认证仅从进程环境读取 `OMLX_API_KEY`。不得读取 `~/.env` 等配置文件、主动执行 shell 启动文件或输出密钥。运行时不启动服务、不下载模型、不改 oMLX 配置。
+- 服务默认 `http://127.0.0.1:8000/v1`；自定义本机端口用 `AGENT_OMLX_BASE_URL`，认证仅从进程环境读取 `OMLX_API_KEY`。不得读取 `~/.env` 等配置文件、主动执行 shell 启动文件或输出密钥。运行时不启动服务、不下载模型、不改 oMLX 配置。
 - 必须通过 `scripts/extract_video_text.sh` 获取文本，禁止手写其他识别命令。`whisper` 模式名、`whisper_profile` 字段与 `.whisper.wav` 文件名仅作兼容。
 - 音频默认优先在停顿处切成不超过 30 秒的连续无重叠块，找不到合适停顿时按上限切开。切分脚本只有 `--max-seconds` 一个可调配置，不提供试听模式。时间戳表示音频块范围，并非逐句或逐字对齐；来源状态必须披露“oMLX 模型名、约30秒块级时间戳、识别风险”。只有全部块请求完成才交付文本；全空转写失败，不用标题补正文。详见 [oMLX 转写配置](references/omlx-asr.md)。
 

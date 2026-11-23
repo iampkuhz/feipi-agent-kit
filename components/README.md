@@ -5,7 +5,7 @@
 | 目录 | 本次引入来源 HEAD | 保留方式 |
 | --- | --- | --- |
 | mac | dotfiles `71cf9f683b70a08092ceed2114dc4926e0f43e09` | 带入原未提交 bootstrap/Zsh 改进；运行副本与研发目录分开 |
-| multica | multica-ops `b2c71500a8d7749b83ffb0588867b44378773911` | 带入原适配/任务工作；继续复用 ops 发布及数据库备份 |
+| multica | multica-ops `b2c71500a8d7749b83ffb0588867b44378773911` | 保留 Cloud Agent 声明、任务工具和验收记录 |
 | openclaw | 新 feipi-openclaw `735a1861b0cc6aa2b3b47c4cac3a10fb67b3818d` | 带入原微信/成长日记等工作；保留原状态与版本锁定 |
 | openclash | 路由器实际活动模块 | 只收无凭据模块及操作脚本；最小配置备份在私有 HOME |
 

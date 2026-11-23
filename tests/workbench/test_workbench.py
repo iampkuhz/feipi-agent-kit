@@ -15,35 +15,15 @@ spec.loader.exec_module(wb)
 
 
 class Recovery(unittest.TestCase):
-    def test_multica_install_only_prepares_native_files(self):
-        with tempfile.TemporaryDirectory(prefix='feipi multica install ') as directory:
-            home = Path(directory)
-            with patch.object(wb, 'HOME', home), patch.object(wb, 'run') as run, patch.object(wb, 'rollback_on_failure') as rollback:
-                wb.install('multica')
-            run.assert_called_once_with([wb.sys.executable, wb.ROOT/'components/multica/scripts/install-native.py', 'install'])
-            rollback.assert_not_called()
-            self.assertEqual(list(home.iterdir()), [])
-
-    def test_multica_doctor_reads_native_status_without_receipt(self):
-        with tempfile.TemporaryDirectory(prefix='feipi multica status ') as directory:
-            home = Path(directory)
-            native = home/'.local/bin/multica'
-            native.parent.mkdir(parents=True)
-            native.touch()
-            native.chmod(0o700)
-            with patch.object(wb, 'HOME', home), patch.object(wb, 'STATE', home/'state'), \
-                    patch.object(wb, 'differences') as diff, patch('builtins.print'), \
-                    patch.object(wb.subprocess, 'run') as run:
-                run.return_value = subprocess.CompletedProcess([], 0, '{"status":"running"}')
-                self.assertEqual(wb.doctor('multica'), 0)
-                run.assert_called_once_with(
-                    [str(native), '--profile', 'personal', 'daemon', 'status', '--output', 'json'],
+    def test_multica_is_not_a_standalone_component(self):
+        for action in ('install', 'doctor'):
+            with self.subTest(action=action):
+                result = subprocess.run(
+                    [str(wb.ROOT/'workbench'), action, 'multica'],
                     capture_output=True, text=True, timeout=10,
                 )
-                run.return_value = subprocess.CompletedProcess([], 0, '{"status":"stopped"}')
-                self.assertEqual(wb.doctor('multica'), 1)
-                diff.assert_not_called()
-            self.assertFalse((home/'state').exists())
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("invalid choice: 'multica'", result.stderr)
 
     def test_service_does_not_forward_unlisted_operations(self):
         with patch.object(wb, 'run') as run:
@@ -55,29 +35,48 @@ class Recovery(unittest.TestCase):
                     wb.service(component, args)
             run.assert_not_called()
 
-    def test_startup_failure_restores_all_managed_plists_including_session_browser(self):
+    def test_openclaw_up_uses_native_service_and_waits_on_its_local_port(self):
+        for installed, state, operation in [(False, 'stopped', 'install'),
+                                            (True, 'stopped', 'start'),
+                                            (True, 'running', None)]:
+            with self.subTest(operation=operation), patch.object(wb, 'openclaw_status') as status, \
+                    patch.object(wb, 'run') as run, patch.object(wb, 'wait_service') as wait:
+                status.return_value = {
+                    'gateway': {'bindMode': 'loopback', 'port': 18790},
+                    'service': {'command': {'sourcePath': 'exists'} if installed else None,
+                                'runtime': {'status': state}},
+                }
+                wb.service('openclaw', ['up'])
+                if operation:
+                    run.assert_called_once_with(wb.openclaw_gateway(operation), timeout=60)
+                else:
+                    run.assert_not_called()
+                wait.assert_called_once_with('openclaw', 'http://127.0.0.1:18790/readyz', seconds=45)
+
+    def test_openclaw_down_confirms_native_stop(self):
+        with patch.object(wb, 'run') as run:
+            wb.service('openclaw', ['down'])
+        run.assert_called_once_with(wb.openclaw_gateway('stop', '--force'), timeout=60)
+
+    def test_startup_failure_restores_managed_plist(self):
         with tempfile.TemporaryDirectory(prefix='feipi startup ') as scratch:
             root = Path(scratch); runtime = root/'runtime'; home = root/'home'
             script = runtime/'services/tools/runtime/startup.py'
             script.parent.mkdir(parents=True); script.write_text('fixture')
             agents = home/'Library/LaunchAgents'
             agents.mkdir(parents=True)
-            labels = ['com.feipi.podman-services', 'com.feipi.session-browser']
-            plists = [agents/(label+'.plist') for label in labels]
-            for plist in plists:
-                plist.write_text('original '+plist.name)
+            plist = agents/'com.feipi.podman-services.plist'
+            plist.write_text('original')
 
             def fail_after_writing(_):
-                for plist in plists:
-                    plist.write_text('changed')
+                plist.write_text('changed')
                 raise subprocess.CalledProcessError(1, 'install')
 
             with patch.object(wb, 'HOME', home), patch.object(wb, 'RUNTIME', runtime), \
                     patch.object(wb, 'run', side_effect=fail_after_writing), \
                     self.assertRaises(subprocess.CalledProcessError):
                 wb.service('startup', ['install'])
-            for plist in plists:
-                self.assertEqual(plist.read_text(), 'original '+plist.name)
+            self.assertEqual(plist.read_text(), 'original')
 
     def test_mac_doctor_detects_installed_nvm_node_outside_inherited_path(self):
         from types import SimpleNamespace

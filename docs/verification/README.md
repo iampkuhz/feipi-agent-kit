@@ -21,6 +21,7 @@
 | SearXNG | `./workbench service searxng up` | `curl -fsS http://127.0.0.1:8873/healthz` |
 | LiteLLM | `./workbench service litellm up` | `curl -fsS http://127.0.0.1:4000/health/readiness` |
 | Crawl4AI | `./workbench service crawl4ai up` | `curl -fsS http://127.0.0.1:11235/health` |
+| FastMCP | `./workbench service fastmcp up` | `bash runtimes/fastmcp/scripts/test_searxng_mcp.sh` |
 | OTel | `./workbench service otel up` | `./workbench service otel status` |
 
 ## 验证功能

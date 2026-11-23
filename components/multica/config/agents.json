@@ -1,9 +1,5 @@
 {
   "schema": 1,
-  "compatibility": {
-    "multica": "0.6.3",
-    "codex": "0.162.1"
-  },
   "agents": [
     {
       "key": "codex-builder",
@@ -13,37 +9,9 @@
       "thinking_level": "high",
       "max_concurrent_tasks": 1,
       "instructions": "config/instructions/codex-builder.md"
-    },
-    {
-      "key": "coordinator",
-      "name": "Codex Coordinator",
-      "runtime": "codex",
-      "model": "gpt-6.1-sol",
-      "thinking_level": "xhigh",
-      "max_concurrent_tasks": 1,
-      "instructions": "config/instructions/coordinator.md"
-    },
-    {
-      "key": "validator",
-      "name": "Codex Validator",
-      "runtime": "codex",
-      "model": "gpt-6-luna",
-      "thinking_level": "medium",
-      "max_concurrent_tasks": 1,
-      "instructions": "config/instructions/validator.md"
-    },
-    {
-      "key": "reviewer",
-      "name": "Codex Reviewer",
-      "runtime": "codex",
-      "model": "gpt-6-luna",
-      "thinking_level": "medium",
-      "max_concurrent_tasks": 1,
-      "instructions": "config/instructions/reviewer.md"
     }
   ],
   "projects": [
-    "lexiflow",
     "asd"
   ],
   "skill": {

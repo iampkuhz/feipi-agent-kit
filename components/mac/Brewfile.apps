@@ -9,7 +9,7 @@ cask "font-jetbrains-mono"
 cask "font-jetbrains-mono-nerd-font"
 # 冷安装中 LibreOffice 的系统字体回退会丢失中文；提供可嵌入的中文文档字体。
 cask "font-noto-sans-cjk-sc"
-# 仅安装 ChatGPT 桌面应用；Codex CLI 由锁定版本的命令行入口管理。
+# ChatGPT 桌面应用在此安装，终端使用的 Codex CLI 见共享 Brewfile。
 cask "chatgpt"
 cask "visual-studio-code"
 cask "intellij-idea"
@@ -52,6 +52,6 @@ cask "itsycal"
 cask "menumeters"
 cask "openinterminal"
 
-# 不重复安装 codex/claude-code/qodercli，统一使用 bootstrap/agents.sh。
-# temurin@25 见管理员审核清单；FlClash/oMLX/Session Browser 使用 desktop-extras.sh。
+# Codex CLI 见共享 Brewfile；Claude Code 与 Qoder CLI 由 bootstrap/agents.sh 按需补装。
+# temurin@25 见管理员审核清单；FlClash 和 oMLX 使用 desktop-extras.sh。
 # Chromium 只剩旧安装元数据且当前 cask 已停用，不作为可恢复的软件安装。

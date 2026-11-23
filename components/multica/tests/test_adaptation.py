@@ -107,7 +107,9 @@ class Authentication(unittest.TestCase):
         return subprocess.run([str(ROOT / 'bin/multica-task'), 'issue', 'list'], env=env, capture_output=True, text=True)
     def test_personal(self):
         p = self.call(self.env)
-        self.assertEqual(p.stdout.splitlines(), ['--profile', 'personal', 'issue', 'list'])
+        self.assertEqual(p.stdout.splitlines(), ['issue', 'list'])
+        p = self.call(dict(self.env, MULTICA_PERSONAL_PROFILE='cloud'))
+        self.assertEqual(p.stdout.splitlines(), ['--profile', 'cloud', 'issue', 'list'])
     def test_complete_task_and_each_missing_field(self):
         fields = dict(MULTICA_TOKEN='mat_test_secret', MULTICA_TASK_ID='t', MULTICA_AGENT_ID='a', MULTICA_WORKSPACE_ID='w', MULTICA_SERVER_URL='http://localhost')
         p = self.call(dict(self.env, **fields))
@@ -131,18 +133,18 @@ class Bindings(unittest.TestCase):
 
     def test_codex_doctor_does_not_probe_disabled_runtimes(self):
         with tempfile.TemporaryDirectory() as root:
-            m = {'agent_kit': root, 'server_url': 'http://localhost', 'workspace_id': 'workspace',
-                 'profile': 'personal', 'commands': {'codex': '/test/codex'}, 'projects': {}}
-            c = {'agents': [{'key': 'codex-builder', 'runtime': 'codex'}],
-                 'compatibility': {'codex': 'test-version'}, 'skill_checks': []}
+            m = {'agent_kit': root, 'server_url': 'https://api.multica.ai', 'workspace_id': 'workspace',
+                 'profile': 'cloud', 'commands': {'codex': '/test/codex'}, 'projects': {}}
+            c = {'agents': [{'key': 'codex-builder', 'runtime': 'codex'}], 'skill_checks': []}
             def read(path, default=None):
                 return {'server_url': m['server_url'], 'workspace_id': 'workspace', 'max_concurrent_tasks': 1} if str(path).endswith('config.json') else (default or {})
             response = subprocess.CompletedProcess([], 0, stdout='test-version', stderr='')
-            with patch.object(adapt, 'machine', return_value=m), patch.object(adapt, 'catalog', return_value=c), patch.object(adapt, 'read_json', side_effect=read), patch.object(adapt.subprocess, 'run', return_value=response), patch.object(adapt.urllib.request, 'urlopen') as http, patch.object(adapt.shutil, 'which', return_value='/test/codex'), patch.object(adapt, 'build_plan', return_value={'actions': []}), patch.object(adapt, 'public_plan', return_value={}), patch.object(adapt, 'evidence_fingerprint', return_value='fingerprint'):
-                http.return_value.__enter__.return_value.status = 200
+            with patch.object(adapt, 'machine', return_value=m), patch.object(adapt, 'catalog', return_value=c), patch.object(adapt, 'read_json', side_effect=read), patch.object(adapt.subprocess, 'run', return_value=response) as run, patch.object(adapt.urllib.request, 'urlopen') as http, patch.object(adapt.shutil, 'which', return_value='/test/codex'), patch.object(adapt, 'build_plan', return_value={'actions': []}), patch.object(adapt, 'public_plan', return_value={}), patch.object(adapt, 'evidence_fingerprint', return_value='fingerprint'):
                 result = adapt.doctor()
             self.assertTrue(result['static_ok'])
-            self.assertEqual(http.call_count, 1)
+            http.assert_not_called()
+            version_calls = [call.args[0] for call in run.call_args_list if '--version' in call.args[0]]
+            self.assertEqual(version_calls, [['multica', '--version']])
             self.assertNotIn('openclaw-isolated', [v['check'] for v in result['checks']])
 
     def test_idle_audit_reads_later_pages(self):

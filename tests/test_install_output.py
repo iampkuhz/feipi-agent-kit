@@ -136,8 +136,9 @@ class InstallOutputTests(unittest.TestCase):
         self.assertIsNone(shutil.which(executable, path=env["PATH"]))
         return env
 
-    def assert_counts(self, output, added=0, updated=0, skipped=0, warnings=0):
-        self.assertIn(f"总计：新增 {added} · 更新 {updated} · 跳过 {skipped} · 警告 {warnings}", output)
+    def assert_counts(self, output, added=0, updated=0, deleted=0, preserved=0, skipped=0, warnings=0):
+        self.assertIn(f"总计：新增 {added} · 更新 {updated} · 删除 {deleted} · 保留 {preserved}"
+                      f" · 跳过 {skipped} · 警告 {warnings}", output)
 
     def test_single_skill_preserves_other_entries_and_skips_unrelated_dependencies(self):
         self.run_installer('--copy', '--agent', 'codex')
@@ -207,17 +208,19 @@ class InstallOutputTests(unittest.TestCase):
         installed_metadata = self.codex / "skills/feipi-one/agents/openai.yaml"
         self.assertEqual(installed_metadata.read_text(encoding="utf-8"), "version: 2\n")
 
-    def test_default_shows_skip_and_preservation_reasons(self):
+    def test_unrelated_skills_are_silently_ignored(self):
         self.run_installer('--agent', 'codex')
         foreign = self.codex / "skills/foreign-skill"
         foreign.mkdir()
+        entry = foreign / "SKILL.md"
+        entry.write_text("third-party skill")
         result = self.run_installer('--agent', 'codex')
         self.assertIn("[跳过] feipi-one（内容未变）", result.stdout)
         self.assertIn("[跳过] 共享/shared（链接未变）", result.stdout)
-        self.assertIn(f"[保留] {foreign}（无来源标记", result.stdout)
+        self.assertNotIn(foreign.name, result.stdout + result.stderr)
         self.assertIn("注册表及目录一致", result.stdout)
         self.assert_counts(result.stdout, skipped=3)
-        self.assertTrue(foreign.is_dir())
+        self.assertEqual(entry.read_text(), "third-party skill")
 
     def test_source_marker_is_stable_across_umask_in_copy_and_link_modes(self):
         for options in (('--copy',), ()):
@@ -238,14 +241,15 @@ class InstallOutputTests(unittest.TestCase):
                                          (marker.stat().st_ino, marker.stat().st_mtime_ns))
                     self.assertEqual(marker.stat().st_mode & 0o777, 0o600)
 
-    def test_cleanup_remains_visible_in_concise_mode(self):
+    def test_deletion_is_visible_in_client_subtotal_and_total(self):
         self.run_installer('--agent', 'codex')
         retired = self.codex / "skills/feipi-old"
         retired.symlink_to(self.repo / "skills/integration/feipi-old", target_is_directory=True)
         result = self.run_installer('--agent', 'codex')
-        self.assertIn(f"[清理] 已移除本仓库旧入口：{retired}", result.stdout)
-        self.assertIn("移除 1 · 保留 0", result.stdout)
-        self.assert_counts(result.stdout, skipped=3)
+        self.assertIn(f"[删除] 已移除本仓库旧入口：{retired}", result.stdout)
+        self.assertIn("小计：新增 0 · 更新 0 · 删除 1 · 保留 0 · 跳过 3 · 警告 0", result.stdout)
+        self.assertNotIn("[清理]", result.stdout)
+        self.assert_counts(result.stdout, deleted=1, skipped=3)
         self.assertFalse(retired.is_symlink())
 
     def test_dependencies_are_not_discovered_or_installed_in_any_mode(self):
@@ -325,7 +329,12 @@ class InstallOutputTests(unittest.TestCase):
         result = self.run_installer()
         self.assertEqual(result.stdout.count("小计：新增 3"), 2)
         self.assert_counts(result.stdout, added=6)
-        self.assert_counts(self.run_installer().stdout, skipped=6)
+        retired = self.codex / "skills/feipi-old"
+        retired.symlink_to(self.repo / "skills/integration/feipi-old", target_is_directory=True)
+        repeat = self.run_installer()
+        self.assertIn("小计：新增 0 · 更新 0 · 删除 1 · 保留 0 · 跳过 3 · 警告 0", repeat.stdout)
+        self.assertIn("小计：新增 0 · 更新 0 · 删除 0 · 保留 0 · 跳过 3 · 警告 0", repeat.stdout)
+        self.assert_counts(repeat.stdout, deleted=1, skipped=6)
 
     def test_no_shared_dependencies_is_a_successful_install(self):
         for name in ("feipi-one", "feipi-two"):
@@ -398,7 +407,7 @@ class InstallOutputTests(unittest.TestCase):
         failed = self.run_installer('--agent', 'codex', success=False)
         self.assertIn("[FAIL]", failed.stderr)
         self.assertIn("[失败] 注册表验证失败", failed.stderr)
-        self.assertNotIn("[清理]", failed.stdout)
+        self.assertNotIn("[删除]", failed.stdout)
         self.assertNotIn("总计：", failed.stdout)
         self.assertFalse(self.codex.exists())
 

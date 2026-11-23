@@ -99,6 +99,20 @@ class RenderedLayoutTests(unittest.TestCase):
             self.assertEqual(self.check(LINE+text)["status"], "review_required")
         self.assertEqual(self.check('<g clip-path="url(#clip)">'+LINE+'</g>'+TEXT)["status"], "review_required")
 
+    def test_plantuml_fullwidth_glyph_without_text_length(self):
+        text = '<text x="40" y="55" font-size="14">技</text>'
+        attributes = {'data-diagram-type': 'MINDMAP'}
+        far_line = '<path d="M0,18 L120,18" fill="none" stroke="black"/>'
+        self.assertEqual(self.check(far_line+text, **attributes)["status"], "ok")
+        self.assertEqual(self.check(LINE+text, **attributes)["status"], "failed")
+
+    def test_plantuml_sequence_number_without_text_length(self):
+        text = '<text x="40" y="55" font-size="14">1</text>'
+        attributes = {'data-diagram-type': 'SEQUENCE'}
+        arrow = '<g class="message">' + LINE + '</g>'
+        self.assertEqual(self.check(arrow+text, **attributes)["status"], "failed")
+        self.assertEqual(self.check(arrow+text.replace('>1<', '>A<'), **attributes)["status"], "review_required")
+
     def test_sequence_lifelines_distinguished_from_message_arrows(self):
         attributes = {'data-diagram-type':'SEQUENCE'}
         self.assertEqual(self.check(LINE+TEXT, **attributes)["status"], "ok")

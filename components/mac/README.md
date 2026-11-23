@@ -26,8 +26,8 @@ bash components/mac/bootstrap/brew.sh check
 默认顺序：**Homebrew → Node/npm → Rust → Agent CLI → oh-my-zsh → 桌面应用**。
 安装前预检受管路径。安装保留已有版本，并在发现路径冲突时停止。
 
-`install mac` 包含 Homebrew 应用清单，以及固定官方发布包的 FlClash for oixCloud、oMLX、
-Session Browser。代理可在裸机先单独安装；来源、摘要及账号准备边界见 [首次安装](docs/setup.md)。
+`install mac` 包含 Homebrew 应用清单，以及固定官方发布包的 FlClash for oixCloud 和 oMLX。
+Agent CLI 的安装渠道、升级方式及账号准备见 [首次安装](docs/setup.md)。
 这用于首次准备或补齐环境，不是每次开机要运行的流程，也不自动启动后台服务。
 
 `./workbench install mac` 用 Stow 将运行目录中的 Zsh、Neovim、Qwen 语言配置、Karabiner 和 iTerm2 配置链接到 HOME。`.zshrc` 按编号加载 `.zsh_config/` 中的模块，`~/.env` 由本机维护。`bash components/mac/bootstrap/check.sh` 核对链接与源码。系统授权及按键在应用中验证。

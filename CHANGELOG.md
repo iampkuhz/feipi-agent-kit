@@ -1,7 +1,13 @@
 # 变更记录
 
+## 2026-11-21
+
+- feipi-multica-manage-tasks v7：改用 Cloud 绑定，移除自建冒烟测试
+
 ## 2026-11-19
 - feipi-skill-govern v9：补全重构退出、脚本归位与初始化规则
+- 工作台：移除个人项目绑定，统一 Podman 图表服务
+- feipi-plantuml-generate-diagram v15：只读预检与新版字宽兼容
 
 ## 2026-11-16
 - feipi-interaction-review-output v1：交付交互审查与汇报前复审
@@ -85,7 +91,7 @@
 - feipi-video-read-url v8：严道图文视频、身份摘要及转写兼容
 
 ## 2026-10-16
-- feipi-writing-refine-text v1：分离诊断与修复，交付问题清单，增加 LexiFlow 文档快照及保真、误报测试
+- feipi-writing-refine-text v1：分离诊断与修复，补充保真与误报测试
 
 ## 2026-10-15
 - feipi-drawio-generate-diagram v1：新增本地作图、Podman 渲染与验证

@@ -47,7 +47,7 @@ export OTEL_LOGS_EXPORT_INTERVAL=1000
 | 文件 | 说明 |
 |---|---|
 | `claude-code-otel.jsonl` | **干净 JSONL**，每行一条，可直接 cat/grep/jq |
-| `claude-code-otel.raw` | 原始 OTLP JSON，可能有 null 填充字节，日常不用看 |
+| `claude-code-otel.raw` | Collector 原始 OTLP JSONL，历史文件可能含 NUL 填充字节 |
 
 日常只看 `claude-code-otel.jsonl`：
 

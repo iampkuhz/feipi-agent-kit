@@ -13,8 +13,6 @@ import time
 import urllib.request
 import uuid
 
-from configure import require_personal_ready
-
 from adaptation import (ROOT, MACHINE, STATE, ACTIVE, AdaptError, agent_runs, cli, digest, expand,
                         file_inventory, lock, machine, private_write, read_json,
                         render, resolve_runtime, task_context)
@@ -200,32 +198,37 @@ def apply(expected):
         return {'status': 'verified', 'changes_applied': len(plan['actions']), 'rollback': stamp}
 
 
+def profile_matches(m):
+    profile = m['profile']
+    if not profile or profile in ('.', '..') or Path(profile).name != profile:
+        return False
+    native = read_json(Path.home() / '.multica/profiles' / profile / 'config.json', {})
+    return (isinstance(native, dict) and native.get('server_url') == m['server_url']
+            and native.get('workspace_id') == m['workspace_id'])
+
+
 def doctor():
     m, c = machine(), catalog()
     runtimes = {a['runtime'] for a in c['agents']}
     checks = []
     def check(name, ok, detail):
         checks.append({'check': name, 'status': 'pass' if ok else 'blocked', 'detail': detail})
-    urls = [('multica-ready', m['server_url'].rstrip('/') + '/readyz')]
     if any(a['key'] == 'litellm-coder' for a in c['agents']):
-        urls.append(('litellm-ready', m.get('litellm_readiness_url')))
-    for label, url in urls:
+        url = m.get('litellm_readiness_url')
         if not url:
-            check(label, False, '已启用的执行器缺少服务地址')
-            continue
-        try:
-            with urllib.request.urlopen(url, timeout=4) as response:
-                check(label, response.status == 200, '仅验证服务就绪，不代表模型请求通过')
-        except Exception as exc:
-            check(label, False, type(exc).__name__)
-    for key, version in c['compatibility'].items():
-        try:
-            command = {'qoder': 'qodercli', 'openclaw-isolated': 'multica-openclaw'}.get(key, key)
-            command = expand(m.get('commands', {}).get(key, command))
-            p = subprocess.run([command, '--version'], text=True, capture_output=True, timeout=15)
-            check('version:' + key, p.returncode == 0 and version in p.stdout, '期望 ' + version)
-        except (OSError, subprocess.TimeoutExpired):
-            check('version:' + key, False, '命令不可用或超时')
+            check('litellm-ready', False, '已启用的执行器缺少服务地址')
+        else:
+            try:
+                with urllib.request.urlopen(url, timeout=4) as response:
+                    check('litellm-ready', response.status == 200, '仅验证 LiteLLM 服务就绪')
+            except (OSError, ValueError) as exc:
+                check('litellm-ready', False, type(exc).__name__)
+    try:
+        command = expand(m.get('commands', {}).get('multica', 'multica'))
+        p = subprocess.run([command, '--version'], text=True, capture_output=True, timeout=15)
+        check('version:multica', p.returncode == 0, p.stdout.strip() if p.returncode == 0 else '无法读取版本')
+    except (OSError, subprocess.TimeoutExpired):
+        check('version:multica', False, '命令不可用或超时')
     directories = list(dict.fromkeys(str(Path(expand(p)).parent) for p in m.get('commands', {}).values()))
     daemon_path = os.pathsep.join(directories + [str(Path.home()/'.local/bin'), '/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin'])
     for key, name in [('codex','codex'),('qoder','qodercli'),('openclaw','openclaw')]:
@@ -235,9 +238,7 @@ def doctor():
         found = shutil.which(name, path=daemon_path)
         check('command-binding:' + key, bool(declared and found) and Path(expand(declared)).resolve() == Path(found).resolve(),
               '机器声明应与 daemon 搜索到的可执行文件一致；同版本也不能代替路径核对')
-    native = read_json(Path.home() / '.multica/profiles' / m['profile'] / 'config.json', {})
-    check('profile', native.get('server_url') == m['server_url'] and native.get('workspace_id') == m['workspace_id'], '只比较服务与工作区，不输出凭据')
-    check('daemon-concurrency', native.get('max_concurrent_tasks') == 1, '试点并发为 1')
+    check('profile', profile_matches(m), '只比较服务与工作区，不输出凭据')
     capabilities = read_json(ROOT / 'config/capabilities.json', {'runtimes': {}})
     for key, entry in capabilities['runtimes'].items():
         missing = [name for name in entry['required_commands'] if not shutil.which(name)]
@@ -318,18 +319,15 @@ def rebind(daemon_id):
 
 
 def local_identity(m, health):
-    """只确认本机原生 UUID 与本次固定构建；不创建或复制设备身份。"""
-    pinned = read_json(ROOT/'versions.json')
-    commit = health.get('cli_commit')
+    """核对本机原生 daemon 的身份和 Cloud 连接。"""
     if (health.get('profile') != m['profile'] or health.get('device_name') != m['device_name']
             or not isinstance(health.get('server_url'), str)
             or health['server_url'].rstrip('/') != m['server_url'].rstrip('/')
-            or health.get('os') != sys.platform or health.get('cli_version') != pinned['release'].lstrip('v')
-            or not isinstance(commit, str) or len(commit) < 7 or not pinned['upstream_commit'].startswith(commit)):
-        raise AdaptError('本机 daemon 的 profile、设备、服务或程序构建不匹配，未修改绑定。')
+            or health.get('os') != sys.platform):
+        raise AdaptError('本机 daemon 的 profile、设备、服务或系统不匹配，未修改绑定。')
     record = Path.home()/'.multica/daemon.id'
     if record.is_symlink() or not record.is_file():
-        raise AdaptError('缺少本机原生 daemon.id；先由固定 CLI 注册，不复制旧设备身份。')
+        raise AdaptError('缺少本机原生 daemon.id；先由官方 CLI 注册。')
     identity = record.read_text().strip()
     try:
         uuid.UUID(identity)
@@ -342,8 +340,9 @@ def local_identity(m, health):
 
 def rebind_local():
     with lock('configuration'):
-        require_personal_ready(Path.home())
         m = machine()
+        if not profile_matches(m):
+            raise AdaptError('本机 profile 尚未就绪；核对官方 CLI 登录的服务与工作区。')
         if not isinstance(m.get('runtimes'), dict) or not m['runtimes']:
             raise AdaptError('缺少待重绑 runtime 声明，未修改机器绑定。')
         workspace = cli('workspace', 'get', timeout=15)

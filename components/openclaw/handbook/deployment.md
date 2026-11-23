@@ -37,7 +37,6 @@ command -v git jq node npm
 `~/.env` 至少需要以下变量，格式参考仓库 `.env.example`：
 
 - `LITELLM_BASE_URL`
-- `LITELLM_CODE_MODEL_OPENAI`
 - `LITELLM_API_KEY_OPENAI`
 - `OPENCLAW_GATEWAY_TOKEN`
 - `OPENCLAW_TG_BOT_TOKEN`
@@ -63,12 +62,11 @@ export all_proxy=socks5://127.0.0.1:7890
 bash components/openclaw/scripts/deploy.sh --check
 ```
 
-安装锁定的程序、provider、微信插件和技能，并发布配置。首次注册和启动 Gateway 使用原生命令。
+安装锁定的程序、provider、微信插件和技能，并发布配置。工作台首次启动时注册原生 LaunchAgent。
 
 ```bash
 ./workbench install openclaw
-openclaw gateway install --force
-openclaw gateway restart
+./workbench service openclaw up
 ./workbench doctor openclaw
 ```
 
@@ -81,7 +79,7 @@ openclaw gateway restart
 ```bash
 bash components/openclaw/tests/run.sh
 ./workbench install openclaw
-openclaw gateway restart
+./workbench service openclaw restart
 bash components/openclaw/scripts/doctor.sh
 ```
 
@@ -169,12 +167,14 @@ Gateway 重启后，用“文件 / 不压缩”发送附件并写 `/growth YYYY-
 
 用户选择保留成长资料库的 Documents 位置，并手动为 Gateway 后台进程配置 macOS 文件访问权限。本机 LaunchAgent 使用 `/opt/homebrew/opt/node/bin/node`；授权方法和授权后的查询、附件验收顺序维护在独立资料库 `README.md`。后台访问阻塞时不自动迁移目录。
 
+换机后用运行中的 Gateway 读取资料库内的临时测试文件，再启用成长日记插件。插件加载后复验 Telegram 查询和附件归档，图片理解使用当前 LiteLLM DeepSeek 路由。
+
 ## 8. MCP 服务
 
 MCP 定义统一位于 `openclaw.json` 的 `mcp.servers`：
 
 - `crawl4ai`：`http://127.0.0.1:11235/mcp/sse`，当前启用。
-- `fastmcp-gateway`：`http://127.0.0.1:18080/mcp`，当前因本机服务未监听而禁用。
+- `fastmcp-gateway` 使用 `http://127.0.0.1:18080/mcp` 提供 SearXNG 搜索工具。
 
 OpenClaw 根据这些定义连接服务，并把服务暴露的工具交给 Agent。静态校验与真实探测是两回事：
 
@@ -185,7 +185,7 @@ openclaw mcp doctor --probe
 
 外部 MCP 进程不由本仓库启动；端口未监听时应修复相应服务，而不是把服务源码、缓存或日志放进本仓库。
 
-启用 `fastmcp-gateway` 时，先确认 18080 端口的服务已经启动，再把仓库配置中的 `enabled` 改为 `true`，执行 `./workbench install openclaw`、`openclaw gateway restart` 和 `openclaw mcp doctor --probe`。不要只修改运行副本。
+先启动 SearXNG，再执行 `./workbench service fastmcp up`。用 `openclaw mcp doctor --probe` 检查 MCP 连接。
 
 ## 9. 验收与更新
 
@@ -203,9 +203,15 @@ openclaw mcp doctor --probe
 
 OpenClaw 继续使用日期版本号；“OpenClaw 2.0”是 `v2026.8.1` 的发布名称。升级时同时修改 `versions.json` 中的 OpenClaw 与 Qwen provider，按新 schema 调整 `openclaw.json`，然后重新执行 `./workbench install openclaw`。不要单独安装 `openclaw@latest`。
 
+定期用 npm 的 `latest` 标签和官方发布日核对稳定版，预留两周给适配和复验。升级前先验证候选版本的配置与插件，暂停本机 Gateway 并备份 SQLite 和运行状态。工作台发布后核对 Gateway、模型请求、已登录渠道和已迁入的会话与记忆。
+
+工作台切换程序版本后，用新版 Doctor 迁移现有 SQLite 和 heartbeat，再安装锁定插件。升级后核对原有 heartbeat 任务的启停状态。新版通过 Automations 管理这些任务。 [Heartbeat 迁移说明](https://docs.openclaw.ai/heartbeat)
+
+新版要求记忆 CLI 和带 `--probe` 的 MCP 诊断独占本机状态，停写期间运行这两项，再启动 Gateway 做在线模型和渠道验收。
+
 ## 10. 微信入口
 
-采用[腾讯维护的微信插件](https://github.com/Tencent/openclaw-weixin)，版本由 `versions.json` 独立锁定；当前为 `2.4.10`，要求 OpenClaw `>=2026.5.12`。本仓库的 `2026.9.2` 满足要求。插件提供个人微信 ClawBot 私聊和媒体收发，不配置群聊。
+微信插件 `2.4.10` 由 `versions.json` 独立锁定，兼容 OpenClaw `2026.11.5`，用于个人微信 ClawBot 私聊和媒体收发。 [腾讯微信插件](https://github.com/Tencent/openclaw-weixin)
 
 完整部署后执行：
 
@@ -247,10 +253,8 @@ bash components/openclaw/scripts/weixin-login.sh --name xuzan
 
 ### Telegram 装修摘要入口的模型与交付
 
-`channels.modelByChannel.telegram["7026716907"]` 使用 `openai/gpt-6-astra`，其余入口仍使用全局默认模型。该选择来自同源装修视频实测：默认模型能通过引用校验但误解画面归属，Astra 能定向补帧并保留来源歧义。该入口依赖本机 OpenAI 登录凭据；部署后须验证实际模型请求，模型列表可见不等于账户可调用。它的延迟和用量高于原模型，不能据此宣称所有素材都会自动无误。
+Telegram 私聊沿用全局默认模型 `litellm/litellm-token-plan-deepseek`。LiteLLM 将请求转发到百炼 Token Plan 的 `deepseek-v4.1-flash-1017`，同一模型也用于图片理解。
 
 Housing 新收件使用编号证据草稿和 `finalize` 完成构建、复核、入库；最多一次集中修复。最终回执来自实际笔记，Telegram 发送须有工具成功回执；不能把内部历史正文视为已送达。语义验收仍须检查原有层级、模糊术语、重要条件与画面时间归属，引用校验通过不等于内容正确。
 
-OpenAI provider 显式使用 `request.proxy.mode=env-proxy`。终端 shell 的临时 `https_proxy` 不会自动传入 LaunchAgent；标准代理变量必须保存在唯一源 `~/.env`。修改后执行 `openclaw gateway install --force` 重新生成受管服务环境，再重启 Gateway，分别验证原生模型请求与 Telegram 回执。不要用隔离 CLI 成功代替 Gateway 实测，也不要把自动回退模型的成功当作所选模型成功。
-
-`agents.entries.main.model.fallbacks=[]` 显式关闭模型失败时的自动回退，避免 Telegram 指定的质量模型失败后悄悄改用未通过该素材验收的全局默认模型。其余入口的首选模型不变；失败时应返回真实失败状态。
+发布配置并重启 Gateway 后，分别验证默认模型请求和 Telegram 实际收发。`agents.entries.main.model.fallbacks=[]` 使模型调用失败时直接报告错误。

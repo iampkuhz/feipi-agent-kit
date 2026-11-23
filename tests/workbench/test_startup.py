@@ -34,7 +34,7 @@ class Startup(unittest.TestCase):
         agents = self.home/'Library/LaunchAgents'
         path = agents/(startup.SERVICE_LABEL+'.plist')
         self.assertEqual(list(agents.iterdir()), [path])
-        self.assertEqual(plistlib.loads(path.read_bytes()), startup.definitions()[startup.SERVICE_LABEL])
+        self.assertEqual(plistlib.loads(path.read_bytes()), startup.definition())
         self.assertEqual(path.stat().st_mode & 0o777, 0o600)
         self.assertFalse((self.home/'.local/env-vault').exists())
 
@@ -56,54 +56,17 @@ class Startup(unittest.TestCase):
             self.assertTrue(path.is_file())
             self.assertNotIn(['launchctl', 'bootout', target], [call.args[0] for call in run.call_args_list])
 
-    def test_installed_session_browser_gets_an_independent_loopback_job(self):
-        launcher = self.home/'.local/bin/session-browser'
-        launcher.parent.mkdir(parents=True)
-        launcher.write_text('#!/bin/sh\nexit 0\n'); launcher.chmod(0o700)
-        with patch.object(startup, 'run') as run:
-            startup.install()
-        run.assert_not_called()
-        path = self.home/'Library/LaunchAgents'/(startup.SESSION_BROWSER_LABEL+'.plist')
-        actual = plistlib.loads(path.read_bytes())
-        self.assertEqual(actual['ProgramArguments'],
-                         [str(launcher), 'serve', '--host', '127.0.0.1', '--port', '8848'])
-        self.assertNotIn('KeepAlive', actual)
-        self.assertEqual(path.stat().st_mode & 0o777, 0o600)
-        with patch.object(startup.subprocess, 'run') as launchctl, \
-                patch.object(startup, 'run') as load:
-            launchctl.return_value.returncode = 1
-            startup.start()
-        self.assertEqual([call.args[0][-1].name for call in load.call_args_list],
-                         [label+'.plist' for label in startup.definitions()])
-
-    def test_absent_or_non_executable_session_browser_is_not_required(self):
-        self.assertNotIn(startup.SESSION_BROWSER_LABEL, startup.definitions())
-        launcher = self.home/'.local/bin/session-browser'
-        launcher.parent.mkdir(parents=True)
-        launcher.write_text('not executable\n'); launcher.chmod(0o600)
-        self.assertNotIn(startup.SESSION_BROWSER_LABEL, startup.definitions())
-
-    def test_session_browser_drift_fails_before_loading_any_job(self):
-        launcher = self.home/'.local/bin/session-browser'
-        launcher.parent.mkdir(parents=True)
-        launcher.write_text('#!/bin/sh\nexit 0\n'); launcher.chmod(0o700)
-        startup.install()
-        path = self.home/'Library/LaunchAgents'/(startup.SESSION_BROWSER_LABEL+'.plist')
-        data = plistlib.loads(path.read_bytes()); data['ProgramArguments'][-1] = '9999'
-        path.write_bytes(plistlib.dumps(data))
-        with patch.object(startup.subprocess, 'run') as launchctl, \
-                patch.object(startup, 'run') as load, self.assertRaisesRegex(ValueError, 'session-browser'):
-            startup.start()
-        launchctl.assert_not_called(); load.assert_not_called()
-
-    def test_start_refuses_drift_before_touching_loaded_jobs(self):
+    def test_check_and_start_reject_the_same_drift_before_touching_jobs(self):
         startup.install()
         path = self.home/'Library/LaunchAgents'/(startup.SERVICE_LABEL+'.plist')
         data = plistlib.loads(path.read_bytes()); data['RunAtLoad'] = False
         path.write_bytes(plistlib.dumps(data))
-        with patch.object(startup, 'run') as run, self.assertRaises(ValueError):
-            startup.start()
-        run.assert_not_called()
+        with patch.object(startup.os, 'umask'), patch.object(startup.subprocess, 'run') as launchctl:
+            for action in ('check', 'start'):
+                with self.subTest(action=action), patch('sys.argv', ['startup.py', action]), \
+                        self.assertRaisesRegex(ValueError, startup.SERVICE_LABEL):
+                    startup.main()
+        launchctl.assert_not_called()
 
     def test_failed_service_does_not_prevent_independent_services_from_starting(self):
         calls = []
@@ -114,8 +77,9 @@ class Startup(unittest.TestCase):
         with patch.object(startup, 'run', side_effect=run), \
                 patch.object(startup, 'wait_service') as wait, self.assertRaisesRegex(ValueError, 'litellm'):
             startup.services()
-        self.assertEqual([call.args[0] for call in wait.call_args_list], ['searxng', 'crawl4ai'])
+        self.assertEqual([call.args[0] for call in wait.call_args_list], ['searxng', 'fastmcp', 'crawl4ai'])
         self.assertTrue(any('crawl4ai.sh' in str(item) for call in calls for item in call))
+        self.assertEqual(calls[-1], ['bash', startup.ROOT/'tools/diagram/diagrams.sh', 'up'])
 
 
 if __name__ == '__main__':

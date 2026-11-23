@@ -9,7 +9,7 @@ services:
     image: docker.io/unclecode/crawl4ai:0.8.6
     container_name: crawl4ai
     ports:
-      - "11235:11235"
+      - "127.0.0.1:11235:11235"
     environment:
       - NO_PROXY=127.0.0.1,localhost,0.0.0.0,::1,host.containers.internal
       - no_proxy=127.0.0.1,localhost,0.0.0.0,::1,host.containers.internal

@@ -3,9 +3,9 @@ import time
 import urllib.request
 
 
-def wait_service(component, endpoint):
+def wait_service(component, endpoint, *, seconds=600):
     """首次迁移/浏览器准备可能较慢；有界等待健康检查，不反复重建。"""
-    deadline = time.monotonic()+600
+    deadline = time.monotonic()+seconds
     attempt = 0
     while time.monotonic() < deadline:
         try:
@@ -20,4 +20,4 @@ def wait_service(component, endpoint):
         time.sleep(2)
         attempt += 1
     else:
-        raise ValueError(component+' 未在 10 分钟内就绪；保留运行状态供 service '+component+' logs 检查，不重复重建数据库。')
+        raise ValueError(f'{component} 未在 {seconds} 秒内就绪，请运行 workbench service {component} logs 检查。')
