@@ -26,6 +26,8 @@ Multica CLI 由 `install mac` 的 Homebrew 阶段补齐。平台服务由 Multic
 ./workbench install skills --agent codex --skill feipi-health-maintain-family-records
 ```
 
+`skills/deleted-skills.txt` 记录仓库历史中已删除 `SKILL.md` 的名称。安装器用它提示目标目录里的同名旧副本；名称相同不等于来源已确认，也不会因此自动删除。确认删除时应逐项核对目标路径与来源。
+
 工作台发布使用独立运行副本。Mac 的 Podman VM、桌面授权及应用验收见 [Mac 安装说明](../components/mac/docs/setup.md)。OpenClash 的 SSH、API 和真实网络验收见 [组件手册](../components/openclash/README.md)。
 
 ## 命令与参数

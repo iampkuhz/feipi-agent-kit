@@ -1,0 +1,12 @@
+# 曾从仓库删除 SKILL.md 的名称；新增或重命名时按 Git 删除记录维护。
+# 安装器据此提示同名旧副本，不将名称匹配视为来源证明或删除授权。
+feipi-dingtalk-send-webhook
+feipi-gen-plantuml-code
+feipi-gen-skills
+feipi-ops-openclaw-config
+feipi-patent-generate-innovation-disclosure
+feipi-plantuml-generate-architecture-diagram
+feipi-plantuml-generate-sequence-diagram
+feipi-read-bilibili-video
+feipi-read-youtube-video
+feipi-summarize-video-url

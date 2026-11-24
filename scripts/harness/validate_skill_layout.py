@@ -303,6 +303,9 @@ def validate_retired_entries(root: Path, link_root: Path, project: Path, env: di
                     "-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null",
                     "commit", "--quiet", "-m", "Add historical skill"], cwd=repo, check=True)
     shutil.rmtree(historical)
+    (source_root / "deleted-skills.txt").write_text(
+        f"# fixture historical skill\n{unmarked_copy_name}\n", encoding="utf-8"
+    )
 
     preserved = {}
     removed = []

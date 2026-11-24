@@ -637,16 +637,12 @@ active_names = {Path(source).name for source in sys.argv[5:]}
 
 
 def historical_skill_names():
-    # 同名只用于决定是否提示保留，不能证明安装来源。
+    # 清单记录仓库中已删除 SKILL.md 的名称；同名只用于提示，不能证明安装来源。
     try:
-        history = subprocess.run(
-            ["git", "-C", str(source_root.parent), "log", "--format=", "--name-only", "-z",
-             "--no-renames", "HEAD", "--", ":(glob)skills/*/SKILL.md", ":(glob)skills/*/*/SKILL.md"],
-            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=True,
-        )
-    except (OSError, subprocess.CalledProcessError):
+        lines = (source_root / "deleted-skills.txt").read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeError):
         return set()
-    return {Path(os.fsdecode(path)).parent.name for path in history.stdout.split(b"\0") if path}
+    return {line.strip() for line in lines if line.strip() and not line.lstrip().startswith("#")}
 
 
 def repository_identity(url):
