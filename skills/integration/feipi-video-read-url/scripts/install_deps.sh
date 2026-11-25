@@ -5,10 +5,8 @@ set -euo pipefail
 # 依赖：yt-dlp、ffmpeg、Python 3、本地 oMLX 服务与 ASR 模型
 #
 # 用法：
-#   bash scripts/install_deps.sh              # 安装下载依赖并检查 oMLX fast 模型
-#   bash scripts/install_deps.sh --accurate   # 额外检查 oMLX Qwen3-ASR-1.7B 模型
+#   bash scripts/install_deps.sh              # 安装下载依赖并检查 oMLX 转写模型
 #   bash scripts/install_deps.sh --check      # 仅检查，不安装
-#   bash scripts/install_deps.sh --check --accurate  # 仅检查，要求 accurate
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/yt_dlp_common.sh"
@@ -16,24 +14,19 @@ source "$SCRIPT_DIR/lib/yt_dlp_common.sh"
 usage() {
   cat <<'USAGE'
 用法:
-  bash scripts/install_deps.sh [--check] [--accurate]
+  bash scripts/install_deps.sh [--check]
 
 参数:
   --check     仅检查依赖，不执行安装
-  --accurate  额外检查 oMLX Qwen3-ASR-1.7B 模型
 USAGE
 }
 
 CHECK_ONLY=0
-REQUIRE_ACCURATE=0
 if [[ $# -gt 0 ]]; then
   for arg in "$@"; do
     case "$arg" in
       --check)
         CHECK_ONLY=1
-        ;;
-      --accurate)
-        REQUIRE_ACCURATE=1
         ;;
       -h|--help)
         usage
@@ -112,13 +105,9 @@ check_and_install yt-dlp install_yt_dlp || FAILED=1
 check_and_install ffmpeg install_ffmpeg || FAILED=1
 check_and_install python3 install_python || FAILED=1
 
-python3 "$SCRIPT_DIR/lib/omlx_transcribe.py" --check fast || FAILED=1
-if [[ "$REQUIRE_ACCURATE" -eq 1 ]]; then
-  python3 "$SCRIPT_DIR/lib/omlx_transcribe.py" --check accurate || FAILED=1
-fi
-
+python3 "$SCRIPT_DIR/lib/omlx_transcribe.py" --check || FAILED=1
 if [[ "$FAILED" -ne 0 ]]; then
-  echo "依赖检查/安装未完全通过。请启动 oMLX 并在服务中配置 SenseVoiceSmall（fast）及 Qwen3-ASR-1.7B（accurate）；本脚本不修改服务配置或下载模型。" >&2
+  echo "依赖检查/安装未完全通过。请启动 oMLX 并在服务中配置 Qwen3-ASR-1.7B-8bit；本脚本不修改服务配置或下载模型。" >&2
   exit 1
 fi
 

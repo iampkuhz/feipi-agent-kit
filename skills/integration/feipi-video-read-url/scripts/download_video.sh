@@ -4,16 +4,14 @@ set -euo pipefail
 URL="${1:-}"
 OUT_DIR="${2:-./downloads}"
 MODE="${3:-video}"
-WHISPER_PROFILE="${4:-auto}"
 
 usage() {
   cat <<'USAGE'
 用法:
-  bash scripts/download_video.sh <url> [output_dir] [mode] [whisper_profile]
+  bash scripts/download_video.sh <url> [output_dir] [mode]
 
 参数:
   mode: dryrun | video | audio | subtitle | whisper
-  whisper_profile: auto | fast | accurate
 USAGE
 }
 
@@ -42,14 +40,14 @@ detect_source() {
   return 1
 }
 
-if [[ -z "$URL" ]]; then
+if [[ -z "$URL" || $# -gt 3 ]]; then
   usage
   exit 1
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ ! "$URL" =~ ^https?:// ]]; then
-  exec python3 "$SCRIPT_DIR/lib/read_local_media.py" "$URL" "$OUT_DIR" "$MODE" "$WHISPER_PROFILE"
+  exec python3 "$SCRIPT_DIR/lib/read_local_media.py" "$URL" "$OUT_DIR" "$MODE"
 fi
 SOURCE="$(detect_source "$URL")"
 
@@ -78,4 +76,4 @@ if [[ ! -x "$TARGET_SCRIPT" ]]; then
 fi
 
 echo "source=$SOURCE"
-exec bash "$TARGET_SCRIPT" "$URL" "$OUT_DIR" "$MODE" "$WHISPER_PROFILE"
+exec bash "$TARGET_SCRIPT" "$URL" "$OUT_DIR" "$MODE"

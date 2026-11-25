@@ -76,11 +76,11 @@ fi
 
 sources=(
   "$REPO_DIR/openclaw.json"
-  "$REPO_DIR/scripts/transcribe-audio-whispercpp-openclaw.sh"
+  "$REPO_DIR/scripts/transcribe-audio-omlx.sh"
 )
 targets=(
   "$STATE_DIR/openclaw.json"
-  "$STATE_DIR/scripts/transcribe-audio-whispercpp-openclaw.sh"
+  "$STATE_DIR/scripts/transcribe-audio-omlx.sh"
 )
 modes=(600 755)
 

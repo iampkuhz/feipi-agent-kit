@@ -19,7 +19,7 @@
 - `bash bootstrap/check.sh`：只读检查 Bash 语法、可用时的 ShellCheck、关键命令和配置来源，不联网、不加载用户启动文件、不启动服务。
 - `bash bootstrap/neovim.sh`：配置发布后联网恢复锁定插件、构建与有界等待，检查解析器、Mason、Lua LSP、格式化及 Markdown 本机 HTTP 预览；失败非零，可修复后重跑。
 - `bash bootstrap/apps.sh check|install`：检查或批量补装桌面清单，禁用 Homebrew sudo。`Brewfile.apps.admin` 列出需要本人逐项审核的 PKG。`python3 bootstrap/verify-apps.py` 真实检查中英文 PDF 及 JDK 25。
-- `bash bootstrap/desktop-extras.sh plan|check|install [all|flclash|omlx]`：固定官方原生发布包，不依赖 Homebrew。`python3 bootstrap/verify-extras.py` 隔离验证 oMLX 文本与两套语音推理。
+- `bash bootstrap/desktop-extras.sh plan|check|install [all|flclash|omlx]`：固定官方原生发布包，不依赖 Homebrew。`python3 bootstrap/verify-extras.py` 隔离验证 oMLX 文本及固定语音模型推理。
 
 ## 编码风格与命名规范
 - Bash 脚本优先使用 `set -euo pipefail`；缩进 2 空格；函数用 `snake_case` 命名。

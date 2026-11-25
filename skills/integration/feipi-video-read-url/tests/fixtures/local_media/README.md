@@ -19,6 +19,6 @@ FEIPI_OMLX_TEST_OUTPUT=tmp/skill-evals/feipi-video-read-url/local-live \
 python3 skills/integration/feipi-video-read-url/tests/test_local_media.py
 ```
 
-该测试在默认30秒上限下分别运行 SenseVoiceSmall 和 Qwen3-ASR-1.7B，断言分成两块且真实 ASR 与参考稿的162个正文汉字逐字一致。只忽略标点和空白，不替换同音字、不补字、不改繁简。模型升级或识别差异导致不一致时测试必须失败。`real-asr-results.json` 保存逐字对照、模型和缓存状态；`cache_reused=1` 只证明已有结果复用，首次真实推理证据须为0。
+该测试在默认30秒上限下运行本地 oMLX 模型 `Qwen3-ASR-1.7B-8bit`，断言分成两块且真实 ASR 与参考稿的162个正文汉字逐字一致。只忽略标点和空白，不替换同音字、不补字、不改繁简。模型升级或识别差异导致不一致时测试必须失败。`real-asr-results.json` 保存逐字对照、模型和缓存状态；`cache_reused=1` 只证明已有结果复用，首次真实推理证据须为0。
 
 合成样例只验证固定语音的回归与流程，不代表自然长音频的通用识别质量。未进行人工听感评估；原42分钟音频无人工参考稿，不计算准确率百分比。

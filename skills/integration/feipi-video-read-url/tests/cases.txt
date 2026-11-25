@@ -1,10 +1,10 @@
-# 每行格式：<kind>|<url>|<arg3>|<arg4>|<arg5>
+# 每行格式：<kind>|<url>|[mode]
 #
 # kind=download:
-#   download|<url>|<mode>|[whisper_profile]|
+#   download|<url>|<mode>
 #
 # kind=summary:
-#   summary|<url>|<instruction>|<expected_profile>|<selection|extract>
+#   summary|<url>
 #
 # 摘要输出结构约束（由 lint 脚本验证）：
 #   summary_result.md 必须包含顶层标题：## 摘要概述、## 来源状态、## 附件
@@ -13,22 +13,16 @@
 #   ## 附件 必须包含原始视频 URL 和转写文本路径
 
 # 统一下载入口：YouTube dryrun
-download|https://www.youtube.com/watch?v=wyVsPzzC_vo|dryrun||
+download|https://www.youtube.com/watch?v=wyVsPzzC_vo|dryrun
 
 # 统一下载入口：Bilibili dryrun
-download|https://www.bilibili.com/video/BV1GJ411x7h7|dryrun||
-
-# 自动选档：默认速度优先，应选 fast
-summary|https://www.youtube.com/watch?v=wyVsPzzC_vo|请快速提取并总结重点|fast|selection
-
-# 自动选档：明确要求高质量，应选 accurate
-summary|https://www.youtube.com/watch?v=wyVsPzzC_vo|请高质量逐字转写，准确优先|accurate|selection
+download|https://www.bilibili.com/video/BV1GJ411x7h7|dryrun
 
 # 统一提取 + 摘要请求包：YouTube
-summary|https://www.youtube.com/watch?v=6OiE0jIY93c||fast|extract
+summary|https://www.youtube.com/watch?v=6OiE0jIY93c
 
 # 统一提取 + 摘要请求包：Bilibili
-summary|https://www.bilibili.com/video/BV1LRcLzREG9||fast|extract
+summary|https://www.bilibili.com/video/BV1LRcLzREG9
 
 # 离线错误诊断回归：scripts/test_error_diagnostics.sh（由 test.sh 自动执行）
 # 覆盖真实入口全失败、各次错误保留、依赖路径版本与 URL 脱敏。

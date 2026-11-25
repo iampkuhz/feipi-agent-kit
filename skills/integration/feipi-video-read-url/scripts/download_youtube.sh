@@ -4,14 +4,13 @@ set -euo pipefail
 # YouTube 下载脚本（简化版）
 #
 # 用法：
-#   bash scripts/download_youtube.sh <url> [output_dir] [mode] [whisper_profile]
+#   bash scripts/download_youtube.sh <url> [output_dir] [mode]
 #
 # mode: video | audio | dryrun | subtitle | whisper
-# whisper_profile: auto | fast | accurate（仅 mode=whisper 时生效）
 #
 # 样例（whisper 快/慢档）：
 #   bash scripts/download_youtube.sh "<youtube_url>" "./downloads" whisper fast
-#   bash scripts/download_youtube.sh "<youtube_url>" "./downloads" whisper accurate
+#   bash scripts/download_youtube.sh "<youtube_url>" "./downloads" whisper
 #
 # 认证配置：
 # - 支持 AGENT_CHROME_PROFILE（浏览器 profile）
@@ -27,7 +26,6 @@ set -euo pipefail
 URL="${1:-}"
 OUT_DIR_RAW="${2:-./downloads}"
 MODE="${3:-video}"
-WHISPER_PROFILE="${4:-auto}"
 
 normalize_out_dir() {
   local raw="$1"
@@ -45,7 +43,6 @@ normalize_out_dir() {
 OUT_DIR="$(normalize_out_dir "$OUT_DIR_RAW")"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WHISPER_HELPER="$SCRIPT_DIR/lib/omlx_transcribe.sh"
 YT_COMMON_LIB="$SCRIPT_DIR/lib/yt_dlp_common.sh"
 
 AGENT_CHROME_PROFILE="${AGENT_CHROME_PROFILE:-}"
@@ -79,15 +76,11 @@ ACTIVE_PROXY_URL=""
 YT_NETWORK_ROUTE="direct"
 NETWORK_READY_FILE="${AGENT_VIDEO_NETWORK_CACHE_FILE:-$OUT_DIR/.network-ready}"
 
-if [[ -z "$URL" ]]; then
-  echo "用法: bash scripts/download_youtube.sh <url> [output_dir] [video|audio|dryrun|subtitle|whisper] [auto|fast|accurate]" >&2
+if [[ -z "$URL" || $# -gt 3 ]]; then
+  echo "用法: bash scripts/download_youtube.sh <url> [output_dir] [video|audio|dryrun|subtitle|whisper]" >&2
   exit 1
 fi
 
-if [[ "$WHISPER_PROFILE" != "auto" && "$WHISPER_PROFILE" != "fast" && "$WHISPER_PROFILE" != "accurate" ]]; then
-  echo "whisper_profile 仅支持 auto|fast|accurate，当前: $WHISPER_PROFILE" >&2
-  exit 1
-fi
 
 is_valid_port() {
   local value="${1:-}"
@@ -290,12 +283,7 @@ probe_youtube_connectivity() {
 print_proxy_port_guidance() {
   local tested_proxy="$1"
   local retry_cmd
-
-  if [[ "$MODE" == "whisper" ]]; then
-    retry_cmd="AGENT_VIDEO_PROXY_PORT=7891 bash scripts/download_youtube.sh \"$URL\" \"$OUT_DIR_RAW\" \"$MODE\" \"$WHISPER_PROFILE\""
-  else
-    retry_cmd="AGENT_VIDEO_PROXY_PORT=7891 bash scripts/download_youtube.sh \"$URL\" \"$OUT_DIR_RAW\" \"$MODE\""
-  fi
+  retry_cmd="AGENT_VIDEO_PROXY_PORT=7891 bash scripts/download_youtube.sh \"$URL\" \"$OUT_DIR_RAW\" \"$MODE\""
 
   echo "直连 YouTube 失败，且默认代理也不可用: $tested_proxy" >&2
   echo "请提供可用代理端口后重试，例如:" >&2
@@ -474,27 +462,10 @@ run_subtitle_mode() {
 }
 
 run_whisper_mode() {
-  local whisper_log used_device used_profile used_model audio_file text_file
-  local resolved_profile profile_reason profile_pair
-
-  resolve_whisper_profile_auto() {
-    local requested="$1"
-
-    if [[ "$requested" == "accurate" ]]; then
-      echo "accurate|explicit_accurate"
-      return 0
-    fi
-
-    # auto 和 fast 都解析为 fast，不再因为视频时长短自动切 accurate。
-    echo "fast|auto_default_fast"
-  }
-
-  profile_pair="$(resolve_whisper_profile_auto "$WHISPER_PROFILE")"
-  resolved_profile="${profile_pair%%|*}"
-  profile_reason="${profile_pair#*|}"
+  local whisper_log used_device used_model audio_file text_file
 
   whisper_log="$(mktemp "$OUT_DIR/.whisper-mode.XXXXXX")"
-  if ! yt_common_run_whisper_mode_from_url "$URL" "$OUT_DIR" "$WHISPER_HELPER" zh "$resolved_profile" >"$whisper_log" 2>&1; then
+  if ! yt_common_run_whisper_mode_from_url "$URL" "$OUT_DIR" zh >"$whisper_log" 2>&1; then
     # 标准路径失败，检查是否是格式/下载错误
     if [[ "$(yt_common_last_stage "$whisper_log")" == "media_download" ]] \
       && grep -Eqi "403|HTTP Error|Requested format is not available|Only images" "$whisper_log"; then
@@ -502,7 +473,7 @@ run_whisper_mode() {
       yt_common_print_diagnostic "$whisper_log" >&2
       rm -f "$whisper_log"
       whisper_log="$(mktemp "$OUT_DIR/.whisper-mode.XXXXXX")"
-      if ! yt_common_run_whisper_mode_from_url "$URL" "$OUT_DIR" "$WHISPER_HELPER" zh "$resolved_profile" yt_common_mode_whisper_audio_with_format_fallback >"$whisper_log" 2>&1; then
+      if ! yt_common_run_whisper_mode_from_url "$URL" "$OUT_DIR" zh yt_common_mode_whisper_audio_with_format_fallback >"$whisper_log" 2>&1; then
         cat "$whisper_log"
         rm -f "$whisper_log"
         return 1
@@ -516,7 +487,6 @@ run_whisper_mode() {
 
   cat "$whisper_log"
   used_device="$(LC_ALL=C sed -n 's/^device=//p' "$whisper_log" | tail -n1)"
-  used_profile="$(LC_ALL=C sed -n 's/^profile=//p' "$whisper_log" | tail -n1)"
   used_model="$(LC_ALL=C sed -n 's/^model=//p' "$whisper_log" | tail -n1)"
   audio_file="$(LC_ALL=C sed -n 's/^audio_file=//p' "$whisper_log" | tail -n1)"
   text_file="$(LC_ALL=C sed -n 's/^text_file=//p' "$whisper_log" | tail -n1)"
@@ -525,17 +495,11 @@ run_whisper_mode() {
   if [[ -z "$used_device" ]]; then
     used_device="unknown"
   fi
-  if [[ -z "$used_profile" ]]; then
-    used_profile="unknown"
-  fi
   if [[ -z "$used_model" ]]; then
     used_model="unknown"
   fi
 
-  echo "whisper_profile_requested=$WHISPER_PROFILE"
-  echo "whisper_profile_resolved=$resolved_profile"
-  echo "whisper_profile_reason=$profile_reason"
-  echo "完成: mode=whisper, engine=omlx, profile=$used_profile, model=$used_model, device=$used_device, audio=$audio_file, text=$text_file"
+  echo "完成: mode=whisper, engine=omlx, model=$used_model, device=$used_device, audio=$audio_file, text=$text_file"
 }
 
 case "$MODE" in

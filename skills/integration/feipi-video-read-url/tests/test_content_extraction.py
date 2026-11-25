@@ -96,18 +96,17 @@ class ManifestTests(unittest.TestCase):
         observed_args = []
         def run(args, log, timeout):
             observed_args.extend(args)
-            return 0, f"mode=whisper\ntext_path={text}\nasr_model=Qwen3-ASR-1.7B-bf16\n".encode()
+            return 0, f"mode=whisper\ntext_path={text}\nasr_model=Qwen3-ASR-1.7B-8bit\n".encode()
         m = cm.new_manifest("https://www.bilibili.com/video/BVexample", "bilibili", "video")
         with patch.object(content, "resolve_media", return_value={"id": "BVexample", "title": "元数据", "duration": 2}), \
                 patch.object(content, "run_logged", side_effect=run), patch.object(content, "extract_frames"):
-            content.collect_video(m["original_url"], self.root, m, quality="accurate")
+            content.collect_video(m["original_url"], self.root, m)
         self.assertEqual(m["channels"]["asr"]["status"], "complete")
         self.assertEqual([a["kind"] for a in m["artifacts"]], ["source", "asr"])
         self.assertIn("00:00:01", (self.root / "asr.txt").read_text())
-        self.assertEqual(observed_args[observed_args.index("--quality") + 1], "accurate")
-        self.assertEqual(m["channels"]["asr"]["requested_quality"], "accurate")
+        self.assertEqual(observed_args[-1], "auto")
         self.assertEqual(m["channels"]["asr"]["provenance"], "omlx")
-        self.assertEqual(m["channels"]["asr"]["model"], "Qwen3-ASR-1.7B-bf16")
+        self.assertEqual(m["channels"]["asr"]["model"], "Qwen3-ASR-1.7B-8bit")
         self.assertEqual(m["channels"]["asr"]["timestamp_source"], "audio_chunk")
 
 

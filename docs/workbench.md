@@ -54,7 +54,7 @@ OpenClaw 复用原生 LaunchAgent。`service openclaw up` 首次注册网关并�
 oMLX 的受管服务配置在 `components/mac/config/omlx-service.json`。修改后运行
 `./workbench service omlx restart`：工作台只合并其中明确管理的服务键到 oMLX 数据目录的
 `settings.json`，保留 API key、模型目录、缓存等本机内容，再重启 Homebrew 服务并检查实际
-监听端口和 `/v1/models` 接口。默认只监听本机 `127.0.0.1:8000`；服务启动和状态查询不需要 sudo。
+监听端口和 `/v1/models` 接口。默认只监听本机 `127.0.0.1:8037`；服务启动和状态查询不需要 sudo。
 
 ## `.env` 本地历史
 

@@ -115,32 +115,30 @@ class LocalMediaTests(unittest.TestCase):
         root.mkdir(parents=True, exist_ok=True)
         video = self.make_video(root)
         expected = characters((FIXTURE / "reference.txt").read_text())
-        results = []
-        for quality in ("fast", "accurate"):
-            with self.subTest(quality=quality):
-                command = ["bash", str(SKILL / "scripts/extract_video_text.sh"), str(video), str(root / quality),
-                           "auto", "--quality", quality]
-                completed = subprocess.run(command, capture_output=True, text=True, timeout=600)
-                (root / f"{quality}-entrypoint.log").write_text(completed.stdout + completed.stderr)
-                self.assertEqual(completed.returncode, 0, completed.stderr)
-                values = fields(completed.stdout)
-                record = json.loads(Path(values["text_path"]).with_suffix(".asr.json").read_text())
-                actual = characters("".join(piece["text"] for piece in record["chunks"]))
-                item = {"quality": quality, "model": record["model"], "cache_reused": values["cache_reused"],
-                        "expected_characters": len(expected), "actual_characters": len(actual),
-                        "all_reference_characters_equal": actual == expected, "expected": expected, "actual": actual,
-                        "audio_path": values["audio_path"], "text_path": values["text_path"],
-                        "asr_elapsed_seconds": values["asr_elapsed_seconds"], "human_listening_performed": False}
-                results.append(item)
-                (root / "real-asr-results.json").write_text(json.dumps(results, ensure_ascii=False, indent=2) + "\n")
-                self.assertEqual(actual, expected, "实际 ASR 与事先参考稿逐字不符；不允许按参考稿修正文稿")
-                self.assertEqual(len(record["chunks"]), 2)
-                # 摘要请求包含真实转写、模型、文件来源与块级时间精度。
-                prompt = subprocess.run(["bash", str(SKILL / "scripts/render_summary_prompt.sh"), str(video), "",
-                                         values["duration_sec"], values["text_path"]], capture_output=True, text=True, check=True)
-                (root / f"{quality}-summary_request.md").write_text(prompt.stdout)
-                self.assertIn(record["model"], prompt.stdout)
-                self.assertIn("local_filename", prompt.stdout)
+        command = ["bash", str(SKILL / "scripts/extract_video_text.sh"), str(video), str(root / "output"),
+                   "auto"]
+        completed = subprocess.run(command, capture_output=True, text=True, timeout=600)
+        (root / "entrypoint.log").write_text(completed.stdout + completed.stderr)
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        values = fields(completed.stdout)
+        record = json.loads(Path(values["text_path"]).with_suffix(".asr.json").read_text())
+        actual = characters("".join(piece["text"] for piece in record["chunks"]))
+        item = {"model": record["model"], "cache_reused": values["cache_reused"],
+                "expected_characters": len(expected), "actual_characters": len(actual),
+                "all_reference_characters_equal": actual == expected, "expected": expected, "actual": actual,
+                "audio_path": values["audio_path"], "text_path": values["text_path"],
+                "asr_elapsed_seconds": values["asr_elapsed_seconds"], "human_listening_performed": False}
+        (root / "real-asr-results.json").write_text(json.dumps(item, ensure_ascii=False, indent=2) + "\n")
+        self.assertEqual(record["model"], "Qwen3-ASR-1.7B-8bit")
+        self.assertEqual(values["cache_reused"], "0")
+        self.assertEqual(actual, expected, "实际 ASR 与事先参考稿逐字不符；不允许按参考稿修正文稿")
+        self.assertEqual(len(record["chunks"]), 2)
+        # 摘要请求包含真实转写、模型、文件来源与块级时间精度。
+        prompt = subprocess.run(["bash", str(SKILL / "scripts/render_summary_prompt.sh"), str(video), "",
+                                 values["duration_sec"], values["text_path"]], capture_output=True, text=True, check=True)
+        (root / "summary_request.md").write_text(prompt.stdout)
+        self.assertIn(record["model"], prompt.stdout)
+        self.assertIn("local_filename", prompt.stdout)
 
 
 if __name__ == "__main__":

@@ -95,11 +95,9 @@
       "models": [
         {
           "type": "cli",
-          "command": "${HOME}/.openclaw/scripts/transcribe-audio-whispercpp-openclaw.sh",
+          "command": "${HOME}/.openclaw/scripts/transcribe-audio-omlx.sh",
           "args": [
-            "{{AttachmentPath}}",
-            "zh",
-            "accurate"
+            "{{AttachmentPath}}"
           ],
           "capabilities": [
             "audio"

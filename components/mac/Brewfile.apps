@@ -19,6 +19,8 @@ cask "telegram"
 cask "wechat"
 # Homebrew 只准备搜狗输入法的原厂安装器，实际安装由本人在 macOS 界面完成。
 cask "sogouinput"
+# OpenWhispr 用全局快捷键录音，并连接本机 oMLX 转写；搜狗继续负责键盘输入。
+cask "openwhispr"
 
 # oMLX 命令行服务默认编译原生自定义内核，需要完整 Xcode 和 Metal Toolchain。
 tap "jundot/omlx", "https://github.com/jundot/omlx", trusted: { formula: "omlx" }

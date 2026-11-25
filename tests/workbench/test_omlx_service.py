@@ -29,14 +29,14 @@ class OmlxService(unittest.TestCase):
                     patch.dict(omlx.os.environ, {}, clear=True), \
                     patch.object(omlx.Path, 'home', return_value=Path(scratch)):
                 omlx.CONFIG.write_text(json.dumps({
-                    'server': {'host': '127.0.0.1', 'port': 8000, 'log_level': 'info'},
+                    'server': {'host': '127.0.0.1', 'port': 8037, 'log_level': 'info'},
                     'scheduler': {'max_concurrent_requests': 8},
                 }))
                 target = omlx.apply_config(omlx.managed_settings())
             saved = json.loads(settings.read_text())
             self.assertEqual(target, settings.resolve())
             self.assertEqual(saved['server'], {
-                'port': 8000, 'cors_origins': ['http://localhost'],
+                'port': 8037, 'cors_origins': ['http://localhost'],
                 'host': '127.0.0.1', 'log_level': 'info',
             })
             self.assertEqual(saved['auth'], {'api_key': 'private-key'})

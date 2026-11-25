@@ -84,7 +84,6 @@ def main():
     parser.add_argument("media", type=Path)
     parser.add_argument("output_root", type=Path)
     parser.add_argument("mode", choices=("dryrun", "video", "audio", "auto", "whisper", "subtitle"))
-    parser.add_argument("profile", choices=("auto", "fast", "accurate"))
     parser.add_argument("--check-deps", action="store_true")
     args = parser.parse_args()
     media = args.media.expanduser().resolve(strict=True)
@@ -103,12 +102,11 @@ def main():
         raise ValueError("local_media_has_no_decodable_audio_stream")
     source_hash = digest_file(media)
     root = args.output_root.expanduser().resolve() / ("local-" + source_hash[:32])
-    profile = "fast" if args.profile == "auto" else args.profile
     if args.check_deps:
-        result = subprocess.run([sys.executable, str(HERE / "omlx_transcribe.py"), "--check", profile])
+        result = subprocess.run([sys.executable, str(HERE / "omlx_transcribe.py"), "--check"])
         if result.returncode:
             return result.returncode
-        print(f"dependency_ok=1\nsource=local\nrun_dir={root}\nwhisper_profile={profile}")
+        print(f"dependency_ok=1\nsource=local\nrun_dir={root}")
         return 0
     if args.mode in ("dryrun", "video"):
         print(f"source=local\nmode={args.mode}\nmedia_path={media}\nmedia_sha256={source_hash}")
@@ -126,7 +124,7 @@ def main():
           f"audio_duration_seconds={source_record['duration_seconds']}", flush=True)
     for key in ("platform", "video_id", "video_title", "title_source", "suggested_thread_title"):
         print(f"{key}={identity[key]}")
-    print(f"identity_path={root / 'video_identity.json'}\nwhisper_profile={profile}", flush=True)
+    print(f"identity_path={root / 'video_identity.json'}", flush=True)
     if args.mode == "audio":
         print("mode=audio")
         return 0
@@ -135,7 +133,7 @@ def main():
     log = logs / "local-whisper.log"
     with log.open("w") as target:
         result = subprocess.run([sys.executable, str(HERE / "omlx_transcribe.py"), str(audio), str(prefix),
-                                 "auto", profile], stdout=target, stderr=subprocess.STDOUT)
+                                 "auto"], stdout=target, stderr=subprocess.STDOUT)
     if result.returncode:
         print(f"failure_stage=transcription\nfailure_log={log}", file=sys.stderr)
         # 客户端只输出状态和认证来源，绝不回显服务错误体或密钥。

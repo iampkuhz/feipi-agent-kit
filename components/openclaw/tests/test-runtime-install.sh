@@ -24,8 +24,8 @@ HOME="$TEST_HOME" "$REPO_DIR/scripts/install-runtime.sh" --check >/dev/null
 [[ "$(readlink "$TEST_HOME/.openclaw/.env")" == "$TEST_HOME/.env" ]]
 [[ ! -L "$TEST_HOME/.openclaw/openclaw.json" ]]
 cmp -s "$TEST_HOME/.openclaw/openclaw.json" "$REPO_DIR/openclaw.json"
-cmp -s "$TEST_HOME/.openclaw/scripts/transcribe-audio-whispercpp-openclaw.sh" \
-  "$REPO_DIR/scripts/transcribe-audio-whispercpp-openclaw.sh"
+cmp -s "$TEST_HOME/.openclaw/scripts/transcribe-audio-omlx.sh" \
+  "$REPO_DIR/scripts/transcribe-audio-omlx.sh"
 
 while IFS= read -r relative_path; do
   target_file="$TEST_HOME/.openclaw/workspace/$relative_path"

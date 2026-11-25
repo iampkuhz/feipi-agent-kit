@@ -120,7 +120,6 @@ for required_file in \
   "$TARGET_DIR/scripts/install_deps.sh" \
   "$TARGET_DIR/scripts/lib/yt_dlp_common.sh" \
   "$TARGET_DIR/scripts/lib/youtube_retry_policy.sh" \
-  "$TARGET_DIR/scripts/lib/omlx_transcribe.sh" \
   "$TARGET_DIR/scripts/lib/omlx_transcribe.py" \
   "$TARGET_DIR/references/omlx-asr.md" \
   "$TARGET_DIR/references/sources.md"; do
@@ -195,7 +194,7 @@ if grep -En 'feipi-scripts/video|feipi-read-youtube-video|feipi-read-bilibili-vi
   "$TARGET_DIR/scripts/extract_video_text.sh" \
   "$TARGET_DIR/scripts/install_deps.sh" \
   "$TARGET_DIR/scripts/lib/yt_dlp_common.sh" \
-  "$TARGET_DIR/scripts/lib/omlx_transcribe.sh" >&2; then
+  "$TARGET_DIR/scripts/lib/omlx_transcribe.py" >&2; then
   echo "检测到旧依赖或旧 skill 名残留" >&2
   exit 1
 fi

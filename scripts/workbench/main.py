@@ -78,7 +78,7 @@ def mappings(component):
             ('desktop/iterm2/profile.json', 'Library/Application Support/iTerm2/DynamicProfiles/dotfiles.json')]:
             result[relative] = (base/relative, HOME/target)
     elif component == 'openclaw':
-        for rel in ['openclaw.json', 'scripts/transcribe-audio-whispercpp-openclaw.sh']:
+        for rel in ['openclaw.json', 'scripts/transcribe-audio-omlx.sh']:
             result[rel] = (base/rel, HOME/'.openclaw'/rel)
         manifest = json.loads((base/'templates/workspace/manifest.json').read_text())
         for rel in manifest['files']:

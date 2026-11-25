@@ -53,7 +53,6 @@ brew "wget"
 brew "hf"
 brew "ffmpeg"
 brew "yt-dlp"
-brew "whisper.cpp"
 
 # 本地服务运行时
 brew "podman"

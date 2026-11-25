@@ -225,7 +225,7 @@ try:
     record = cached(path.with_suffix(''), repair_text=False)
     audio = path.with_suffix('.whisper.wav')
     if record and audio.is_file():
-        record = cached(path.with_suffix(''), fingerprint(audio, record['profile'], record['language'],
+        record = cached(path.with_suffix(''), fingerprint(audio, record['language'],
                         record['chunk_seconds']), repair_text=False)
     if record:
         print('oMLX 来源信息: ' + json.dumps({key: record.get(key) for key in

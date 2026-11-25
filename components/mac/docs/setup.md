@@ -64,8 +64,30 @@ oMLX 服务配置由 `config/omlx-service.json` 管理。修改 host、port 或�
 `./workbench service omlx restart`；工作台合并受管键到 `~/.omlx/settings.json`（或 oMLX
 选择的数据目录），保留 API key、模型、缓存等本机设置，随后重启并确认监听与 API 响应。
 用 `./workbench service omlx status` 查看 PID、实际监听地址和接口状态，`logs` 查看 Homebrew
-服务日志。默认以当前用户运行且仅监听本机 `127.0.0.1:8000`，不需要 sudo。要使用菜单栏应用，请运行
+服务日志。默认以当前用户运行且仅监听本机 `127.0.0.1:8037`，不需要 sudo。要使用菜单栏应用，请运行
 `bash components/mac/bootstrap/desktop-extras.sh install omlx`。
+
+### OpenWhispr 全局听写
+
+`./workbench install mac` 会从 `Brewfile.apps` 补装 OpenWhispr。已有环境只补这一项时运行
+`brew install --cask openwhispr`。首次启动可使用无账号模式。按系统提示给 OpenWhispr 开启
+麦克风和辅助功能，分别用于录音和把文字填回当前输入框。
+
+1. 运行 `./workbench service omlx status` 核对本机服务。换机时在 oMLX 恢复 `Qwen3-ASR-1.7B-8bit`，
+   并以本机 `/v1/models` 返回的模型 ID 为准。
+2. 在 **Settings → Speech to Text → Dictation** 选择 **Self-Hosted**。`Server URL` 填
+   `http://127.0.0.1:8037/v1`，`Model` 填 `Qwen3-ASR-1.7B-8bit`。在
+   **HTTP headers → Add header** 中填 `Authorization`，值填 `Bearer <本机 oMLX API key>`。
+   应用向此基址下的 `/audio/transcriptions` 发送音频，认证信息在应用内保存。
+3. 在 **Preferences → Language** 选择自动识别，在 **Preferences → Clipboard** 开启
+   `Automatic pasting`。在 **Hotkeys** 把 `Dictation Hotkey` 设为 `Control+Shift+Space`，
+   使用点按启停。在 **Language Model → Dictation Cleanup / Voice Assistant / Translation**
+   关闭对应的三项功能。搜狗继续作为键盘输入法。
+4. 在 TextEdit 草稿中按快捷键录一条含中英文术语的短句，再按一次结束，核对文字出现在
+   原输入框。用 `./workbench service omlx logs` 核对转写请求到了本机服务。
+
+参考 [OpenWhispr 的 Homebrew 安装项](https://formulae.brew.sh/cask/openwhispr) 和
+[自定义转写接口说明](https://github.com/OpenWhispr/openwhispr/tree/main/examples/custom-asr-shim)。
 
 ### 固定桌面应用
 
@@ -86,7 +108,7 @@ oMLX 公证票据及 CLI 入口；实际启动仍需单独验收。
 `omlx` 使用应用自带 CLI。模型和真实业务请求另行验收。
 非交互脚本先 `source components/mac/bootstrap/environment.sh`；它和交互 Zsh 都预留 `~/.omlx/bin`，优先使用应用原生入口，尚未打开应用时回退到 `~/.local/bin`。原生入口由 oMLX 创建并读取其数据目录设置；不会为此向 shell 启动文件追加另一份配置。
 恢复三个既用 oMLX 模型后运行 `python3 components/mac/bootstrap/verify-extras.py`：
-用随机本机端口验证文本推理及两套语音识别。
+用随机本机端口验证文本推理及固定模型的语音识别。
 仅创建本次隔离状态和公开验证音频，结束清理自有进程，保留私有日志、源码摘要及结果报告。
 模型不在默认位置时传 `--model-dir 路径`。
 参考：[FlClash 官方发布](https://github.com/pickrui/FlClash/releases/tag/v0.9.3)、
@@ -172,7 +194,7 @@ Java 验收用本机 JDK 25 编译并运行小程序。报告、日志、源码�
 虽能抽取 PDF 中文却没有可见字形。直接从其他环境调用 Office 转换时也应传入该配置。
 
 原生应用验收使用 `python3 components/mac/bootstrap/verify-extras.py`。oMLX 模型已恢复到
-`~/.omlx/models` 且有迁入设置时，验收从设置的隔离副本解析模型路径，完成真实文本和两套语音请求，
+`~/.omlx/models` 且有迁入设置时，验收从设置的隔离副本解析模型路径，完成真实文本和固定语音模型请求，
 不改动原设置；使用其他模型目录时可传 `--model-dir`。
 
 服务、Skills、模型与业务资料按统一工作台的[恢复说明](../../../docs/workbench.md)处理；

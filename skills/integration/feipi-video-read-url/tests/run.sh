@@ -97,12 +97,10 @@ while IFS= read -r raw || [[ -n "$raw" ]]; do
   line="$(printf '%s' "$line" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
   [[ -z "$line" ]] && continue
 
-  IFS='|' read -r KIND URL ARG3 ARG4 ARG5 <<< "$line"
+  IFS='|' read -r KIND URL ARG3 <<< "$line"
   KIND="$(printf '%s' "${KIND:-}" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
   URL="$(printf '%s' "${URL:-}" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
   ARG3="$(printf '%s' "${ARG3:-}" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
-  ARG4="$(printf '%s' "${ARG4:-}" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
-  ARG5="$(printf '%s' "${ARG5:-}" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
 
   TOTAL=$((TOTAL + 1))
   case_id="case-$TOTAL"
@@ -113,9 +111,8 @@ while IFS= read -r raw || [[ -n "$raw" ]]; do
   case "$KIND" in
     download)
       MODE="${ARG3:-dryrun}"
-      WHISPER_PROFILE="${ARG4:-auto}"
       set +e
-      bash "$DOWNLOAD_SCRIPT" "$URL" "$case_dir" "$MODE" "$WHISPER_PROFILE" >"$log_file" 2>&1
+      bash "$DOWNLOAD_SCRIPT" "$URL" "$case_dir" "$MODE" >"$log_file" 2>&1
       code=$?
       set -e
 
@@ -165,60 +162,11 @@ while IFS= read -r raw || [[ -n "$raw" ]]; do
       PASSED=$((PASSED + 1))
       ;;
     summary)
-      INSTRUCTION="$ARG3"
-      EXPECTED_PROFILE="${ARG4:-fast}"
-      RUN_TYPE="${ARG5:-extract}"
-
-      selection_cmd=(bash "$EXTRACT_SCRIPT" "$URL" "$case_dir/selection" auto --quality auto --check-deps)
-      if [[ -n "$INSTRUCTION" ]]; then
-        selection_cmd+=(--instruction "$INSTRUCTION")
-      fi
-
       set +e
-      selection_output="$("${selection_cmd[@]}" 2>&1)"
-      selection_code=$?
-      set -e
-      printf "[selection]\n%s\n" "$selection_output" >"$log_file"
-
-      if [[ "$selection_code" -ne 0 ]]; then
-        echo "[FAIL] $case_id 选档检查失败" >&2
-        echo "日志: $log_file" >&2
-        FAILED=$((FAILED + 1))
-        continue
-      fi
-
-      selected_profile="$(printf "%s\n" "$selection_output" | sed -n 's/^whisper_profile=//p' | tail -n1)"
-      selected_run_dir="$(printf "%s\n" "$selection_output" | sed -n 's/^run_dir=//p' | tail -n1)"
-      if [[ "$selected_profile" != "$EXPECTED_PROFILE" ]]; then
-        echo "[FAIL] $case_id 选档不符合预期（expect=$EXPECTED_PROFILE actual=$selected_profile）" >&2
-        echo "日志: $log_file" >&2
-        FAILED=$((FAILED + 1))
-        continue
-      fi
-
-      if [[ -z "$selected_run_dir" || "$selected_run_dir" != "$case_dir/selection/"* ]]; then
-        echo "[FAIL] $case_id 选档阶段 run_dir 异常（actual=$selected_run_dir）" >&2
-        echo "日志: $log_file" >&2
-        FAILED=$((FAILED + 1))
-        continue
-      fi
-
-      if [[ "$RUN_TYPE" == "selection" ]]; then
-        echo "[PASS] $case_id selection-only profile=$selected_profile"
-        PASSED=$((PASSED + 1))
-        continue
-      fi
-
-      extract_cmd=(bash "$EXTRACT_SCRIPT" "$URL" "$case_dir" auto --quality auto)
-      if [[ -n "$INSTRUCTION" ]]; then
-        extract_cmd+=(--instruction "$INSTRUCTION")
-      fi
-
-      set +e
-      extract_output="$("${extract_cmd[@]}" 2>&1)"
+      extract_output="$(bash "$EXTRACT_SCRIPT" "$URL" "$case_dir" auto 2>&1)"
       extract_code=$?
       set -e
-      printf "[selection]\n%s\n\n[extract]\n%s\n" "$selection_output" "$extract_output" >"$log_file"
+      printf '%s\n' "$extract_output" >"$log_file"
 
       if [[ "$extract_code" -ne 0 ]]; then
         echo "[FAIL] $case_id 文本提取失败" >&2
@@ -229,15 +177,6 @@ while IFS= read -r raw || [[ -n "$raw" ]]; do
 
       text_path="$(printf "%s\n" "$extract_output" | sed -n 's/^text_path=//p' | tail -n1)"
       run_dir="$(printf "%s\n" "$extract_output" | sed -n 's/^run_dir=//p' | tail -n1)"
-      whisper_profile="$(printf "%s\n" "$extract_output" | sed -n 's/^whisper_profile=//p' | tail -n1)"
-
-      if [[ "$whisper_profile" != "$EXPECTED_PROFILE" ]]; then
-        echo "[FAIL] $case_id 提取阶段选档不符合预期（expect=$EXPECTED_PROFILE actual=$whisper_profile）" >&2
-        echo "日志: $log_file" >&2
-        FAILED=$((FAILED + 1))
-        continue
-      fi
-
       if [[ -z "$text_path" || ! -f "$text_path" ]]; then
         echo "[FAIL] $case_id 未产出文本文件" >&2
         echo "日志: $log_file" >&2
@@ -444,28 +383,12 @@ else
   stub_fail_msg "retryable-429" "429 未被识别为可重试错误"
 fi
 
-# --- 离线 stub 测试：档位语义验证（不依赖真实网络/whisper） ---
-
-# oMLX 的档位、缓存与失败行为通过真实 HTTP 替身验证。
 run_simple_case "omlx-asr-contract" pass python3 "$SCRIPT_DIR/test_omlx_transcribe.py"
 run_simple_case "local-media-contract" pass python3 "$SCRIPT_DIR/test_local_media.py"
 run_simple_case "pause-split-contract" pass python3 "$SCRIPT_DIR/test_split_audio.py"
 
-# 测试 8：download_youtube.sh 的 auto 不再因为时长切 accurate
 YOUTUBE_SCRIPT="$RUNTIME_DIR/download_youtube.sh"
-if grep -Eq 'auto_duration_short' "$YOUTUBE_SCRIPT"; then
-  stub_fail_msg "yt-no-duration-accurate" "download_youtube.sh 仍存在 auto_duration_short 逻辑"
-else
-  stub_pass "yt-no-duration-accurate"
-fi
-
-# 测试 9：download_bilibili.sh 的 auto 不再因为时长切 accurate
 BILIBILI_SCRIPT="$RUNTIME_DIR/download_bilibili.sh"
-if grep -Eq 'auto_duration_short' "$BILIBILI_SCRIPT"; then
-  stub_fail_msg "bili-no-duration-accurate" "download_bilibili.sh 仍存在 auto_duration_short 逻辑"
-else
-  stub_pass "bili-no-duration-accurate"
-fi
 
 # --- 测试 11（增强）：重试链预算验证 ---
 
@@ -678,7 +601,7 @@ else
 fi
 
 # 测试 12c：输出包含关键状态字段
-for field in run_dir mode text_path log_dir whisper_profile; do
+for field in run_dir mode text_path log_dir; do
   if ! grep -Eq "^echo \"$field=" "$EXTRACT_SCRIPT"; then
     stub_fail_msg "extract-output-fields" "extract_video_text.sh 未输出 $field 字段"
     break
@@ -880,25 +803,17 @@ ffmpeg() {
   return 0
 }
 
-# mock whisper helper：创建预期的 .srt 和 .txt 文件，并输出诊断信息到日志。
-MOCK_WHISPER="$STUB_DIR_BACKFILL/mock-whispercpp.sh"
-cat > "$MOCK_WHISPER" << 'WHISPER_MOCK'
-#!/usr/bin/env bash
-transcribe_audio="$1"
-output_prefix="$2"
-srt_file="$output_prefix.srt"
-text_file="$output_prefix.txt"
-echo "requested_profile=fast"
-echo "profile=fast"
-echo "model=mock"
-echo "device=mock"
-printf '1\n00:00:00,000 --> 00:00:01,000\nmock transcript text\n' > "$srt_file"
-echo "- [00:00] mock transcript text" > "$text_file"
-exit 0
-WHISPER_MOCK
-chmod +x "$MOCK_WHISPER"
-
-output="$(yt_common_run_whisper_mode_from_url "https://youtube.com/watch?v=test" "$STUB_DIR_BACKFILL" "$MOCK_WHISPER" "zh" "fast")"
+# 在子 shell 中替换转写命令，字幕解析仍使用真实 Python。
+output="$(
+  python3() {
+    if [[ "$1" == */omlx_transcribe.py ]]; then
+      printf '1\n00:00:00,000 --> 00:00:01,000\nmock transcript text\n' > "$3.srt"
+    else
+      command python3 "$@"
+    fi
+  }
+  yt_common_run_whisper_mode_from_url "https://youtube.com/watch?v=test" "$STUB_DIR_BACKFILL" zh
+)"
 backfill_code=$?
 
 if [[ "$backfill_code" -ne 0 ]]; then
@@ -1133,7 +1048,7 @@ fi
 # --- 测试 8：输出包含关键状态字段 ---
 EXTRACT_SCRIPT="$SKILL_DIR/scripts/extract_video_text.sh"
 STATUS_FIELDS_OK=1
-for field in "run_dir=" "mode=" "text_path=" "log_dir=" "whisper_profile=" "duration_sec=" "long_video=" "estimated_risk="; do
+for field in "run_dir=" "mode=" "text_path=" "log_dir=" "duration_sec=" "long_video=" "estimated_risk="; do
   if ! grep -Eq "echo.*${field}" "$EXTRACT_SCRIPT"; then
     STATUS_FIELDS_OK=0
     stub_fail_msg "output-status-fields" "extract_video_text.sh 未输出字段: $field"
@@ -1145,7 +1060,6 @@ if [[ "$STATUS_FIELDS_OK" -eq 1 ]]; then
 fi
 
 # --- 测试 9：残留 .whisper.wav 不会被误删 ---
-WHISPER_HELPER="$SKILL_DIR/scripts/lib/omlx_transcribe.sh"
 if grep -Eq 'rm -f.*out_dir.*\.whisper\.wav' "$SKILL_DIR/scripts/lib/yt_dlp_common.sh"; then
   stub_fail_msg "no-aggressive-wav-cleanup" "yt_dlp_common.sh 仍存在通配符删除 .whisper.wav"
 else
@@ -1158,15 +1072,6 @@ else
   stub_fail_msg "whisper-reuse-residual" "yt_dlp_common.sh 未找到复用已有转写结果的逻辑"
 fi
 
-
-# accurate 不复用 fast 已由 omlx-asr-contract 实际执行公共流程与 HTTP 请求验证。
-
-# --- 测试 11：install_deps.sh 默认不要求 accurate 模型 ---
-if grep -Eq "REQUIRE_ACCURATE=0" "$SKILL_DIR/scripts/install_deps.sh"; then
-  stub_pass "install-deps-fast-default"
-else
-  stub_fail_msg "install-deps-fast-default" "install_deps.sh 默认 REQUIRE_ACCURATE 不为 0"
-fi
 
 # --- 测试 12：长视频时长探测覆盖 auto 模式 ---
 if grep -Fq '"$MODE" == "whisper" || "$MODE" == "auto"' "$EXTRACT_SCRIPT"; then

@@ -4,13 +4,9 @@ set -euo pipefail
 # 依据 URL 来源统一提取带时间戳文本。
 # 用法：
 #   bash scripts/extract_video_text.sh <url> [output_root_dir] [auto|subtitle|whisper] \
-#     [--instruction "用户原始指令"] [--quality auto|fast|accurate] [--check-deps]
+#     [--check-deps]
 
 CHECK_ONLY="0"
-INSTRUCTION_TEXT=""
-QUALITY_HINT="auto"
-PROFILE_REASON="default_fast"
-WHISPER_PROFILE="fast"
 URL=""
 OUT_ROOT_DIR="./tmp/video-text"
 RUN_DIR=""
@@ -22,72 +18,7 @@ LAST_MODE_LOG=""
 ATTEMPT_LOGS=()
 
 usage() {
-  echo "用法: bash scripts/extract_video_text.sh <url> [output_root_dir] [auto|subtitle|whisper] [--instruction \"文本\"] [--quality auto|fast|accurate] [--check-deps]" >&2
-}
-
-contains_any() {
-  local haystack="$1"
-  shift
-
-  local keyword
-  for keyword in "$@"; do
-    if [[ -n "$keyword" && "$haystack" == *"$keyword"* ]]; then
-      return 0
-    fi
-  done
-
-  return 1
-}
-
-resolve_whisper_profile() {
-  local quality_hint="$1"
-  local instruction="$2"
-  local normalized
-
-  case "$quality_hint" in
-    fast)
-      PROFILE_REASON="explicit_fast"
-      echo "fast"
-      return 0
-      ;;
-    accurate)
-      PROFILE_REASON="explicit_accurate"
-      echo "accurate"
-      return 0
-      ;;
-    auto)
-      ;;
-    *)
-      echo "invalid_quality"
-      return 1
-      ;;
-  esac
-
-  if [[ -z "$instruction" ]]; then
-    PROFILE_REASON="auto_default_fast"
-    echo "fast"
-    return 0
-  fi
-
-  normalized="$(printf "%s" "$instruction" | tr '[:upper:]' '[:lower:]')"
-  if contains_any "$normalized" \
-    "高质量" "高精度" "高准确" "准确率" "精确" "逐字" "逐句" "完整转写" "高保真" "质量优先" \
-    "high quality" "accurate" "precision" "verbatim"; then
-    PROFILE_REASON="auto_high_quality_instruction"
-    echo "accurate"
-    return 0
-  fi
-
-  if contains_any "$normalized" \
-    "快速" "尽快" "速度优先" "低延迟" "先粗略" "快一点" \
-    "fast" "quick" "speed first" "low latency"; then
-    PROFILE_REASON="auto_speed_instruction"
-    echo "fast"
-    return 0
-  fi
-
-  PROFILE_REASON="auto_default_fast"
-  echo "fast"
+  echo "用法: bash scripts/extract_video_text.sh <url> [output_root_dir] [auto|subtitle|whisper] [--check-deps]" >&2
 }
 
 POSITIONAL_ARGS=()
@@ -96,24 +27,6 @@ while [[ $# -gt 0 ]]; do
     --check-deps)
       CHECK_ONLY="1"
       shift
-      ;;
-    --instruction)
-      if [[ -z "${2:-}" ]]; then
-        echo "--instruction 缺少参数" >&2
-        usage
-        exit 1
-      fi
-      INSTRUCTION_TEXT="$2"
-      shift 2
-      ;;
-    --quality)
-      if [[ -z "${2:-}" ]]; then
-        echo "--quality 缺少参数" >&2
-        usage
-        exit 1
-      fi
-      QUALITY_HINT="$2"
-      shift 2
       ;;
     -h|--help)
       usage
@@ -152,17 +65,6 @@ fi
 
 if [[ "$MODE" != "auto" && "$MODE" != "subtitle" && "$MODE" != "whisper" ]]; then
   echo "mode 仅支持 auto|subtitle|whisper，当前: $MODE" >&2
-  exit 1
-fi
-
-if [[ "$QUALITY_HINT" != "auto" && "$QUALITY_HINT" != "fast" && "$QUALITY_HINT" != "accurate" ]]; then
-  echo "quality 仅支持 auto|fast|accurate，当前: $QUALITY_HINT" >&2
-  exit 1
-fi
-
-WHISPER_PROFILE="$(resolve_whisper_profile "$QUALITY_HINT" "$INSTRUCTION_TEXT" || true)"
-if [[ "$WHISPER_PROFILE" != "fast" && "$WHISPER_PROFILE" != "accurate" ]]; then
-  echo "无法解析 whisper 档位，请检查 quality 或 instruction 输入。" >&2
   exit 1
 fi
 
@@ -342,11 +244,11 @@ resolve_url_key() {
 }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# 本地文件不进入站点、Cookie、代理或 yt-dlp 链路；沿用相同选档与文本输出合同。
+# 本地文件不进入站点、Cookie、代理或 yt-dlp 链路；复用同一转写客户端与文本输出合同。
 if [[ ! "$URL" =~ ^https?:// ]]; then
   local_args=()
   if [[ "$CHECK_ONLY" == "1" ]]; then local_args+=(--check-deps); fi
-  exec python3 "$SCRIPT_DIR/lib/read_local_media.py" "$URL" "$OUT_ROOT_DIR" "$MODE" "$WHISPER_PROFILE" "${local_args[@]+${local_args[@]}}"
+  exec python3 "$SCRIPT_DIR/lib/read_local_media.py" "$URL" "$OUT_ROOT_DIR" "$MODE" "${local_args[@]+${local_args[@]}}"
 fi
 INSTALL_SCRIPT="$SCRIPT_DIR/install_deps.sh"
 YT_COMMON_LIB="$SCRIPT_DIR/lib/yt_dlp_common.sh"
@@ -394,15 +296,11 @@ if ! yt_common_require_tools dryrun; then
 fi
 
 if [[ "$CHECK_ONLY" == "1" ]]; then
-  dependency_args=(--check)
-  if [[ "$WHISPER_PROFILE" == "accurate" ]]; then dependency_args+=(--accurate); fi
-  bash "$INSTALL_SCRIPT" "${dependency_args[@]}" >/dev/null
+  bash "$INSTALL_SCRIPT" --check >/dev/null
   echo "dependency_ok=1"
   echo "source=$SOURCE"
   echo "run_dir=$RUN_DIR"
   echo "script=$SOURCE_SCRIPT"
-  echo "whisper_profile=$WHISPER_PROFILE"
-  echo "selection_reason=$PROFILE_REASON"
   exit 0
 fi
 
@@ -413,7 +311,7 @@ NETWORK_CACHE_FILE="$LOG_DIR/network-ready"
 rm -f "$NETWORK_CACHE_FILE"
 
 # 长视频保护：检测视频时长，输出风险提示。
-# 仅做信息提示，不阻断执行；用户显式指定 accurate 仍可按设计执行。
+# 仅做信息提示，不阻断执行。
 LONG_VIDEO_FLAG="0"
 DURATION_SEC=""
 ESTIMATED_RISK="low"
@@ -442,7 +340,7 @@ fi
 run_mode() {
   local mode="$1"
   local auth_mode="${2:-auth}"
-  local marker log_file newest_txt
+  local marker log_file newest_txt code=0
 
   MODE_CALL_COUNT=$((MODE_CALL_COUNT + 1))
   if [[ "$MODE_CALL_COUNT" -gt "$MAX_MODE_CALLS" ]]; then
@@ -461,22 +359,11 @@ run_mode() {
   TEXT_FILE=""
   marker="$(mktemp "$RUN_DIR/.txt-marker.XXXXXX")"
 
-  set +e
-  if [[ "$mode" == "whisper" ]]; then
-    if [[ "$auth_mode" == "no_auth" && "$SOURCE" == "youtube" ]]; then
-      env AGENT_VIDEO_NETWORK_CACHE_FILE="$NETWORK_CACHE_FILE" AGENT_CHROME_PROFILE= AGENT_YOUTUBE_COOKIE_FILE= bash "$SOURCE_SCRIPT" "$URL" "$RUN_DIR" "$mode" "$WHISPER_PROFILE" >"$log_file" 2>&1
-    else
-      env AGENT_VIDEO_NETWORK_CACHE_FILE="$NETWORK_CACHE_FILE" bash "$SOURCE_SCRIPT" "$URL" "$RUN_DIR" "$mode" "$WHISPER_PROFILE" >"$log_file" 2>&1
-    fi
+  if [[ "$auth_mode" == "no_auth" && "$SOURCE" == "youtube" ]]; then
+    env AGENT_VIDEO_NETWORK_CACHE_FILE="$NETWORK_CACHE_FILE" AGENT_CHROME_PROFILE= AGENT_YOUTUBE_COOKIE_FILE= bash "$SOURCE_SCRIPT" "$URL" "$RUN_DIR" "$mode" >"$log_file" 2>&1 || code=$?
   else
-    if [[ "$auth_mode" == "no_auth" && "$SOURCE" == "youtube" ]]; then
-      env AGENT_VIDEO_NETWORK_CACHE_FILE="$NETWORK_CACHE_FILE" AGENT_CHROME_PROFILE= AGENT_YOUTUBE_COOKIE_FILE= bash "$SOURCE_SCRIPT" "$URL" "$RUN_DIR" "$mode" >"$log_file" 2>&1
-    else
-      env AGENT_VIDEO_NETWORK_CACHE_FILE="$NETWORK_CACHE_FILE" bash "$SOURCE_SCRIPT" "$URL" "$RUN_DIR" "$mode" >"$log_file" 2>&1
-    fi
+    env AGENT_VIDEO_NETWORK_CACHE_FILE="$NETWORK_CACHE_FILE" bash "$SOURCE_SCRIPT" "$URL" "$RUN_DIR" "$mode" >"$log_file" 2>&1 || code=$?
   fi
-  local code=$?
-  set -e
 
   rename_recent_files "$marker"
   newest_txt="$(find "$RUN_DIR" -maxdepth 1 -type f -name '*.txt' -newer "$marker" | sort | tail -n1 || true)"
@@ -580,20 +467,11 @@ USED_MODE=""
 STRATEGY=""
 
 if [[ "$MODE" == "auto" ]]; then
-  if [[ "$WHISPER_PROFILE" == "accurate" ]]; then
-    STRATEGY="whisper_first"
-    if run_mode_with_fallback whisper; then
-      USED_MODE="whisper"
-    elif run_mode_with_fallback subtitle; then
-      USED_MODE="subtitle"
-    fi
-  else
-    STRATEGY="subtitle_first"
-    if run_mode_with_fallback subtitle; then
-      USED_MODE="subtitle"
-    elif run_mode_with_fallback whisper; then
-      USED_MODE="whisper"
-    fi
+  STRATEGY="subtitle_first"
+  if run_mode_with_fallback subtitle; then
+    USED_MODE="subtitle"
+  elif run_mode_with_fallback whisper; then
+    USED_MODE="whisper"
   fi
 elif [[ "$MODE" == "subtitle" ]]; then
   STRATEGY="subtitle_only"
@@ -610,7 +488,7 @@ fi
 if [[ -z "$TEXT_FILE" ]]; then
   yt_common_report_identity "$URL" - "$RUN_DIR"
   echo "mode_calls=$MODE_CALL_COUNT" >&2
-  echo "文本提取失败: source=$SOURCE mode=$MODE strategy=$STRATEGY whisper_profile=$WHISPER_PROFILE" >&2
+  echo "文本提取失败: source=$SOURCE mode=$MODE strategy=$STRATEGY" >&2
   if [[ "$SOURCE" == "bilibili" ]]; then
     report_bilibili_network_failure "$LOG_DIR" "$MODE" || true
   elif [[ "$SOURCE" == "youtube" ]]; then
@@ -630,8 +508,6 @@ yt_common_report_identity "$URL" - "$RUN_DIR"
 echo "text_path=$TEXT_FILE"
 echo "log_dir=$LOG_DIR"
 echo "strategy=$STRATEGY"
-echo "whisper_profile=$WHISPER_PROFILE"
-echo "selection_reason=$PROFILE_REASON"
 echo "mode_calls=$MODE_CALL_COUNT"
 if [[ "$USED_MODE" == "whisper" ]]; then
   echo "asr_backend=omlx"

@@ -19,12 +19,8 @@ import wave
 
 from split_audio import CHUNK_POLICY, DEFAULT_MAX_SECONDS, audio_properties, plan_audio, validate_max_seconds
 
-MODELS = {"fast": "sensevoicesmall", "accurate": "qwen3-asr-1.7b"}
+MODEL = "Qwen3-ASR-1.7B-8bit"
 CACHE_SCHEMA = "omlx-asr-v2"
-
-
-def effective_profile(profile):
-    return "fast" if profile == "auto" else profile
 
 
 def request_json(base, path, body=None, content_type=None):
@@ -52,33 +48,13 @@ def request_json(base, path, body=None, content_type=None):
     return result
 
 
-def resolve_model(base, profile):
-    family = re.sub(r"[^a-z0-9]", "", MODELS[profile])
-    candidates = []
-    data = request_json(base, "/models").get("data")
-    if not isinstance(data, list):
-        raise ValueError("omlx_invalid_model_list")
-    for item in data:
-        model = item.get("id", "") if isinstance(item, dict) else ""
-        if not isinstance(model, str):
-            continue
-        normalized = re.sub(r"[^a-z0-9]", "", model.rsplit("/", 1)[-1].lower())
-        if re.fullmatch(family + r"(?:bf16|fp16|4bit|8bit)?", normalized):
-            candidates.append(model)
-    if len(candidates) != 1:
-        raise ValueError("omlx_model_{}: {}，请在 oMLX 中提供唯一对应模型".format(
-            "missing" if not candidates else "ambiguous", MODELS[profile]))
-    return candidates[0]
-
-
-def fingerprint(audio, profile, language, max_seconds=DEFAULT_MAX_SECONDS):
+def fingerprint(audio, language, max_seconds=DEFAULT_MAX_SECONDS):
     rate, frames = audio_properties(audio)
     digest = hashlib.sha256()
     with audio.open("rb") as source:
         for block in iter(lambda: source.read(1024 * 1024), b""):
             digest.update(block)
-    return {"schema": CACHE_SCHEMA, "backend": "omlx", "profile": profile,
-            "model_family": MODELS[profile], "language": language,
+    return {"schema": CACHE_SCHEMA, "backend": "omlx", "model": MODEL, "language": language,
             "audio_sha256": digest.hexdigest(), "audio_frames": frames, "sample_rate": rate,
             "chunk_seconds": max_seconds, "chunk_policy": CHUNK_POLICY}
 
@@ -98,18 +74,11 @@ def cached(prefix, expected=None, repair_text=True):
         record = json.loads(Path(str(prefix) + ".asr.json").read_text())
         if not isinstance(record, dict):
             return None
-        if not isinstance(record.get("model"), str) or not record["model"]:
-            return None
         if expected is not None and not all(record.get(key) == value for key, value in expected.items()):
             return None
+        if record.get("model") != MODEL:
+            return None
         if record.get("schema") != CACHE_SCHEMA or record.get("chunk_policy") != CHUNK_POLICY:
-            return None
-        profile = record.get("profile")
-        if profile not in MODELS or record.get("model_family") != MODELS[profile]:
-            return None
-        model = re.sub(r"[^a-z0-9]", "", record["model"].rsplit("/", 1)[-1].lower())
-        family = re.sub(r"[^a-z0-9]", "", MODELS[profile])
-        if not re.fullmatch(family + r"(?:bf16|fp16|4bit|8bit)?", model):
             return None
         maximum = validate_max_seconds(record["chunk_seconds"])
         last = 0
@@ -152,9 +121,9 @@ def cached(prefix, expected=None, repair_text=True):
         return None
 
 
-def multipart(model, language, payload):
+def multipart(language, payload):
     boundary = "feipi" + uuid.uuid4().hex
-    fields = {"model": model, "response_format": "json"}
+    fields = {"model": MODEL, "response_format": "json"}
     if language != "auto":
         fields["language"] = language
     body = bytearray()
@@ -176,13 +145,12 @@ def stamp(seconds):
     return "{:02d}:{:02d}:{:02d},{:03d}".format(hour, minute, second, ms)
 
 
-def transcribe(audio, prefix, language, profile, base, max_seconds=DEFAULT_MAX_SECONDS):
-    expected = fingerprint(audio, profile, language, max_seconds)
+def transcribe(audio, prefix, language, base, max_seconds=DEFAULT_MAX_SECONDS):
+    expected = fingerprint(audio, language, max_seconds)
     record = cached(prefix, expected)
     if record:
         return record, True
     rate, frames, plan = plan_audio(audio, max_seconds)
-    model = resolve_model(base, profile)
     chunks = []
     with wave.open(str(audio), "rb") as source:
         for piece in plan:
@@ -198,18 +166,16 @@ def transcribe(audio, prefix, language, profile, base, max_seconds=DEFAULT_MAX_S
             print("asr_chunk_start={}/{} start={:.3f} end={:.3f} cut={}".format(
                 len(chunks) + 1, len(plan), offset / rate, (offset + count) / rate, piece["cut_reason"]),
                 file=sys.stderr, flush=True)
-            body, content_type = multipart(model, language, payload.getvalue())
+            body, content_type = multipart(language, payload.getvalue())
             result = request_json(base, "/audio/transcriptions", body, content_type)
             text = result.get("text")
             if not isinstance(text, str):
                 raise ValueError("omlx_invalid_transcription_text")
-            # SenseVoice 的语言/情绪标签属于控制信息，不混入摘要正文。
-            text = re.sub(r"<\|[^|]*\|>", "", text).strip()
             start, end = offset / 16000, (offset + count) / 16000
-            chunks.append(dict(piece, start=start, end=end, text=text))
+            chunks.append(dict(piece, start=start, end=end, text=text.strip()))
             print("asr_chunk={}/{}".format(len(chunks), len(plan)), file=sys.stderr, flush=True)
     srt, text = transcript_outputs(chunks)
-    record = dict(expected, model=model, timestamp_source="audio_chunk", duration_seconds=frames / 16000,
+    record = dict(expected, timestamp_source="audio_chunk", duration_seconds=frames / 16000,
                   chunks=chunks, srt_sha256=hashlib.sha256(srt.encode()).hexdigest(),
                   text_sha256=hashlib.sha256(text.encode()).hexdigest())
     prefix.parent.mkdir(parents=True, exist_ok=True)
@@ -233,38 +199,40 @@ def main():
     parser.add_argument("audio", nargs="?")
     parser.add_argument("output_prefix", nargs="?")
     parser.add_argument("language", nargs="?", default="auto", choices=("auto", "zh", "en", "ja", "ko", "yue"))
-    parser.add_argument("profile", nargs="?", default="auto", choices=("auto", "fast", "accurate"))
-    parser.add_argument("--check", choices=("fast", "accurate"))
+    parser.add_argument("--check", action="store_true")
     parser.add_argument("--check-cache", action="store_true")
     parser.add_argument("--max-seconds", type=float, default=DEFAULT_MAX_SECONDS)
     args = parser.parse_args()
     validate_max_seconds(args.max_seconds)
-    base = os.environ.get("AGENT_OMLX_BASE_URL", "http://127.0.0.1:8000/v1").rstrip("/")
+    base = os.environ.get("AGENT_OMLX_BASE_URL", "http://127.0.0.1:8037/v1").rstrip("/")
     # 明确限制本机，保留用户期望的本地服务边界。
     from urllib.parse import urlsplit
     parsed = urlsplit(base)
     if parsed.scheme not in ("http", "https") or parsed.hostname not in ("localhost", "127.0.0.1", "::1") or parsed.username or parsed.password or parsed.query or parsed.fragment:
         raise ValueError("AGENT_OMLX_BASE_URL 必须是无凭据的本机 HTTP(S) 地址")
     if args.check:
-        model = resolve_model(base, args.check)
+        data = request_json(base, "/models").get("data")
+        if not isinstance(data, list):
+            raise ValueError("omlx_invalid_model_list")
+        if not any(isinstance(item, dict) and item.get("id") == MODEL for item in data):
+            raise ValueError(f"omlx_model_missing: {MODEL}")
         print("asr_backend=omlx\nmodel={}\nasr_auth={}".format(
-            model, "env:OMLX_API_KEY" if os.environ.get("OMLX_API_KEY") else "none"))
+            MODEL, "env:OMLX_API_KEY" if os.environ.get("OMLX_API_KEY") else "none"))
         return 0
     if not args.audio or not args.output_prefix:
         parser.error("需要 audio 和 output_prefix")
-    profile = effective_profile(args.profile)
     audio, prefix = Path(args.audio), Path(args.output_prefix)
     if args.check_cache:
-        return 0 if cached(prefix, fingerprint(audio, profile, args.language, args.max_seconds)) else 1
+        return 0 if cached(prefix, fingerprint(audio, args.language, args.max_seconds)) else 1
     started = time.perf_counter()
-    record, reused = transcribe(audio, prefix, args.language, profile, base, args.max_seconds)
+    record, reused = transcribe(audio, prefix, args.language, base, args.max_seconds)
     elapsed = time.perf_counter() - started
     # 仅报告认证来源，缓存命中时明确本次没有发起认证请求。
     auth_source = "not_requested_cache" if reused else "env:OMLX_API_KEY" if os.environ.get("OMLX_API_KEY") else "none"
     print("asr_auth=" + auth_source)
     print("asr_elapsed_seconds={:.3f}".format(elapsed))
-    print("requested_profile={}\nprofile={}\nmodel={}\ndevice=omlx\nasr_backend=omlx\nasr_model={}\nasr_timestamps=audio_chunk\ncache_reused={}\nsrt={}\ntext={}".format(
-        args.profile, profile, record["model"], record["model"], int(reused), str(prefix) + ".srt", str(prefix) + ".txt"))
+    print("model={}\ndevice=omlx\nasr_backend=omlx\nasr_model={}\nasr_timestamps=audio_chunk\ncache_reused={}\nsrt={}\ntext={}".format(
+        record["model"], record["model"], int(reused), str(prefix) + ".srt", str(prefix) + ".txt"))
     return 0
 
 

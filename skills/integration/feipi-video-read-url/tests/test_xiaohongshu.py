@@ -125,7 +125,7 @@ print('装修与家务')
         self.assertFalse(list(self.out.glob("*.mp4")))
 
     def test_auto_returns_timestamped_subtitles_from_real_converter(self):
-        result = self.run_entry("extract_video_text.sh", NOTE, self.out, "auto", "--instruction", "总结视频")
+        result = self.run_entry("extract_video_text.sh", NOTE, self.out, "auto")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("source=xiaohongshu", result.stdout)
         self.assertIn("mode=subtitle", result.stdout)
@@ -149,11 +149,10 @@ yt_common_run_whisper_mode_from_url() {
   printf 'text_file=%s/fixture-transcript.txt\\n' "$2"
 }
 ''')
-        result = self.run_entry("extract_video_text.sh", SHARE, self.out, "auto", "--instruction", "总结视频")
+        result = self.run_entry("extract_video_text.sh", SHARE, self.out, "auto")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("mode=whisper", result.stdout)
         self.assertIn("mode_calls=2", result.stdout)
-        self.assertIn("whisper_profile=fast", result.stdout)
 
     def test_missing_subtitles_is_failure_and_not_note_description(self):
         self.env["XHS_TEST_NO_SUBS"] = "1"

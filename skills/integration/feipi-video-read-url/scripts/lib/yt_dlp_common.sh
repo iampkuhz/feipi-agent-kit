@@ -494,15 +494,11 @@ yt_common_report_youtube_failure() {
 yt_common_run_whisper_mode_from_url() {
   local url="$1"
   local out_dir="$2"
-  local whisper_helper="$3"
-  local language="${4:-zh}"
-  local whisper_profile="${5:-auto}"
-  local audio_download_fn="${6:-yt_common_mode_whisper_audio}"
+  local language="${3:-zh}"
+  local audio_download_fn="${4:-yt_common_mode_whisper_audio}"
 
   local marker audio_file transcribe_audio_file base text_file srt_file output_prefix
   local audio_download_log
-  local transcribe_log used_device used_model used_profile requested_profile
-  local run_code
 
   echo "pipeline_stage=dependency" >&2
   if [[ "$(uname -s)" != "Darwin" ]]; then
@@ -510,24 +506,17 @@ yt_common_run_whisper_mode_from_url() {
     return 1
   fi
 
-  if [[ ! -x "$whisper_helper" ]]; then
-    echo "缺少共享转写脚本: $whisper_helper" >&2
-    return 1
-  fi
-
-  # 只复用当前 oMLX 模型家族、档位、语言和音频指纹均匹配的完整结果。
+  # 只复用模型、语言和音频指纹均匹配的完整结果。
   local existing_wav existing_srt existing_model
   existing_wav="$(find "$out_dir" -maxdepth 1 -name '*.whisper.wav' -type f 2>/dev/null | sort | tail -n1 || true)"
   if [[ -n "$existing_wav" ]]; then
     output_prefix="${existing_wav%.whisper.wav}"
     existing_srt="$output_prefix.srt"
-    if python3 "$YT_COMMON_LIB_DIR/omlx_transcribe.py" "$existing_wav" "$output_prefix" "$language" "$whisper_profile" --check-cache; then
+    if python3 "$YT_COMMON_LIB_DIR/omlx_transcribe.py" "$existing_wav" "$output_prefix" "$language" --check-cache; then
       text_file="$output_prefix.txt"
       yt_common_subtitle_to_text "$existing_srt" "$text_file" || return 1
       existing_model="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["model"])' "$output_prefix.asr.json")"
       echo "复用已有 oMLX whisper 模式转写结果: model=$existing_model" >&2
-      echo "requested_profile=$whisper_profile"
-      echo "profile=reused"
       echo "model=$existing_model"
       echo "asr_backend=omlx"
       echo "asr_model=$existing_model"
@@ -601,47 +590,14 @@ yt_common_run_whisper_mode_from_url() {
   fi
 
   echo "pipeline_stage=transcription" >&2
-  transcribe_log="$(mktemp "$out_dir/.omlx-log.XXXXXX")"
-  set +e
-  bash "$whisper_helper" "$transcribe_audio_file" "$output_prefix" "$language" "$whisper_profile" >"$transcribe_log" 2>&1
-  run_code=$?
-  set -e
-  cat "$transcribe_log"
-  if [[ $run_code -ne 0 ]]; then
-    rm -f "$transcribe_log"
-    return 1
-  fi
-  used_device="$(LC_ALL=C sed -n 's/^device=//p' "$transcribe_log" | tail -n1)"
-  used_model="$(LC_ALL=C sed -n 's/^model=//p' "$transcribe_log" | tail -n1)"
-  used_profile="$(LC_ALL=C sed -n 's/^profile=//p' "$transcribe_log" | tail -n1)"
-  requested_profile="$(LC_ALL=C sed -n 's/^requested_profile=//p' "$transcribe_log" | tail -n1)"
-  rm -f "$transcribe_log"
-  if [[ -z "$used_device" ]]; then
-    used_device="unknown"
-  fi
-  if [[ -z "$used_profile" ]]; then
-    used_profile="unknown"
-  fi
-  if [[ -z "$requested_profile" ]]; then
-    requested_profile="$whisper_profile"
-  fi
-  if [[ -z "$used_model" ]]; then
-    used_model="unknown"
-  fi
+  python3 "$YT_COMMON_LIB_DIR/omlx_transcribe.py" "$transcribe_audio_file" "$output_prefix" "$language" || return 1
 
   if [[ ! -f "$srt_file" ]]; then
     echo "oMLX 已执行，但未找到转写结果: $srt_file" >&2
     return 1
   fi
 
-  # 兼容旧调用方读取元数据；缓存信任来源仍仅为 oMLX 的 .asr.json。
-  printf "profile=%s\nmodel=%s\nlanguage=%s\n" "$used_profile" "$used_model" "$language" > "$output_prefix.meta"
-
   yt_common_subtitle_to_text "$srt_file" "$text_file" || return 1
-  echo "requested_profile=$requested_profile"
-  echo "profile=$used_profile"
-  echo "model=$used_model"
-  echo "device=$used_device"
   echo "audio_file=$audio_file"
   echo "transcribe_audio_file=$transcribe_audio_file"
   echo "text_file=$text_file"

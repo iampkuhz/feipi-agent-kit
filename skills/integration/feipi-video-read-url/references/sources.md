@@ -8,7 +8,7 @@
 
 严道统一入口遇到既有`audio.whisper.wav`时，先流式重解码当前完整视频，核对16kHz单声道16-bit PCM的长度与SHA256。完全相同才复用并保存`audio_cache_validation.json`；参数不符、截断、解码失败或内容不同时停止并保留原件。校验不落地新的音频副本，也不替代视频来源身份检查。
 
-转写统一改用本地 oMLX；历史 `AGENT_VIDEO_RECOVERY_NO_CONTEXT` 与 whisper.cpp 的 `-mc` 参数已退出当前链路。旧转写文件保留，但不得作为新模型的有效缓存。新稿仍需核验专名、数字和医学表达，不因切换模型而自动提升整理状态。
+通过本地 oMLX 使用 `Qwen3-ASR-1.7B-8bit`。复用转写须通过固定模型与音频指纹校验。新稿仍需核验专名、数字和医学表达。
 
 本技能由以下三类历史能力合并而来：
 
@@ -22,7 +22,7 @@
 
 3. 旧视频摘要链路
 - 历史 skill：`feipi-summarize-video-url`
-- 继承内容：自动选档、带时间戳文本提取、摘要请求包、扩展背景请求包、背景单问请求包。
+- 继承内容：带时间戳文本提取、摘要请求包、扩展背景请求包、背景单问请求包。
 
 ## 当前本地化资源
 
@@ -44,8 +44,8 @@
 6. `scripts/render_background_prompt.sh`
 - 用途：构建背景请求包，支持 `expand` 与 `background-only` 两种模式。
 
-7. `scripts/lib/omlx_transcribe.sh`
-- 用途：本地 oMLX 转写客户端，fast 使用 SenseVoiceSmall，accurate 使用 Qwen3-ASR-1.7B；配置与时间精度见 [oMLX 转写](omlx-asr.md)。
+7. `scripts/lib/omlx_transcribe.py`
+- 用途：本地 oMLX 转写客户端，固定使用 `Qwen3-ASR-1.7B-8bit`；配置与时间精度见 [oMLX 转写](omlx-asr.md)。
 
 8. `scripts/lib/yt_dlp_common.sh`
 - 用途：当前 skill 内置的 yt-dlp 公共流程，提供通用下载模式、字幕转文本和 whisper 模式公共逻辑。
@@ -66,8 +66,7 @@
    - https://github.com/jundot/omlx
    - https://github.com/jundot/omlx/blob/main/omlx/api/audio_routes.py
 5. MLX 模型发布
-   - https://huggingface.co/mlx-community/SenseVoiceSmall
-   - https://huggingface.co/mlx-community/Qwen3-ASR-1.7B-bf16
+   - https://huggingface.co/mlx-community/Qwen3-ASR-1.7B-8bit
 
 ## 小红书视频笔记适配
 
@@ -75,7 +74,7 @@
 - 接受 `https://www.xiaohongshu.com/explore/<24位笔记ID>`、`/discovery/item/<24位笔记ID>`，以及 `xhslink.com`、`xhslink.cn`（含 `/o/`）短链；从分享文案中取出 URL 传入即可。完整保留 `xsec_token` 等查询参数，不截掉分享凭据，不在日志打印解析后的直链。
 - 短链仅跟随小红书和分享域名，遇笔记地址即交给 yt-dlp；旧 HTTP 目标规范化为同站 HTTPS。跳往登录页、其他站点或不支持的页面时停止并输出诊断。网络超时有界，不调用第三方解析服务。
 - 由 yt-dlp 的 XiaoHongShu 提取器读取站点提供的媒体与标题；支持 `dryrun/video/audio/subtitle/whisper`。默认匿名访问，不自动读取浏览器 Cookie。登录、验证码、内容失效或图文笔记可能导致失败，应查看 `logs/xiaohongshu-<mode>.log`，不能直接归因为没有字幕。
-- `auto + fast` 优先独立字幕，无可用字幕时回退本地 oMLX SenseVoiceSmall。只有真实带时间戳文本可用于摘要，标题、笔记描述、标签、评论和画面硬字幕均不作为完整语音转写。短链输出目录使用原链接指纹，`video_identity.json` 保存站点真实笔记 ID、原标题和原始输入链接。
+- `auto` 优先独立字幕，无可用字幕时回退本地 oMLX Qwen3-ASR-1.7B-8bit。只有真实带时间戳文本可用于摘要，标题、笔记描述、标签、评论和画面硬字幕均不作为完整语音转写。短链输出目录使用原链接指纹，`video_identity.json` 保存站点真实笔记 ID、原标题和原始输入链接。
 - 上游实现：[yt-dlp XiaoHongShu 提取器](https://github.com/yt-dlp/yt-dlp/blob/master/yt_dlp/extractor/xiaohongshu.py)。站点策略会变化；适配成功不保证所有笔记匿名可读。
 
 ## 严道单讲适配

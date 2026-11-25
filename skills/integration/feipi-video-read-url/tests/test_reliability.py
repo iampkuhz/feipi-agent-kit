@@ -120,8 +120,6 @@ class ReliabilityTests(unittest.TestCase):
 
     def test_reuse_rebuilds_partial_text_and_propagates_failure(self):
         self.program(self.bin / "uname", "echo Darwin")
-        helper = self.root / "helper"
-        self.program(helper, "exit 99")
         import wave
         with wave.open(str(self.root / "video.whisper.wav"), "wb") as audio:
             audio.setparams((1, 2, 16000, 0, "NONE", "not compressed"))
@@ -144,17 +142,17 @@ class ReliabilityTests(unittest.TestCase):
                    "text": "last", "cut_reason": "end"}]
         srt_data, txt_data = client.transcript_outputs(chunks)
         srt.write_text(srt_data)
-        record = dict(client.fingerprint(self.root / "video.whisper.wav", "fast", "zh"),
-                      model="SenseVoiceSmall", timestamp_source="audio_chunk", duration_seconds=31,
+        record = dict(client.fingerprint(self.root / "video.whisper.wav", "zh"),
+                      timestamp_source="audio_chunk", duration_seconds=31,
                       chunks=chunks, srt_sha256=hashlib.sha256(srt.read_bytes()).hexdigest(),
                       text_sha256=hashlib.sha256(txt_data.encode()).hexdigest())
         (self.root / "video.asr.json").write_text(json.dumps(record))
-        call = 'yt_common_run_whisper_mode_from_url url "$1" "$2" zh fast'
-        result = self.shell(call, self.root, helper)
+        call = 'yt_common_run_whisper_mode_from_url url "$1" zh'
+        result = self.shell(call, self.root)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("[00:00:30]", target.read_text())
         srt.write_text("no timestamp")
-        result = self.shell(call, self.root, helper)
+        result = self.shell(call, self.root)
         self.assertNotEqual(result.returncode, 0)
         self.assertNotIn("text_file=", result.stdout)
 
@@ -167,7 +165,11 @@ class ReliabilityTests(unittest.TestCase):
             download() { echo 'ERROR: HTTP Error 403: Forbidden'; touch "$TEST_ROOT/audio.mp3"; }
             ffmpeg() { touch "${!#}"; }
             TEST_ROOT="$1"
-            if yt_common_run_whisper_mode_from_url url "$1" "$2" zh fast download >"$3" 2>&1; then exit 9; fi
+            python3() {
+              if [[ "$1" == */omlx_transcribe.py ]]; then bash "$ASR_HELPER" "${@:2}"; else command python3 "$@"; fi
+            }
+            ASR_HELPER="$2"
+            if yt_common_run_whisper_mode_from_url url "$1" zh download >"$3" 2>&1; then exit 9; fi
             yt_common_report_youtube_failure "$3"
         ''', self.root, helper, log)
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -188,19 +190,22 @@ class ReliabilityTests(unittest.TestCase):
         helper = self.root / "helper"
         self.program(helper, '''
             printf '\\377\\n'
-            printf 'profile=fast\\nmodel=test-model\\ndevice=test-device\\n'
+            printf 'model=test-model\\ndevice=test-device\\n'
             printf '1\\n00:00:00,000 --> 00:00:01,000\\nlast\\n' > "$2.srt"
         ''')
         result = self.shell('''
             download() { touch "$TEST_ROOT/audio.mp3"; }
             ffmpeg() { touch "${!#}"; }
             TEST_ROOT="$1"
-            yt_common_run_whisper_mode_from_url url "$1" "$2" zh fast download
+            python3() {
+              if [[ "$1" == */omlx_transcribe.py ]]; then bash "$ASR_HELPER" "${@:2}"; else command python3 "$@"; fi
+            }
+            ASR_HELPER="$2"
+            yt_common_run_whisper_mode_from_url url "$1" zh download
         ''', self.root, helper)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("model=test-model", result.stdout)
         self.assertNotIn("illegal byte sequence", result.stderr)
-        self.assertIn("model=test-model", (self.root / "audio.meta").read_text())
 
     def test_fresh_conversion_failure_does_not_return_text_path(self):
         self.program(self.bin / "uname", "echo Darwin")
@@ -210,7 +215,11 @@ class ReliabilityTests(unittest.TestCase):
             download() { touch "$TEST_ROOT/audio.mp3"; }
             ffmpeg() { touch "${!#}"; }
             TEST_ROOT="$1"
-            if yt_common_run_whisper_mode_from_url url "$1" "$2" zh fast download; then exit 9; else exit 7; fi
+            python3() {
+              if [[ "$1" == */omlx_transcribe.py ]]; then bash "$ASR_HELPER" "${@:2}"; else command python3 "$@"; fi
+            }
+            ASR_HELPER="$2"
+            if yt_common_run_whisper_mode_from_url url "$1" zh download; then exit 9; else exit 7; fi
         ''', self.root, helper)
         self.assertEqual(result.returncode, 7, result.stderr)
         self.assertNotIn("text_file=", result.stdout)

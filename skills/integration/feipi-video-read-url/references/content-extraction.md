@@ -9,7 +9,7 @@ python3 <feipi-xiaohongshu-read-note>/scripts/extract_note.py '<URL>' '<OUTPUT_D
 python3 <feipi-video-read-url>/scripts/extract_content.py '<URL>' '<OUTPUT_DIR>'
 ```
 
-输出目录必须由调用方指定且不能位于任意 skill 安装目录内。每次调用使用独立目录；重复调用已存在 manifest 的目录拒绝覆盖。默认视频字幕优先、本地 oMLX SenseVoiceSmall 回退（accurate 使用 Qwen3-ASR-1.7B），并按需远程抽帧；不下载完整原视频。图文逐图保存。两个入口均输出 `<OUTPUT_DIR>/extraction_manifest.json`；stdout 仅输出 manifest 路径与状态。退出码 0=complete，2=partial（已有证据或等待宿主读图），1=failed/blocked；manifest 始终是业务状态真源（参数或文件系统错误除外）。
+输出目录必须由调用方指定且不能位于任意 skill 安装目录内。每次调用使用独立目录；重复调用已存在 manifest 的目录拒绝覆盖。默认视频字幕优先、缺少字幕时通过本地 oMLX 的 `Qwen3-ASR-1.7B-8bit` 转写，并按需远程抽帧；不下载完整原视频。图文逐图保存。两个入口均输出 `<OUTPUT_DIR>/extraction_manifest.json`；stdout 仅输出 manifest 路径与状态。退出码 0=complete，2=partial（已有证据或等待宿主读图），1=failed/blocked；manifest 始终是业务状态真源（参数或文件系统错误除外）。
 
 ## JSON 结构
 
@@ -72,7 +72,5 @@ JSON 为 `[{"source_artifact_id":"image-001","ocr_text":"…","observation":"…
 ## 可选的正常浏览器取证输入（兼容 v1）
 
 匿名访问受限、已有正常浏览器会话能显示笔记时，宿主可读取可见 DOM/轮播图与实际页面资源，并保存最小取证 JSON 后传 `extract_note.py URL OUTPUT_DIR --rendered-note INPUT_JSON`；不导出 Cookie 或登录凭据。输出 schema、字段与退出码不变。source artifact 增加 provenance=browser_dom。输入包详见笔记 skill 的 references/rendered-note.md；脚本校验原链接、source_url 和 noteId 一致。匿名失败目录与浏览器成功目录分开保留。
-
-可选 `--quality fast|accurate` 复用既有转写档位，默认 fast；不改变 v1 的输出字段和默认字幕优先行为。accurate 沿用既有语音优先的高质量策略。
 
 ASR channel 的 `provenance=omlx`，包含实际 `model`、`timestamp_source=audio_chunk`、`timestamp_precision_seconds=30`。时间锚点为不超过30秒的音频块范围，不是句级对齐；摘要来源状态须保留该精度限制。配置见 [oMLX 转写](omlx-asr.md)。

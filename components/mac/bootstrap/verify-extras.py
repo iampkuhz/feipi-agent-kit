@@ -60,8 +60,9 @@ def ready(process, url, headers=None):
 
 
 def omlx(base, environment, models):
-    required = ['Qwen3.5-0.8B-MLX-4bit', 'Qwen3-ASR-1.7B-4bit', 'SenseVoiceSmall']
-    for name in required:
+    text_model = 'Qwen3.5-0.8B-MLX-4bit'
+    speech_model = 'Qwen3-ASR-1.7B-8bit'
+    for name in (text_model, speech_model):
         if not any((directory/name/'config.json').is_file() for directory in (models, models/'mlx-community')):
             raise RuntimeError('先从 Hugging Face 下载模型：mlx-community/'+name)
     endpoint = 'http://127.0.0.1:'+str(port())
@@ -88,17 +89,17 @@ def omlx(base, environment, models):
         available = json.loads(ready(process, endpoint+'/v1/models', headers))['data']
         (base/'omlx-models.json').write_text(json.dumps(available, indent=2)+'\n')
         ids = [row['id'] for row in available]
-        chosen = {}
-        for name in required:
-            settings = next((value for key, value in model_settings.items()
-                             if key == name or key.endswith('/'+name)), {})
-            expected = settings.get('model_alias') or name
-            matches = [item for item in ids if item == expected or item.endswith('/'+expected)]
-            if len(matches) != 1:
-                raise RuntimeError('模型发现结果缺失或歧义：'+name)
-            chosen[name] = matches[0]
+        settings = next((value for key, value in model_settings.items()
+                         if key == text_model or key.endswith('/'+text_model)), {})
+        expected = settings.get('model_alias') or text_model
+        matches = [item for item in ids if item == expected or item.endswith('/'+expected)]
+        if len(matches) != 1:
+            raise RuntimeError('文本模型发现结果缺失或歧义：'+text_model)
+        if speech_model not in ids:
+            raise RuntimeError('语音模型未注册：'+speech_model)
+        text_id = matches[0]
         response = json.loads(request(endpoint+'/v1/chat/completions', json.dumps({
-            'model': chosen[required[0]], 'messages': [{'role': 'user', 'content': 'Reply with one short greeting.'}],
+            'model': text_id, 'messages': [{'role': 'user', 'content': 'Reply with one short greeting.'}],
             'max_tokens': 16, 'temperature': 0}).encode(), dict(headers, **{'Content-Type': 'application/json'}), 180))
         content = response['choices'][0]['message']['content']
         if not content.strip():
@@ -108,21 +109,18 @@ def omlx(base, environment, models):
         subprocess.run(['/usr/bin/say', '-o', str(base/'sample.aiff'), 'Hello, this is a new machine test.'], check=True, timeout=60)
         subprocess.run(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-i', str(base/'sample.aiff'),
                         '-ar', '16000', '-ac', '1', str(base/'sample.wav')], check=True, timeout=60)
-        transcriptions = {}
-        for name in required[1:]:
-            boundary = 'feipi-'+uuid.uuid4().hex
-            payload = ('--'+boundary+'\r\nContent-Disposition: form-data; name="model"\r\n\r\n'+chosen[name]+'\r\n').encode()
-            payload += ('--'+boundary+'\r\nContent-Disposition: form-data; name="file"; filename="sample.wav"\r\nContent-Type: audio/wav\r\n\r\n').encode()
-            payload += (base/'sample.wav').read_bytes()+('\r\n--'+boundary+'--\r\n').encode()
-            result = json.loads(request(endpoint+'/v1/audio/transcriptions', payload,
-                dict(headers, **{'Content-Type': 'multipart/form-data; boundary='+boundary}), 240))
-            text = result.get('text', '')
-            if 'hello' not in text.lower() or 'machine' not in text.lower():
-                raise RuntimeError('语音验证句识别不符：'+name+'；见私有产物。')
-            transcriptions[name] = text
-        (base/'omlx-transcriptions.json').write_text(json.dumps(transcriptions, indent=2)+'\n')
-    return {'text_inference': True, 'speech_models': list(transcriptions),
-            'restored_settings': restored_settings, 'model_ids': chosen}
+        boundary = 'feipi-'+uuid.uuid4().hex
+        payload = ('--'+boundary+'\r\nContent-Disposition: form-data; name="model"\r\n\r\n'+speech_model+'\r\n').encode()
+        payload += ('--'+boundary+'\r\nContent-Disposition: form-data; name="file"; filename="sample.wav"\r\nContent-Type: audio/wav\r\n\r\n').encode()
+        payload += (base/'sample.wav').read_bytes()+('\r\n--'+boundary+'--\r\n').encode()
+        result = json.loads(request(endpoint+'/v1/audio/transcriptions', payload,
+            dict(headers, **{'Content-Type': 'multipart/form-data; boundary='+boundary}), 240))
+        text = result.get('text', '')
+        if 'hello' not in text.lower() or 'machine' not in text.lower():
+            raise RuntimeError('语音验证句识别不符：'+speech_model+'；见私有产物。')
+        (base/'omlx-transcriptions.json').write_text(json.dumps({speech_model: text}, indent=2)+'\n')
+    return {'text_inference': True, 'speech_model': speech_model,
+            'restored_settings': restored_settings, 'model_ids': {text_model: text_id, speech_model: speech_model}}
 
 
 def main():

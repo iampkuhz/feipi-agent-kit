@@ -43,7 +43,7 @@ mkdir -p "$AUDIT_TMP/output/youtube-a4RcpaTccFc/logs"
 printf 'pipeline_stage=transcription\n' > "$AUDIT_TMP/output/youtube-a4RcpaTccFc/logs/youtube-whisper-noauth.log"
 if env PATH="$AUDIT_TMP/bin:$SYSTEM_PATH" AGENT_CHROME_PROFILE= AGENT_YOUTUBE_COOKIE_FILE= \
   bash "$RUNTIME_DIR/extract_video_text.sh" 'https://www.youtube.com/watch?v=a4RcpaTccFc' \
-  "$AUDIT_TMP/output" auto --instruction '总结视频' > "$AUDIT_TMP/result.log" 2>&1; then
+  "$AUDIT_TMP/output" auto > "$AUDIT_TMP/result.log" 2>&1; then
   echo 'FAIL: 全部下载失败却报告成功' >&2
   exit 1
 fi
@@ -93,7 +93,7 @@ grep -q 2020.01.01-test "$AUDIT_TMP/recovered.out"
 # 通过真实入口产生无 Cookie 重试，最终诊断必须指向该次日志。
 if env PATH="$AUDIT_TMP/bin:$SYSTEM_PATH" AGENT_CHROME_PROFILE=Default AGENT_YOUTUBE_COOKIE_FILE= TEST_AUTH_SIGNAL=1 \
   bash "$RUNTIME_DIR/extract_video_text.sh" 'https://www.youtube.com/watch?v=a4RcpaTccFc' \
-  "$AUDIT_TMP/noauth-output" whisper --instruction '总结视频' > "$AUDIT_TMP/noauth-result.log" 2>&1; then
+  "$AUDIT_TMP/noauth-output" whisper > "$AUDIT_TMP/noauth-result.log" 2>&1; then
   echo 'FAIL: 无 Cookie 重试全失败却报告成功' >&2
   exit 1
 fi

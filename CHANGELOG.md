@@ -1,5 +1,10 @@
 # 变更记录
 
+## 2026-11-25
+- feipi-video-read-url v20：统一 oMLX 端口与语音模型
+- feipi-xiaohongshu-read-note v5：接入统一语音转写
+- 工作台：统一 OpenClaw 语音转写模型
+
 ## 2026-11-21
 
 - feipi-multica-manage-tasks v7：改用 Cloud 绑定，移除自建冒烟测试

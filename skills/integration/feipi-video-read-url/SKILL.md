@@ -32,12 +32,12 @@ description: 用于按用户意图处理视频网站 URL（如 YouTube、Bilibil
 本地文件复用原有文字提取、oMLX 和摘要请求入口，不经过 yt-dlp、Cookie 或代理：
 
 ```bash
-bash <本 skill>/scripts/extract_video_text.sh '/绝对路径/视频.mp4' '<OUTPUT_ROOT>' auto --instruction '总结视频'
+bash <本 skill>/scripts/extract_video_text.sh '/绝对路径/视频.mp4' '<OUTPUT_ROOT>' auto
 # 只提取完整音轨，不调用 ASR：
 bash <本 skill>/scripts/download_video.sh '/绝对路径/视频.mp4' '<OUTPUT_ROOT>' audio
 ```
 
-也接受本地音频路径和带空格的路径；相对路径按调用时目录解析。`auto` 与 `whisper` 都转写首条音轨，默认 SenseVoiceSmall，`--quality accurate` 使用 Qwen3-ASR-1.7B；本地不尝试平台字幕。显式 `subtitle` 会停止并提示改用转写。`dryrun` 仅探测音轨，`video` 返回原文件路径。本地普通输入同样不猜测意图；仅给路径时先 dryrun。
+也接受本地音频路径和带空格的路径；相对路径按调用时目录解析。`auto` 与 `whisper` 都转写首条音轨，使用本地 oMLX 的 `Qwen3-ASR-1.7B-8bit`；本地不尝试平台字幕。显式 `subtitle` 会停止并提示改用转写。`dryrun` 仅探测音轨，`video` 返回原文件路径。本地普通输入同样不猜测意图；仅给路径时先 dryrun。
 
 输出 `audio_path` 是完整的16kHz单声道PCM WAV，保留静音，供 ASR 与交付复用；`text_path`、`srt_path` 与 URL 链路含义一致。`source_media.json` 记录原件内容指纹、原始路径、音轨及音频指纹，按原件内容隔离运行目录；原件内容变化或音频损坏不会复用旧稿。原件不改写。`duration_sec` 为向上取整的摘要兼容时长，`audio_duration_seconds` 和来源清单保留实际采样时长。
 
@@ -51,7 +51,7 @@ bash <本 skill>/scripts/download_video.sh '/绝对路径/视频.mp4' '<OUTPUT_R
 python3 <本 skill>/scripts/extract_content.py '<URL>' '<OUTPUT_DIR>'
 ```
 
-该入口支持 YouTube、Bilibili、小红书；小红书自动交给同级 `feipi-xiaohongshu-read-note` 判断图文/视频。默认字幕优先、本地 oMLX SenseVoiceSmall 回退，并通过 ffmpeg 远程输入端 seek 只截首帧。仅获取独立音频与按需画面；不下载完整原视频，合流视频不能作为 ASR 回退。可用 `--quality accurate` 保留高质量转写档位。其他既有来源、用户明确只要文字或明确下载需求继续使用原入口。
+该入口支持 YouTube、Bilibili、小红书；小红书自动交给同级 `feipi-xiaohongshu-read-note` 判断图文/视频。优先提取字幕，缺失时用 oMLX 转写，并通过 ffmpeg 远程输入端 seek 只截首帧。仅获取独立音频与按需画面；不下载完整原视频，合流视频不能作为 ASR 回退。其他既有来源、用户明确只要文字或明确下载需求继续使用原入口。
 
 调用方必须指定独立输出目录，不得写入 skill 安装目录。结果为 `extraction_manifest.json`（`schema=feipi-content-extraction-v1`），包含来源、正文/字幕/ASR、图片/帧及 OCR/视觉观察独立清单。退出码 0=complete、2=partial、1=failed/blocked；先读 manifest 判断已有证据。字段、读图登记、失败边界及安装依赖见 [通用提取合同](references/content-extraction.md)。
 
@@ -101,7 +101,6 @@ python3 <本 skill>/scripts/extract_content.py '<URL>' '<OUTPUT_DIR>'
 2. 按需确认
 - 输出目录
 - 用户当前目标是 `dryrun`、`video`、`audio`、`subtitle`、`whisper`、`summary`、`expand` 还是 `background-only`
-- 用户原始指令中是否明确要求高质量转写
 - 用户是否明确要求相关新闻/最新进展/当前影响
 - 是否已有视频标题或上下文说明
 - 是否允许批量处理（当前默认不自动展开播放列表或合集）
@@ -111,7 +110,7 @@ python3 <本 skill>/scripts/extract_content.py '<URL>' '<OUTPUT_DIR>'
 1. 如果用户要摘要、背景或分析，默认从 `summary / expand / background-only` 三类中决策。
 2. 如果用户要下载、提取、转写或先验证链接，走 `dryrun / video / audio / subtitle / whisper`。
 3. 若用户只给 URL、意图不清，默认先做 `dryrun`，不直接真实下载。
-4. 有“高质量/准确/逐字”等明确要求时，转写档位自动走 `accurate`；其他情况默认 `fast`。
+4. 显式要求语音转写时使用 `whisper`。网站自动提取优先读字幕，缺失时走转写。
 5. 未明确要求背景时，不自动进入第二阶段分析。
 6. 背景阶段若未明确要求”相关新闻/最新/最近/现状”，默认 `--news off`，优先稳定背景资料，不主动搜索相关新闻。
 7. 摘要风格默认路由：
@@ -133,10 +132,10 @@ python3 <本 skill>/scripts/extract_content.py '<URL>' '<OUTPUT_DIR>'
 - 最终摘要或背景内容必须由大模型基于转写和外部资料生成，禁止用词频或模板硬拼结论。
 
 3. 转写严格性（强制）
-- 统一调用本 skill 的 `scripts/lib/omlx_transcribe.sh`，通过本地 oMLX `/v1/audio/transcriptions` 识别。
-- 默认和 `fast` 使用 `sensevoicesmall`（SenseVoiceSmall）；`accurate` 使用 `qwen3-asr-1.7b`（Qwen3-ASR-1.7B）。按 `/v1/models` 解析实际模型 ID；缺失或同一家族多个候选时明确失败，不切换其他模型。
-- 服务默认 `http://127.0.0.1:8000/v1`；自定义本机端口用 `AGENT_OMLX_BASE_URL`，认证仅从进程环境读取 `OMLX_API_KEY`。不得读取 `~/.env` 等配置文件、主动执行 shell 启动文件或输出密钥。运行时不启动服务、不下载模型、不改 oMLX 配置。
-- 必须通过 `scripts/extract_video_text.sh` 获取文本，禁止手写其他识别命令。`whisper` 模式名、`whisper_profile` 字段与 `.whisper.wav` 文件名仅作兼容。
+- 统一调用本 skill 的 `scripts/lib/omlx_transcribe.py`，通过本地 oMLX `/v1/audio/transcriptions` 识别。
+- 所有语音转写请求固定使用 `Qwen3-ASR-1.7B-8bit`。依赖检查验证 oMLX 已注册此模型 ID。
+- 服务默认 `http://127.0.0.1:8037/v1`；自定义本机端口用 `AGENT_OMLX_BASE_URL`，认证仅从进程环境读取 `OMLX_API_KEY`。不得读取 `~/.env` 等配置文件、主动执行 shell 启动文件或输出密钥。运行时不启动服务、不下载模型、不改 oMLX 配置。
+- 必须通过 `scripts/extract_video_text.sh` 获取文本，禁止手写其他识别命令。转写产物的音频文件名以 `.whisper.wav` 结尾。
 - 音频默认优先在停顿处切成不超过 30 秒的连续无重叠块，找不到合适停顿时按上限切开。切分脚本只有 `--max-seconds` 一个可调配置，不提供试听模式。时间戳表示音频块范围，并非逐句或逐字对齐；来源状态必须披露“oMLX 模型名、约30秒块级时间戳、识别风险”。只有全部块请求完成才交付文本；全空转写失败，不用标题补正文。详见 [oMLX 转写配置](references/omlx-asr.md)。
 
 4. 分段触发强约束
@@ -169,11 +168,11 @@ python3 <本 skill>/scripts/extract_content.py '<URL>' '<OUTPUT_DIR>'
 8. 单命令执行契约（强制）
 - 执行方只运行一个阻塞式入口命令（画面取证用 `extract_content.py`，文字摘要或下载用 `extract_video_text.sh` / `download_video.sh`），等待命令退出。
 - 禁止额外启动 `Wait for whisper srt completion`、`tail -f`、轮询 `.srt` 或其他产物文件、重复后台 monitor。
-- 脚本标准输出已包含 `run_dir`、`mode`、`text_path`、`log_dir`、`whisper_profile`、`duration_sec`、`long_video`、`estimated_risk` 等字段，执行方可据此判断完成状态。
-- 长视频保护：whisper 模式会输出 `duration_sec`、`long_video` 和 `estimated_risk`，执行方可据此预估耗时，不做交互式确认。用户显式传 `accurate` 仍可按设计执行。
+- 脚本标准输出已包含 `run_dir`、`mode`、`text_path`、`log_dir`、`duration_sec`、`long_video`、`estimated_risk` 等字段，执行方可据此判断完成状态。
+- 长视频保护：whisper 模式会输出 `duration_sec`、`long_video` 和 `estimated_risk`，执行方可据此预估耗时，不做交互式确认。
 - 字幕原文件保留不动；转换时将无效 UTF-8 字节替换为 `�`，用 `subtitle_encoding_replaced_bytes` 披露受损字节数。先完整解析全部有效字幕、核对末尾时间戳，再原子写入 TXT；失败不能返回成功文本路径。
 - 复用 SRT 时也会重新生成并校验 TXT，修复历史残留的半份文本；成功日志包含 `subtitle_cue_count`、`text_last_timestamp`。有字节替换时必须在摘要来源状态披露文本损坏风险。
-- 中断后残留的 `.whisper.wav` + `.srt` + `.asr.json` 仅在模型家族、档位、语言、音频 SHA256 与完整 SRT 校验均匹配时复用，不会触发重复下载或重复转写。执行方不要删除 run_dir 下已有的媒体文件，除非是本次 run 明确的临时文件。
+- 中断后残留的 `.whisper.wav` + `.srt` + `.asr.json` 仅在模型 ID、语言、音频 SHA256 与完整 SRT 校验均匹配时复用，不会触发重复下载或重复转写。执行方不要删除 run_dir 下已有的媒体文件，除非是本次 run 明确的临时文件。
 
 9. Bilibili 网络诊断契约（强制）
 - 若日志出现 `diagnostic_code=bilibili_network_preflight_failed`，只能说明当前执行环境的网络预检失败，不能直接断言 Bilibili 不可访问或代理未启动。
@@ -217,9 +216,7 @@ python3 <本 skill>/scripts/extract_content.py '<URL>' '<OUTPUT_DIR>'
 2. 可选输入
 - 视频标题
 - 输出目录
-- 用户原始指令（用于自动判定提取质量档位与交付意图）
 - 直接读取模式：`dryrun|video|audio|subtitle|whisper`
-- 质量档位参数：`--quality auto|fast|accurate`（默认 `auto`）
 - 总结模式：`summary|expand|background-only`
 - 摘要风格：`strict|structured|review|tutorial|action`（默认 `structured`）
 - 新闻范围：`--news off|on`（默认 `off`）
@@ -239,30 +236,17 @@ python3 <本 skill>/scripts/extract_content.py '<URL>' '<OUTPUT_DIR>'
 - `background_request.md`：`expand` 或 `background-only` 模式使用的背景请求包。
 - `background_result.md`：背景结果；`expand` 模式标题为 `相关影响和背景分析`，`background-only` 模式标题为 `上下文背景`。
 
-## 自动选档规则
+## 文本提取策略
 
-1. 默认策略（`--quality auto`）
-- 默认和 `auto` 都解析为 `fast`，速度优先。
-- 只有用户显式指定 `accurate`、`--quality accurate`、或使用高质量关键词（高质量/高精度/准确/逐字等）时，才使用 `accurate`。
-- 不再因为视频时长（如短于 480 秒）自动切到 `accurate`。
-
-2. `mode=auto` 的执行顺序
-- `accurate`：先 `whisper`，失败再回退 `subtitle`。
-- `fast`：先 `subtitle`，失败再回退 `whisper`。
-
-3. 服务与模型检查
-- `scripts/install_deps.sh --check` 检查本地服务与 SenseVoiceSmall；加 `--accurate` 同时检查 Qwen3-ASR-1.7B。
-- 模型缺失时提示在 oMLX 中配置，不静默切换模型；accurate 的既有字幕回退会明确输出 `mode=subtitle`。
-
-4. 观测字段
-- `extract_video_text.sh` 保留 `run_dir`、`whisper_profile`、`selection_reason`、`strategy`，ASR 成功时新增 `asr_backend=omlx`、`asr_model`、`asr_timestamps=audio_chunk`。
-- `.asr.json` 保存实际模型、音频指纹、分块时间范围与原文；取证 manifest 的 ASR 来源为 `omlx`，明确模型与块级时间精度。
+- 网站 `auto` 优先获取平台字幕，无可用字幕时调用语音转写。显式 `subtitle` 只获取字幕，显式 `whisper` 直接转写。支持的本地文件使用首条音轨。
+- `scripts/install_deps.sh --check` 检查下载工具、本地服务及固定模型。
+- 转写成功时输出 `asr_backend=omlx`、`asr_model` 和 `asr_timestamps=audio_chunk`。取证 manifest 与 `.asr.json` 保留实际模型和块级时间范围。
 
 ## 工作流（Explore -> Plan -> Implement -> Verify）
 
 1. Explore
 - `scripts/download_video.sh` 与 `scripts/extract_video_text.sh` 内部识别 YouTube、Bilibili、小红书与严道来源。
-- `scripts/install_deps.sh --check` 或 `scripts/extract_video_text.sh --check-deps` 校验依赖与自动选档结果；安装检查与真实执行共用 yt-dlp 候选解析器。字幕转换依赖 Python 3 标准库，由安装入口统一检查。
+- `scripts/install_deps.sh --check` 或 `scripts/extract_video_text.sh --check-deps` 校验依赖及固定模型；安装检查与真实执行共用 yt-dlp 候选解析器。字幕转换依赖 Python 3 标准库，由安装入口统一检查。
 - 先判断用户意图属于直接读取还是总结模式。
 - 再判断背景阶段是否明确要求“相关新闻/最新进展”；未明确时默认 `--news off`。
 - 若检测到 YouTube 在 Cookie、浏览器认证或风控相关失败，会自动以“无 Cookie”重试，并输出 `*-noauth.log` 便于排查；若日志不含认证/风控信号，不把普通字幕缺失或转写失败误报为 Cookie 问题。
@@ -277,7 +261,7 @@ python3 <本 skill>/scripts/extract_content.py '<URL>' '<OUTPUT_DIR>'
 
 2. Plan
 - 直接读取模式：确定 `dryrun / video / audio / subtitle / whisper`。
-- 总结模式：根据用户指令选择质量档位，再经 `scripts/extract_video_text.sh` 获取带时间戳文本；需要画面证据或调用方明确要求文字＋关键帧时，经 `scripts/extract_content.py` 获取两类证据，高质量需求传 `--quality accurate`。
+- 总结模式：经 `scripts/extract_video_text.sh` 获取带时间戳文本；需要画面证据或调用方明确要求文字＋关键帧时，经 `scripts/extract_content.py` 获取两类证据。
 - `summary`：只生成摘要请求包并交付摘要结果。
 - `expand`：先交付摘要，再生成背景请求包并继续交付背景分析。
 - `background-only`：直接生成背景请求包并交付上下文背景，不强制先展示摘要。
@@ -337,11 +321,6 @@ SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 bash "$SKILL_DIR/scripts/install_deps.sh" --check
 ```
 
-1b. 检查依赖（含 accurate 模型）：
-```bash
-bash "$SKILL_DIR/scripts/install_deps.sh" --check --accurate
-```
-
 2. 仅验证链接可读（不真实下载）：
 ```bash
 bash "$SKILL_DIR/scripts/download_video.sh" "<video_url>" "./tmp/video-read" dryrun
@@ -354,29 +333,15 @@ bash "$SKILL_DIR/scripts/download_video.sh" "<video_url>" "./tmp/video-read" sub
 
 4. 强制 whisper 转写：
 ```bash
-bash "$SKILL_DIR/scripts/download_video.sh" "<video_url>" "./tmp/video-read" whisper fast
+bash "$SKILL_DIR/scripts/download_video.sh" "<video_url>" "./tmp/video-read" whisper
 ```
 
-5. 自动选档提取（默认快档）：
+5. 自动提取带时间戳文本：
 ```bash
-bash "$SKILL_DIR/scripts/extract_video_text.sh" "<video_url>" "./tmp/video-text" auto \
-  --instruction "请快速提取并总结重点"
+bash "$SKILL_DIR/scripts/extract_video_text.sh" "<video_url>" "./tmp/video-text" auto
 ```
 
-6. 高质量提取（触发慢档）：
-```bash
-bash "$SKILL_DIR/scripts/extract_video_text.sh" "<video_url>" "./tmp/video-text" auto \
-  --instruction "请高质量逐字转写，准确优先"
-```
-
-7. 检查依赖并输出选档结果：
-```bash
-bash "$SKILL_DIR/scripts/extract_video_text.sh" "<video_url>" "./tmp/video-text" auto \
-  --instruction "请快速总结" \
-  --check-deps
-```
-
-8. 生成默认摘要请求包：
+6. 生成默认摘要请求包：
 ```bash
 bash "$SKILL_DIR/scripts/render_summary_prompt.sh" \
   "<video_url>" \
@@ -387,7 +352,7 @@ bash "$SKILL_DIR/scripts/render_summary_prompt.sh" \
   > "./tmp/video-text/summary_request.md"
 ```
 
-9. 生成“扩展分析”背景请求包：
+7. 生成“扩展分析”背景请求包：
 ```bash
 bash "$SKILL_DIR/scripts/render_background_prompt.sh" \
   "<video_url>" \
@@ -399,7 +364,7 @@ bash "$SKILL_DIR/scripts/render_background_prompt.sh" \
   > "./tmp/video-text/background_request.md"
 ```
 
-10. 生成“单独问背景”请求包：
+8. 生成“单独问背景”请求包：
 ```bash
 bash "$SKILL_DIR/scripts/render_background_prompt.sh" \
   "<video_url>" \
@@ -425,6 +390,6 @@ bash "$SKILL_DIR/scripts/render_background_prompt.sh" \
 - 统一提取入口：`scripts/extract_video_text.sh`
 - 依赖安装入口：`scripts/install_deps.sh`
 - 请求包模板脚本：`scripts/render_summary_prompt.sh`、`scripts/render_background_prompt.sh`
-- 本地公共库：`scripts/lib/yt_dlp_common.sh`、`scripts/lib/omlx_transcribe.sh`
+- 本地公共库：`scripts/lib/yt_dlp_common.sh`、`scripts/lib/omlx_transcribe.py`
 - 字幕转换：`scripts/lib/subtitle_to_text.py`（Python 3 标准库）
 - 来源说明：`references/sources.md`

@@ -27,7 +27,7 @@ def managed_settings():
     host = server.get('host', '127.0.0.1')
     if host not in ('127.0.0.1', 'localhost', '::1'):
         raise ValueError('工作台只允许本机回环监听，避免无意暴露未认证的推理接口。')
-    port = server.get('port', 8000)
+    port = server.get('port', 8037)
     if isinstance(port, bool) or not isinstance(port, int) or not 1 <= port <= 65535:
         raise ValueError('oMLX server.port 必须是 1 到 65535 的整数。')
     level = server.get('log_level', 'info')

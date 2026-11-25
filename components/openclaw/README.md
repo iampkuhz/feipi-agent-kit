@@ -34,7 +34,7 @@ OpenClaw 的 macOS 配置仓库。版本基线由 `versions.json` 锁定 OpenCla
 - `~/.env`：唯一人工维护的环境变量和密钥来源。
 - `~/.openclaw`：SQLite、会话、浏览器、插件、skills、日志、长期记忆和任务产物。
 
-`~/.openclaw/.env` 软链接到 `~/.env`。配置、workspace 模板和语音 adapter 由 `./workbench install openclaw` 复制到运行目录；不用 Documents 软链接，因为 macOS LaunchAgent 会被系统文件访问控制阻塞。
+`~/.openclaw/.env` 软链接到 `~/.env`。配置、workspace 模板和语音 adapter 由 `./workbench install openclaw` 复制到运行目录；不用 Documents 软链接，因为 macOS LaunchAgent 会被系统文件访问控制阻塞。 语音消息复用同批安装的 `feipi-video-read-url`，通过本地 oMLX 使用 `Qwen3-ASR-1.7B-8bit`。启用语音转写时在全局环境中提供 `OMLX_API_KEY`。
 
 业务路径使用 OpenClaw 原生 `${HOME}` 插值；workspace 文字使用 `~/`。本地 skill manifest
 的 `source.repository` 支持 `~/`（当前用户）和 `./`、`../`（相对本组件），安装时解析真实路径，
