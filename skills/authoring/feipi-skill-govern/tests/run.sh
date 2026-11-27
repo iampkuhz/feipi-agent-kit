@@ -194,6 +194,9 @@ PY
     resource-boundary-tests)
       python3 "$SKILL_DIR/tests/test_resources.py"
       ;;
+    migration-and-review-tests)
+      python3 "$SKILL_DIR/tests/test_migration_review.py"
+      ;;
     delivery-and-harness-tests)
       python3 "$SKILL_DIR/tests/test_delivery.py"
       ;;
@@ -228,6 +231,7 @@ for case_name in \
   registry-validator-command-arguments \
   portability-checker-tests \
   resource-boundary-tests \
+  migration-and-review-tests \
   delivery-and-harness-tests
 do
   TOTAL=$((TOTAL + 1))

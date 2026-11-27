@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "upstream_revision": "填写完整 Git SHA",
+  "skills": [],
+  "dependencies": []
+}

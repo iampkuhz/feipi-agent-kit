@@ -17,12 +17,14 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT/'tools/runtime'))
 from service_health import wait_service
 from rollback import rollback_on_failure
+from agent_config import (MODES, current_project, initialize_project, installation_lock,
+                          profile_mappings, profile_receipt, profile_updates, session_brief, write_atomic)
 
 HOME = Path.home()
 STATE = HOME / '.local/state/feipi-workbench'
 RUNTIME = HOME / '.local/share/feipi-workbench'
 ENV_HISTORY_LABEL = 'com.feipi.env-history'
-COMPONENTS = ('mac', 'skills', 'services', 'openclaw', 'openclash')
+COMPONENTS = ('mac', 'skills', 'services', 'openclaw', 'openclash', 'codex')
 SERVICE_SCRIPTS = {'litellm': 'gateway/litellm/scripts/litellm.sh',
                    'searxng': 'search/searxng/scripts/searxng.sh',
                    'crawl4ai': 'crawl/crawl4ai/scripts/crawl4ai.sh',
@@ -63,6 +65,8 @@ def mappings(component):
     """列出用于配置发布或状态比较的仓库文件与运行目标。"""
     result = {}
     base = ROOT / 'components' / component
+    if component == 'codex':
+        return profile_mappings(ROOT, codex_home())
     if component == 'mac':
         result['zsh/.zshrc'] = (base/'zsh/.zshrc', HOME/'.zshrc')
         for package, directory in [('zsh', '.zsh_config'), ('neovim', '.config'), ('qwen', '.qwen')]:
@@ -136,13 +140,34 @@ def snapshot(source, target, files=None):
     os.replace(stage, target)
 
 
-def receipt(component, pairs):
+def receipt(component, pairs, **metadata):
     private_json(STATE/(component+'.json'), {
-        'source': str(ROOT), 'component': component,
+        'source': str(ROOT), 'component': component, **metadata,
         'head': subprocess.check_output(['git', '-C', str(ROOT), 'rev-parse', 'HEAD'], text=True).strip(),
         'applied_at': datetime.datetime.now().astimezone().isoformat(),
         'files': {name: digest(src) for name, (src, _) in pairs.items()},
         'note': '包含未提交工作，以文件摘要为准；不代表真实功能验收通过。'})
+
+
+def codex_home():
+    return Path(os.environ.get('CODEX_HOME', str(HOME/'.codex'))).expanduser().resolve()
+
+
+def install_codex():
+    target = codex_home()
+    pairs = profile_mappings(ROOT, target)
+    record = STATE/'codex.json'
+    with installation_lock(STATE):
+        previous = profile_receipt(record)
+        updates = profile_updates(pairs, previous, target)
+        wanted = {name: digest(source) for name, (source, _) in pairs.items()}
+        if updates or previous.get('codex_home') != str(target) or previous.get('files') != wanted:
+            target.mkdir(parents=True, exist_ok=True, mode=0o700)
+            with rollback_on_failure([*updates, record]):
+                for path, content in updates.items():
+                    write_atomic(path, content)
+                receipt('codex', pairs, codex_home=str(target))
+    print('Codex 命名档位已就绪：feipi-develop、feipi-review。')
 
 
 def install(component, agent=None, skill=None):
@@ -155,6 +180,9 @@ def install(component, agent=None, skill=None):
         if not skill.startswith('feipi-') or any(c not in 'abcdefghijklmnopqrstuvwxyz0123456789-' for c in skill):
             raise ValueError('无效 skill 名称')
         skill_args += ['--skill', skill]
+    if component == 'codex':
+        install_codex()
+        return
     if component == 'openclash':
         run([sys.executable, ROOT/'components/openclash/router.py', 'apply'])
         return
@@ -238,12 +266,25 @@ def install(component, agent=None, skill=None):
 
 def doctor(component):
     failed = False
-    chosen = COMPONENTS if component is None else [component]
+    chosen = ([name for name in COMPONENTS if name != 'codex' or (STATE/'codex.json').exists()]
+              if component is None else [component])
     for name in chosen:
         print('\n['+name+']', flush=True)
         if name in ('mac', 'openclaw', 'services'):
             failed |= bool(differences(name))
-        if name == 'mac':
+        if name == 'codex':
+            target = codex_home()
+            record = STATE/'codex.json'
+            installed = profile_receipt(record)
+            pairs = profile_mappings(ROOT, target)
+            wanted = {name: digest(source) for name, (source, _) in pairs.items()}
+            failed |= bool(differences(name))
+            if (any(live.is_symlink() for _, live in pairs.values())
+                    or installed.get('codex_home') != str(target)
+                    or installed.get('files') != wanted):
+                print('Codex 档位的来源或安装位置无法确认。')
+                failed = True
+        elif name == 'mac':
             for command in ['brew', 'git', 'stow', 'zsh', 'nvim', 'node', 'python3', 'podman']:
                 found = shutil.which(command)
                 if not found:
@@ -425,6 +466,13 @@ def main():
             parser.add_argument('--agent', choices=('codex', 'claudecode', 'qwen', 'qoder', 'openclaw'),
                                 help='限定目标客户端')
             parser.add_argument('--skill', help='限定已注册的技能')
+    project_parser = sub.add_parser('project', help='初始化或检查本机项目绑定')
+    project_actions = project_parser.add_subparsers(dest='operation', required=True)
+    for operation in ('init', 'doctor'):
+        project_actions.add_parser(operation).add_argument('path', nargs='?', type=Path, default=Path.cwd())
+    session_parser = sub.add_parser('session', help='为指定项目生成一次性会话简报')
+    session_parser.add_argument('mode', choices=MODES)
+    session_parser.add_argument('path', nargs='?', type=Path, default=Path.cwd())
     service_parser = sub.add_parser('service', help='管理工作台托管的本地服务')
     services = service_parser.add_subparsers(dest='component', required=True)
     for component, actions in SERVICE_ACTIONS.items():
@@ -445,6 +493,14 @@ def main():
         return doctor(a.component)
     elif a.action == 'install':
         install(a.component, getattr(a, 'agent', None), getattr(a, 'skill', None))
+    elif a.action == 'project':
+        if a.operation == 'init':
+            initialize_project(ROOT, a.path)
+        else:
+            project, _ = current_project(ROOT, a.path)
+            print(f'项目绑定一致，入口可定位：{project}')
+    elif a.action == 'session':
+        session_brief(ROOT, a.path, a.mode)
     elif a.action == 'service':
         arguments = [a.operation]
         if getattr(a, 'log_scope', None):

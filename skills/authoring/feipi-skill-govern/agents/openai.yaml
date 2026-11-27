@@ -1,4 +1,4 @@
-version: 9
+version: 10
 interface:
   display_name: "Skill 工程治理（中文）"
   short_description: "创建、重构或审计 skill，明确功能交付契约，验证业务效果并定位失败环节。"

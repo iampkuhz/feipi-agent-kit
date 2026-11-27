@@ -1,0 +1,20 @@
+{
+  "github.com/iampkuhz/feipi-session-browser": {
+    "instructions": "AGENTS.md",
+    "workflow": "harness/README.md",
+    "verification": "docs/development/README.md",
+    "evidence": "docs/gates/gate-control-plane.md"
+  },
+  "github.com/iampkuhz/lexiflow": {
+    "instructions": "AGENTS.md",
+    "workflow": "harness/README.md",
+    "verification": "docs/scenarios/run-repository-gates.md",
+    "evidence": "docs/reference/delivery-gate.md"
+  },
+  "github.com/iampkuhz/feipi-agent-kit": {
+    "instructions": "AGENTS.md",
+    "workflow": "docs/workbench.md",
+    "verification": "docs/agent-handbook.md",
+    "evidence": "docs/workbench-validation.md"
+  }
+}

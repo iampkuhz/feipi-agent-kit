@@ -11,12 +11,17 @@ import subprocess
 import sys
 
 
-EXCLUDED = {"maintenance", "tests", "evals", "node_modules"}
+EXCLUDED = {"maintenance", "tests", "evals", "node_modules", "__pycache__"}
 MARKER = ".feipi-agent-kit-source"
 
 
 def excluded(path):
-    return path.name in EXCLUDED or (path.is_symlink() and bool(EXCLUDED.intersection(path.resolve().parts)))
+    if path.name in EXCLUDED or path.suffix == ".pyc":
+        return True
+    if path.is_symlink():
+        target = path.resolve()
+        return target.suffix == ".pyc" or bool(EXCLUDED.intersection(target.parts))
+    return False
 
 
 def entries(directory):

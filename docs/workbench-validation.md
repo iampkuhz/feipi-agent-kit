@@ -2,6 +2,13 @@
 
 以下记录按日期保留当时的运行结果和命令。复验时，请使用 [现行工作台命令](workbench.md#命令与参数) 和 [服务验收指南](verification/README.md)。
 
+## 2026-11-26 · Agent 用户档位与项目初始化
+
+- 已用 `./workbench install codex` 安装 `feipi-develop` 和 `feipi-review`，`./workbench doctor codex` 通过。Codex 基础配置、OpenClaw 用户配置及受保护的个人文件摘要一致。
+- Session Browser、LexiFlow 和 Agent Kit 各执行两次 `project init`，三项目 `project doctor` 均通过，二次初始化不写回。每个项目的 `develop`、`review`、`verify` 简报均可以生成。
+- 用隔离 HOME 和三个实际项目，在 Codex 0.171.0 上检查生成的 9 组会话参数。只读审阅加载 `read-only` 和 `never`，开发及验证加载 `workspace-write`，网络受限。OpenClaw 另通过配置一致性与 Gateway RPC 检查。
+- `python3 -m unittest discover -s tests/workbench` 共 62 项通过。覆盖用户档位冲突、幂等、项目绑定版本漂移、符号链接拒绝及 Git worktree 隔离。现场核验覆盖配置发布和加载，业务 Gate 与实际渠道任务由其项目验收。
+
 ## 2026-11-05：安装提速与 npm 依赖分离
 
 当前索引及所有本地引用可达的 Git 历史均没有 `node_modules`；`.gitignore` 已排除该目录。本轮不改写历史。原问题是安装器将本地生成目录一起扫描、复制，再比较是否需要更新。运行依赖迁移验收后，已清理 Mermaid 源码中的旧依赖及本轮隔离测试缓存，正式共享缓存和全部发布备份保留。

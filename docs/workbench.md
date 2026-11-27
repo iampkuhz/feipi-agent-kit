@@ -12,6 +12,7 @@
 | --- | --- |
 | `mac` | 补齐工具链、Agent CLI 和桌面依赖，发布 dotfiles 到 `~/.local/share/feipi-workbench/mac/dotfiles`，通过 Stow 链接 Zsh 入口和模块、Neovim、Qwen 语言配置、Karabiner 与 iTerm2。`.env` 由本机维护，单文件 `.zshrc` 只用于临时换机 |
 | `skills` | 发布到已安装客户端。新对话会重新发现 |
+| `codex` | 发布两个可选命名 Profile 到 `CODEX_HOME`（默认 `~/.codex`）。启动 CLI 会话时显式选择 |
 | `services` | 检查本机 Podman 和 Compose，发布服务定义。按需执行 `service <名称> up` 或 `restart` |
 | `openclaw` | 安装锁定程序与插件并发布配置。用 `./workbench service openclaw up` 启动网关 |
 | `openclash` | 校验并应用路由覆写模块。模块有变化时由路由器流程重启并恢复选择，相同内容直接接管 |
@@ -30,14 +31,39 @@ Multica CLI 由 `install mac` 的 Homebrew 阶段补齐。平台服务由 Multic
 
 工作台发布使用独立运行副本。Mac 的 Podman VM、桌面授权及应用验收见 [Mac 安装说明](../components/mac/docs/setup.md)。OpenClash 的 SSH、API 和真实网络验收见 [组件手册](../components/openclash/README.md)。
 
+## 用户、项目和会话配置
+
+| 范围 | 工作台管理 | 各自维护 |
+| --- | --- | --- |
+| 用户 | `components/codex/profiles/` 是 Codex 命名 Profile 源码。`feipi-develop` 允许工作区写入，扩权请求由用户审批，默认无网络。`feipi-review` 使用只读权限。共享 skill 与 OpenClaw 受管配置继续按已有组件发布。 | Codex 基础 `config.toml`、账号、模型、项目的信任决定、个人插件和 MCP 属于本机。OpenClaw 的登录、状态、渠道身份与密钥留在本机私有位置。 |
+| 项目 | `templates/agent/projects.json` 用 Git 远端身份找到已有项目入口。`project init` 写入相应 checkout 的 `tmp/feipi-agent-kit/project.json`，记录相对路径和模板摘要。 | 项目维护自己的 `AGENTS.md`、`.codex/config.toml`、角色、Hook、规格、验收用例及 Gate。 |
+| 会话 | `templates/agent/` 下共享开发、只读审阅和验证三种简报。启动命令显式声明本次权限，CLI 参数优先于已信任项目的默认设置。 | 任务内容、候选、获准动作、正式验收身份和运行凭证来自本轮与项目实际系统。 |
+
+第一次安装用户档位并为一个项目初始化。目录可传仓库根、子目录或该项目的 checkout。
+
+```bash
+./workbench install codex
+./workbench doctor codex
+./workbench project init ../lexiflow
+./workbench project doctor ../lexiflow
+./workbench session review ../lexiflow
+```
+
+会话命令打印一份简报和可复制的 Codex CLI 命令。运行 CLI 命令或在现有对话粘贴简报，分别使用对应入口。现有对话由它自己的权限设置控制。正式验收按项目角色、候选与 Gate 规则执行。
+
+新增项目时，在目录登记能够从仓库根解析的四个入口，并初始化一次。新 checkout 或 worktree 单独生成绑定。初始化可以重复运行，已有同版本且内容相同的文件会保留原时间。更新模板后，doctor 会识别版本差异，重新初始化即可刷新；用户 Profile 更新通过 `install codex` 发布。发现同名个人配置、本机漂移、路径越界或未知项目时，命令会报告具体冲突。绑定由目录生成，放在项目已忽略的 `tmp/`。现有项目若实际需要随仓分发某个 skill，仍走手册里的单 skill 项目安装。 [项目安装方式](agent-handbook.md#安装或更新-skill) · [Codex 配置优先级](https://learn.chatgpt.com/docs/config-file/config-basic)
+
 ## 命令与参数
 
 尖括号表示必填，方括号表示可省略。各层命令支持 `--help`，例如 `./workbench service litellm logs --help`。
 
 | 命令 | 参数与行为 |
 | --- | --- |
-| `workbench doctor [组件]` | `mac / skills / services / openclaw / openclash`。省略时检查全部 |
-| `workbench install <组件>` | `mac / skills / services / openclaw / openclash`。仅 `skills` 可选 `--agent <客户端>` 和 `--skill <已注册名称>` |
+| `workbench doctor [组件]` | `mac / skills / services / openclaw / openclash / codex`。省略时检查全部已启用组件，Codex 以安装回执为准 |
+| `workbench install <组件>` | `mac / skills / services / openclaw / openclash / codex`。仅 `skills` 可选 `--agent <客户端>` 和 `--skill <已注册名称>` |
+| `workbench project init [目录]` | 从项目 Git 根目录生成本机配置。省略目录时使用调用位置 |
+| `workbench project doctor [目录]` | 只读检查项目身份、配置版本与现有入口 |
+| `workbench session <模式> [目录]` | 生成 `develop / review / verify` 会话简报和 Codex CLI 启动命令 |
 | `workbench service <服务> <操作>` | 管理工作台托管的服务，见下表 |
 
 `--agent` 支持 `codex / claudecode / qwen / qoder / openclaw`。两个筛选项可分别使用，也可组合。

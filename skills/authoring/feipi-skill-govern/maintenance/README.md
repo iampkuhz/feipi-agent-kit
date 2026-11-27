@@ -12,6 +12,7 @@
 | 技术、语义、链路验证及失败定位 | `../references/workflow.md`、`../references/quality-checklist.md` |
 | 新建 Skill 与维护资料模板 | `../scripts/init_skill*.sh`、`../templates/`；初始化默认不创建空资源目录 |
 | 结构、维护资料与运行依赖校验 | `../scripts/validate.sh`、`../scripts/validate_resources.py` |
+| 迁移和候选审阅 | `../references/migration-policy.md`、`../references/manual-review.md`、`../scripts/check_migration.py`、`../scripts/review_skill.py` |
 | 路径与双平台静态检查 | `../scripts/check_portability.py` |
 | 确定性回归与独立 Agent 评估 | `../tests/run.sh`、`../tests/test_delivery.py`、`../evals/cases.json`、`../evals/README.md` |
 | 安装与打包 | 仓库 `scripts/install_skills.sh`、`scripts/package_skill.py` |

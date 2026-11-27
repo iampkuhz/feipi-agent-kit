@@ -1,0 +1,3 @@
+# Feipi 只读审阅。使用已有候选与冻结证据。
+sandbox_mode = "read-only"
+approval_policy = "never"

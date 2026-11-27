@@ -39,7 +39,24 @@ def code_files(skill_dir: Path):
 
 def is_regex_example(value: str) -> bool:
     """Wildcard path fragments are search patterns, not usable filesystem paths."""
-    return any(fragment in value for fragment in (".*", "[^", "\\", "(?:", "|"))
+    return any(fragment in value for fragment in (".*", "[^", "\\\\", "(?:", "|"))
+
+
+def fixed_machine_paths(line: str, *, serialized_windows: bool = False):
+    path_line = re.sub(r"https?://[^\s\"'`]+", "", line)
+    for match in ABSOLUTE_PATH.finditer(path_line):
+        literal = match.group(0)
+        context = path_line[max(0, match.start() - 20):match.start()]
+        relative_prefix = path_line[match.start() - 1:match.start()] if match.start() else ""
+        standard_path = literal in {"/usr/bin/env", "/dev/null", "/dev/stdin"}
+        if not is_regex_example(literal) and "${TMPDIR:-" not in context \
+                and relative_prefix not in {".", "\\", "}"} and not standard_path:
+            yield f"固定机器/临时绝对路径：{literal}"
+    for match in WINDOWS_ABSOLUTE_PATH.finditer(path_line):
+        literal = match.group(0)
+        candidate = literal.replace("\\", "/") if serialized_windows else literal
+        if not is_regex_example(candidate):
+            yield f"Windows 盘符绝对路径：{literal}"
 
 
 def scan_file(path: Path, skill_dir: Path):
@@ -49,20 +66,7 @@ def scan_file(path: Path, skill_dir: Path):
     relative = path.relative_to(skill_dir)
 
     for number, line in enumerate(lines, 1):
-        path_line = re.sub(r"https?://[^\s\"'`]+", "", line)
-        for match in ABSOLUTE_PATH.finditer(path_line):
-            literal = match.group(0)
-            context = path_line[max(0, match.start() - 20):match.start()]
-            relative_prefix = path_line[match.start() - 1:match.start()] if match.start() else ""
-            standard_path = literal in {"/usr/bin/env", "/dev/null", "/dev/stdin"}
-            escaped_regex_delimiter = relative_prefix == "\\"
-            if not is_regex_example(literal) and "${TMPDIR:-" not in context \
-                    and relative_prefix != "." and not escaped_regex_delimiter and not standard_path:
-                problems.append((number, f"固定机器/临时绝对路径：{literal}"))
-        for match in WINDOWS_ABSOLUTE_PATH.finditer(path_line):
-            literal = match.group(0)
-            if not is_regex_example(literal):
-                problems.append((number, f"Windows 盘符绝对路径：{literal}"))
+        problems.extend((number, problem) for problem in fixed_machine_paths(line))
         if relative.as_posix() != "scripts/check_portability.py" and RIPGREP_COMMAND.search(line):
             problems.append((number, "调用 ripgrep（rg）；安装与校验应使用基础工具或显式检查依赖"))
 

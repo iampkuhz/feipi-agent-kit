@@ -19,7 +19,8 @@ description: 用于创建、重构或审计 skill，建立功能交付契约并�
 1. 按 [治理流程与功能契约](references/governance-process.md) 建立需求、问题和失败案例，再审计、修复、验收。它是阶段顺序与阶段交付的唯一真源；只有涉及命名或归位才进入 Step 1.5。涉及重构时，明确新旧入口、调用者迁移、兼容方式及旧路径退出条件。
 2. 需要跨阶段恢复或交接时，按 [治理记录](references/governance-artifacts.md) 保存绑定本轮输入的正式中间结果。交接实际内容或明确不足，不用文件名、目标名称或“已完成”代替结果。
 3. 按 [验证与纠偏](references/workflow.md) 分别验证确定性逻辑、Agent 分析效果及真实接口链路。先定位失败所属模块，再修改及复验必要消费者。
-4. 收口前逐项核对 [质量清单](references/quality-checklist.md)，同步版本和变更记录，交付问题、修复、验证证据、未解决项。只在需要时给出待重审项与重启建议。
+4. 用户要求逐份人工审阅时，按 [候选界面审阅](references/manual-review.md) 展示实际候选，记录与候选绑定的确认。
+5. 收口前逐项核对 [质量清单](references/quality-checklist.md)，同步版本和变更记录，交付问题、修复、验证证据、未解决项。只在需要时给出待重审项与重启建议。
 
 ## 设计边界
 
@@ -37,6 +38,7 @@ description: 用于创建、重构或审计 skill，建立功能交付契约并�
 | 情况 | 读取 |
 |---|---|
 | 命名、layer、迁移 | [命名](references/naming-conventions.md)、[分层](references/skill-layering-policy.md)；命名按 domain → action → object → layer，`feipi-skill-govern` 为保留特例 |
+| 移植外部 Skill 或更换宿主 | [依赖来源、项目 Reference、跨 Skill 调用和宿主适配](references/migration-policy.md) |
 | 新建或修改资源布局 | [开发资料与安装边界](references/development-layout.md)、[仓库约束](references/repo-constraints.md)、[frontmatter](references/frontmatter-policy.md) |
 | 更新收口 | [版本与变更记录](references/version-changelog-policy.md)；同日同 skill 只升版一次、合并一条摘要 |
 | 历史规则冲突 | [反模式](references/anti-patterns.md)、[待重审清单](references/reassessment-backlog.md)；旧 action-first 结论重新评审 |
@@ -60,7 +62,8 @@ bash tests/run.sh
 
 ## 跨平台与分发
 
-- 路径从脚本位置、显式参数或系统接口推导，不写开发者机器绝对路径；临时产物写到唯一的仓库 `tmp/` 子目录或系统临时目录，只清理本次创建的路径。
+- 审核所有实际读、写和执行路径。优先使用相对于 Skill、仓库或任务目录的路径，按 [运行路径兼容](references/workflow.md#运行路径兼容) 核对运行时解析和安装后可用性。运行资源禁止依赖固定机器路径或 IDE 私有目录。
+- 临时产物写到唯一的仓库 `tmp/` 子目录或系统临时目录，只清理本次创建的路径。
 - 安装、校验兼容 macOS Bash 3.2/BSD 与 Linux Bash/GNU；外部依赖先探测，不隐式依赖 `rg`。未实测的平台单列。
 - 运行知识保留在 `references/`；普通 skill 运行内容不依赖源码维护资料、测试或评估目录。创建和治理时按需读取目标 `tests/`、`evals/`，安装时递归排除开发资料。
 - 中文维护，保留必要技术名称。临时治理报告和评估运行产物不写回 skill 源码。

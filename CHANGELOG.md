@@ -1,5 +1,13 @@
 # 变更记录
 
+## 2026-11-27
+
+- feipi-skill-govern v10：通用迁移规约、路径兼容与逐份审阅
+
+## 2026-11-26
+
+- 工作台增加 Codex 用户档位、项目初始化和开发、审阅、验证会话简报。
+
 ## 2026-11-25
 - feipi-video-read-url v20：统一 oMLX 端口与语音模型
 - feipi-xiaohongshu-read-note v5：接入统一语音转写

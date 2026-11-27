@@ -6,7 +6,7 @@ set -euo pipefail
 # 1. 过滤链接模式：入口文件实拷、运行目录链接到用户级 agent 目录
 # 2. 过滤拷贝模式：安装到项目目录内（<project>/.agents/skills 等）
 #
-# 递归排除 maintenance/、tests/、evals/ 与 node_modules/，不进入安装目标。
+# 递归排除 maintenance/、tests/、evals/ 、node_modules/ 和 Python 缓存，不进入安装目标。
 # 安装来源写入隐藏标记；再次安装时只清理本仓库已退役的入口。
 #
 # 安装前自动验证：
@@ -242,7 +242,7 @@ collect_shared_roots() {
 
   # 不依赖目标机器未必预装的 ripgrep，使用基础系统工具递归扫描脚本。
   find "$scan_root" \
-    \( -type d \( -name maintenance -o -name tests -o -name evals -o -name node_modules \) -prune \) -o \
+    \( -type d \( -name maintenance -o -name tests -o -name evals -o -name node_modules -o -name __pycache__ \) -prune \) -o \
     \( -type f -name '*.sh' -exec sh -c '
       pattern=$1
       shift
@@ -813,9 +813,9 @@ install_skills() {
   heading "$label"
   printf '  目标：%s\n' "$dest_root"
   if [[ "$mode" == link ]]; then
-    printf '  模式：入口实拷、运行目录链接；递归排除 maintenance/tests/evals/node_modules\n'
+    printf '  模式：入口实拷、运行目录链接；递归排除 maintenance/tests/evals/node_modules 及 Python 缓存\n'
   else
-    printf '  模式：实拷；递归排除 maintenance/tests/evals/node_modules\n'
+    printf '  模式：实拷；递归排除 maintenance/tests/evals/node_modules 及 Python 缓存\n'
   fi
 
 

@@ -31,7 +31,7 @@ Skill 根目录的 `maintenance/` 是源码维护专用目录，包含非空 `RE
 
 - 普通 skill 的 `SKILL.md` 不引用 `tests/`、`evals/` 或开发命令。
 - 只有 `feipi-skill-govern` 在治理态按需读取目标 skill 的开发目录。
-- `scripts/install_skills.sh` 的链接、拷贝及打包内容递归排除 `maintenance/`、`tests/`、`evals/` 和 `node_modules/`，包括嵌套位置。链接模式实拷入口文件，只链接无需过滤的运行目录；需要过滤的父目录展开后再安装，确保客户端能发现 Skill 且不泄漏维护资料。
+- `scripts/install_skills.sh` 的链接、拷贝及打包内容递归排除 `maintenance/`、`tests/`、`evals/` 、`node_modules/`、`__pycache__/` 和 `.pyc`，包括嵌套位置。链接模式实拷入口文件，只链接无需过滤的运行目录；需要过滤的父目录展开后再安装，确保客户端能发现 Skill 且不泄漏维护资料。
 - 归位审查沿 `SKILL.md` 到命令、脚本和资源的调用链确认每个运行依赖都存在并随包发布；同时确认测试专用程序不被运行入口调用。资源校验器的静态引用结果不等于完整的动态调用图，无法静态判定时由维护者核实。
 - 初始化默认创建维护入口、术语表和 `tests/run.sh`；只有确有 Agent 行为用例时才创建 `evals/`，不创建空目录。
 - 新建与本次治理交付运行 `validate.sh <目标源码目录> --require-maintenance`。仓库级历史布局检查不带此参数，允许尚未治理的旧 Skill 暂缺维护目录；一旦存在该目录，两份维护资料都必须完整。

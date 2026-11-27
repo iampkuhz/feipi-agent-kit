@@ -40,6 +40,12 @@
 
 脚本放在业务分析之后补充，只做确定性校验。结构性缺交、格式错误、引用失效与哈希不符可以自动报错；分析是否完整和结论是否正确由业务证据判断。交接检查通过只说明记录满足契约。
 
+## 运行路径兼容
+
+- 沿正式入口核对所有读、写和执行路径，包括 Markdown 引用、配置、脚本、模板、生成结果，以及运行时拼接和链接指向。逐项核对谁解析、从哪个根解析、在安装和目标环境中是否可用，以及资源缺失或权限不足时怎么处理。
+- Skill 自带资源相对于 Skill 或脚本所在位置，项目资源从实际仓库根和项目绑定定位，任务产物从任务目录定位。用户选择的外部文件用显式输入，系统目录通过环境或系统接口发现。运行时可解析为绝对路径，随包发布的内容禁止写死本机路径、固定共享临时路径、IDE 或 Agent 宿主私有目录及个人插件检出的路径。
+- 在隔离安装副本中换一个安装位置和工作目录，沿正式入口确认读到正确目标，验证必需资源缺失时的表现。核对目标平台的分隔符、大小写和命令差异。静态检查与各平台实测分别记录。
+
 ## 本仓库的必要检查
 
 - 本次治理目标：从治理 Skill 目录运行 `bash scripts/validate.sh "$target_skill" --require-maintenance`，并执行目标实际受影响的测试。
@@ -47,3 +53,25 @@
 - 模板/初始化：生成临时 skill，核对功能交付规约和失败表达；初始化通过只证明脚手架可生成。
 - 全 registry 的结构与安装验收：先读目标仓库 `AGENTS.md`，再从其指定入口、构建文件或 CI 配置定位实际验收命令；记录命令覆盖范围。禁止凭记忆假设目标仓库有某脚本。当前 Feipi Agent Kit 仓库可运行 `python3 scripts/harness/validate_skill_layout.py`，覆盖 registry 中 Skill 的结构与过滤安装布局，不等于语义评估或跨平台实测。改变共享校验器或分发内容时执行，不能只测自身支持全仓结论。
 - 按本次变化搜索旧规则、过时引用和模板残留；更新版本与 CHANGELOG。具体技术检查不能代替上面的业务验收。
+
+## 迁移技术检查
+
+从治理 Skill 目录运行。可先核对源码与上游，再提供隔离安装目录重跑。
+
+```sh
+python3 scripts/check_migration.py "$manifest" --source-root "$source_root" \
+  --upstream-root "$upstream_root" --installed-root "$staged_skills"
+```
+
+迁移清单的 `upstream_revision` 填完整 Git SHA。`skills` 每项记录唯一 Feipi Skill ID（`name`）和目标仓库相对目录（`path`）。正式入库时追加 `--registered`，与现有 Registry 的名称、目录和入口核对。隔离安装在平铺安装根下按 `<skill-id>/SKILL.md` 核对入口和 frontmatter 的 ID。
+
+每条 `dependencies` 包含 `id`、`caller`（Skill ID）、`source`（固定上游相对路径和 `#L行号`）、`kind`、`behavior`、`disposition`、`target`、`missing`、`verification`。处理方式用 `reuse / port / adapt / blocked`。依赖类型与目标的关系如下：
+
+| 类型 | 目标 |
+| --- | --- |
+| `skill` | 清单中的确切 Skill ID |
+| `bundled` | 该调用者目录内的运行资源相对路径 |
+| `project` | 项目绑定键，清单使用 `instructions`、`workflow`、`verification` 或 `evidence` |
+| `host`、`sibling` | 经核实的能力接口、稳定工具入口或项目绑定 |
+
+`verification` 指实际证据或准备进行的检查，路径有变化时写清解析根和验证方式。`missing` 说明缺少能力时的行为。校验检查清单、包内资源、调用环和源码及隔离安装树中可静态识别的私有路径。上游目录有 Git 元数据时还会核对固定提交。动态调用、宿主能力是否等价及是否读到正确项目 Reference，仍要沿真实入口观察。记录为 `blocked` 的项会单独列出，不计为能力通过。

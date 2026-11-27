@@ -1,10 +1,10 @@
 # Feipi Agent Kit
 
-> 统一个人工作台：Mac 配置、Skills 与工具服务、Multica、OpenClaw、OpenClash。沿用本仓库 Git；源码集中维护，日常环境显式应用。
+> 统一个人工作台：Mac 配置、Skills 与工具服务、Codex、Multica、OpenClaw、OpenClash。沿用本仓库 Git；源码集中维护，日常环境显式应用。
 
 ## 工作台入口
 
-`./workbench` 提供安装、状态检查和本地服务操作。`install` 补齐依赖并发布仓库配置，组件测试直接运行。命令和组件范围见 [工作台手册](docs/workbench.md)。安装、维护和验收可从 [文档导航](docs/README.md) 按任务查找。
+`./workbench` 提供安装、状态检查、项目初始化、会话简报和本地服务操作。`install` 补齐依赖并发布仓库配置，组件测试直接运行。命令和组件范围见 [工作台手册](docs/workbench.md)。安装、维护和验收可从 [文档导航](docs/README.md) 按任务查找。
 
 ## 环境配置
 

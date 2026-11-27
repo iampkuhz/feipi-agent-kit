@@ -58,7 +58,7 @@ class InstallOutputTests(unittest.TestCase):
     def test_recursive_development_exclusion_and_repeat_install(self):
         source = self.repo / 'skills/integration/feipi-one'
         for parent in (source, source/'scripts/examples'):
-            for name in ('maintenance', 'tests', 'evals', 'node_modules'):
+            for name in ('maintenance', 'tests', 'evals', 'node_modules', '__pycache__'):
                 directory = parent/name
                 directory.mkdir(parents=True)
                 (directory/'SKILL.md').write_text('source only')
@@ -68,6 +68,7 @@ class InstallOutputTests(unittest.TestCase):
         clean = source/'scripts/examples/runtime'
         clean.mkdir()
         (clean/'data.txt').write_text('runtime data')
+        (clean.parent/'old.pyc').write_bytes(b'cached python')
         (source/'scripts/source-notes').symlink_to(source/'maintenance')
         (source/'scripts/runtime-alias').symlink_to(source/'scripts/examples')
         commands = (
@@ -80,7 +81,8 @@ class InstallOutputTests(unittest.TestCase):
                 self.run_installer(*command)
                 installed = destination/source.name
                 for directory, dirs, files in os.walk(installed, followlinks=True):
-                    self.assertFalse({'maintenance', 'tests', 'evals', 'node_modules'}.intersection(dirs+files), directory)
+                    self.assertFalse({'maintenance', 'tests', 'evals', 'node_modules', '__pycache__'}.intersection(dirs+files), directory)
+                    self.assertFalse(any(name.endswith('.pyc') for name in files), directory)
                 self.assertEqual((installed/'scripts/examples/runtime/data.txt').read_text(), 'runtime data')
                 self.assertFalse((installed/'scripts').is_symlink())
                 self.assertFalse((installed/'scripts/source-notes').exists())

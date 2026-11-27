@@ -1,0 +1,7 @@
+# Feipi 日常开发与本机验证。项目内写入，额外权限由用户审批。
+sandbox_mode = "workspace-write"
+approval_policy = "on-request"
+approvals_reviewer = "user"
+
+[sandbox_workspace_write]
+network_access = false
