@@ -10,13 +10,14 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
+from runpy import run_path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-REGISTRY = REPO_ROOT / "skills/registry.yaml"
+parse_registry = run_path(str(REPO_ROOT / "scripts/harness/validate_registry.py"))["parse_registry"]
 INSTALLER = REPO_ROOT / "scripts/install_skills.sh"
 CREATOR_NAME = "feipi-skill-govern"
-SKILL_VALIDATOR = REPO_ROOT / "skills/authoring/feipi-skill-govern/scripts/validate.sh"
+SKILL_VALIDATOR = REPO_ROOT / "skills/agent/skills/feipi-skill-govern/scripts/validate.sh"
 DEVELOPMENT_REF = re.compile(r"(^|[\s'\"`(])(tests|evals)/|scripts/test\.sh", re.MULTILINE)
 
 
@@ -25,14 +26,7 @@ def fail(message: str) -> None:
 
 
 def registry_paths() -> list[Path]:
-    paths: list[Path] = []
-    for line in REGISTRY.read_text(encoding="utf-8").splitlines():
-        match = re.match(r"^\s+path:\s*(.+?)\s*$", line)
-        if match:
-            paths.append(REPO_ROOT / match.group(1).strip("'\""))
-    if not paths:
-        fail("registry.yaml 未解析到 skill 路径")
-    return paths
+    return [REPO_ROOT / entry["path"] for entry in parse_registry(REPO_ROOT)]
 
 
 def validate_eval_cases(skill: Path) -> None:
@@ -171,7 +165,7 @@ def validate_retired_entries(root: Path, link_root: Path, project: Path, env: di
     def create_skill(name: str, resources: bool = True) -> Path:
         skill = source_root / "integration" / name
         skill.mkdir(parents=True)
-        (skill / "SKILL.md").write_text(f"---\nname: {name}\n---\nfixture\n", encoding="utf-8")
+        (skill / "SKILL.md").write_text(f"---\nname: {name}\ndescription: fixture\n---\nfixture\n", encoding="utf-8")
         if resources:
             (skill / "scripts").mkdir()
             (skill / "scripts/run.sh").write_text(
@@ -182,13 +176,7 @@ def validate_retired_entries(root: Path, link_root: Path, project: Path, env: di
         return skill
 
     def write_registry(skills: list[Path]) -> None:
-        records = ["skills:"]
-        for skill in skills:
-            records.append(
-                f"  - name: {skill.name}\n    path: {skill.relative_to(repo)}\n"
-                f"    layer: {skill.parent.name}\n    description: fixture\n"
-                "    clients: [codex]\n    entry: SKILL.md\n    validation: null\n    status: stable"
-            )
+        records = ["skills:", *(f"  - {skill.relative_to(repo)}" for skill in skills)]
         (source_root / "registry.yaml").write_text("\n".join(records) + "\n", encoding="utf-8")
 
     installer = ["bash", "scripts/install_skills.sh"]
@@ -408,12 +396,15 @@ def validate_retired_entries(root: Path, link_root: Path, project: Path, env: di
 
     renamed = retired.with_name("feipi-renamed")
     retired.rename(renamed)
+    renamed_entry = renamed / "SKILL.md"
+    renamed_entry.write_text(renamed_entry.read_text(encoding="utf-8").replace(retired.name, renamed.name), encoding="utf-8")
     shutil.rmtree(marker_only)
     marker_only.mkdir()  # 目录仍存在但已无 SKILL.md，也应退役。
-    moved = source_root / "authoring" / current.name
-    moved.parent.mkdir()
+    moved = source_root / "content/writing" / current.name
+    moved.parent.mkdir(parents=True)
     current.rename(moved)
-    (moved / "SKILL.md").write_text("updated current skill", encoding="utf-8")
+    moved_entry = moved / "SKILL.md"
+    moved_entry.write_text(moved_entry.read_text(encoding="utf-8").replace("\nfixture\n", "\nupdated current skill\n"), encoding="utf-8")
 
     # 注册表未同步时，必须在任何清理或安装之前中止。
     before = {entry: entry_snapshot(entry) for entry in removed}
@@ -452,7 +443,7 @@ def validate_retired_entries(root: Path, link_root: Path, project: Path, env: di
             for source in (moved, renamed):
                 if Path((destination / source.name / marker).read_text().strip()).resolve() != source.resolve():
                     fail(f"改名或迁层后来源未同步：{destination / source.name}")
-            if (destination / moved.name / "SKILL.md").read_text() != "updated current skill":
+            if (destination / moved.name / "SKILL.md").read_bytes() != moved_entry.read_bytes():
                 fail(f"当前入口未更新：{destination / moved.name}")
         if not (source_root / "integration/feipi-live-retired/keep.txt").is_file():
             fail("清理旧入口误删了链接指向的源码")
@@ -464,7 +455,7 @@ def validate_retired_entries(root: Path, link_root: Path, project: Path, env: di
     copy_command.write_text("#!/bin/sh\nexit 77\n", encoding="utf-8")
     copy_command.chmod(0o755)
     failure_env = dict(env, PATH=f"{fakebin}{os.pathsep}{env['PATH']}")
-    (moved / "SKILL.md").write_text("changed before failed copy", encoding="utf-8")
+    moved_entry.write_text(moved_entry.read_text(encoding="utf-8") + "\nchanged before failed copy\n", encoding="utf-8")
     for command, destination, _ in commands:
         before = entry_identity(destination / moved.name)
         result = subprocess.run(command, cwd=repo, env=failure_env, text=True, capture_output=True, timeout=60)

@@ -1,86 +1,19 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Feipi Agent Kit Skill Registry",
-  "description": "Skill 注册表 — 描述仓库内所有已注册的 skill",
+  "title": "Feipi Skill Registry",
   "type": "object",
-  "required": ["version", "skills"],
+  "required": [
+    "skills"
+  ],
+  "additionalProperties": false,
   "properties": {
-    "version": {
-      "type": "string",
-      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
-      "description": "注册表版本号"
-    },
     "skills": {
       "type": "array",
       "minItems": 1,
+      "uniqueItems": true,
       "items": {
-        "type": "object",
-        "required": ["name", "path", "layer", "description", "clients", "entry", "validation", "status"],
-        "additionalProperties": false,
-        "properties": {
-          "name": {
-            "type": "string",
-            "pattern": "^feipi-[a-z0-9-]+$",
-            "description": "Skill 名称，遵循 feipi- 前缀 + 小写短横线命名"
-          },
-          "path": {
-            "type": "string",
-            "description": "Skill 目录的仓库相对路径"
-          },
-          "layer": {
-            "type": "string",
-            "enum": ["authoring", "diagram", "integration"],
-            "description": "Skill 所属层级"
-          },
-          "description": {
-            "type": "string",
-            "minLength": 1,
-            "description": "Skill 功能描述"
-          },
-          "clients": {
-            "type": "array",
-            "minItems": 1,
-            "items": { "type": "string" },
-            "description": "支持的 agent 客户端列表"
-          },
-          "entry": {
-            "type": "string",
-            "description": "Skill 入口文件名，通常为 SKILL.md"
-          },
-          "validation": {
-            "oneOf": [
-              {
-                "type": "object",
-                "required": ["type"],
-                "additionalProperties": false,
-                "properties": {
-                  "type": { "type": "string", "enum": ["script", "none"] },
-                  "command": { "type": "string", "minLength": 1 }
-                },
-                "allOf": [
-                  {
-                    "if": {
-                      "properties": {
-                        "type": { "const": "script" }
-                      },
-                      "required": ["type"]
-                    },
-                    "then": {
-                      "required": ["command"]
-                    }
-                  }
-                ]
-              },
-              { "type": "null" }
-            ],
-            "description": "校验方式"
-          },
-          "status": {
-            "type": "string",
-            "enum": ["stable", "compatibility"],
-            "description": "Skill 当前状态"
-          }
-        }
+        "type": "string",
+        "pattern": "^skills/[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)?/feipi-[a-z0-9]+(?:-[a-z0-9]+)*$"
       }
     }
   }

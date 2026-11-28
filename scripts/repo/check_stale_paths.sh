@@ -14,8 +14,8 @@ blocks=0
 # 格式: "旧路径|建议新路径"
 declare -a STALE_PATH_MAP=(
   "tools/search/searxng-mcp|已退役（请删除或标注[历史]）"
-  "skills/feipi-plantuml-diagram/|skills/authoring/feipi-plantuml-generate-*/"
-  "skills/feipi-video-read-url/|skills/authoring/feipi-video-read-url/"
+  "skills/feipi-plantuml-diagram/|skills/diagram/feipi-plantuml-generate-*/"
+  "skills/feipi-video-read-url/|skills/media/video/feipi-video-read-url/"
 )
 
 # --- 1. 死链检测：扫描 .md 文件中的相对路径引用 ---

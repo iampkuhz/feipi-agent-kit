@@ -3,7 +3,7 @@
   "title": "Feipi Agent Kit Harness Manifest",
   "description": "仓库资源注册表 — 描述所有已存在的文件、目录与工作流",
   "type": "object",
-  "required": ["version", "name", "description", "entrypoints", "rules", "commands", "skills", "workflows", "validation", "local_config"],
+  "required": ["version", "name", "description", "entrypoints", "rules", "commands", "skill_registry", "workflows", "validation", "local_config"],
   "properties": {
     "version": {
       "type": "string",
@@ -55,22 +55,7 @@
         "readme": { "type": "string" }
       }
     },
-    "skills": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["name", "path", "layer", "description"],
-        "properties": {
-          "name": { "type": "string" },
-          "path": { "type": "string" },
-          "layer": {
-            "type": "string",
-            "enum": ["authoring", "diagram", "integration"]
-          },
-          "description": { "type": "string" }
-        }
-      }
-    },
+    "skill_registry": { "const": "skills/registry.yaml" },
     "workflows": {
       "type": "array",
       "items": {

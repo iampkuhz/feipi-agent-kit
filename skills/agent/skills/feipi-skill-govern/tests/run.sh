@@ -1,0 +1,242 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# feipi-skill-govern 自测入口。
+# 确定性回归；真实 Agent 效果评估按 evals/README.md 单独执行。
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+source "$SKILL_DIR/scripts/skill_identity.sh"
+REPO_ROOT="$(skill_repo_root "$SKILL_DIR")"
+INIT_SCRIPT="$SKILL_DIR/scripts/init_skill.sh"
+VALIDATE_SCRIPT="$SKILL_DIR/scripts/validate.sh"
+
+TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/feipi-skill-govern-test.XXXXXX")"
+REPO_FLAT_DIR="$REPO_ROOT/skills/feipi-video-read-youtube-flat-test-$$-$RANDOM"
+REPO_FLAT_DIR_CREATED=0
+
+cleanup() {
+  rm -rf "$TMP_ROOT"
+  if [[ "$REPO_FLAT_DIR_CREATED" -eq 1 ]]; then
+    rm -rf "$REPO_FLAT_DIR"
+  fi
+}
+trap cleanup EXIT
+
+TOTAL=0
+PASSED=0
+FAILED=0
+
+run_case() {
+  local case_name="$1"
+  local gen_dir=""
+  local output=""
+  local code=0
+  local -a normative_files=(
+    "$SKILL_DIR/SKILL.md"
+    "$SKILL_DIR/agents/openai.yaml"
+    "$SKILL_DIR/scripts/init_skill.sh"
+    "$SKILL_DIR/scripts/init_skill_internal.sh"
+    "$SKILL_DIR/scripts/quick_validate_internal.sh"
+    "$SKILL_DIR/scripts/validate.sh"
+    "$SKILL_DIR/scripts/check_portability.py"
+    "$SKILL_DIR/scripts/validate_resources.py"
+    "$SKILL_DIR/scripts/check_delivery.py"
+    "$SKILL_DIR/references/naming-conventions.md"
+    "$SKILL_DIR/references/skill-classification.md"
+    "$SKILL_DIR/references/workflow.md"
+    "$SKILL_DIR/references/governance-process.md"
+    "$SKILL_DIR/references/governance-artifacts.md"
+    "$SKILL_DIR/references/frontmatter-policy.md"
+    "$SKILL_DIR/references/reassessment-backlog.md"
+    "$SKILL_DIR/references/version-changelog-policy.md"
+    "$SKILL_DIR/references/development-layout.md"
+    "$SKILL_DIR/references/quality-checklist.md"
+    "$SKILL_DIR/references/repo-constraints.md"
+    "$SKILL_DIR/references/anti-patterns.md"
+    "$SKILL_DIR/tests/test_portability.py"
+    "$SKILL_DIR/templates/SKILL.template.md"
+    "$SKILL_DIR/templates/tests-run.template.sh"
+    "$SKILL_DIR/evals/cases.json"
+  )
+
+  case "$case_name" in
+    validate-self)
+      bash "$VALIDATE_SCRIPT" "$SKILL_DIR" --require-maintenance >/dev/null
+      ;;
+    init-generated-skill)
+      bash "$INIT_SCRIPT" "video-read-youtube" --resources "references,assets" --domain media --subdomain video --target "$TMP_ROOT/skills" >/dev/null
+      gen_dir="$TMP_ROOT/skills/media/video/feipi-video-read-youtube"
+      [[ -d "$gen_dir" ]] || return 1
+      [[ -d "$gen_dir/references" ]] || return 1
+      [[ -d "$gen_dir/assets" ]] || return 1
+      [[ -x "$gen_dir/tests/run.sh" ]] || return 1
+      [[ -s "$gen_dir/maintenance/README.md" ]] || return 1
+      [[ -s "$gen_dir/maintenance/terminology.md" ]] || return 1
+      ! grep -Fq '{{' "$gen_dir/maintenance/README.md" "$gen_dir/maintenance/terminology.md" || return 1
+      ! grep -Eq 'make[[:space:]]+validate[[:space:]]+DIR=|make[[:space:]]+test[[:space:]]+SKILL=' "$gen_dir/SKILL.md" || return 1
+      ! grep -Fq '{{' "$gen_dir/SKILL.md" "$gen_dir/agents/openai.yaml" "$gen_dir/tests/run.sh" || return 1
+      ! grep -Fq '<skill-name>' "$gen_dir/SKILL.md" "$gen_dir/agents/openai.yaml" "$gen_dir/tests/run.sh" || return 1
+      bash "$VALIDATE_SCRIPT" "$gen_dir" --require-maintenance >/dev/null
+      bash "$gen_dir/tests/run.sh" >/dev/null
+      ;;
+    init-default-no-empty-resources)
+      bash "$INIT_SCRIPT" "report-build-summary" --target "$TMP_ROOT/default-resources" >/dev/null
+      gen_dir="$TMP_ROOT/default-resources/feipi-report-build-summary"
+      [[ -d "$gen_dir" ]] || return 1
+      [[ ! -e "$gen_dir/scripts" && ! -e "$gen_dir/references" && ! -e "$gen_dir/assets" ]] || return 1
+      bash "$INIT_SCRIPT" "report-generate-brief" --resources scripts --target "$TMP_ROOT/selected-resources" >/dev/null
+      [[ -d "$TMP_ROOT/selected-resources/feipi-report-generate-brief/scripts" ]] || return 1
+      ;;
+    reject-missing-option-value)
+      set +e
+      output="$(bash "$INIT_SCRIPT" video-read-youtube --domain 2>&1)"
+      code=$?
+      set -e
+      [[ "$code" -ne 0 ]] || return 1
+      grep -Fq -- "--domain 缺少参数值" <<<"$output"
+      ;;
+    reject-invalid-domain)
+      set +e
+      output="$(bash "$INIT_SCRIPT" video-read-youtube --domain verification --target "$TMP_ROOT/platform" 2>&1)"
+      code=$?
+      set -e
+      [[ "$code" -ne 0 ]] || return 1
+      grep -Fq "分类目录须表达主题" <<<"$output"
+      ;;
+    reject-v1-name)
+      set +e
+      output="$(bash "$INIT_SCRIPT" "read-youtube-video" --domain media --subdomain video --target "$TMP_ROOT/legacy" 2>&1)"
+      code=$?
+      set -e
+      [[ "$code" -ne 0 ]] || return 1
+      grep -Fq "旧 action-first" <<<"$output"
+      ;;
+    reject-low-signal-action)
+      set +e
+      output="$(bash "$INIT_SCRIPT" "dingtalk-web-webhook" --domain media --subdomain video --target "$TMP_ROOT/bad-action" 2>&1)"
+      code=$?
+      set -e
+      [[ "$code" -ne 0 ]] || return 1
+      grep -Fq "低语义词" <<<"$output"
+      ;;
+    validate-detects-placeholder)
+      bash "$INIT_SCRIPT" "video-review-transcript" --domain media --subdomain video --target "$TMP_ROOT/placeholder" >/dev/null
+      gen_dir="$TMP_ROOT/placeholder/media/video/feipi-video-review-transcript"
+      placeholder="$(printf '%s%s%s' '{{' 'SKILL_NAME' '}}')"
+      printf '\n%s\n' "$placeholder" >> "$gen_dir/SKILL.md"
+      set +e
+      output="$(bash "$VALIDATE_SCRIPT" "$gen_dir" 2>&1)"
+      code=$?
+      set -e
+      [[ "$code" -ne 0 ]] || return 1
+      grep -Fq "未替换模板占位符" <<<"$output"
+      ;;
+    validate-detects-maintenance-command)
+      bash "$INIT_SCRIPT" "video-test-transcript" --domain media --subdomain video --target "$TMP_ROOT/maint" >/dev/null
+      gen_dir="$TMP_ROOT/maint/media/video/feipi-video-test-transcript"
+      printf '\n## 维护命令\n\n```bash\nmake validate DIR=%s\n```\n' "$gen_dir" >> "$gen_dir/SKILL.md"
+      set +e
+      output="$(bash "$VALIDATE_SCRIPT" "$gen_dir" 2>&1)"
+      code=$?
+      set -e
+      [[ "$code" -ne 0 ]] || return 1
+      grep -Fq "repo 维护命令" <<<"$output"
+      ;;
+    validate-detects-flat-repo-path)
+      bash "$INIT_SCRIPT" "video-read-youtube" --domain media --subdomain video --target "$TMP_ROOT/flat-source" >/dev/null
+      gen_dir="$TMP_ROOT/flat-source/media/video/feipi-video-read-youtube"
+      [[ ! -e "$REPO_FLAT_DIR" ]] || return 1
+      cp -R "$gen_dir" "$REPO_FLAT_DIR"
+      REPO_FLAT_DIR_CREATED=1
+      set +e
+      output="$(bash "$VALIDATE_SCRIPT" "$REPO_FLAT_DIR" 2>&1)"
+      code=$?
+      set -e
+      [[ "$code" -ne 0 ]] || return 1
+      grep -Fq "skills/<领域>/[<子领域>/]<Skill ID>/" <<<"$output"
+      ;;
+    governance-temp-artifacts-absent)
+      [[ ! -d "$SKILL_DIR/assets/governance" ]] || return 1
+      ! find "$SKILL_DIR" -type f \
+        \( \
+          -name 'step-1-audit.template.md' -o \
+          -name 'step-1-5-rename-review.template.md' -o \
+          -name 'step-2-execution-checklist.template.md' -o \
+          -name 'rename-plan.template.md' -o \
+          -name 'governance-report.template.md' -o \
+          -name 'anti-pattern.template.md' \
+        \) | grep -q . || return 1
+      ! grep -En 'assets/governance/' \
+        "$SKILL_DIR/SKILL.md" \
+        "$SKILL_DIR/references/"*.md || return 1
+      ;;
+    legacy-rule-scan)
+      ! grep -En 'feipi-<action>-<target\.\.\.>|domain-action-object|prefix-domain-action-object' "${normative_files[@]}" || return 1
+      ! grep -En 'action 白名单|第二段固定|web：前端与页面|ops：运维与发布|automate：自动化流程' "${normative_files[@]}" || return 1
+      ;;
+    registry-index)
+      python3 -S "$REPO_ROOT/scripts/harness/validate_registry.py"
+      ;;
+    portability-checker-tests)
+      python3 "$SKILL_DIR/tests/test_portability.py" >/dev/null
+      ;;
+    resource-boundary-tests)
+      python3 "$SKILL_DIR/tests/test_resources.py"
+      ;;
+    migration-and-review-tests)
+      python3 "$SKILL_DIR/tests/test_migration_review.py"
+      ;;
+    delivery-and-harness-tests)
+      python3 "$SKILL_DIR/tests/test_delivery.py"
+      ;;
+    *)
+      echo "未知测试项：$case_name" >&2
+      return 1
+      ;;
+  esac
+}
+
+# 单独进程中执行，避免 if 调用函数使 Bash 的 errexit 在整个函数内失效。
+if [[ "${1:-}" == "--case" ]]; then
+  [[ $# -eq 2 ]] || exit 1
+  run_case "$2"
+  exit 0
+fi
+[[ $# -eq 0 ]] || exit 1
+
+for case_name in \
+  validate-self \
+  init-generated-skill \
+  init-default-no-empty-resources \
+  reject-v1-name \
+  reject-low-signal-action \
+  validate-detects-placeholder \
+  validate-detects-maintenance-command \
+  validate-detects-flat-repo-path \
+  governance-temp-artifacts-absent \
+  legacy-rule-scan \
+  reject-missing-option-value \
+  reject-invalid-domain \
+  registry-index \
+  portability-checker-tests \
+  resource-boundary-tests \
+  migration-and-review-tests \
+  delivery-and-harness-tests
+do
+  TOTAL=$((TOTAL + 1))
+  if bash "$SCRIPT_DIR/run.sh" --case "$case_name"; then
+    echo "[PASS] $case_name"
+    PASSED=$((PASSED + 1))
+  else
+    echo "[FAIL] $case_name" >&2
+    FAILED=$((FAILED + 1))
+  fi
+done
+
+echo "测试汇总：total=$TOTAL pass=$PASSED fail=$FAILED"
+if [[ "$FAILED" -ne 0 ]]; then
+  exit 1
+fi
+
+echo "确定性回归通过：feipi-skill-govern；Agent 效果与实际链路需单独核对"

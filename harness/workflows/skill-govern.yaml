@@ -16,7 +16,7 @@ workflow:
   # 引用的 skill
   referenced_skills:
     - name: "feipi-skill-govern"
-      path: "skills/authoring/feipi-skill-govern/SKILL.md"
+      path: "skills/agent/skills/feipi-skill-govern/SKILL.md"
       role: "主治理 skill"
 
   # 校验步骤

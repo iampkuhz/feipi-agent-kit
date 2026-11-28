@@ -1,6 +1,6 @@
 # 家庭健康 Skill
 
-Codex 和 OpenClaw 加载同一 Skill 的运行副本。家庭健康档案原位维护在 `~/Documents/life/家庭健康`，目录规则、模板和档案内容也以该库为准。 [Skill 源码](../skills/authoring/feipi-health-maintain-family-records/SKILL.md)
+Codex 和 OpenClaw 加载同一 Skill 的运行副本。家庭健康档案原位维护在 `~/Documents/life/家庭健康`，目录规则、模板和档案内容也以该库为准。 [Skill 源码](../skills/health/feipi-health-maintain-family-records/SKILL.md)
 
 ## 使用
 
@@ -19,8 +19,8 @@ Codex 和 OpenClaw 加载同一 Skill 的运行副本。家庭健康档案原位
 改源码后运行：
 
 ```bash
-bash skills/authoring/feipi-health-maintain-family-records/tests/run.sh
-bash skills/authoring/feipi-skill-govern/scripts/validate.sh skills/authoring/feipi-health-maintain-family-records
+bash skills/health/feipi-health-maintain-family-records/tests/run.sh
+bash skills/agent/skills/feipi-skill-govern/scripts/validate.sh skills/health/feipi-health-maintain-family-records
 python3 scripts/harness/validate_registry.py
 ```
 

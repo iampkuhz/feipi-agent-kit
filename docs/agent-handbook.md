@@ -37,13 +37,13 @@
 
 ## 新增或维护 Skill
 
-1. 查阅命名、分层、测试和注册要求。 [Skill 工程治理](../skills/authoring/feipi-skill-govern/SKILL.md)
-2. 创建脚手架，替换下方占位参数为实际名称和分层。
+1. 查阅命名、主题归类、测试和注册要求。 [Skill 工程治理](../skills/agent/skills/feipi-skill-govern/SKILL.md)
+2. 创建脚手架，替换下方占位参数为实际名称和领域。
 3. 运行 Skill 自身测试与注册表回归，最后用一个代表性任务验证结果。
 
 ```bash
-bash skills/authoring/feipi-skill-govern/scripts/init_skill.sh <name> --layer <layer>
-bash skills/authoring/feipi-skill-govern/scripts/validate.sh <skill-path> --require-maintenance
+bash skills/agent/skills/feipi-skill-govern/scripts/init_skill.sh <name> --domain <领域> [--subdomain <子领域>]
+bash skills/agent/skills/feipi-skill-govern/scripts/validate.sh <skill-path> --require-maintenance
 bash <skill-path>/tests/run.sh
 bash scripts/harness/doctor.sh
 ```

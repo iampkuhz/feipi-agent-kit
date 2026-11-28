@@ -13,7 +13,7 @@ Multica Cloud 提供平台服务。Mac 上的 daemon 执行绑定到本机的任
 
 - `config/agents.json` 和 `config/instructions/` 维护 Agent 声明、模型、推理档位、并发和角色指令。当前默认声明 Codex Builder。
 - 可选的 `config/machine.example.json` 提供 Cloud 机器绑定示例。使用 `~/.config/feipi-multica/machine.json` 保存准确的 Cloud 工作区、daemon、runtime 和项目 UUID。本机登录态由官方 CLI 管理。
-- 任务操作走官方 `multica` 或 Web。需要本机操作回执时可选用 `multica-work`。配置差异和运行验收见 [操作手册](docs/adaptation-runbook.md)，任务协作见 [Skill 操作参考](../../skills/integration/feipi-multica-manage-tasks/references/operations.md)。
+- 任务操作走官方 `multica` 或 Web。需要本机操作回执时可选用 `multica-work`。配置差异和运行验收见 [操作手册](docs/adaptation-runbook.md)，任务协作见 [Skill 操作参考](../../skills/collaboration/feipi-multica-manage-tasks/references/operations.md)。
 - 可选的本机工具通过 `python3 scripts/install-runtime.py` 发布到 `~/.local/share/multica/ops`。只用官方 CLI 的机器可以直接通过 Cloud 管理任务。
 
 ## 历史可选方案：LiteLLM Agent

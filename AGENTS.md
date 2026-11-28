@@ -5,7 +5,7 @@
 ## 强约束
 
 1. **中文优先**：面向用户输出默认简体中文。详见 `rules/global/language.md`。
-2. **规则先行**：先遵循 `rules/` 和 `skills/authoring/feipi-skill-govern/`，再实现。
+2. **规则先行**：先遵循 `rules/` 和 `skills/agent/skills/feipi-skill-govern/`，再实现。
 3. **职责分离**：`skills/`（Agent 能力）| `tools/`（外部服务封装）| `rules/`（行为规范）| `runtimes/`（运行时框架）。
 4. **默认行为优先**。脚本和工具直接采用适合常规场景的默认行为。能由默认行为或现有配置满足的需求，不新增命令行参数、环境变量或配置项。只有调用方确实需要不同且无法自动判断的行为时，才提供最小的配置入口。批量安装默认显示下载与安装进度。
 
@@ -64,4 +64,4 @@ Agent 启动后按以下顺序加载规则：
 - [docs/agent-handbook.md](docs/agent-handbook.md) — 操作手册
 - [docs/governance/tool-usage.md](docs/governance/tool-usage.md) — 工具使用规范
 - [rules/README.md](rules/README.md) — 行为规则
-- [skills/authoring/feipi-skill-govern/SKILL.md](skills/authoring/feipi-skill-govern/SKILL.md) — Skill 治理
+- [skills/agent/skills/feipi-skill-govern/SKILL.md](skills/agent/skills/feipi-skill-govern/SKILL.md) — Skill 治理

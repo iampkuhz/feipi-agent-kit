@@ -30,7 +30,7 @@
 
 | 要新增什么 | 从哪里开始 |
 | --- | --- |
-| Skill | 按治理流程选择分层、登记注册表，提供用例和随附测试。 [Skill 工程治理](../../skills/authoring/feipi-skill-govern/SKILL.md) |
+| Skill | 按主要对象归类，登记路径索引，提供用例和随附测试。 [Skill 工程治理](../../skills/agent/skills/feipi-skill-govern/SKILL.md) |
 | MCP 服务 | 查看 FastMCP 运行时和 Python 模板，将业务封装放在对应服务目录。 [FastMCP](../../runtimes/fastmcp/README.md) · [Python 模板](../../runtimes/fastmcp/templates/python/) |
 | 规则 | 按适用范围放入 `rules/`，说明何时适用并补充正反示例。 [规则索引](../../rules/README.md) |
 

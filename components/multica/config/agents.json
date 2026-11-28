@@ -16,10 +16,10 @@
   ],
   "skill": {
     "name": "feipi-multica-manage-tasks",
-    "path": "skills/integration/feipi-multica-manage-tasks"
+    "path": "skills/collaboration/feipi-multica-manage-tasks"
   },
   "skill_checks": [
-    "skills/integration/feipi-multica-manage-tasks",
-    "skills/integration/feipi-video-read-url"
+    "skills/collaboration/feipi-multica-manage-tasks",
+    "skills/media/video/feipi-video-read-url"
   ]
 }

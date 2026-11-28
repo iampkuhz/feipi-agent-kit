@@ -1,5 +1,0 @@
-version: 10
-interface:
-  display_name: "Skill 工程治理（中文）"
-  short_description: "创建、重构或审计 skill，明确功能交付契约，验证业务效果并定位失败环节。"
-  default_prompt: "请使用 $feipi-skill-govern 治理目标 skill：从用户目标和失败案例建立功能交付契约，修改所属模块及必要消费者，分别验证技术、Agent 效果和实际链路，交付逐问题结果与未验证项。"

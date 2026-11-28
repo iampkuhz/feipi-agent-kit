@@ -17,7 +17,7 @@ def try_parse_manifest_simple(text):
     result = {
         "entrypoints": [],
         "rules": [],
-        "skills": [],
+        "skill_registry": None,
         "workflows": [],
         "validation_scripts": [],
         "validation_doctor": None,
@@ -33,14 +33,16 @@ def try_parse_manifest_simple(text):
         if not stripped or stripped.startswith("#"):
             continue
 
+        if line.startswith("skill_registry:"):
+            result["skill_registry"] = line.split(":", 1)[1].strip().strip('"').strip("'")
+            continue
+
         # Detect top-level sections
         top_match = re.match(r'^(\w[\w_]*):\s*$', line)
         if top_match:
             section_name = top_match.group(1)
             if current_item:
-                if current_section == "skills":
-                    result["skills"].append(current_item)
-                elif current_section == "entrypoints":
+                if current_section == "entrypoints":
                     result["entrypoints"].append(current_item)
                 elif current_section == "rules":
                     result["rules"].append(current_item)
@@ -58,9 +60,7 @@ def try_parse_manifest_simple(text):
         # Detect list item start
         if stripped.startswith("- "):
             if current_item and "path" in current_item:
-                if current_section == "skills":
-                    result["skills"].append(current_item)
-                elif current_section == "entrypoints":
+                if current_section == "entrypoints":
                     result["entrypoints"].append(current_item)
                 elif current_section == "rules":
                     result["rules"].append(current_item)
@@ -79,14 +79,12 @@ def try_parse_manifest_simple(text):
             key = key.strip()
             value = value.strip().strip('"').strip("'")
 
-            if key in ("path", "type", "description", "name", "scope", "layer", "policy"):
+            if key in ("path", "type", "description", "name", "scope", "policy"):
                 current_item[key] = value
 
     # Don't forget the last item
     if current_item and "path" in current_item:
-        if current_section == "skills":
-            result["skills"].append(current_item)
-        elif current_section == "entrypoints":
+        if current_section == "entrypoints":
             result["entrypoints"].append(current_item)
         elif current_section == "rules":
             result["rules"].append(current_item)
@@ -164,10 +162,9 @@ def collect_paths(data):
         if "path" in rule:
             paths.append(("rule", rule["path"]))
 
-    # Skills
-    for skill in data.get("skills", []):
-        if "path" in skill:
-            paths.append(("skill", skill["path"]))
+    # Skills use the shared registry instead of a second metadata list.
+    if data.get("skill_registry"):
+        paths.append(("skill_registry", data["skill_registry"]))
 
     # Workflows
     for wf in data.get("workflows", []):

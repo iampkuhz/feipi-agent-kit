@@ -19,7 +19,7 @@
 
 后续功能需要另有实际需求和命令证据再加入。当前无需增加 MCP、API 客户端、凭据来源或新的分发入口。项目删除、批量改写、工作流及服务运维未纳入这批功能。
 
-运行方法见 [项目管理操作参考](../skills/integration/feipi-multica-manage-tasks/references/project-management.md)。
+运行方法见 [项目管理操作参考](../skills/collaboration/feipi-multica-manage-tasks/references/project-management.md)。
 
 ## 任务边界与恢复
 

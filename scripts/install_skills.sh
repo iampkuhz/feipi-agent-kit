@@ -10,8 +10,7 @@ set -euo pipefail
 # 安装来源写入隐藏标记；再次安装时只清理本仓库已退役的入口。
 #
 # 安装前自动验证：
-# 1. 运行 scripts/harness/validate_registry.py 校验 registry.yaml
-# 2. 对比 registry.yaml 中列出的技能路径与文件系统扫描结果，必须完全一致
+# 读取注册表，校验入口与文件系统的一致性，之后才写入安装目标。
 #
 # 注意：OpenClaw 安全策略拒绝 realpath 超出根目录的软链接
 # （"resolved realpath stays inside the configured root"），
@@ -397,194 +396,12 @@ copy_dir() {
   fi
 }
 
-# 递归收集所有技能目录（平铺到一维）
-# 技能目录的识别规则：
-# 1. 包含 SKILL.md 文件
-# 2. 包含 .smile 文件
-# 3. 包含 agents/ 子目录（Claude Code skills 结构）
-# 只选择最深层的技能目录，中间分类目录不会被选中
-collect_all_skills() {
-  local src_root="$1"
-  local all_skill_dirs=()
-  local final_skills=()
-
-  # 第一遍：收集所有技能目录
-  while IFS= read -r -d '' skill_dir; do
-    # 跳过根目录本身
-    [[ "$skill_dir" == "$src_root" ]] && continue
-
-    # 跳过隐藏目录
-    local basename
-    basename="${skill_dir##*/}"
-    [[ "$basename" == .* ]] && continue
-
-    # 检查是否是有效的技能目录（满足任一条件）：
-    # 1. 包含 SKILL.md 文件
-    # 2. 包含 .smile 文件
-    # 3. 包含 agents/ 子目录
-    local is_skill=false
-
-    if [[ -f "$skill_dir/SKILL.md" ]]; then
-      is_skill=true
-    elif [[ -f "$skill_dir/.smile" ]]; then
-      is_skill=true
-    elif [[ -d "$skill_dir/agents" ]]; then
-      is_skill=true
-    fi
-
-    if [[ "$is_skill" == true ]]; then
-      all_skill_dirs+=("$skill_dir")
-    fi
-  done < <(find "$src_root" -type d \( -name '.*' -o -name node_modules -o -name maintenance -o -name tests -o -name evals -o -name __pycache__ \) -prune -o -type d -print0)
-
-  # 第二遍：排除那些有子技能的父目录
-  # 如果一个技能目录的子目录中还有其他技能目录，则排除这个父目录
-  for skill_dir in "${all_skill_dirs[@]}"; do
-    local has_child_skill=false
-
-    for other_dir in "${all_skill_dirs[@]}"; do
-      # 检查 other_dir 是否是 skill_dir 的子目录
-      if [[ "$other_dir" != "$skill_dir" ]] && [[ "$other_dir" == "$skill_dir"/* ]]; then
-        has_child_skill=true
-        break
-      fi
-    done
-
-    # 只有当没有子技能时，才将这个目录加入最终列表
-    if [[ "$has_child_skill" == false ]]; then
-      final_skills+=("$skill_dir")
-    fi
-  done
-
-  # 输出去重后的技能路径
-  printf '%s\n' "${final_skills[@]}" | sort -u
-}
-
-# ===== 注册表验证与解析 =====
-
-validate_registry() {
-  heading "Skills 安装 · 预检查"
-  local validator="$REPO_ROOT/scripts/harness/validate_registry.py"
-  if [[ ! -f "$validator" ]]; then
-    status_line failed "注册表验证脚本不存在：$validator" >&2
-    return 1
-  fi
-  local validation_output
-  if ! validation_output="$(python3 "$validator" 2>&1)"; then
-    printf '%s\n' "$validation_output" >&2
-    status_line failed "注册表验证失败，已中止安装；请先修复 skills/registry.yaml。" >&2
-    return 1
-  fi
-  if [[ "$validation_output" == *'[WARN'* ]]; then
-    printf '%s\n' "$validation_output"
-  fi
-  return 0
-}
-
-parse_registry_skills() {
-  local reg_file="$REPO_ROOT/skills/registry.yaml"
-
-  if [[ ! -f "$reg_file" ]]; then
-    status_line failed "注册表文件不存在：$reg_file" >&2
-    return 1
-  fi
-
-  python3 << 'PYEOF'
-import sys, re, os
-
-reg_file = os.environ.get("REG_FILE", "")
-if not reg_file:
-    print("[ERROR] REG_FILE not set", file=sys.stderr)
-    sys.exit(1)
-
-try:
-    import yaml
-    with open(reg_file, "r") as f:
-        data = yaml.safe_load(f)
-    for s in data.get("skills", []):
-        print(s.get("path", ""))
-except ImportError:
-    with open(reg_file, "r") as f:
-        text = f.read()
-    for line in text.splitlines():
-        m = re.match(r"^\s+path:\s*(.+)$", line)
-        if m:
-            print(m.group(1).strip().strip('"').strip("'"))
-except Exception as e:
-    print(f"[ERROR] 解析注册表失败: {e}", file=sys.stderr)
-    sys.exit(1)
-PYEOF
-}
-
-validate_registry_consistency() {
-  local registry_file="$1"
-  local collected_file="$2"
-
-  if [[ ! -f "$registry_file" ]] || [[ ! -s "$registry_file" ]]; then
-    status_line failed "无法读取注册表中的技能列表" >&2
-    return 1
-  fi
-
-  if [[ ! -f "$collected_file" ]] || [[ ! -s "$collected_file" ]]; then
-    status_line failed "无法读取文件系统扫描的技能列表" >&2
-    return 1
-  fi
-
-  # 将文件系统收集的绝对路径转为相对路径（相对于 REPO_ROOT）
-  # 以便与 registry.yaml 中的相对路径进行比较
-  local _normalized_collected
-  _normalized_collected="$(mktemp)"
-  sed "s|^${REPO_ROOT}/||" "$collected_file" | sort -u > "$_normalized_collected"
-
-  local missing_in_registry missing_in_fs
-  missing_in_registry="$(comm -23 <(sort "$_normalized_collected") <(sort "$registry_file"))"
-  missing_in_fs="$(comm -13 <(sort "$_normalized_collected") <(sort "$registry_file"))"
-
-  rm -f "$_normalized_collected"
-
-  local ok=true
-
-  if [[ -n "$missing_in_registry" ]]; then
-    status_line failed "以下技能存在于文件系统但未注册于 skills/registry.yaml：" >&2
-    while IFS= read -r p; do
-      echo "  - $p" >&2
-    done <<< "$missing_in_registry"
-    ok=false
-  fi
-
-  if [[ -n "$missing_in_fs" ]]; then
-    status_line failed "以下技能注册于 registry.yaml 但文件系统中不存在：" >&2
-    while IFS= read -r p; do
-      echo "  - $p" >&2
-    done <<< "$missing_in_fs"
-    ok=false
-  fi
-
-  if [[ "$ok" == false ]]; then
-    echo ""
-    status_line failed "注册表与文件系统不一致，已中止安装；请同步 skills/registry.yaml 与 skills/ 目录。" >&2
-    return 1
-  fi
-
-  return 0
-}
-
-# ===== 主流程：注册表验证 =====
-
-if ! validate_registry; then
-  exit 1
-fi
-
-# 收集技能列表（一次），用于注册表一致性校验和安装前展示
-_tmp_skills_registry="$(mktemp)"
+# 一次读取完整注册表并校验磁盘一致性，然后按需筛选。
+heading "Skills 安装 · 预检查"
 _tmp_skills_collected="$(mktemp)"
-trap 'rm -f "$_tmp_skills_registry" "$_tmp_skills_collected"' EXIT
-
-export REG_FILE="$REPO_ROOT/skills/registry.yaml"
-parse_registry_skills | sort -u > "$_tmp_skills_registry"
-collect_all_skills "$SRC_ROOT" | sort -u > "$_tmp_skills_collected"
-
-if ! validate_registry_consistency "$_tmp_skills_registry" "$_tmp_skills_collected"; then
+trap 'rm -f "$_tmp_skills_collected"' EXIT
+if ! python3 "$REPO_ROOT/scripts/harness/validate_registry.py" --paths > "$_tmp_skills_collected"; then
+  status_line failed "注册表验证失败，已中止安装；请先修复 skills/registry.yaml。" >&2
   exit 1
 fi
 
@@ -808,7 +625,7 @@ install_skills() {
   local dest_root="$2"
   local install_func="$3"
   local label="$4"
-  local skills_file="${5:-}"
+  local skills_file="$5"
 
   heading "$label"
   printf '  目标：%s\n' "$dest_root"
@@ -824,18 +641,10 @@ install_skills() {
     return 1
   fi
 
-  # 收集所有技能（递归扫描，平铺输出）
-  # 如果提供了预收集的列表（用于注册表校验），直接使用
   local skill_paths=()
-  if [[ -n "$skills_file" ]] && [[ -f "$skills_file" ]] && [[ -s "$skills_file" ]]; then
-    while IFS= read -r skill_path; do
-      [[ -n "$skill_path" ]] && skill_paths+=("$skill_path")
-    done < "$skills_file"
-  else
-    while IFS= read -r skill_path; do
-      [[ -n "$skill_path" ]] && skill_paths+=("$skill_path")
-    done < <(collect_all_skills "$SRC_ROOT")
-  fi
+  while IFS= read -r skill_path; do
+    skill_paths+=("$skill_path")
+  done < "$skills_file"
 
   local deleted=0 preserved=0 cleanup_counts
   if [[ -z "$SKILL_NAME" ]]; then

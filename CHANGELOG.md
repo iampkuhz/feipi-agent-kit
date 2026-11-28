@@ -1,5 +1,10 @@
 # 变更记录
 
+## 2026-11-28
+
+- feipi-skill-govern v11：按主题归类并统一路径索引
+- feipi-xiaohongshu-read-note v6：兼容新源码目录的跨技能定位
+
 ## 2026-11-27
 
 - feipi-skill-govern v10：通用迁移规约、路径兼容与逐份审阅

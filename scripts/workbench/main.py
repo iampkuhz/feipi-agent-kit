@@ -15,6 +15,8 @@ import urllib.request
 ROOT = Path(__file__).resolve().parents[2]
 # 工作台与脱离源码运行的自启脚本共用同一就绪合同。
 sys.path.insert(0, str(ROOT/'tools/runtime'))
+sys.path.insert(0, str(ROOT/'scripts/harness'))
+from validate_registry import parse_registry
 from service_health import wait_service
 from rollback import rollback_on_failure
 from agent_config import (MODES, current_project, initialize_project, installation_lock,
@@ -99,14 +101,21 @@ def mappings(component):
                 rel = str(src.relative_to(ROOT))
                 result[rel] = (src, RUNTIME/'services'/rel)
     elif component == 'skills':
+        skill_names = {ROOT / entry['path']: entry['name'] for entry in parse_registry(ROOT)}
+        clients = {client: HOME/('.'+client)/'skills'
+                   for client in ('codex', 'claude', 'qwen', 'qoder', 'openclaw')
+                   if (HOME/('.'+client)).is_dir()}
         for src in source_files(ROOT/'skills'):
-            parts = src.relative_to(ROOT/'skills').parts
-            if len(parts) < 3 or any(p in ('maintenance', 'tests', 'evals', 'node_modules', '__pycache__') for p in parts[2:]):
+            directory = next((parent for parent in src.parents if parent in skill_names), None)
+            if directory is None:
                 continue
-            for client in ['codex', 'claude', 'qwen', 'qoder', 'openclaw']:
-                if (HOME/('.'+client)).is_dir():
-                    relative = Path(*parts[2:])
-                    result[client+'/'+parts[1]+'/'+str(relative)] = (src, HOME/('.'+client)/'skills'/parts[1]/relative)
+            relative = src.relative_to(directory)
+            if any(part in ('maintenance', 'tests', 'evals', 'node_modules', '__pycache__')
+                   for part in relative.parts) or relative.suffix == '.pyc':
+                continue
+            name = skill_names[directory]
+            for client, destination in clients.items():
+                result[f'{client}/{name}/{relative}'] = (src, destination/name/relative)
     return result
 
 
@@ -219,13 +228,13 @@ def install(component, agent=None, skill=None):
             roots = [HOME/'.agents/skills']
         paths = roots
         if skill:
-            sources = list((ROOT/'skills').glob('*/'+skill))
-            if len(sources) != 1 or not (sources[0]/'SKILL.md').is_file():
+            source = next((ROOT/entry['path'] for entry in parse_registry(ROOT) if entry['name'] == skill), None)
+            if source is None:
                 raise ValueError('未找到唯一 skill：'+skill)
             # 与安装器一致，只扫描被选 skill 的运行脚本中的直接共享依赖。
             shared = set()
-            for script in sources[0].rglob('*.sh'):
-                if any(x in ('maintenance', 'tests', 'evals', 'node_modules') for x in script.relative_to(sources[0]).parts):
+            for script in source.rglob('*.sh'):
+                if any(x in ('maintenance', 'tests', 'evals', 'node_modules') for x in script.relative_to(source).parts):
                     continue
                 for name in re.findall(r'\$REPO_ROOT/([A-Za-z0-9._-]+)', script.read_text()):
                     if name != 'skills' and not name.startswith('.') and (ROOT/name).exists():

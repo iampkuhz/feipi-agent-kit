@@ -11,7 +11,7 @@
 | Agent 职责、模型选择、并发 | `config/agents.json`、`config/instructions/` | 保留项目规则，机器参数用 `${...}` 绑定 |
 | 运行时能力 | `config/capabilities.json` | Codex 检查机器绑定路径，Multica 通过 CLI 检查 Cloud 工作区 |
 | 机器身份、路径和依赖 | `~/.config/feipi-multica/machine.json` | 0600；不进入 Git；迁机重建 daemon/runtime |
-| 技能正文 | Agent Kit 的 `skills/integration/feipi-multica-manage-tasks` | 安装完整技能后同步工作区单文件入口，入口注明已发布资源目录 |
+| 技能正文 | Agent Kit 的 `skills/collaboration/feipi-multica-manage-tasks` | 安装完整技能后同步工作区单文件入口，入口注明已发布资源目录 |
 | 运行副本 | `~/.local/share/multica/ops` | 只能从源码发布，不手改 |
 | 变更快照和请求回执 | `~/.local/state/multica/adaptation` | 私有；备份；不提交；并发锁限本机 |
 | 登录态及任务数据 | 官方 CLI profile 与 Multica Cloud | 本机重新登录，平台保存任务和附件 |
@@ -22,7 +22,7 @@
 
 在 Codex、Qoder、个人 OpenClaw 中使用共享 Skill：`$feipi-multica-manage-tasks`。新聊天重新加载技能。本机受管后台链使用 workspace Skill，但这不是其他平台 Agent 的派发资格条件，也不要求继承桌面聊天历史。
 
-默认使用官方 `multica`，已明确工作区、项目与 Issue 时直接核对，不依赖机器映射、受管声明或包装器。只有从当前仓库自动发现项目时，才用 Skill 的 `scripts/project.py context --directory`；显式项目可用 `--project-id`。`find/read` 限定项目并标明分页或截断，保留全部根线程摘要。需要项目主动关联工作时，使用 `enable` 预览仓库 AGENTS 入口，再在已授权范围内 `--apply`；机器映射本身不等于主动启用。具体边界与典型操作见 [Skill 项目接入](../../../skills/integration/feipi-multica-manage-tasks/references/project-setup.md) 和 [标准操作](../../../skills/integration/feipi-multica-manage-tasks/references/operations.md)。
+默认使用官方 `multica`，已明确工作区、项目与 Issue 时直接核对，不依赖机器映射、受管声明或包装器。只有从当前仓库自动发现项目时，才用 Skill 的 `scripts/project.py context --directory`；显式项目可用 `--project-id`。`find/read` 限定项目并标明分页或截断，保留全部根线程摘要。需要项目主动关联工作时，使用 `enable` 预览仓库 AGENTS 入口，再在已授权范围内 `--apply`；机器映射本身不等于主动启用。具体边界与典型操作见 [Skill 项目接入](../../../skills/collaboration/feipi-multica-manage-tasks/references/project-setup.md) 和 [标准操作](../../../skills/collaboration/feipi-multica-manage-tasks/references/operations.md)。
 
 下面是可选本机回执示例，交互终端可按需要添加已配置的 `--profile`；后台不得指定个人 profile，每个写操作仍核对工作区、项目及 Issue。
 

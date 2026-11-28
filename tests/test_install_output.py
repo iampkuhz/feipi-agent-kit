@@ -38,13 +38,9 @@ class InstallOutputTests(unittest.TestCase):
         for name in ("feipi-one", "feipi-two"):
             skill = self.repo / "skills/integration" / name
             (skill / "scripts").mkdir(parents=True)
-            (skill / "SKILL.md").write_text(f"---\nname: {name}\n---\nfixture\n")
+            (skill / "SKILL.md").write_text(f"---\nname: {name}\ndescription: fixture\n---\nfixture\n")
             (skill / "scripts/run.sh").write_text("# $REPO_ROOT/shared/resource.txt\n")
-            records.append(
-                f"  - name: {name}\n    path: skills/integration/{name}\n"
-                "    layer: integration\n    description: fixture\n    clients: [codex]\n"
-                "    entry: SKILL.md\n    validation: null\n    status: stable"
-            )
+            records.append(f"  - {skill.relative_to(self.repo)}")
         (self.repo / "skills/registry.yaml").write_text("\n".join(records) + "\n")
         (self.repo / "shared").mkdir()
         (self.repo / "shared/resource.txt").write_text("shared fixture\n")

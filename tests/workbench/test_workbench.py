@@ -178,9 +178,10 @@ class Recovery(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             name = 'feipi-test-maintain-records'
-            source = root/'skills/authoring'/name
+            source = root/'skills/agent/skills'/name
             (source/'scripts').mkdir(parents=True)
-            (source/'SKILL.md').write_text('fixture')
+            (source/'SKILL.md').write_text(f'---\nname: {name}\ndescription: fixture\n---\n')
+            (root/'skills/registry.yaml').write_text(f'skills:\n  - {source.relative_to(root)}\n')
             (source/'maintenance').mkdir()
             (source/'maintenance/setup.sh').write_text('# $REPO_ROOT/maintenance-only/resource.txt\n')
             (root/'maintenance-only').mkdir()
@@ -197,11 +198,13 @@ class Recovery(unittest.TestCase):
     def test_skill_mapping_excludes_nested_maintenance(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
-            source = root/'skills/authoring/feipi-example-review-rules'
+            source = root/'skills/content/writing/feipi-example-review-rules'
             runtime = source/'references/rules.md'
             maintenance = source/'references/examples/maintenance/design.md'
             maintenance.parent.mkdir(parents=True)
             runtime.write_text('runtime')
+            (source/'SKILL.md').write_text(f'---\nname: {source.name}\ndescription: fixture\n---\n')
+            (root/'skills/registry.yaml').write_text(f'skills:\n  - {source.relative_to(root)}\n')
             maintenance.write_text('source only')
             home = root/'home'
             (home/'.codex').mkdir(parents=True)

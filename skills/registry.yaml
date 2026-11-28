@@ -1,124 +1,13 @@
-# Feipi Agent Kit — Skill Registry
-# Auto-generated. All paths verified against filesystem.
-# Schema: harness/schemas/skill-registry.schema.json
-
-version: "0.1.0"
-
+# 仓库相对 Skill 路径。元数据来自各目录的 SKILL.md。
 skills:
-  # --- authoring layer ---
-  - name: feipi-skill-govern
-    path: skills/authoring/feipi-skill-govern
-    layer: authoring
-    description: Skill 治理（功能交付契约、业务效果及工程边界）
-    clients: [claude, codex]
-    entry: SKILL.md
-    validation:
-      type: script
-      command: bash skills/authoring/feipi-skill-govern/scripts/validate.sh skills/authoring/feipi-skill-govern
-    status: stable
-
-  - name: feipi-techreport-ppt-skill
-    path: skills/authoring/feipi-techreport-ppt-skill
-    layer: authoring
-    description: 技术汇报 PPT 单页重构
-    clients: [claude, codex]
-    entry: SKILL.md
-    validation: null
-    status: stable
-
-  - name: feipi-writing-refine-text
-    path: skills/authoring/feipi-writing-refine-text
-    layer: authoring
-    description: 中文文稿精炼与问题诊断，从对话和要点提炼自然回复
-    clients: [claude, codex]
-    entry: SKILL.md
-    validation: null
-    status: stable
-
-  - name: feipi-interaction-review-output
-    path: skills/authoring/feipi-interaction-review-output
-    layer: authoring
-    description: 手机与聊天渠道交付审查、修订反馈和汇报前复审
-    clients: [claude, codex, qoder, openclaw]
-    entry: SKILL.md
-    validation:
-      type: script
-      command: bash skills/authoring/feipi-skill-govern/scripts/validate.sh skills/authoring/feipi-interaction-review-output
-    status: stable
-
-  - name: feipi-health-maintain-family-records
-    path: skills/authoring/feipi-health-maintain-family-records
-    layer: authoring
-    description: 家庭健康资料归档、事件维护、问题跟踪与按需监测
-    clients: [codex, openclaw]
-    entry: SKILL.md
-    validation:
-      type: script
-      command: bash skills/authoring/feipi-skill-govern/scripts/validate.sh skills/authoring/feipi-health-maintain-family-records
-    status: stable
-
-  # --- diagram layer ---
-  - name: feipi-drawio-generate-diagram
-    path: skills/diagram/feipi-drawio-generate-diagram
-    layer: diagram
-    description: draw.io 可编辑图表、Podman 本地渲染与图包校验
-    clients: [claude, codex]
-    entry: SKILL.md
-    validation:
-      type: script
-      command: bash skills/diagram/feipi-drawio-generate-diagram/scripts/validate.sh
-    status: stable
-
-  - name: feipi-plantuml-generate-diagram
-    path: skills/diagram/feipi-plantuml-generate-diagram
-    layer: diagram
-    description: PlantUML 作图唯一入口，支持思维导图自动布局
-    clients: [claude, codex]
-    entry: SKILL.md
-    validation:
-      type: script
-      command: bash skills/diagram/feipi-plantuml-generate-diagram/scripts/validate.sh
-    status: stable
-
-  - name: feipi-mermaid-generate-diagram
-    path: skills/diagram/feipi-mermaid-generate-diagram
-    layer: diagram
-    description: Mermaid 六类图、通用语法与本地图包验收
-    clients: [claude, codex]
-    entry: SKILL.md
-    validation:
-      type: script
-      command: bash skills/diagram/feipi-mermaid-generate-diagram/scripts/validate.sh
-    status: stable
-
-  # --- integration layer ---
-  - name: feipi-multica-manage-tasks
-    path: skills/integration/feipi-multica-manage-tasks
-    layer: integration
-    description: 本机 CLI 管理 Multica 项目与资源，协作处理任务、派发、交接与验收
-    clients: [codex, qoder, openclaw]
-    entry: SKILL.md
-    validation: null
-    status: stable
-
-  - name: feipi-video-read-url
-    path: skills/integration/feipi-video-read-url
-    layer: integration
-    description: 视频 URL 处理（下载、字幕、摘要）
-    clients: [claude, codex]
-    entry: SKILL.md
-    validation:
-      type: script
-      command: bash skills/integration/feipi-video-read-url/scripts/validate.sh
-    status: compatibility
-
-  - name: feipi-xiaohongshu-read-note
-    path: skills/integration/feipi-xiaohongshu-read-note
-    layer: integration
-    description: 小红书图文与视频笔记、原图和独立来源证据提取
-    clients: [claude, codex]
-    entry: SKILL.md
-    validation:
-      type: script
-      command: bash skills/integration/feipi-xiaohongshu-read-note/scripts/validate.sh
-    status: stable
+  - skills/agent/skills/feipi-skill-govern
+  - skills/collaboration/feipi-multica-manage-tasks
+  - skills/content/delivery/feipi-interaction-review-output
+  - skills/content/presentations/feipi-techreport-ppt-skill
+  - skills/content/writing/feipi-writing-refine-text
+  - skills/diagram/feipi-drawio-generate-diagram
+  - skills/diagram/feipi-mermaid-generate-diagram
+  - skills/diagram/feipi-plantuml-generate-diagram
+  - skills/health/feipi-health-maintain-family-records
+  - skills/media/notes/feipi-xiaohongshu-read-note
+  - skills/media/video/feipi-video-read-url

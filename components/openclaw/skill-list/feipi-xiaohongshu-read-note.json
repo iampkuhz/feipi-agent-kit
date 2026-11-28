@@ -1,12 +1,12 @@
 {
   "version": 1,
   "name": "feipi-xiaohongshu-read-note",
-  "homepage": "https://github.com/iampkuhz/feipi-agent-kit/tree/main/skills/integration/feipi-xiaohongshu-read-note",
+  "homepage": "https://github.com/iampkuhz/feipi-agent-kit/tree/main/skills/media/notes/feipi-xiaohongshu-read-note",
   "source": {
     "type": "git-subdirectory",
     "repository": "../..",
     "ref": "main",
-    "path": "skills/integration/feipi-xiaohongshu-read-note"
+    "path": "skills/media/notes/feipi-xiaohongshu-read-note"
   },
   "setup": {
     "useLocalWorkingTree": true

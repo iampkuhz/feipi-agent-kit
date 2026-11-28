@@ -19,7 +19,7 @@ class DevelopmentReferenceTests(unittest.TestCase):
         layout.REPO_ROOT = self.root
         self.skill = self.root/'skills/diagram/feipi-example-generate-diagram'
         subprocess.run(['bash', str(layout.SKILL_VALIDATOR.parent/'init_skill.sh'), self.skill.name,
-                        '--layer', 'diagram', '--target', str(self.root/'skills')],
+                        '--domain', 'diagram', '--resources', 'references', '--target', str(self.root/'skills')],
                        check=True, capture_output=True, text=True)
         (self.skill/'evals').mkdir()
         (self.skill/'tests/run.sh').write_text('#!/bin/sh\nexit 0\n')

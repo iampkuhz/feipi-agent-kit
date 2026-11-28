@@ -41,45 +41,9 @@ commands:
   readme: "commands/README.md"
 
 # ---------------------------------------------------------------------------
-# Skills — 已注册 skill
+# Skills — 从唯一索引读取
 # ---------------------------------------------------------------------------
-skills:
-  # --- authoring layer ---
-  - name: "feipi-skill-govern"
-    path: "skills/authoring/feipi-skill-govern/SKILL.md"
-    layer: "authoring"
-    description: "Skill 治理（命名、触发、验证边界）"
-  - name: "feipi-techreport-ppt-skill"
-    path: "skills/authoring/feipi-techreport-ppt-skill/SKILL.md"
-    layer: "authoring"
-    description: "技术汇报 PPT 单页重构"
-  # --- diagram layer ---
-  - name: "feipi-drawio-generate-diagram"
-    path: "skills/diagram/feipi-drawio-generate-diagram/SKILL.md"
-    layer: "diagram"
-    description: "draw.io 本地作图与图包校验"
-  - name: "feipi-plantuml-generate-diagram"
-    path: "skills/diagram/feipi-plantuml-generate-diagram/SKILL.md"
-    layer: "diagram"
-    description: "PlantUML 作图唯一入口"
-  - name: "feipi-mermaid-generate-diagram"
-    path: "skills/diagram/feipi-mermaid-generate-diagram/SKILL.md"
-    layer: "diagram"
-    description: "Mermaid 六类图与通用图包验收"
-  # --- integration layer ---
-  - name: "feipi-multica-manage-tasks"
-    path: "skills/integration/feipi-multica-manage-tasks/SKILL.md"
-    layer: "integration"
-    description: "Multica 任务记录、派发、交接与验收"
-  - name: "feipi-video-read-url"
-    path: "skills/integration/feipi-video-read-url/SKILL.md"
-    layer: "integration"
-    description: "视频 URL 处理（下载、字幕、摘要）"
-
-  - name: "feipi-xiaohongshu-read-note"
-    path: "skills/integration/feipi-xiaohongshu-read-note/SKILL.md"
-    layer: "integration"
-    description: "小红书笔记与顺序原图取证"
+skill_registry: "skills/registry.yaml"
 
 # ---------------------------------------------------------------------------
 # Workflows — 已定义的工作流
