@@ -103,7 +103,7 @@ def mappings(component):
     elif component == 'skills':
         skill_names = {ROOT / entry['path']: entry['name'] for entry in parse_registry(ROOT)}
         clients = {client: HOME/('.'+client)/'skills'
-                   for client in ('codex', 'claude', 'qwen', 'qoder', 'openclaw')
+                   for client in ('codex', 'cursor', 'claude', 'qwen', 'qoder', 'openclaw')
                    if (HOME/('.'+client)).is_dir()}
         for src in source_files(ROOT/'skills'):
             directory = next((parent for parent in src.parents if parent in skill_names), None)
@@ -196,7 +196,7 @@ def install(component, agent=None, skill=None):
         run([sys.executable, ROOT/'components/openclash/router.py', 'apply'])
         return
     base = ROOT/'components'/component
-    pairs = mappings(component)
+    pairs = {} if component == 'skills' else mappings(component)
     if component == 'mac':
         runtime = RUNTIME/'mac'
         mac_link_conflicts(pairs)
@@ -212,7 +212,8 @@ def install(component, agent=None, skill=None):
             target for _, target in pairs.values() if not any(parent in replace for parent in target.parents)
         )]
     elif component == 'skills':
-        clients = {'codex': '.codex', 'claudecode': '.claude', 'qwen': '.qwen', 'qoder': '.qoder', 'openclaw': '.openclaw', '': '.agents'}
+        clients = {'codex': '.codex', 'cursor': '.cursor', 'claudecode': '.claude', 'qwen': '.qwen',
+                   'qoder': '.qoder', 'openclaw': '.openclaw', '': '.agents'}
         selected = [agent] if agent else list(clients)
         roots = []
         for name in selected:
@@ -240,11 +241,6 @@ def install(component, agent=None, skill=None):
                     if name != 'skills' and not name.startswith('.') and (ROOT/name).exists():
                         shared.add(name)
             paths = [p/skill for p in roots] + [p.parent/name for p in roots for name in sorted(shared)]
-        if agent or skill:
-            receipt_client = 'claude' if agent == 'claudecode' else agent
-            pairs = {name: pair for name, pair in pairs.items()
-                     if (not agent or name.split('/')[0] == receipt_client)
-                     and (not skill or name.split('/')[1] == skill)}
     elif component == 'services':
         run(['bash', ROOT/'scripts/bootstrap/setup.sh'])
         paths = [RUNTIME/'services']
@@ -264,6 +260,10 @@ def install(component, agent=None, skill=None):
             run([sys.executable, runtime/env_history, 'install'])
         elif component == 'skills':
             run(['bash', ROOT/'scripts/install_skills.sh', '--copy', *skill_args])
+            receipt_client = 'claude' if agent == 'claudecode' else agent
+            pairs = {name: pair for name, pair in mappings(component).items()
+                     if (not agent or name.split('/')[0] == receipt_client)
+                     and (not skill or name.split('/')[1] == skill)}
         elif component == 'services':
             snapshot(ROOT/'tools', RUNTIME/'services/tools')
             snapshot(ROOT/'runtimes/fastmcp', RUNTIME/'services/runtimes/fastmcp')
@@ -472,7 +472,7 @@ def main():
     for component in COMPONENTS:
         parser = install_components.add_parser(component, allow_abbrev=False)
         if component == 'skills':
-            parser.add_argument('--agent', choices=('codex', 'claudecode', 'qwen', 'qoder', 'openclaw'),
+            parser.add_argument('--agent', choices=('codex', 'cursor', 'claudecode', 'qwen', 'qoder', 'openclaw'),
                                 help='限定目标客户端')
             parser.add_argument('--skill', help='限定已注册的技能')
     project_parser = sub.add_parser('project', help='初始化或检查本机项目绑定')

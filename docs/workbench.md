@@ -66,7 +66,7 @@ Multica CLI 由 `install mac` 的 Homebrew 阶段补齐。平台服务由 Multic
 | `workbench session <模式> [目录]` | 生成 `develop / review / verify` 会话简报和 Codex CLI 启动命令 |
 | `workbench service <服务> <操作>` | 管理工作台托管的服务，见下表 |
 
-`--agent` 支持 `codex / claudecode / qwen / qoder / openclaw`。两个筛选项可分别使用，也可组合。
+`--agent` 支持 `codex / cursor / claudecode / qwen / qoder / openclaw`。两个筛选项可分别使用，也可组合。Cursor 安装到 `~/.cursor/skills/`，通过 Skill 的 `icon` 显示 Custom Mode 徽章。`agents/openai.yaml` 的大小图字段都写出选定图标的文件名，安装器按这个名字复制同名的 [Codex 图标母版](../assets/skill-icons/README.md)。
 
 | 服务 | 操作 |
 | --- | --- |

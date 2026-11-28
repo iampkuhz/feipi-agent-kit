@@ -1,6 +1,8 @@
 ---
 name: feipi-xiaohongshu-read-note
 description: 读取小红书图文或视频笔记及分享短链，保存正文与顺序原图，并对视频复用字幕、语音与关键帧证据；用于提取笔记内容，不用于发布、登录或独立处理其他平台视频。
+icon: note
+color: red
 ---
 
 # 小红书笔记读取

@@ -27,6 +27,8 @@
 
 ## Skills
 
+仓库 Skill 随包提供 Cursor Custom Mode 徽章和 Codex 图标。选图和维护方法见[图标素材库](assets/skill-icons/README.md)。
+
 | Skill | 用途 |
 |-------|------|
 | [feipi-health-maintain-family-records](skills/health/feipi-health-maintain-family-records/SKILL.md) | 家庭报告归档、健康事件、问题跟踪与按需监测；[双端使用与维护](docs/family-health-skill.md) |

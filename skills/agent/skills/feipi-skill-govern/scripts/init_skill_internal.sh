@@ -7,7 +7,7 @@ set -euo pipefail
 # - agents/openai.yaml
 # - tests/run.sh
 # - <target_skill>/maintenance/README.md 与术语表
-# - 用户明确选择的资源目录；默认不预建空目录
+# - assets/ 下的初始图稿，以及用户明确选择的资源目录
 
 usage() {
   cat <<'USAGE'
@@ -188,7 +188,34 @@ fi
 
 RESOURCES="$(normalize_resources "$RESOURCES")"
 
-mkdir -p "$ROOT_DIR/agents" "$ROOT_DIR/tests" "$ROOT_DIR/maintenance"
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "缺少依赖：python3（用于解析 Skill 图标路径）" >&2
+  exit 1
+fi
+ICON_LINK="$(python3 - "$SCRIPT_DIR" "$ROOT_DIR" <<'PYTHON'
+import os
+from pathlib import Path
+import sys
+
+sys.path.insert(0, sys.argv[1])
+from validate_host_metadata import source_library
+
+skill = Path(sys.argv[2]).resolve()
+library = source_library(skill)
+if library is not None:
+    icon = library / "code.png"
+    if not icon.is_file():
+        sys.exit(f"图库缺少初始化图标：{icon}")
+    print(os.path.relpath(icon, skill / "assets"))
+PYTHON
+)"
+
+mkdir -p "$ROOT_DIR/agents" "$ROOT_DIR/assets" "$ROOT_DIR/tests" "$ROOT_DIR/maintenance"
+if [[ -n "$ICON_LINK" ]]; then
+  ln -s "$ICON_LINK" "$ROOT_DIR/assets/code.png"
+else
+  cp -L "$TEMPLATES_ROOT/code.png" "$ROOT_DIR/assets/"
+fi
 
 for name in README terminology; do
   sed -e "s/{{SKILL_NAME}}/$SKILL_NAME/g" \
@@ -226,4 +253,4 @@ sed \
 chmod +x "$ROOT_DIR/tests/run.sh"
 
 echo "已初始化: $(relative_display_path "$ROOT_DIR")"
-echo "这是待完善的脚手架；请补齐功能规约、业务案例与实际验证，结构通过不代表业务可用。"
+echo "这是待完善的脚手架；请核对颜色与图标，并补齐功能规约、业务案例与实际验证。"

@@ -3,7 +3,7 @@
 
 workflow:
   name: "skill-govern"
-  version: "0.1.0"
+  version: "0.2.0"
   description: "Skill 治理工作流 — 确保所有 skill 遵循命名、结构、触发与验证规范"
 
   # 触发条件
@@ -31,9 +31,9 @@ workflow:
       script: "scripts/hooks/check-skill-structure.sh"
       required: true
 
-    - name: "check-frontmatter"
-      description: "检查 SKILL.md frontmatter"
-      script: "scripts/hooks/check-frontmatter.sh"
+    - name: "validate-skill-layout"
+      description: "遍历 registry，校验各 Skill 的颜色、图标、结构与安装包"
+      script: "scripts/harness/validate_skill_layout.py"
       required: true
 
     - name: "validate-context-hygiene"

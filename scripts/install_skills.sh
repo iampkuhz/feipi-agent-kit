@@ -101,7 +101,7 @@ while [[ $# -gt 0 ]]; do
       echo "用法: $0 [--agent <name>] [--skill <name>] [--dir <path>] [--copy]"
       echo ""
       echo "选项:"
-      echo "  --agent <name>  指定 agent 类型（codex | qwen | qoder | claudecode | openclaw）"
+      echo "  --agent <name>  指定 agent 类型（codex | cursor | qwen | qoder | claudecode | openclaw）"
       echo "  --skill <name>  只安装该 skill 及其直接共享依赖，不清理其他入口"
       echo "  --dir <path>    指定目标路径"
       echo "  --copy          用户级安装也使用实拷（日常工作台默认）；不随源码编辑变化"
@@ -169,6 +169,9 @@ get_user_dest_root() {
       local codex_home_dir="${CODEX_HOME:-$HOME/.codex}"
       echo "$codex_home_dir/skills"
       ;;
+    cursor)
+      echo "$HOME/.cursor/skills"
+      ;;
     qoder)
       echo "$HOME/.qoder/skills"
       ;;
@@ -198,6 +201,9 @@ get_project_dest_root() {
     codex)
       echo "$project/.codex/skills"
       ;;
+    cursor)
+      echo "$project/.cursor/skills"
+      ;;
     qoder)
       echo "$project/.qoder/skills"
       ;;
@@ -220,7 +226,7 @@ get_project_dest_root() {
 }
 
 get_all_agents() {
-  echo "codex qwen qoder claudecode openclaw"
+  echo "codex cursor qwen qoder claudecode openclaw"
 }
 
 find_existing_agents() {
@@ -722,7 +728,7 @@ if [[ -n "$TARGET_DIR" ]]; then
 
   if [[ -z "$dest_root" ]]; then
     if [[ -n "$AGENT_NAME" ]]; then
-      status_line failed "未知 AGENT: ${AGENT_NAME}（支持 codex | qwen | qoder | claudecode | openclaw）" >&2
+      status_line failed "未知 AGENT: ${AGENT_NAME}（支持 $(get_all_agents)）" >&2
     else
       status_line failed "无法确定目标目录" >&2
     fi
@@ -741,7 +747,7 @@ else
   if [[ -n "$AGENT_NAME" ]]; then
     dest="$(get_user_dest_root "$AGENT_NAME")"
     if [[ -z "$dest" ]]; then
-      status_line failed "未知 AGENT: ${AGENT_NAME}（支持 codex | qwen | qoder | claudecode | openclaw）" >&2
+      status_line failed "未知 AGENT: ${AGENT_NAME}（支持 $(get_all_agents)）" >&2
       exit 1
     fi
     mkdir -p "$(dirname "$dest")"

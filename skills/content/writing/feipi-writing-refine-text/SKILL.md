@@ -1,6 +1,8 @@
 ---
 name: feipi-writing-refine-text
 description: 用于中文文稿去废话、去 AI 味，定位表达问题并交付优化稿与问题清单；也从对话和用户要点提炼自然回复。优先处理汇报，兼顾技术说明、邮件、聊天回复、纪要和文章。不负责无依据代写、事实调查或排版。
+icon: pen-nib
+color: magenta
 ---
 
 # 中文文本精炼

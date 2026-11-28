@@ -1,5 +1,7 @@
-version: 5
+version: 6
 interface:
   display_name: "draw.io 作图与本地校验"
   short_description: "生成可编辑 draw.io 图表，通过 Podman 本地渲染、布局和图包验证。"
+  icon_small: "./assets/drawio-generate-diagram.png"
+  icon_large: "./assets/drawio-generate-diagram.png"
   default_prompt: "请使用 $feipi-drawio-generate-diagram 将需求整理为可编辑 draw.io 图表，通过 Podman 本地渲染与校验后交付图包。"

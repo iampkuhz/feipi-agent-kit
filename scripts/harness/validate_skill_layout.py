@@ -15,6 +15,7 @@ from runpy import run_path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 parse_registry = run_path(str(REPO_ROOT / "scripts/harness/validate_registry.py"))["parse_registry"]
+shared_icons = run_path(str(REPO_ROOT / "scripts/package_skill.py"))["shared_icons"]
 INSTALLER = REPO_ROOT / "scripts/install_skills.sh"
 CREATOR_NAME = "feipi-skill-govern"
 SKILL_VALIDATOR = REPO_ROOT / "skills/agent/skills/feipi-skill-govern/scripts/validate.sh"
@@ -96,6 +97,17 @@ def assert_installed_tree(root: Path, skills: list[Path], link_mode: bool) -> No
         installed = root / source.name
         if not (installed / "SKILL.md").is_file():
             fail(f"安装后缺少 SKILL.md：{installed}")
+        for relative in ("SKILL.md", "agents/openai.yaml"):
+            original = source / relative
+            packaged = installed / relative
+            if original.is_file() and (not packaged.is_file() or packaged.read_bytes() != original.read_bytes()):
+                fail(f"安装包未保留 Skill 元数据：{packaged}")
+        for original, master in shared_icons(source).items():
+            packaged = installed / original.relative_to(source)
+            if (not packaged.is_file() or packaged.is_symlink()
+                    or not packaged.resolve().is_relative_to(installed.resolve())
+                    or packaged.read_bytes() != master.read_bytes()):
+                fail(f"安装包的图标须为与仓库母版一致的实文件：{packaged}")
         for directory, dirs, files in os.walk(installed, followlinks=True):
             leaked = {"maintenance", "tests", "evals", "node_modules"}.intersection(dirs + files)
             if leaked:
@@ -108,7 +120,8 @@ def assert_installed_tree(root: Path, skills: list[Path], link_mode: bool) -> No
             runtime_dirs = [
                 entry for entry in source.iterdir()
                 if entry.is_dir() and entry.name not in {"maintenance", "tests", "evals", "node_modules"}
-                and not any(p.name in {"maintenance", "tests", "evals", "node_modules"} for p in entry.rglob("*"))
+                and not any(p.is_symlink() or p.name in {"maintenance", "tests", "evals", "node_modules"}
+                            for p in entry.rglob("*"))
             ]
             if runtime_dirs and not any((installed / entry.name).is_symlink() for entry in runtime_dirs):
                 fail(f"链接模式未保留运行目录源码联动：{installed}")
@@ -475,6 +488,10 @@ def validate_installation(skills: list[Path]) -> None:
         run_installer(["--dir", str(project)], env)
         assert_installed_tree(project / ".agents/skills", skills, link_mode=False)
 
+        for agent, directory in (("cursor", ".cursor"),):
+            run_installer(["--agent", agent, "--dir", str(project)], env)
+            assert_installed_tree(project / directory / "skills", skills, link_mode=False)
+
         codex_home = root / "codex-home"
         env["CODEX_HOME"] = str(codex_home)
         run_installer(["--agent", "codex"], env)
@@ -486,7 +503,7 @@ def main() -> None:
     skills = registry_paths()
     validate_source_layout(skills)
     validate_installation(skills)
-    print(f"Skill layout validation passed: {len(skills)} skills; install filtering and ownership cleanup verified")
+    print(f"Skill layout validation passed: {len(skills)} skills; host metadata, install filtering and cleanup verified")
 
 
 if __name__ == "__main__":

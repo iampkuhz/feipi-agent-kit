@@ -1,6 +1,8 @@
 ---
 name: feipi-drawio-generate-diagram
 description: 用于生成或修改 draw.io（diagrams.net）架构图、流程图等可编辑图表；在用户要求 draw.io 或 .drawio 文件时使用，通过 Podman 本地服务渲染并校验图包。
+icon: diagram
+color: orange
 ---
 
 # draw.io 作图与本地校验

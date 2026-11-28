@@ -1,6 +1,8 @@
 ---
 name: feipi-interaction-review-output
 description: 用于审查手机或聊天渠道的 Agent 交付，检查展示、产物访问和用户操作；复杂交付、请求决策或项目要求每次汇报时使用。普通文稿润色使用文字精炼 Skill。
+icon: chat-bubbles
+color: cyan
 ---
 
 # 交付交互审查

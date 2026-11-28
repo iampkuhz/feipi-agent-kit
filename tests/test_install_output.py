@@ -51,6 +51,62 @@ class InstallOutputTests(unittest.TestCase):
         self.assertEqual(result.returncode == 0, success, result.stdout + result.stderr)
         return result
 
+    def test_shared_icon_is_copied_and_updated_for_each_skill(self):
+        library = self.repo / "assets/skill-icons"
+        library.mkdir(parents=True)
+        original = library / "shared.png"
+        shutil.copy2(ROOT / "assets/skill-icons/code.png", original)
+        governors = Path("skills/agent/skills/feipi-skill-govern/scripts")
+        (self.repo / governors).mkdir(parents=True)
+        for filename in ("validate_host_metadata.py", "skill_icon_catalog.py"):
+            shutil.copy2(ROOT / governors / filename, self.repo / governors / filename)
+        skills = ("feipi-one", "feipi-two")
+        for name in skills:
+            skill = self.repo / "skills/integration" / name
+            binding = skill / "assets/shared.png"
+            binding.parent.mkdir()
+            binding.symlink_to(os.path.relpath(original, binding.parent))
+            (skill / "agents").mkdir()
+            (skill / "agents/openai.yaml").write_text(
+                'interface:\n  icon_small: "./assets/shared.png"\n  icon_large: "./assets/shared.png"\n',
+                encoding="utf-8",
+            )
+
+        for args, installed in ((["--agent", "codex"], self.codex / "skills"),
+                                (["--agent", "codex", "--dir", str(self.project)], self.project / ".codex/skills")):
+            with self.subTest(args=args):
+                self.run_installer(*args)
+                for name in skills:
+                    icon = installed / name / "assets/shared.png"
+                    self.assertFalse(icon.is_symlink())
+                    self.assertEqual(icon.read_bytes(), original.read_bytes())
+                self.assertIn("更新 0", self.run_installer(*args).stdout)
+
+        old_bytes = original.read_bytes()
+        shutil.copy2(ROOT / "assets/skill-icons/skill-govern.png", original)
+        result = self.run_installer("--agent", "codex", "--skill", skills[0])
+        self.assertIn("更新 1", result.stdout)
+        self.assertEqual((self.codex / "skills" / skills[0] / "assets/shared.png").read_bytes(), original.read_bytes())
+        self.assertEqual((self.codex / "skills" / skills[1] / "assets/shared.png").read_bytes(), old_bytes)
+
+        binding = self.repo / "skills/integration" / skills[0] / "assets/shared.png"
+        binding.unlink()
+        substitute = library / "code.png"
+        shutil.copy2(ROOT / "assets/skill-icons/code.png", substitute)
+        binding.symlink_to(os.path.relpath(substitute, binding.parent))
+        result = self.run_installer("--agent", "codex", "--skill", skills[0], success=False)
+        self.assertIn("文件名须与图库母版同名", result.stderr)
+        self.assertEqual((self.codex / "skills" / skills[0] / "assets/shared.png").read_bytes(), original.read_bytes())
+
+        binding.unlink()
+        binding.symlink_to(os.path.relpath(original, binding.parent))
+        (library / "catalog.json").touch()
+        metadata = binding.parents[1] / "agents/openai.yaml"
+        metadata.write_text('interface:\n  display_name: "Fixture"\n', encoding="utf-8")
+        result = self.run_installer("--agent", "codex", "--skill", skills[0], success=False)
+        self.assertIn("icon_small", result.stderr)
+        self.assertEqual((self.codex / "skills" / skills[0] / "assets/shared.png").read_bytes(), original.read_bytes())
+
     def test_recursive_development_exclusion_and_repeat_install(self):
         source = self.repo / 'skills/integration/feipi-one'
         for parent in (source, source/'scripts/examples'):

@@ -1,6 +1,8 @@
 ---
 name: feipi-video-read-url
 description: 用于按用户意图处理视频网站 URL（如 YouTube、Bilibili、小红书及分享短链）或本地视频、音频文件，覆盖下载、音频提取、字幕转写、摘要和背景扩展；在用户提供视频 URL 或本地媒体路径需要处理时触发。非媒体文件或普通网页不适用。
+icon: play-circle
+color: blue
 ---
 
 [//]: # (# 视频 URL 读取与总结（中文）)

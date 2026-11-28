@@ -1,6 +1,8 @@
 ---
 name: feipi-mermaid-generate-diagram
 description: 生成或修改 Mermaid 架构图、时序图、组件图、活动图、部署图、思维导图及其他 Mermaid 图，交付经过真实渲染与质量检查的源码图包；用户指定 PlantUML 或 draw.io 时不使用。
+icon: git-branch
+color: cyan
 ---
 
 # Mermaid 作图与图包验收

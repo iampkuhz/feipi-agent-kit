@@ -1,6 +1,8 @@
 ---
 name: feipi-skill-govern
 description: 用于创建、重构或审计 skill，建立功能交付契约并验证用户目标是否实现，同时治理命名、触发、资源与脚本边界；普通业务执行不使用。
+icon: shield
+color: purple
 ---
 
 # Skill 工程治理
@@ -40,6 +42,7 @@ description: 用于创建、重构或审计 skill，建立功能交付契约并�
 | 命名、归类、迁移 | [命名](references/naming-conventions.md)、[主题归类](references/skill-classification.md)；按主要对象选择领域和可选子领域，再确定 Skill ID |
 | 移植外部 Skill 或更换宿主 | [依赖来源、项目 Reference、跨 Skill 调用和宿主适配](references/migration-policy.md) |
 | 新建或修改资源布局 | [开发资料与安装边界](references/development-layout.md)、[仓库约束](references/repo-constraints.md)、[frontmatter](references/frontmatter-policy.md) |
+| 新增 Skill、补齐图标、换图或发现新版 Cursor 图标 | [查找、设计与分发 Skill 图标](references/skill-icons.md)。实现时先从用途检索，再选择复用或新绘，绑定后验证 |
 | 更新收口 | [版本与变更记录](references/version-changelog-policy.md)；同日同 skill 只升版一次、合并一条摘要 |
 | 历史规则冲突 | [反模式](references/anti-patterns.md)、[待重审清单](references/reassessment-backlog.md)；旧 action-first 结论重新评审 |
 
@@ -51,12 +54,13 @@ description: 用于创建、重构或审计 skill，建立功能交付契约并�
 bash scripts/init_skill.sh report-generate-brief --domain content --target "$target_root"
 bash scripts/validate.sh "$target_skill" --require-maintenance
 python3 scripts/check_portability.py "$target_skill"
+python3 scripts/skill_icon_catalog.py search --skill "$target_skill"
 bash tests/run.sh
 ```
 
 - `init_skill.sh` 生成待完善的脚手架，不代表业务功能已可用。
-- 初始化默认不预建空资源目录；明确指定资源时才创建目录，未指定的运行脚本等资源应在有首个实际文件时再建目录。
-- `validate.sh` 是结构校验；`check_portability.py` 静态扫描脚本和测试，不能证明已在双平台实测。
+- 初始化生成默认颜色和图标资源。其他资源目录在有文件或调用方明确指定时创建。
+- `validate.sh` 校验结构、徽章及图标资源；`check_portability.py` 静态扫描脚本和测试，不能证明已在双平台实测。
 - `tests/run.sh` 是治理 Skill 的确定性回归入口。治理目标的行为评估按其实际能力设计，不能用治理自测替代。
 - `scripts/check_delivery.py` 按治理记录契约检查交接完整性；只报告技术检查结果。
 

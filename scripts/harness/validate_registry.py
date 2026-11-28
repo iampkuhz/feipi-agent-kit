@@ -42,13 +42,17 @@ def read_metadata(entry):
             raise ValueError(f"入口缺少 frontmatter：{entry}")
         fields = {}
         for line in stream:
-            if line.strip() == "---":
+            if line.rstrip() == "---":
                 break
             if not line.strip() or line.lstrip().startswith("#"):
                 continue
-            key, separator, value = line.rstrip().partition(":")
-            if not separator or key not in {"name", "description"} or key in fields:
-                raise ValueError(f"入口 frontmatter 只接受唯一 name 与 description：{entry}")
+            # Only name and description are consumed by the index. Leave extension
+            # fields and nested YAML to the Skill package and its actual consumers.
+            key, _, value = line.rstrip().partition(":")
+            if key not in {"name", "description"}:
+                continue
+            if key in fields:
+                raise ValueError(f"入口 frontmatter 字段重复：{key} → {entry}")
             value = value.strip()
             if len(value) > 1 and value[0] in ("'", '"') and value[-1] == value[0]:
                 value = value[1:-1]

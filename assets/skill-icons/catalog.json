@@ -1,0 +1,15 @@
+{
+  "code": {"name": "通用代码", "description": "一对代码尖括号与斜杠。适合尚未选定图稿的脚手架。", "aliases": ["代码", "脚手架", "代码占位", "code", "scaffold", "placeholder"]},
+  "drawio-generate-diagram": {"name": "draw.io 作图", "description": "图块与直角连线，表示可编辑的 draw.io 流程与架构图。", "aliases": ["draw.io", "drawio", "diagrams.net", "可编辑流程图", "架构图", "diagram editor"]},
+  "engineering-feiteto-mode": {"name": "Feiteto 工程模式", "description": "冠形与火花，表示显式启动的工程协作模式。", "aliases": ["Feiteto", "工程模式", "工程工作流", "engineering mode", "engineering workflow"]},
+  "health-maintain-family-records": {"name": "家庭健康档案", "description": "心形和脉冲线，表示家庭健康资料和随访。", "aliases": ["家庭健康", "健康档案", "体检", "随访", "health records", "family health", "medical records"]},
+  "interaction-review-output": {"name": "交付审查", "description": "对话框和对勾，表示检查交付内容在聊天中的呈现。", "aliases": ["交付审查", "交付验收", "交互审查", "展示核对", "聊天展示", "delivery review", "interaction review"]},
+  "mermaid-generate-diagram": {"name": "Mermaid 作图", "description": "代码括号和分支，表示用 Mermaid 文本描述图表。", "aliases": ["Mermaid", "文本图表", "代码画图", "分支图", "mermaid diagram", "diagram as code"]},
+  "multica-manage-tasks": {"name": "Multica 任务", "description": "三列看板与任务卡，表示项目任务和协作分派。", "aliases": ["Multica", "任务管理", "任务看板", "项目协作", "派单", "kanban", "task board", "issue management"]},
+  "plantuml-generate-diagram": {"name": "PlantUML 作图", "description": "两条生命线与时序箭头，表示 PlantUML 结构与交互图。", "aliases": ["PlantUML", "UML", "时序图", "顺序图", "sequence diagram", "lifeline"]},
+  "skill-govern": {"name": "Skill 治理", "description": "盾牌与对勾，表示编写、审查和校验 Skill。", "aliases": ["技能治理", "技能审计", "规范", "skill governance", "skill audit", "validation"]},
+  "techreport-ppt-skill": {"name": "技术汇报 PPT", "description": "幻灯片与柱形图，表示技术汇报和演示文稿。", "aliases": ["技术汇报", "幻灯片", "PPT", "技术演示", "slide", "presentation", "tech report"]},
+  "video-read-url": {"name": "视频与音频阅读", "description": "播放键和音频波形，表示读取视频、音频、字幕与转写。", "aliases": ["视频", "音频", "字幕", "转写", "视频总结", "video", "audio", "transcription", "subtitles"]},
+  "writing-refine-text": {"name": "中文润色", "description": "稿纸与修订笔，表示校订、改写和精炼措辞。", "aliases": ["润色", "精炼", "中文文稿", "改稿", "修订", "copy editing", "proofread", "refine text"]},
+  "xiaohongshu-read-note": {"name": "小红书读笔记", "description": "笔记页与图文条目，表示提取小红书笔记。", "aliases": ["小红书", "红书", "小红书笔记", "图文笔记", "Xiaohongshu", "Rednote", "social note"]}
+}

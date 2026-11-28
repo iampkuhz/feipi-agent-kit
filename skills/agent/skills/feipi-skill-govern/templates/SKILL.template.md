@@ -1,6 +1,8 @@
 ---
 name: {{SKILL_NAME}}
 description: {{SKILL_DESCRIPTION}}
+icon: code
+color: default
 ---
 
 # {{TITLE}}

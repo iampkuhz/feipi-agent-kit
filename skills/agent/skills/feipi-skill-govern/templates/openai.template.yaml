@@ -2,4 +2,6 @@ version: 1
 interface:
   display_name: "{{DISPLAY_NAME}}"
   short_description: "{{SHORT_DESCRIPTION}}"
+  icon_small: "./assets/code.png"
+  icon_large: "./assets/code.png"
   default_prompt: "{{DEFAULT_PROMPT}}"

@@ -1,5 +1,7 @@
-version: 6
+version: 7
 interface:
   display_name: "中文技术汇报 PPT"
   short_description: "将中文技术材料重构为 CTO 可读、视觉确定且原生可编辑的 PPT，并强制执行 token、组件/布局合同与真实 QA。"
+  icon_small: "./assets/techreport-ppt-skill.png"
+  icon_large: "./assets/techreport-ppt-skill.png"
   default_prompt: "请基于用户材料先提炼结论和认知任务，从登记的 Layout、Component、Variant、Size 中选择表达，生成 Semantic Slide IR v2，并运行 schema、contract、role-aware 字号、原生可编辑性和真实渲染验收。仅在结论、拆页、重要内容删除或业务含义存在关键分歧时请求确认。"

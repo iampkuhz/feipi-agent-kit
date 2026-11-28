@@ -10,8 +10,10 @@
 | 阶段功能契约、重构退出、模块拆分与消费者 | `../references/governance-process.md` |
 | 正式交接记录与输入绑定 | `../references/governance-artifacts.md`、`../templates/governance-record.template.json`、`../scripts/check_delivery.py` |
 | 技术、语义、链路验证及失败定位 | `../references/workflow.md`、`../references/quality-checklist.md` |
-| 新建 Skill 与维护资料模板 | `../scripts/init_skill*.sh`、`../templates/`；初始化默认不创建空资源目录 |
+| 新建 Skill 与维护资料模板 | `../scripts/init_skill*.sh`、`../templates/`；默认图来自仓库图库 |
 | 结构、维护资料与运行依赖校验 | `../scripts/validate.sh`、`../scripts/validate_resources.py` |
+| 宿主徽章、图标和图像资源 | `../scripts/validate_host_metadata.py`、`../tests/test_host_metadata.py` |
+| 图标检索、版本发现及新图稿 | `../references/skill-icons.md`、`../scripts/skill_icon_catalog.py`、`../scripts/discover_cursor_icons.py`、`../scripts/render_skill_icon.py` |
 | 迁移和候选审阅 | `../references/migration-policy.md`、`../references/manual-review.md`、`../scripts/check_migration.py`、`../scripts/review_skill.py` |
 | 路径与双平台静态检查 | `../scripts/check_portability.py` |
 | 确定性回归与独立 Agent 评估 | `../tests/run.sh`、`../tests/test_delivery.py`、`../evals/cases.json`、`../evals/README.md` |

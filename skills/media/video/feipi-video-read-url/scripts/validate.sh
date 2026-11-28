@@ -129,7 +129,6 @@ FRONTMATTER="$(awk '
 
 NAME_VALUE="$(printf "%s\n" "$FRONTMATTER" | sed -nE 's/^name:[[:space:]]*(.+)[[:space:]]*$/\1/p' | head -n1)"
 DESC_VALUE="$(printf "%s\n" "$FRONTMATTER" | sed -nE 's/^description:[[:space:]]*(.+)[[:space:]]*$/\1/p' | head -n1)"
-EXTRA_KEYS="$(printf "%s\n" "$FRONTMATTER" | sed -nE 's/^([a-zA-Z0-9_-]+):.*$/\1/p' | grep -Ev '^(name|description)$' || true)"
 
 if [[ "$NAME_VALUE" != "$BASE" ]]; then
   echo "name 字段必须与目录名一致：$NAME_VALUE != $BASE" >&2
@@ -137,10 +136,6 @@ if [[ "$NAME_VALUE" != "$BASE" ]]; then
 fi
 if [[ -z "$DESC_VALUE" ]]; then
   echo "description 不能为空" >&2
-  exit 1
-fi
-if [[ -n "$EXTRA_KEYS" ]]; then
-  echo "Frontmatter 仅允许 name 与 description" >&2
   exit 1
 fi
 

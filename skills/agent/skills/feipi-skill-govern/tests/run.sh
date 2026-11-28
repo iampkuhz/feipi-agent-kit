@@ -41,6 +41,7 @@ run_case() {
     "$SKILL_DIR/scripts/validate.sh"
     "$SKILL_DIR/scripts/check_portability.py"
     "$SKILL_DIR/scripts/validate_resources.py"
+    "$SKILL_DIR/scripts/validate_host_metadata.py"
     "$SKILL_DIR/scripts/check_delivery.py"
     "$SKILL_DIR/references/naming-conventions.md"
     "$SKILL_DIR/references/skill-classification.md"
@@ -84,9 +85,21 @@ run_case() {
       bash "$INIT_SCRIPT" "report-build-summary" --target "$TMP_ROOT/default-resources" >/dev/null
       gen_dir="$TMP_ROOT/default-resources/feipi-report-build-summary"
       [[ -d "$gen_dir" ]] || return 1
-      [[ ! -e "$gen_dir/scripts" && ! -e "$gen_dir/references" && ! -e "$gen_dir/assets" ]] || return 1
+      [[ ! -e "$gen_dir/scripts" && ! -e "$gen_dir/references" ]] || return 1
+      [[ -s "$gen_dir/assets/code.png" && ! -L "$gen_dir/assets/code.png" ]] || return 1
+      grep -Fxq '  icon_small: "./assets/code.png"' "$gen_dir/agents/openai.yaml" || return 1
+      grep -Fxq 'icon: code' "$gen_dir/SKILL.md" || return 1
+      grep -Fxq 'color: default' "$gen_dir/SKILL.md" || return 1
       bash "$INIT_SCRIPT" "report-generate-brief" --resources scripts --target "$TMP_ROOT/selected-resources" >/dev/null
       [[ -d "$TMP_ROOT/selected-resources/feipi-report-generate-brief/scripts" ]] || return 1
+      cp "$gen_dir/SKILL.md" "$TMP_ROOT/default-icon-entry.md"
+      sed 's/^icon: code$/icon: not-a-cursor-icon/' "$TMP_ROOT/default-icon-entry.md" > "$gen_dir/SKILL.md"
+      if output="$(bash "$VALIDATE_SCRIPT" "$gen_dir" 2>&1)"; then return 1; fi
+      grep -Fq 'icon 未收录于 Cursor 图标表' <<<"$output" || return 1
+      cp "$TMP_ROOT/default-icon-entry.md" "$gen_dir/SKILL.md"
+      rm "$gen_dir/assets/code.png"
+      if output="$(bash "$VALIDATE_SCRIPT" "$gen_dir" 2>&1)"; then return 1; fi
+      grep -Fq 'icon_small 和 icon_large 的资源缺失' <<<"$output" || return 1
       ;;
     reject-missing-option-value)
       set +e
@@ -184,6 +197,22 @@ run_case() {
     resource-boundary-tests)
       python3 "$SKILL_DIR/tests/test_resources.py"
       ;;
+    host-metadata-tests)
+      python3 "$SKILL_DIR/tests/test_host_metadata.py"
+      python3 "$SKILL_DIR/tests/test_skill_icons.py"
+      ;;
+    installed-validator)
+      local project="$TMP_ROOT/project"
+      mkdir -p "$project"
+      bash "$REPO_ROOT/scripts/install_skills.sh" --dir "$project" --skill feipi-skill-govern >/dev/null
+      local installed="$project/.agents/skills/feipi-skill-govern"
+      [[ -f "$installed/scripts/validate_host_metadata.py" && ! -L "$installed/scripts/validate_host_metadata.py" ]] || return 1
+      (
+        cd "$project"
+        bash "$installed/scripts/validate.sh" "$SKILL_DIR" --require-maintenance >/dev/null
+        python3 "$installed/scripts/skill_icon_catalog.py" search --skill "$SKILL_DIR" 技能治理 >/dev/null
+      )
+      ;;
     migration-and-review-tests)
       python3 "$SKILL_DIR/tests/test_migration_review.py"
       ;;
@@ -221,6 +250,8 @@ for case_name in \
   registry-index \
   portability-checker-tests \
   resource-boundary-tests \
+  host-metadata-tests \
+  installed-validator \
   migration-and-review-tests \
   delivery-and-harness-tests
 do

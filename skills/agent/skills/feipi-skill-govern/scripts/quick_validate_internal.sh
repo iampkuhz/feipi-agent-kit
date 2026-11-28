@@ -79,12 +79,6 @@ if [[ -z "$NAME_VALUE" || -z "$DESC_VALUE" ]]; then
   exit 1
 fi
 
-EXTRA_KEYS="$(printf "%s\n" "$FRONTMATTER" | sed -nE 's/^([a-zA-Z0-9_-]+):.*$/\1/p' | grep -Ev '^(name|description)$' || true)"
-if [[ -n "$EXTRA_KEYS" ]]; then
-  echo "Frontmatter 仅允许 name 与 description，发现额外字段：$(echo "$EXTRA_KEYS" | tr '\n' ' ')" >&2
-  exit 1
-fi
-
 if [[ "$NAME_VALUE" != "$BASE" ]]; then
   echo "name 字段必须与目录名一致：name=$NAME_VALUE, dir=$BASE" >&2
   exit 1

@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""校验源码维护资料和运行资源的边界，不加载第三方依赖。"""
+"""校验 Skill 的宿主图标、源码维护资料和运行资源边界。"""
 
 import argparse
 import os
 from pathlib import Path
 import re
+
+from validate_host_metadata import validate_host_metadata
 
 
 DEVELOPMENT = {"maintenance", "tests", "evals", "node_modules", ".git", "__pycache__"}
@@ -51,10 +53,11 @@ def main():
     parser.add_argument("--require-maintenance", action="store_true")
     args = parser.parse_args()
     try:
+        validate_host_metadata(args.skill)
         validate_resources(args.skill, args.require_maintenance)
     except (OSError, ValueError) as error:
         parser.exit(1, f"[FAIL] {error}\n")
-    print("[PASS] 源码维护资料与运行资源边界通过")
+    print("[PASS] 宿主徽章、图标与资源边界通过")
 
 
 if __name__ == "__main__":
