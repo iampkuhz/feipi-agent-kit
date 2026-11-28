@@ -1,6 +1,6 @@
 ---
 name: feipi-skill-govern
-description: 用于创建、重构或审计 skill，建立功能交付契约并验证用户目标是否实现，同时治理命名、触发、资源与脚本边界；普通业务执行不使用。
+description: 适用于创建、重构或审计 Skill。帮助作者写清何时调用、如何执行和交付什么，并验证实际任务能否得到预期结果。
 disable-model-invocation: false
 icon: shield
 color: purple
@@ -43,7 +43,8 @@ color: purple
 |---|---|
 | 命名、归类、迁移 | [命名](references/naming-conventions.md)、[主题归类](references/skill-classification.md)；按主要对象选择领域和可选子领域，另定普通命名或工作模式命名 |
 | 移植外部 Skill 或更换宿主 | [依赖来源、项目 Reference、跨 Skill 调用和宿主适配](references/migration-policy.md) |
-| 新建、治理历史 Skill 或修改触发和资源 | [调用策略、颜色与图标](references/frontmatter-policy.md)、[开发资料与安装边界](references/development-layout.md)、[仓库约束](references/repo-constraints.md) |
+| 新建、治理历史 Skill 或修改 Description、触发和资源 | [Description、调用策略与徽章](references/frontmatter-policy.md)、[开发资料与安装边界](references/development-layout.md)、[仓库约束](references/repo-constraints.md) |
+| 排查文本开销、跨文档重复或精简后的行为变化 | [文本 Token 对比与查重](references/workflow.md#文本-token-对比) |
 | 新增 Skill、补齐图标、换图或发现新版 Cursor 图标 | [查找、设计与分发 Skill 图标](references/skill-icons.md)。实现时先从用途检索，再选择复用或新绘，绑定后验证 |
 | 更新收口 | [版本与变更记录](references/version-changelog-policy.md)；同日同 skill 只升版一次、合并一条摘要 |
 | 历史规则冲突 | [反模式](references/anti-patterns.md)、[待重审清单](references/reassessment-backlog.md)；旧 action-first 结论重新评审 |

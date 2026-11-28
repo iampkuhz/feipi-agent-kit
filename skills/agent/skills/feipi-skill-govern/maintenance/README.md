@@ -10,6 +10,7 @@
 | 阶段功能契约、重构退出、模块拆分与消费者 | `../references/governance-process.md` |
 | 正式交接记录与输入绑定 | `../references/governance-artifacts.md`、`../templates/governance-record.template.json`、`../scripts/check_delivery.py` |
 | 技术、语义、链路验证及失败定位 | `../references/workflow.md`、`../references/quality-checklist.md` |
+| 通用 Token 计数与迁移分组调用 | `../references/workflow.md`、`../scripts/count_tokens.py`、`../scripts/count_review_tokens.py` |
 | 新建 Skill 与维护资料模板 | `../scripts/init_skill*.sh`、`../templates/`；默认图来自仓库图库 |
 | 正式校验入口和结构 | `../scripts/validate.sh` |
 | Python 校验入口、维护资料和运行资源边界 | `../scripts/validate_resources.py`、`../tests/test_resources.py` |

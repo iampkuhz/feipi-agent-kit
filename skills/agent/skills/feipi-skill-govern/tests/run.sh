@@ -248,6 +248,7 @@ PYTEST
       ;;
     migration-and-review-tests)
       python3 "$SKILL_DIR/tests/test_migration_review.py"
+      python3 "$SKILL_DIR/tests/test_token_counts.py"
       ;;
     delivery-and-harness-tests)
       python3 "$SKILL_DIR/tests/test_delivery.py"

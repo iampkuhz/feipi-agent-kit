@@ -223,7 +223,7 @@ for name in README terminology; do
 done
 
 TITLE="${SKILL_NAME}（待补中文名）"
-DESCRIPTION="用于处理对应领域任务并输出可验证结果；在用户提出匹配场景需求时使用。"
+DESCRIPTION="待补写实际适用任务、用户能得到的结果和调用条件。"
 DISABLE_MODEL_INVOCATION=false
 ALLOW_IMPLICIT_INVOCATION=true
 if [[ "$SKILL_NAME" == *-mode ]]; then
