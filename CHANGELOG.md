@@ -2,7 +2,7 @@
 
 ## 2026-11-28
 
-- feipi-skill-govern v11：目录索引、分段审阅、宿主校验与显式选图
+- feipi-skill-govern v11：目录索引、分段审阅、宿主校验、选图与显示验收
 - feipi-plantuml-generate-diagram v16：扩展元数据、调用策略与图标
 - feipi-video-read-url v21：扩展元数据、调用策略与图标
 - feipi-xiaohongshu-read-note v6：适配跨技能定位、调用策略与图标

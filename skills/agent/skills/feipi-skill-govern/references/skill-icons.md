@@ -17,6 +17,17 @@ python3 scripts/skill_icon_catalog.py bind "$target_skill" --cursor cross-medica
 bash scripts/validate.sh "$target_skill" --require-maintenance
 ```
 
+## Codex 桌面端显示验收
+
+在 macOS 桌面版 `26.1120.50957` 已实测本地 Skill 的自定义图标。打开 **Settings → Plugins → Skills**，点击右上角 **Browse directory**，在目录的 **Skills** 中搜索已安装的目标，查看卡片左侧是否显示选定的 PNG。也可通过 `codex://skills` 打开 Skills。验收记录应注明客户端版本和实际查看的入口。 [OpenAI 桌面端入口](https://learn.chatgpt.com/docs/app/commands#skills)
+
+该版本在以下两处为本地 Skill 统一显示通用方块图标。
+
+- **Settings → Plugins → Skills** 的启用开关列表。
+- 聊天输入框的 **`$` Skill 选择器**中标记为 **Local file** 的条目。
+
+这两处由客户端决定图标，不读取 `agents/openai.yaml` 的 `interface.icon_small` 和 `interface.icon_large`。出现方块时使用目录卡片验收；更换 PNG 或重新安装无法改变这两处的显示。
+
 ## 发现 Cursor 新图标
 
 收到换图需求且现有候选不足、或仓库准备支持新版本时，检查目标版本的真实安装包。可以使用已安装应用、应用资源目录或官方安装 ZIP。从 Homebrew 下载时可用 `brew fetch --cask cursor`，再用 `brew --cache --cask cursor` 定位下载包。该检索只读取安装包。
