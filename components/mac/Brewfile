@@ -42,6 +42,8 @@ brew "pdf2svg"
 brew "imagemagick"
 # 技能的 PDF 文本/页面处理和 Graphviz 渲染需要真实命令入口。
 brew "poppler"
+# 转换 Markdown 与 Word，并为浏览器导出 PDF 生成独立 HTML。
+brew "pandoc"
 # LibreOffice 自带 Fontconfig 的默认路径未覆盖 Apple Silicon Homebrew；显式提供字体配置。
 brew "fontconfig"
 brew "graphviz"

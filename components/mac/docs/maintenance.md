@@ -63,6 +63,21 @@ oh-my-zsh upgrade 只允许干净仓库 `git pull --ff-only`。Neovim 主动升�
 使用非默认 NVM_DIR、CARGO_HOME、ZSH 等目录时，需要让后续终端保持相同配置；不能只在某次安装临时指定。
 不会从旧机恢复全部 pip/npm 包。Homebrew JDK 的注册与 PATH 按对应 `brew info` 提示处理。
 
+## Markdown 文档转换
+
+`./workbench install mac` 从共享 Homebrew 清单安装 Pandoc。已有环境可单独执行 `brew install pandoc`，再用 `pandoc --version` 检查。
+IntelliJ IDEA 在 **Tools → Markdown → Configure Pandoc…** 中配置 Word 导入和导出。手动配置时使用 `$(brew --prefix pandoc)/bin/pandoc` 的展开路径。
+
+导出带 GitHub Alerts 的 PDF 时，先生成独立 HTML，再用 Chrome 打印为 PDF。`gfm+alerts` 会识别 `[!NOTE]`、`[!TIP]` 等标记。
+
+```bash
+pandoc --from=gfm+alerts --standalone --embed-resources \
+  --metadata title="文档标题" README.md -o README.html
+open -a "Google Chrome" README.html
+```
+
+有文档样式表时，可给 Pandoc 加 `--css=样式文件.css`，样式会随 HTML 一起封装。Chrome 使用桌面应用清单中的安装，打开 HTML 后按 `⌘P` 并选择「另存为 PDF」。
+
 ## 桌面与开发验证
 
 桌面仅限 HHKB/Karabiner 和 iTerm2。Brewfile.local 可选 iterm2、karabiner-elements、font-jetbrains-mono-nerd-font。
