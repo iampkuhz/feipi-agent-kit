@@ -1,6 +1,7 @@
 ---
 name: feipi-techreport-ppt-skill
 description: 用于将中文技术材料重构成 CTO、技术负责人和管理层可读的技术汇报 PPT；负责确定性叙事、布局、组件、设计令牌和质量门禁。若只需普通 PPT 编辑、读取或模板操作，应使用 Presentations skill。
+disable-model-invocation: false
 icon: display-play
 color: orange
 ---

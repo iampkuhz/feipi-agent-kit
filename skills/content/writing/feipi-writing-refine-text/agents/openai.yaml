@@ -5,3 +5,6 @@ interface:
   icon_small: "./assets/writing-refine-text.png"
   icon_large: "./assets/writing-refine-text.png"
   default_prompt: "用 $feipi-writing-refine-text 处理这份文稿或对话材料，先确定阅读或回应目的，再精炼内容与表达。由 AI 完成验收；有原稿时交付正文及问题清单，仅凭对话和要点拟回复时说明必要依据与缺口。明确只要正文时仅给可用文本。"
+
+policy:
+  allow_implicit_invocation: true

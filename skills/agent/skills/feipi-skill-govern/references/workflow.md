@@ -65,6 +65,8 @@ python3 scripts/check_migration.py "$manifest" --source-root "$source_root" \
 
 迁移清单的 `upstream_revision` 填完整 Git SHA。`skills` 每项记录唯一 Feipi Skill ID（`name`）和目标仓库相对目录（`path`）。正式入库时追加 `--registered`，与现有 Registry 的名称、目录和入口核对。隔离安装在平铺安装根下按 `<skill-id>/SKILL.md` 核对入口和 frontmatter 的 ID。
 
+迁移保留元数据时，在对应 Skill 填 `frontmatter.source`（固定上游入口路径）和 `frontmatter.adapted`（明确改写的上游字段）。其余字段按原序列化值核对，从源码到隔离安装包保持一致。
+
 每条 `dependencies` 包含 `id`、`caller`（Skill ID）、`source`（固定上游相对路径和 `#L行号`）、`kind`、`behavior`、`disposition`、`target`、`missing`、`verification`。处理方式用 `reuse / port / adapt / blocked`。依赖类型与目标的关系如下：
 
 | 类型 | 目标 |

@@ -488,7 +488,7 @@ def validate_installation(skills: list[Path]) -> None:
         run_installer(["--dir", str(project)], env)
         assert_installed_tree(project / ".agents/skills", skills, link_mode=False)
 
-        for agent, directory in (("cursor", ".cursor"),):
+        for agent, directory in (("claudecode", ".claude"), ("cursor", ".cursor")):
             run_installer(["--agent", agent, "--dir", str(project)], env)
             assert_installed_tree(project / directory / "skills", skills, link_mode=False)
 

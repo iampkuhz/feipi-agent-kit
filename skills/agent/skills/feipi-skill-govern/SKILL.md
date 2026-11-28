@@ -1,6 +1,7 @@
 ---
 name: feipi-skill-govern
 description: 用于创建、重构或审计 skill，建立功能交付契约并验证用户目标是否实现，同时治理命名、触发、资源与脚本边界；普通业务执行不使用。
+disable-model-invocation: false
 icon: shield
 color: purple
 ---
@@ -28,6 +29,7 @@ color: purple
 
 - 每个独立业务功能说明输入、规约、交付内容、消费者、完成条件和失败结果；简单功能可就地说明，不为凑目录拆文件。
 - 新建模块或脚本前说明独立职责或真实复用场景；短小逻辑优先留在现有模块。拆分导致文件数量或维护面增长时记录必要性及实际受益者。
+- 共享入口面向已加载它的执行者。宿主专用启动命令及本 Skill 自调用放在真正消费它的客户端配置或用户文档；跨 Skill 仍使用准确 ID。迁移中文按 [入口与迁移中文](references/entry-writing.md) 做上下文和语义复核。
 - 总入口负责选择功能和编排调用；运行规约在对应 `references/`，源码维护入口只记录职责及依赖地图，不复制运行规则。
 - `scripts/` 只放正式流程会调用、随安装提供的运行程序。仅供测试的辅助程序、生成器与 fixture 放 `tests/`；入口及脚本调用链所需资源不得藏在被打包排除的目录。确认实现确已废弃后，才连同专属测试一起删除；仍有用的测试不得为清理脚本而删。
 - 校验资源归位时沿总入口、被调用脚本和引用逐层追踪：确认正式入口所需资源存在且会被打包，开发资料不会成为运行依赖。静态检查只覆盖可确定的引用事实，动态调用和语义用途须人工核对。
@@ -39,9 +41,9 @@ color: purple
 
 | 情况 | 读取 |
 |---|---|
-| 命名、归类、迁移 | [命名](references/naming-conventions.md)、[主题归类](references/skill-classification.md)；按主要对象选择领域和可选子领域，再确定 Skill ID |
+| 命名、归类、迁移 | [命名](references/naming-conventions.md)、[主题归类](references/skill-classification.md)；按主要对象选择领域和可选子领域，另定普通命名或工作模式命名 |
 | 移植外部 Skill 或更换宿主 | [依赖来源、项目 Reference、跨 Skill 调用和宿主适配](references/migration-policy.md) |
-| 新建或修改资源布局 | [开发资料与安装边界](references/development-layout.md)、[仓库约束](references/repo-constraints.md)、[frontmatter](references/frontmatter-policy.md) |
+| 新建、治理历史 Skill 或修改触发和资源 | [调用策略、颜色与图标](references/frontmatter-policy.md)、[开发资料与安装边界](references/development-layout.md)、[仓库约束](references/repo-constraints.md) |
 | 新增 Skill、补齐图标、换图或发现新版 Cursor 图标 | [查找、设计与分发 Skill 图标](references/skill-icons.md)。实现时先从用途检索，再选择复用或新绘，绑定后验证 |
 | 更新收口 | [版本与变更记录](references/version-changelog-policy.md)；同日同 skill 只升版一次、合并一条摘要 |
 | 历史规则冲突 | [反模式](references/anti-patterns.md)、[待重审清单](references/reassessment-backlog.md)；旧 action-first 结论重新评审 |
@@ -59,8 +61,8 @@ bash tests/run.sh
 ```
 
 - `init_skill.sh` 生成待完善的脚手架，不代表业务功能已可用。
-- 初始化生成默认颜色和图标资源。其他资源目录在有文件或调用方明确指定时创建。
-- `validate.sh` 校验结构、徽章及图标资源；`check_portability.py` 静态扫描脚本和测试，不能证明已在双平台实测。
+- 初始化为普通 Skill 配置自动匹配，为工作模式配置显式调用，并生成默认颜色和图标资源。其他资源目录在有文件或调用方明确指定时创建。
+- `validate.sh` 校验结构、双端调用策略、徽章及图标资源；`check_portability.py` 静态扫描脚本和测试，不能证明已在双平台实测。
 - `tests/run.sh` 是治理 Skill 的确定性回归入口。治理目标的行为评估按其实际能力设计，不能用治理自测替代。
 - `scripts/check_delivery.py` 按治理记录契约检查交接完整性；只报告技术检查结果。
 

@@ -224,10 +224,17 @@ done
 
 TITLE="${SKILL_NAME}（待补中文名）"
 DESCRIPTION="用于处理对应领域任务并输出可验证结果；在用户提出匹配场景需求时使用。"
+DISABLE_MODEL_INVOCATION=false
+ALLOW_IMPLICIT_INVOCATION=true
+if [[ "$SKILL_NAME" == *-mode ]]; then
+  DISABLE_MODEL_INVOCATION=true
+  ALLOW_IMPLICIT_INVOCATION=false
+fi
 
 sed \
   -e "s/{{SKILL_NAME}}/$SKILL_NAME/g" \
   -e "s/{{SKILL_DESCRIPTION}}/$DESCRIPTION/g" \
+  -e "s/{{DISABLE_MODEL_INVOCATION}}/$DISABLE_MODEL_INVOCATION/g" \
   -e "s/{{TITLE}}/$TITLE/g" \
   "$TEMPLATES_ROOT/SKILL.template.md" > "$ROOT_DIR/SKILL.md"
 
@@ -239,6 +246,7 @@ sed \
   -e "s/{{DISPLAY_NAME}}/$DISPLAY_NAME/g" \
   -e "s/{{SHORT_DESCRIPTION}}/$SHORT_DESCRIPTION/g" \
   -e "s/{{DEFAULT_PROMPT}}/$DEFAULT_PROMPT/g" \
+  -e "s/{{ALLOW_IMPLICIT_INVOCATION}}/$ALLOW_IMPLICIT_INVOCATION/g" \
   "$TEMPLATES_ROOT/openai.template.yaml" > "$ROOT_DIR/agents/openai.yaml"
 
 for r in scripts references assets; do
@@ -253,4 +261,4 @@ sed \
 chmod +x "$ROOT_DIR/tests/run.sh"
 
 echo "已初始化: $(relative_display_path "$ROOT_DIR")"
-echo "这是待完善的脚手架；请核对颜色与图标，并补齐功能规约、业务案例与实际验证。"
+echo "这是待完善的脚手架；请核对调用策略、颜色与图标，并补齐功能规约、业务案例与实际验证。"

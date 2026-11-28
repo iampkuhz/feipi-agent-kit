@@ -5,3 +5,6 @@ interface:
   icon_small: "./assets/health-maintain-family-records.png"
   icon_large: "./assets/health-maintain-family-records.png"
   default_prompt: "使用 $feipi-health-maintain-family-records，先读取家庭健康资料库规则和相关成员档案，再按我的要求查询或更新资料，保留原件、来源与核验范围。"
+
+policy:
+  allow_implicit_invocation: true

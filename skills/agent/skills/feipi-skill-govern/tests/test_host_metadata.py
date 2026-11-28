@@ -34,6 +34,7 @@ class HostMetadataTests(unittest.TestCase):
         self.entry_text = """---
 name: feipi-example-review-rules
 description: 检查仓库规则。
+disable-model-invocation: false
 icon: shield
 color: purple
 ---
@@ -41,6 +42,8 @@ color: purple
         self.config_text = """interface:
   icon_small: "./assets/code.png"
   icon_large: "./assets/code.png"
+policy:
+  allow_implicit_invocation: true
 """
 
     def validate(self, entry=None, config=None):
@@ -48,8 +51,21 @@ color: purple
         self.config.write_text(self.config_text if config is None else config, encoding="utf-8")
         validate_host_metadata(self.skill)
 
+    def test_both_invocation_policies_and_quoted_color(self):
+        self.validate()
+        self.validate(
+            self.entry_text.replace("disable-model-invocation: false", '"disable-model-invocation": true # 手动'),
+            self.config_text.replace("allow_implicit_invocation: true", "allow_implicit_invocation: false")
+            .replace("interface:", 'interface: # 展示\n  brand_color: "#3B82F6" # 主题色'),
+        )
+
     def test_invalid_shared_fields(self):
         for field, current, replacement in (
+            ("disable-model-invocation", "false", ""),
+            ("disable-model-invocation", "false", '"false"'),
+            ("disable-model-invocation", "false", "yes"),
+            ("disable-model-invocation", "false", "false\n  continued"),
+            ("disable-model-invocation", "false", "false\ndisable-model-invocation: true"),
             ("color", "purple", ""),
             ("color", "purple", "ultraviolet"),
             ("icon", "shield", "unknown-icon"),
@@ -62,6 +78,11 @@ color: purple
 
     def test_invalid_codex_metadata(self):
         for current, replacement, error in (
+            ("policy:\n  allow_implicit_invocation: true", "", "policy"),
+            ("allow_implicit_invocation: true", 'allow_implicit_invocation: "true"', "YAML 布尔值"),
+            ("allow_implicit_invocation: true", "allow_implicit_invocation: false", "互为相反"),
+            ("allow_implicit_invocation: true", "allow_implicit_invocation: true\n  allow_implicit_invocation: false",
+             "必须有且只有一个"),
             ("interface:", 'interface:\n  brand_color: "purple"', "brand_color"),
             ('icon_small: "./assets/code.png"', 'icon_small: "./assets/small.png"', "须引用同一个"),
         ):
@@ -92,6 +113,13 @@ color: purple
                 self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
                 self.assertIn(source, result.stderr)
                 self.assertIn(field, result.stderr)
+
+    def test_mode_requires_manual_invocation(self):
+        mode = self.skill.with_name("feipi-engineering-collaborate-mode")
+        self.validate()
+        self.skill.rename(mode)
+        with self.assertRaisesRegex(ValueError, "工作模式须声明"):
+            validate_host_metadata(mode)
 
     def test_source_requires_portable_catalog_binding(self):
         self.validate()
@@ -146,6 +174,14 @@ color: purple
         self.assertTrue(icon.is_symlink())
         self.assertEqual(icon.resolve(), (library / "code.png").resolve())
         validate_host_metadata(created)
+
+    def test_manual_skill_retains_user_invocation_in_claude(self):
+        entry = self.entry_text.replace("disable-model-invocation: false",
+                                        "disable-model-invocation: true\nuser-invocable: false")
+        config = self.config_text.replace("allow_implicit_invocation: true", "allow_implicit_invocation: false")
+        with self.assertRaisesRegex(ValueError, "user-invocable: true"):
+            self.validate(entry, config)
+
 
 if __name__ == "__main__":
     unittest.main()

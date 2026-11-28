@@ -5,3 +5,6 @@ interface:
   icon_small: "./assets/xiaohongshu-read-note.png"
   icon_large: "./assets/xiaohongshu-read-note.png"
   default_prompt: "请使用 $feipi-xiaohongshu-read-note 将笔记提取到调用方指定目录，逐图读取并登记 OCR 与视觉观察，依据独立来源生成摘要；按同级视频 skill 的摘要覆盖复核指引保留比较、建议、理由及适用条件，生成逐项清单并核对引用；明确登录、缺失、失败和未读状态。"
+
+policy:
+  allow_implicit_invocation: true

@@ -59,47 +59,56 @@ if [[ ! -f "$SKILL_FILE" ]]; then
   exit 1
 fi
 
-FRONTMATTER="$(awk '
-  NR==1 && $0=="---" { in_yaml=1; start=1; next }
-  in_yaml && $0=="---" { end=1; in_yaml=0; exit }
-  in_yaml { print }
-  END {
-    if (start!=1 || end!=1) exit 2
-  }
-' "$SKILL_FILE")" || {
-  echo "Frontmatter 必须以 --- 开始并以 --- 结束" >&2
-  exit 1
-}
-
-NAME_VALUE="$(printf "%s\n" "$FRONTMATTER" | sed -nE 's/^name:[[:space:]]*(.+)[[:space:]]*$/\1/p' | head -n1)"
-DESC_VALUE="$(printf "%s\n" "$FRONTMATTER" | sed -nE 's/^description:[[:space:]]*(.+)[[:space:]]*$/\1/p' | head -n1)"
-
-if [[ -z "$NAME_VALUE" || -z "$DESC_VALUE" ]]; then
-  echo "Frontmatter 必须包含非空的 name 与 description" >&2
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "缺少依赖：python3（用于入口、可移植路径与平台检查）" >&2
   exit 1
 fi
 
-if [[ "$NAME_VALUE" != "$BASE" ]]; then
-  echo "name 字段必须与目录名一致：name=$NAME_VALUE, dir=$BASE" >&2
-  exit 1
-fi
+python3 - "$SKILL_FILE" "$BASE" <<'PYTHON'
+from pathlib import Path
+import re
+import sys
 
-validate_skill_name "$NAME_VALUE"
+entry = Path(sys.argv[1])
+name = sys.argv[2]
+lines = entry.read_text(encoding="utf-8").splitlines()
+if not lines or lines[0] != "---" or "---" not in lines[1:]:
+    sys.exit("Frontmatter 必须以 --- 开始并以 --- 结束")
+end = lines.index("---", 1)
+fields = {}
+for line in lines[1:end]:
+    key, _, value = line.partition(":")
+    if key not in {"name", "description"}:
+        continue
+    if key in fields:
+        sys.exit(f"Frontmatter 字段重复：{key}")
+    value = value.strip()
+    if len(value) > 1 and value[0] in ("'", '"') and value[0] == value[-1]:
+        value = value[1:-1]
+    fields[key] = value
+if not fields.get("name") or not fields.get("description"):
+    sys.exit("Frontmatter 必须包含非空的 name 与 description")
+if fields["name"] != name:
+    sys.exit(f"name 字段必须与目录名一致：name={fields['name']}, dir={name}")
+description = fields["description"]
+if re.search(r"<[^>]+>", description):
+    sys.exit("description 不能包含 XML 标签")
+if len(description) > 1024:
+    sys.exit("description 长度不能超过 1024 字符")
+if re.search(r"(我 | 我们 | 你 | 您)", description):
+    sys.exit("description 建议使用第三人称，避免“我/我们/你/您”")
 
-if printf "%s" "$NAME_VALUE" | grep -Eq '<[^>]+>'; then
-  echo "name 不能包含 XML 标签" >&2
-  exit 1
-fi
-
-if printf "%s" "$DESC_VALUE" | grep -Eq '<[^>]+>'; then
-  echo "description 不能包含 XML 标签" >&2
-  exit 1
-fi
-
-if [[ ${#DESC_VALUE} -gt 1024 ]]; then
-  echo "description 长度不能超过 1024 字符" >&2
-  exit 1
-fi
+body = lines[end + 1:]
+if len(body) > 500:
+    sys.exit(f"SKILL.md 正文建议 <= 500 行，当前：{len(body)}")
+# Literal activation syntax is different from a filename, a link, or a bare ID.
+activation = re.compile(rf"(?<![A-Za-z0-9_./$\\-])[$/]{re.escape(name)}(?![A-Za-z0-9_./-])")
+for number, line in enumerate(body, end + 2):
+    if activation.search(line):
+        sys.exit(f"{entry}:{number}：SKILL.md 正文出现本 Skill 的调用命令；入口示例应放在实际宿主配置或面向用户的文档")
+if not any("\u3400" <= char <= "\u9fff" or "\uf900" <= char <= "\ufaff" for char in "\n".join(lines)):
+    sys.exit("SKILL.md 必须包含中文内容（检测不到中文字符）")
+PYTHON
 
 for placeholder in \
   '{{SKILL_NAME}}' \
@@ -114,34 +123,6 @@ do
     exit 1
   fi
 done
-
-if printf "%s" "$DESC_VALUE" | grep -Eq '(我 | 我们 | 你 | 您)'; then
-  echo "description 建议使用第三人称，避免“我/我们/你/您”" >&2
-  exit 1
-fi
-
-BODY_LINES="$(awk '
-  NR==1 && $0=="---" { in_yaml=1; next }
-  in_yaml && $0=="---" { in_yaml=0; body=1; next }
-  body { c++ }
-  END { print c+0 }
-' "$SKILL_FILE")"
-
-if [[ "$BODY_LINES" -gt 500 ]]; then
-  echo "SKILL.md 正文建议 <= 500 行，当前：$BODY_LINES" >&2
-  exit 1
-fi
-
-if ! python3 - "$SKILL_FILE" <<'PY'
-import sys
-text = open(sys.argv[1], encoding="utf-8").read()
-if not any("\u3400" <= char <= "\u9fff" or "\uf900" <= char <= "\ufaff" for char in text):
-    raise SystemExit(1)
-PY
-then
-  echo "SKILL.md 必须包含中文内容（检测不到中文字符）" >&2
-  exit 1
-fi
 
 if ! grep -Eq '验证|校验|测试|验收' "$SKILL_FILE"; then
   echo "SKILL.md 必须包含至少一种验证/校验/测试要求" >&2
@@ -262,10 +243,6 @@ do
   fi
 done
 
-if ! command -v python3 >/dev/null 2>&1; then
-  echo "缺少依赖：python3（用于可移植路径与平台检查）" >&2
-  exit 1
-fi
 python3 "$SCRIPT_DIR/check_portability.py" "$TARGET_DIR"
 
 while IFS= read -r script_path; do

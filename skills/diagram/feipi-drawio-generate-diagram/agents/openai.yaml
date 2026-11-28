@@ -5,3 +5,6 @@ interface:
   icon_small: "./assets/drawio-generate-diagram.png"
   icon_large: "./assets/drawio-generate-diagram.png"
   default_prompt: "请使用 $feipi-drawio-generate-diagram 将需求整理为可编辑 draw.io 图表，通过 Podman 本地渲染与校验后交付图包。"
+
+policy:
+  allow_implicit_invocation: true

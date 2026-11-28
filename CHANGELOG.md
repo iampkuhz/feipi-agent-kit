@@ -2,17 +2,17 @@
 
 ## 2026-11-28
 
-- feipi-skill-govern v11：按主题归类并统一路径索引、双端图标
-- feipi-multica-manage-tasks v8：适配双端图标
-- feipi-interaction-review-output v2：适配双端图标
-- feipi-techreport-ppt-skill v7：适配双端图标
-- feipi-writing-refine-text v5：适配双端图标
-- feipi-drawio-generate-diagram v6：适配双端图标
-- feipi-mermaid-generate-diagram v5：适配双端图标
-- feipi-plantuml-generate-diagram v16：适配双端图标
-- feipi-health-maintain-family-records v2：适配双端图标
-- feipi-xiaohongshu-read-note v6：兼容新源码目录的跨技能定位、双端图标
-- feipi-video-read-url v21：适配双端图标
+- feipi-skill-govern v11：目录索引、分段审阅、宿主校验与显式选图
+- feipi-plantuml-generate-diagram v16：扩展元数据、调用策略与图标
+- feipi-video-read-url v21：扩展元数据、调用策略与图标
+- feipi-xiaohongshu-read-note v6：适配跨技能定位、调用策略与图标
+- feipi-multica-manage-tasks v8：适配调用策略与双端图标
+- feipi-interaction-review-output v2：适配调用策略与双端图标
+- feipi-techreport-ppt-skill v7：适配调用策略与双端图标
+- feipi-writing-refine-text v5：适配调用策略与双端图标
+- feipi-drawio-generate-diagram v6：适配调用策略与双端图标
+- feipi-mermaid-generate-diagram v5：适配调用策略与双端图标
+- feipi-health-maintain-family-records v2：适配调用策略与双端图标
 - 工作台：集中维护 Codex 图标，发布时按 Skill 复制
 
 ## 2026-11-27

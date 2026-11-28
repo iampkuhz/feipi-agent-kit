@@ -1,6 +1,7 @@
 ---
 name: feipi-health-maintain-family-records
 description: 维护本地家庭健康资料库，整理成员体检与就医报告、健康事件、问题跟踪及偶尔测量的数据；用户要求归档健康材料、更新家人健康进展、查询既往检查或通过 /health 操作时使用。普通育儿日记、通用医学问答和资料库结构设计讨论不自动触发写入。
+disable-model-invocation: false
 icon: cross-medical
 color: green
 ---

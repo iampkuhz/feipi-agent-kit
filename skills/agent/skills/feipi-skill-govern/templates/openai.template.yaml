@@ -5,3 +5,6 @@ interface:
   icon_small: "./assets/code.png"
   icon_large: "./assets/code.png"
   default_prompt: "{{DEFAULT_PROMPT}}"
+
+policy:
+  allow_implicit_invocation: {{ALLOW_IMPLICIT_INVOCATION}}

@@ -5,3 +5,6 @@ interface:
   icon_small: "./assets/plantuml-generate-diagram.png"
   icon_large: "./assets/plantuml-generate-diagram.png"
   default_prompt: "使用 $feipi-plantuml-generate-diagram 生成并验证图包。mindmap 单图优先调用 run_mindmap.py，内部完成预检、生成、校验与预览，再查看图片并交付；其他图型沿用按 profile 的执行流程。"
+
+policy:
+  allow_implicit_invocation: true

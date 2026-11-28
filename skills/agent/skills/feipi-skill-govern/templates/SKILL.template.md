@@ -1,6 +1,7 @@
 ---
 name: {{SKILL_NAME}}
 description: {{SKILL_DESCRIPTION}}
+disable-model-invocation: {{DISABLE_MODEL_INVOCATION}}
 icon: code
 color: default
 ---

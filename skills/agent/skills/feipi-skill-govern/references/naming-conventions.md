@@ -10,6 +10,8 @@ feipi-<domain>-<action>-<object...>
 
 保留 `feipi-skill-govern` 的历史特例和本版搬迁 Skill 的实际调用 ID。新建时使用现行规则，已有调用者不因目录调整而改名。
 
+显式进入、约束当前会话协作并根据任务选择内部路线的工作模式使用 `feipi-<领域>-<模式名>-mode`。例如 `feipi-engineering-feiteto-mode`。模式名称标识可辨识的协作方式。普通 Skill 继续使用动作与对象命名。
+
 ## 四段含义
 
 1. `feipi`

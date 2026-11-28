@@ -52,6 +52,39 @@ class MigrationReviewTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "安装入口"):
             self.inspect()
 
+    def test_preserves_upstream_frontmatter_values_on_real_migration_path(self):
+        original = self.upstream / "SKILL.md"
+        source = self.root / self.skills[0]["path"] / "SKILL.md"
+        installed = self.install / self.caller / "SKILL.md"
+        metadata = (
+            'disable-model-invocation: true\nicon: crown\ncolor: yellow\nmetadata:\n  size: 2\n'
+            'hint: |-\n  before\n\n  # literal text\n  after\n'
+        )
+        original.write_text(f"---\nname: upstream\ndescription: Original\n{metadata}---\n")
+        candidate = source.read_text().replace("\n---\n", "\n" + metadata + "---\n", 1)
+        source.write_text(candidate)
+        installed.write_text(candidate)
+        self.skills[0]["frontmatter"] = {"source": "SKILL.md", "adapted": ["name", "description"]}
+        self.assertIn("driver", self.inspect())
+        for old, new in (
+            ("disable-model-invocation: true", 'disable-model-invocation: "true"'),
+            ("icon: crown\n", ""),
+            ("color: yellow", "color: green"),
+            ("size: 2", 'size: "2"'),
+            ("  before\n\n", "  before\n"),
+            ("  # literal text\n", ""),
+        ):
+            with self.subTest(old=old, new=new):
+                changed = candidate.replace(old, new)
+                source.write_text(changed)
+                installed.write_text(changed)
+                with self.assertRaisesRegex(ValueError, "未原样保留上游 Frontmatter"):
+                    self.inspect()
+        source.write_text(candidate)
+        installed.write_text(candidate.replace("icon: crown\n", ""))
+        with self.assertRaisesRegex(ValueError, "安装包 Frontmatter"):
+            self.inspect()
+
     def test_cycle_and_unknown_project_reference(self):
         self.manifest["dependencies"].append(
             dict(self.dep, id="back", caller=self.target, target=self.caller))

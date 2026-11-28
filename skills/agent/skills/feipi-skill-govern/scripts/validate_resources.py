@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""校验 Skill 的宿主图标、源码维护资料和运行资源边界。"""
+"""校验 Skill 的宿主元数据、源码维护资料和运行资源边界。"""
 
 import argparse
 import os
@@ -57,7 +57,7 @@ def main():
         validate_resources(args.skill, args.require_maintenance)
     except (OSError, ValueError) as error:
         parser.exit(1, f"[FAIL] {error}\n")
-    print("[PASS] 宿主徽章、图标与资源边界通过")
+    print("[PASS] 宿主调用策略、徽章、图标与资源边界通过")
 
 
 if __name__ == "__main__":

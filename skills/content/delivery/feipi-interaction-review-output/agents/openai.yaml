@@ -5,3 +5,6 @@ interface:
   icon_small: "./assets/interaction-review-output.png"
   icon_large: "./assets/interaction-review-output.png"
   default_prompt: "用 $feipi-interaction-review-output 审查这份交付在目标渠道中是否可读、可查看、可操作；反馈具体问题和修正要求。作为汇报前自检时先修订复审，只展示可用正文和实质未解决项。"
+
+policy:
+  allow_implicit_invocation: true

@@ -1,6 +1,7 @@
 ---
 name: feipi-multica-manage-tasks
 description: 用官方 multica CLI 管理项目、资源和 Issue，查询进展、派发 Agent 或发布交付材料。用户要求 Multica 操作，或仓库明确启用任务协作时使用；普通咨询、仅讨论或只生成本地报告不会自动写任务。
+disable-model-invocation: false
 icon: board-kanban
 color: blue
 ---

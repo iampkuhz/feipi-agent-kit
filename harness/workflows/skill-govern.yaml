@@ -32,7 +32,7 @@ workflow:
       required: true
 
     - name: "validate-skill-layout"
-      description: "遍历 registry，校验各 Skill 的颜色、图标、结构与安装包"
+      description: "遍历 registry，校验各 Skill 的调用策略、颜色、图标、结构与安装包"
       script: "scripts/harness/validate_skill_layout.py"
       required: true
 

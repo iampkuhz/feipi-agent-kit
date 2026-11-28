@@ -93,6 +93,8 @@ for placeholder_name in \
   TITLE \
   DISPLAY_NAME \
   SHORT_DESCRIPTION \
+  DISABLE_MODEL_INVOCATION \
+  ALLOW_IMPLICIT_INVOCATION \
   DEFAULT_PROMPT
 do
   placeholders+=("$(printf '%s%s%s' '{{' "$placeholder_name" '}}')")

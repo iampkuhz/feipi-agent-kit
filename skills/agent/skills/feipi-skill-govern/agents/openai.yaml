@@ -5,3 +5,6 @@ interface:
   icon_small: "./assets/skill-govern.png"
   icon_large: "./assets/skill-govern.png"
   default_prompt: "请使用 $feipi-skill-govern 治理目标 skill：从用户目标和失败案例建立功能交付契约，修改所属模块及必要消费者，分别验证技术、Agent 效果和实际链路，交付逐问题结果与未验证项。"
+
+policy:
+  allow_implicit_invocation: true

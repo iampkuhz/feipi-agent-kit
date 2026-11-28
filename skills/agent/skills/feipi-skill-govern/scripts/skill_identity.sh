@@ -23,7 +23,7 @@ validate_skill_name() {
   local tokens=()
   IFS='-' read -r -a tokens <<< "$name"
   if [[ ${#tokens[@]} -lt 4 ]]; then
-    echo "名称须符合 feipi-<domain>-<action>-<object...>：$name" >&2
+    echo "名称须符合 feipi-<domain>-<action>-<object...> 或 feipi-<domain>-<mode-name>-mode：$name" >&2
     return 1
   fi
   domain="${tokens[1]}"
@@ -33,6 +33,7 @@ validate_skill_name() {
       echo "检测到旧 action-first 命名痕迹：$name" >&2
       return 1 ;;
   esac
+  [[ "$name" != *-mode ]] || return 0
   case "$action" in
     web|ops|automate|misc|helper|utils|tools|temp|tmp|skill)
       echo "action 不能使用低语义词：$action" >&2

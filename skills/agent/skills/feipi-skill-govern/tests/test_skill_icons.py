@@ -60,6 +60,22 @@ class SkillIconTests(unittest.TestCase):
         self.assertIn('"icon": cross-medical # keep\ncolor: green\n---\n正文\n', self.entry.read_text())
         self.assertEqual(self.metadata.read_bytes(), old_metadata.replace(b"./assets/code.png", b"./assets/health-card.png"))
 
+    def test_replaces_removed_name_and_recovers_if_a_host_field_is_invalid(self):
+        self.entry.write_text(self.entry.read_text().replace("code # keep", "deleted-icon # keep"))
+        bind(self.skill, "cross-medical", "health-card", "green")
+        old_entry = self.entry.read_bytes()
+        selected = self.icon.parent / "health-card.png"
+        old_icon = os.readlink(selected)
+        self.metadata.write_text(self.metadata.read_text().replace("allow_implicit_invocation: true",
+                                                                  "allow_implicit_invocation: false"))
+        old_metadata = self.metadata.read_bytes()
+        with self.assertRaisesRegex(ValueError, "互为相反"):
+            bind(self.skill, "heart", "code", "red")
+        self.assertEqual(self.entry.read_bytes(), old_entry)
+        self.assertEqual(self.metadata.read_bytes(), old_metadata)
+        self.assertEqual(os.readlink(selected), old_icon)
+        self.assertFalse(self.icon.is_symlink())
+
     def test_codex_pngs_and_semantic_records_stay_in_sync(self):
         (self.library / "health-card.png").unlink()
         with self.assertRaisesRegex(ValueError, "缺图"):

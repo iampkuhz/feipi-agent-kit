@@ -5,3 +5,6 @@ interface:
   icon_small: "./assets/multica-manage-tasks.png"
   icon_large: "./assets/multica-manage-tasks.png"
   default_prompt: "请使用 $feipi-multica-manage-tasks，以官方 CLI 核对身份、工作区、项目和 Issue，按用户意图查询、修改、派发或发布结果。明确项目无需本机运维映射；遵守当前平台的最终评论和线程契约，材料发布与整单状态分开，未知结果先核对再重试。"
+
+policy:
+  allow_implicit_invocation: true

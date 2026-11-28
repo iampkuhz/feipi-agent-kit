@@ -1,6 +1,7 @@
 ---
 name: feipi-plantuml-generate-diagram
 description: PlantUML 唯一作图入口；在用户要求生成架构图、时序图、组件图、活动图、部署图、mindmap 思维导图或其他 PlantUML 图时触发，按图型 brief 生成并校验 diagram package。
+disable-model-invocation: false
 icon: arrows-left-right
 color: green
 ---

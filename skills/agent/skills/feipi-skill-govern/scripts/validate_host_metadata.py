@@ -1,4 +1,4 @@
-"""校验各宿主读取的徽章、图标及其资源。"""
+"""校验各宿主读取的调用策略、徽章、图标及其资源。"""
 
 import os
 from pathlib import Path
@@ -133,5 +133,18 @@ def skill_frontmatter(entry):
 def validate_host_metadata(skill):
     _, frontmatter, _ = skill_frontmatter(skill / "SKILL.md")
     validate_cursor_badge(frontmatter)
+    disabled = scalar_field(frontmatter, 0, "disable-model-invocation", "SKILL.md", boolean=True)
+    if skill.name.endswith("-mode") and not disabled:
+        raise ValueError("工作模式须声明 disable-model-invocation: true")
+    if disabled and scalar_field(frontmatter, 0, "user-invocable", "SKILL.md",
+                                 boolean=True, required=False) is False:
+        raise ValueError("仅手动调用的 Skill 须保留 user-invocable: true")
+
     config = (skill / "agents/openai.yaml").read_text(encoding="utf-8")
+    policy, indent = mapping_field(config, "policy", "agents/openai.yaml")
+    allowed = scalar_field(policy, indent, "allow_implicit_invocation", "agents/openai.yaml policy", boolean=True)
+    if allowed == disabled:
+        raise ValueError("SKILL.md 的 disable-model-invocation 与 agents/openai.yaml 的 "
+                         "policy.allow_implicit_invocation 必须互为相反的布尔值")
+
     validate_codex_interface(skill, config)

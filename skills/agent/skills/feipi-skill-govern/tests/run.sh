@@ -90,6 +90,8 @@ run_case() {
       grep -Fxq '  icon_small: "./assets/code.png"' "$gen_dir/agents/openai.yaml" || return 1
       grep -Fxq 'icon: code' "$gen_dir/SKILL.md" || return 1
       grep -Fxq 'color: default' "$gen_dir/SKILL.md" || return 1
+      grep -Fxq 'disable-model-invocation: false' "$gen_dir/SKILL.md" || return 1
+      grep -Fxq '  allow_implicit_invocation: true' "$gen_dir/agents/openai.yaml" || return 1
       bash "$INIT_SCRIPT" "report-generate-brief" --resources scripts --target "$TMP_ROOT/selected-resources" >/dev/null
       [[ -d "$TMP_ROOT/selected-resources/feipi-report-generate-brief/scripts" ]] || return 1
       cp "$gen_dir/SKILL.md" "$TMP_ROOT/default-icon-entry.md"
@@ -188,6 +190,37 @@ run_case() {
       ! grep -En 'feipi-<action>-<target\.\.\.>|domain-action-object|prefix-domain-action-object' "${normative_files[@]}" || return 1
       ! grep -En 'action 白名单|第二段固定|web：前端与页面|ops：运维与发布|automate：自动化流程' "${normative_files[@]}" || return 1
       ;;
+    entry-frontmatter-and-body)
+      bash "$INIT_SCRIPT" engineering-collaborate-mode --domain engineering --target "$TMP_ROOT/entry" >/dev/null
+      gen_dir="$TMP_ROOT/entry/engineering/feipi-engineering-collaborate-mode"
+      grep -Fxq 'disable-model-invocation: true' "$gen_dir/SKILL.md" || return 1
+      grep -Fxq '  allow_implicit_invocation: false' "$gen_dir/agents/openai.yaml" || return 1
+      bash "$VALIDATE_SCRIPT" "$gen_dir" --require-maintenance >/dev/null || return 1
+      python3 - "$gen_dir/SKILL.md" <<'PYTEST'
+from pathlib import Path
+import sys
+
+entry = Path(sys.argv[1])
+text = entry.read_text()
+keys = 'icon: crown\ncolor: yellow\nmetadata:\n  edition: 2\n'
+body = "\n在已绑定的 Codex 工具中验证真实入口。请使用$feipi-code-review-changes复核。路径 `skills/engineering/feipi-engineering-collaborate-mode/SKILL.md`。\n"
+entry.write_text(text.replace("\nicon: code\ncolor: default\n---\n", "\n" + keys + "---\n", 1) + body)
+PYTEST
+      bash "$VALIDATE_SCRIPT" "$gen_dir" --require-maintenance >/dev/null || return 1
+      cp "$gen_dir/SKILL.md" "$TMP_ROOT/entry-valid.md"
+      for prefix in '$' /; do
+        cp "$TMP_ROOT/entry-valid.md" "$gen_dir/SKILL.md"
+        printf '\n调用 `%sfeipi-engineering-collaborate-mode`。\n' "$prefix" >> "$gen_dir/SKILL.md"
+        code=0
+        output="$(bash "$VALIDATE_SCRIPT" "$gen_dir" 2>&1)" || code=$?
+        [[ "$code" != 0 ]] && grep -Fq '正文出现本 Skill 的调用命令' <<<"$output" || return 1
+      done
+      cp "$TMP_ROOT/entry-valid.md" "$gen_dir/SKILL.md"
+      printf '\n请使用$feipi-engineering-collaborate-mode继续验证。\n' >> "$gen_dir/SKILL.md"
+      code=0
+      output="$(bash "$VALIDATE_SCRIPT" "$gen_dir" 2>&1)" || code=$?
+      [[ "$code" != 0 ]] && grep -Fq '正文出现本 Skill 的调用命令' <<<"$output" || return 1
+      ;;
     registry-index)
       python3 -S "$REPO_ROOT/scripts/harness/validate_registry.py"
       ;;
@@ -247,6 +280,7 @@ for case_name in \
   legacy-rule-scan \
   reject-missing-option-value \
   reject-invalid-domain \
+  entry-frontmatter-and-body \
   registry-index \
   portability-checker-tests \
   resource-boundary-tests \

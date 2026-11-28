@@ -27,7 +27,7 @@
 
 ## Skills
 
-仓库 Skill 随包提供 Cursor Custom Mode 徽章和 Codex 图标。选图和维护方法见[图标素材库](assets/skill-icons/README.md)。
+仓库 Skill 明确声明自动匹配或仅显式调用，并随包提供 Cursor Custom Mode 徽章和 Codex 图标。宿主字段见[治理规范](skills/agent/skills/feipi-skill-govern/references/frontmatter-policy.md#调用策略与宿主适配)。Codex 母版与选图方法见[图标素材库](assets/skill-icons/README.md)。
 
 | Skill | 用途 |
 |-------|------|

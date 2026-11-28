@@ -59,13 +59,49 @@ def check_cycles(graph):
         visit(node, ())
 
 
+def frontmatter_fields(path):
+    lines = path.read_text(encoding="utf-8").splitlines()
+    require(lines and lines[0] == "---" and "---" in lines[1:], f"入口缺少 Frontmatter：{path}")
+    fields = {}
+    key = None
+    for line in lines[1:lines.index("---", 1)]:
+        match = re.fullmatch(r"""(['"]?)([a-zA-Z0-9_.-]+)\1:[ \t]*(.*)""", line)
+        if match:
+            _, key, value = match.groups()
+            require(key not in fields, f"Frontmatter 字段重复：{key} → {path}")
+            fields[key] = [value]
+        elif not line.strip() or line.startswith("#"):
+            if key is not None and not line.startswith("#"):
+                fields[key].append(line)
+        else:
+            # Indented comments and empty lines can be literal block content.
+            require(key is not None and (line[0].isspace() or line == "-" or line.startswith("- ")),
+                    f"无法核对 Frontmatter 字段：{path}")
+            fields[key].append(line)
+    return fields
+
+
 def check_entry(path, name):
-    text = path.read_text(encoding="utf-8")
-    parts = text.split("---", 2)
-    meta = parts[1] if len(parts) == 3 and not parts[0].strip() else ""
-    match = re.search(r"(?m)^name:[ \t]*([^\r\n]+)$", meta)
-    require(match and match[1].strip().strip('"').strip("'") == name,
+    fields = frontmatter_fields(path)
+    value = fields.get("name", [])
+    require(value and not any(row.strip() for row in value[1:]) and value[0].strip().strip('"').strip("'") == name,
             f"入口 Skill ID 不符：{name} → {path}")
+    return fields
+
+
+def check_frontmatter_retention(specification, upstream_root, fields, name):
+    require(isinstance(specification, dict) and upstream_root is not None,
+            f"校验 Frontmatter 沿用需要固定上游目录：{name}")
+    original = file_under(upstream_root, specification.get("source"), "上游 Skill 入口")
+    source_fields = frontmatter_fields(original)
+    adapted = specification.get("adapted", [])
+    require(isinstance(adapted, list) and all(isinstance(key, str) and key in source_fields for key in adapted),
+            f"Frontmatter 改写字段必须来自上游：{name}")
+    # Compare serialized value fragments so that a quoted boolean cannot replace
+    # a boolean, and nested extension structures survive intact without a YAML dependency.
+    for key, value in source_fields.items():
+        if key not in adapted:
+            require(fields.get(key) == value, f"未原样保留上游 Frontmatter 字段：{key} → {name}")
 
 
 def check_runtime_path(line, location):
@@ -142,10 +178,13 @@ def validate(data, source_root, installed_root=None, upstream_root=None, registe
         directory = relative(entry.get("path"), name)
         require(directory.parts[0] == "skills" and directory.name == name,
                 f"源码目录与 Skill ID 不匹配：{directory}")
-        check_entry(file_under(source_root, str(directory / "SKILL.md"), name), name)
+        fields = check_entry(file_under(source_root, str(directory / "SKILL.md"), name), name)
+        if "frontmatter" in entry:
+            check_frontmatter_retention(entry["frontmatter"], upstream_root, fields, name)
         runtime_tree(source_root / directory)
         if installed_root is not None:
-            check_entry(file_under(installed_root, f"{name}/SKILL.md", "安装入口"), name)
+            installed = check_entry(file_under(installed_root, f"{name}/SKILL.md", "安装入口"), name)
+            require(fields == installed, f"安装包 Frontmatter 与共享源码不一致：{name}")
             runtime_tree(installed_root / name, installed=True)
 
     dependencies = indexed(objects(data, "dependencies"), "id")
